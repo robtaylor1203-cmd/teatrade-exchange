@@ -3514,7 +3514,7 @@
         // Initialize Supabase
         const SUPABASE_URL = 'https://uznxzyuknigzlxecjgtb.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6bnh6eXVrbmlnemx4ZWNqZ3RiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5Mzc5ODUsImV4cCI6MjA4NjUxMzk4NX0.BVOTqZ9kn2KCrNeF5675PNmMi9oJN3F6OoUnTtbpuIg';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // Global State
         let currentUser = null;
@@ -3536,7 +3536,7 @@
 
         async function checkAuthState() {
             try {
-                const { data: { user } } = await supabase.auth.getUser();
+                const { data: { user } } = await supabaseClient.auth.getUser();
                 if (user) {
                     currentUser = user;
                     await loadUserProfile();
@@ -3586,7 +3586,7 @@
             errorDiv.classList.remove('visible');
 
             try {
-                const { data, error } = await supabase.auth.signUp({
+                const { data, error } = await supabaseClient.auth.signUp({
                     email,
                     password,
                     options: {
@@ -3628,7 +3628,7 @@
             errorDiv.classList.remove('visible');
 
             try {
-                const { data, error } = await supabase.auth.signInWithPassword({
+                const { data, error } = await supabaseClient.auth.signInWithPassword({
                     email,
                     password
                 });
@@ -3655,7 +3655,7 @@
             if (!confirm('Are you sure you want to log out?')) return;
             
             try {
-                await supabase.auth.signOut();
+                await supabaseClient.auth.signOut();
                 currentUser = null;
                 userProfile = null;
                 positions = [];
