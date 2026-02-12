@@ -1,0 +1,2843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>TeaTrade Exchange | Global Tea Market Terminal</title>
+    <link rel="icon" type="image/png" href="images/favicon-nb.png">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111827;
+            --bg-tertiary: #1a2332;
+            --bg-card: #151d2b;
+            --border: #2d3a4f;
+            --border-light: #374357;
+            --text-primary: #e5e7eb;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            --accent-blue: #1a73e8;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-orange: #f59e0b;
+            --accent-purple: #8b5cf6;
+            --ticker-bg: #0f1419;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Top Bar */
+        .top-bar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 0 20px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--accent-blue);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .logo-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 16px;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-text span {
+            color: var(--accent-blue);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 24px;
+            margin-left: auto;
+            margin-right: 32px;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover, .nav-links a.active {
+            color: var(--text-primary);
+        }
+
+        .user-section {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .market-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-green);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.closed {
+            background: var(--accent-red);
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Ticker Strip */
+        .ticker-strip {
+            background: var(--ticker-bg);
+            border-bottom: 1px solid var(--border);
+            overflow: hidden;
+            height: 36px;
+        }
+
+        .ticker-track {
+            display: flex;
+            animation: scroll 25s linear infinite;
+            height: 100%;
+            align-items: center;
+        }
+
+        @keyframes scroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+
+        .ticker-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 24px;
+            white-space: nowrap;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+        }
+
+        .ticker-symbol {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .ticker-price {
+            color: var(--text-secondary);
+        }
+
+        .ticker-change.up {
+            color: var(--accent-green);
+        }
+
+        .ticker-change.down {
+            color: var(--accent-red);
+        }
+
+        /* Main Grid */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 280px 1fr 320px;
+            gap: 1px;
+            background: var(--border);
+            min-height: calc(100vh - 85px);
+        }
+
+        .main-grid > * {
+            min-height: 100%;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: var(--bg-secondary);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .sidebar-section:last-child {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        .sidebar-section {
+            margin-bottom: 24px;
+        }
+
+        .sidebar-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .watchlist-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            background: var(--bg-card);
+            border-radius: 6px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .watchlist-item:hover {
+            border-color: var(--border-light);
+            background: var(--bg-tertiary);
+        }
+
+        .watchlist-name {
+            font-weight: 500;
+            font-size: 13px;
+        }
+
+        .watchlist-grade {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .watchlist-price {
+            text-align: right;
+        }
+
+        .watchlist-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .watchlist-change {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+        }
+
+        .up { color: var(--accent-green); }
+        .down { color: var(--accent-red); }
+
+        /* IB Chat Section */
+        .chat-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            border-top: 1px solid var(--border);
+            margin-top: 16px;
+        }
+        
+        .chat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 8px;
+        }
+        
+        .chat-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .chat-online {
+            font-size: 10px;
+            color: var(--accent-green);
+            font-weight: 400;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-light) var(--bg-tertiary);
+            padding-right: 4px;
+        }
+        
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: var(--border-light);
+            border-radius: 3px;
+        }
+        
+        .chat-message {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .chat-message:last-child {
+            border-bottom: none;
+        }
+        
+        .chat-message-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+        
+        .chat-sender {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent-blue);
+        }
+        
+        .chat-sender.system {
+            color: var(--accent-orange);
+        }
+        
+        .chat-time {
+            font-size: 10px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .chat-text {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+        
+        .chat-input-container {
+            margin-top: 8px;
+            padding-right: 6px;
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        
+        .chat-input {
+            flex: 1;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0 10px;
+            height: 28px;
+            font-size: 12px;
+            color: var(--text-primary);
+            outline: none;
+            box-sizing: border-box;
+            max-width: calc(100% - 80px);
+        }
+        
+        .chat-input:focus {
+            border-color: var(--accent-blue);
+        }
+        
+        .chat-input::placeholder {
+            color: var(--text-muted);
+        }
+        
+        .chat-send {
+            background: var(--accent-blue);
+            border: none;
+            border-radius: 4px;
+            padding: 0 12px;
+            height: 28px;
+            cursor: pointer;
+            color: white;
+            font-size: 11px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            box-sizing: border-box;
+        }
+        
+        .chat-send:hover {
+            background: #1557b0;
+        }
+        
+        .chat-blast {
+            background: var(--accent-orange);
+            border: none;
+            border-radius: 4px;
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            cursor: pointer;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-sizing: border-box;
+        }
+        
+        .chat-blast svg {
+            width: 14px;
+            height: 14px;
+        }
+        
+        .chat-blast:hover {
+            background: #d97706;
+        }
+
+        /* Center Content */
+        .center-content {
+            background: var(--bg-primary);
+            display: flex;
+            flex-direction: column;
+            min-height: 100%;
+        }
+
+        /* Chart Section */
+        .chart-section {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .chart-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .chart-title h2 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .chart-badge {
+            padding: 4px 10px;
+            background: var(--accent-blue);
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .chart-stats {
+            display: flex;
+            gap: 32px;
+            margin-top: 8px;
+        }
+
+        .chart-stat {
+            text-align: left;
+        }
+
+        .chart-stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .chart-stat-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .chart-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .chart-btn {
+            padding: 6px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .chart-btn:hover, .chart-btn.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
+        }
+
+        .chart-type-toggle {
+            display: flex;
+            gap: 4px;
+            margin-left: 16px;
+            padding-left: 16px;
+            border-left: 1px solid var(--border);
+        }
+
+        .chart-type-btn {
+            padding: 6px 10px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .chart-type-btn:hover, .chart-type-btn.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
+        }
+
+        .chart-type-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .chart-container {
+            height: 280px;
+            background: var(--bg-card);
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chart-canvas {
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        .chart-tooltip {
+            position: absolute;
+            background: rgba(17, 24, 39, 0.95);
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-size: 11px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+            z-index: 10;
+            min-width: 160px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .chart-tooltip.visible {
+            opacity: 1;
+        }
+
+        .tooltip-date {
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tooltip-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 2px 0;
+        }
+
+        .tooltip-label {
+            color: var(--text-muted);
+        }
+
+        .tooltip-value {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-primary);
+        }
+
+        .tooltip-value.up { color: var(--accent-green); }
+        .tooltip-value.down { color: var(--accent-red); }
+
+        .chart-crosshair {
+            position: absolute;
+            pointer-events: none;
+            display: none;
+        }
+
+        .crosshair-v {
+            position: absolute;
+            width: 1px;
+            background: rgba(255,255,255,0.2);
+            top: 0;
+            bottom: 0;
+        }
+
+        .crosshair-h {
+            position: absolute;
+            height: 1px;
+            background: rgba(255,255,255,0.2);
+            left: 0;
+            right: 0;
+        }
+
+        /* Auction Data Grid */
+        .auction-section {
+            flex: 1;
+            padding: 20px;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .auction-section .table-container {
+            flex: 1;
+        }
+        
+        /* Order History Section */
+        .order-history-section {
+            padding: 20px;
+            border-top: 1px solid var(--border);
+            background: var(--bg-secondary);
+        }
+        
+        .order-history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        .order-history-title {
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .order-count {
+            background: var(--accent-blue);
+            color: white;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+        
+        .order-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        
+        .order-table th {
+            text-align: left;
+            padding: 8px 12px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+        }
+        
+        .order-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-primary);
+        }
+        
+        .order-table tr:hover {
+            background: var(--bg-card);
+        }
+        
+        .order-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .order-table .order-price {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+        }
+        
+        .order-table .order-qty {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-secondary);
+        }
+        
+        .order-status {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        
+        .order-status.filled {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+        }
+        
+        .order-status.pending {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--accent-orange);
+        }
+        
+        .order-status.partial {
+            background: rgba(26, 115, 232, 0.15);
+            color: var(--accent-blue);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .section-filters {
+            display: flex;
+            gap: 8px;
+        }
+
+        .filter-btn {
+            padding: 5px 10px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        .filter-btn.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .data-table th {
+            text-align: left;
+            padding: 10px 12px;
+            background: var(--bg-secondary);
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+        }
+
+        .data-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .data-table tr:hover td {
+            background: var(--bg-tertiary);
+        }
+
+        .grade-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            font-size: 12px;
+            padding: 3px 8px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .auction-center {
+            color: var(--accent-blue);
+            font-weight: 500;
+        }
+
+        .price-cell {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+        }
+
+        .volume-bar {
+            height: 4px;
+            background: var(--bg-tertiary);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .volume-fill {
+            height: 100%;
+            background: var(--accent-blue);
+            border-radius: 2px;
+        }
+
+        /* Right Panel */
+        .right-panel {
+            background: var(--bg-secondary);
+            display: flex;
+            flex-direction: column;
+            min-height: 100%;
+        }
+
+        .panel-section {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .panel-section:last-child {
+            flex: 1;
+            border-bottom: none;
+        }
+
+        .panel-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .live-badge {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: var(--accent-green);
+            font-size: 10px;
+        }
+
+        .live-badge::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: var(--accent-green);
+            border-radius: 50%;
+            animation: pulse 1s infinite;
+        }
+
+        .news-feed {
+            max-height: 300px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-light) var(--bg-tertiary);
+        }
+
+        .news-feed::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .news-feed::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+        }
+
+        .news-feed::-webkit-scrollbar-thumb {
+            background: var(--border-light);
+            border-radius: 3px;
+        }
+
+        .news-feed::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        .news-item {
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .news-item:last-child {
+            border-bottom: none;
+        }
+
+        .news-time {
+            font-size: 10px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .news-headline {
+            font-size: 13px;
+            line-height: 1.4;
+            margin-top: 4px;
+        }
+
+        .news-tag {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-right: 6px;
+        }
+
+        .news-tag { background: var(--accent-blue); color: white; }
+
+        /* Order Book / Depth of Market */
+        .order-book-section {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .order-book-container {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .ob-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            padding: 6px 10px;
+            position: relative;
+            z-index: 1;
+            cursor: pointer;
+            transition: background 0.15s;
+            overflow: hidden;
+        }
+        
+        .ob-row:hover { background: rgba(255,255,255,0.03); }
+        
+        .ob-row > span {
+            position: relative;
+            z-index: 2;
+        }
+
+        .ob-header {
+            color: var(--text-muted);
+            font-size: 10px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 4px;
+            cursor: default;
+        }
+
+        .ob-header:hover { background: transparent; }
+
+        .ob-price-up { color: var(--accent-green); font-weight: 500; }
+        .ob-price-down { color: var(--accent-red); font-weight: 500; }
+        
+        .depth-bar {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 0;
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .ask-bar { 
+            background-color: var(--accent-red);
+        }
+        .bid-bar { 
+            background-color: var(--accent-green);
+        }
+
+        .ob-spread {
+            text-align: center;
+            padding: 10px 0;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            margin: 4px 0;
+            background: rgba(255,255,255,0.02);
+        }
+
+        .ob-spread-label {
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        .ob-spread-price { 
+            font-size: 16px; 
+            font-weight: 700; 
+            color: var(--text-primary); 
+            margin-top: 2px;
+        }
+
+        .ob-blur-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 55%;
+            background: linear-gradient(to bottom, rgba(10,14,23,0) 0%, rgba(10,14,23,0.9) 35%, rgba(10,14,23,1) 100%);
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 20px;
+            z-index: 10;
+            pointer-events: none;
+        }
+        
+        .ob-lock-content {
+            text-align: center;
+            pointer-events: auto;
+        }
+
+        .ob-lock-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-light);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 8px;
+            color: var(--text-muted);
+        }
+
+        .ob-lock-icon svg {
+            width: 14px;
+            height: 14px;
+        }
+        
+        .ob-lock-content h4 { 
+            color: var(--text-primary); 
+            margin: 0 0 4px; 
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .ob-lock-content p { 
+            color: var(--text-muted); 
+            font-size: 11px; 
+            margin: 0 0 12px;
+            max-width: 200px;
+        }
+        
+        .ob-btn-access {
+            background: var(--accent-blue);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .ob-btn-access:hover { background: #1557b0; }
+
+        /* Top Movers */
+        .movers-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .mover-card {
+            background: var(--bg-card);
+            border-radius: 6px;
+            padding: 12px;
+        }
+
+        .mover-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .mover-name {
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .mover-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+
+        /* Auction Calendar */
+        .calendar-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .calendar-date {
+            width: 48px;
+            text-align: center;
+            padding: 8px;
+            background: var(--bg-card);
+            border-radius: 6px;
+        }
+
+        .calendar-day {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .calendar-month {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .calendar-info {
+            flex: 1;
+        }
+
+        .calendar-name {
+            font-weight: 500;
+            font-size: 13px;
+        }
+
+        .calendar-center {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .calendar-status {
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .calendar-status.live {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--accent-green);
+        }
+
+        .calendar-status.upcoming {
+            background: rgba(26, 115, 232, 0.2);
+            color: var(--accent-blue);
+        }
+
+        /* Market Summary Cards */
+        .market-cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            background: var(--border);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .market-card {
+            background: var(--bg-secondary);
+            padding: 16px 20px;
+        }
+
+        .market-card-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .market-card-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 24px;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+
+        .market-card-change {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        /* Spark line placeholder */
+
+
+        /* Bottom Stats Bar */
+        .bottom-bar {
+            background: var(--ticker-bg);
+            border-top: 1px solid var(--border);
+            padding: 8px 20px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .bottom-stat {
+            display: flex;
+            gap: 24px;
+        }
+
+        .bottom-stat span {
+            color: var(--text-secondary);
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+            .sidebar, .right-panel {
+                display: none;
+            }
+            .market-cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* Mobile Styles */
+        @media (max-width: 768px) {
+            /* Prevent any overflow */
+            body {
+                overflow-x: hidden;
+            }
+
+            /* Top Bar - Logo only, no text */
+            .top-bar {
+                padding: 0 12px;
+                height: 44px;
+            }
+            .logo-text {
+                display: none;
+            }
+            .nav-links {
+                display: none;
+            }
+            .user-section .market-status span:not(.status-dot) {
+                display: none;
+            }
+            .user-section .market-status {
+                gap: 0;
+            }
+
+            /* Ticker - contained width */
+            .ticker-strip {
+                height: 32px;
+                width: 100%;
+                max-width: 100vw;
+            }
+            .ticker-item {
+                padding: 0 12px;
+                gap: 4px;
+            }
+            .ticker-symbol, .ticker-price, .ticker-change {
+                font-size: 10px;
+            }
+
+            /* Market Cards - 2x2 grid that fits */
+            .market-cards {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+                padding: 10px;
+            }
+            .market-card {
+                padding: 10px;
+            }
+            .market-card-label {
+                font-size: 9px;
+            }
+            .market-card-value {
+                font-size: 1rem;
+            }
+            .market-card-change {
+                font-size: 9px;
+            }
+
+            /* Main content */
+            .center-content {
+                padding: 10px;
+            }
+            .chart-section {
+                padding: 12px;
+            }
+            .chart-header {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .chart-title h2 {
+                font-size: 0.95rem;
+            }
+            .chart-badge {
+                font-size: 9px;
+                padding: 2px 6px;
+            }
+            .chart-stats {
+                display: grid;
+                grid-template-columns: 1fr 1fr 1fr;
+                gap: 8px;
+            }
+            .chart-stat-value {
+                font-size: 0.95rem !important;
+            }
+            .chart-stat-label {
+                font-size: 9px;
+            }
+            .chart-controls {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+            .chart-btn {
+                padding: 5px 8px;
+                font-size: 10px;
+            }
+            .chart-container {
+                height: 180px;
+            }
+
+            /* Auction Section - hide less important columns */
+            .auction-section {
+                padding: 10px;
+            }
+            .section-header {
+                flex-direction: column;
+                gap: 8px;
+                align-items: flex-start;
+            }
+            .section-title {
+                font-size: 11px;
+            }
+            .section-filters {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+            .filter-btn {
+                padding: 4px 8px;
+                font-size: 10px;
+            }
+            /* Hide less essential table columns on mobile */
+            .data-table th:nth-child(4),
+            .data-table td:nth-child(4),
+            .data-table th:nth-child(5),
+            .data-table td:nth-child(5),
+            .data-table th:nth-child(8),
+            .data-table td:nth-child(8) {
+                display: none;
+            }
+            .data-table th, .data-table td {
+                padding: 6px 4px;
+                font-size: 10px;
+            }
+            .data-table th:first-child, .data-table td:first-child {
+                padding-left: 8px;
+            }
+            .grade-badge {
+                padding: 2px 4px;
+                font-size: 9px;
+            }
+
+            /* Bottom Bar - single row, minimal */
+            .bottom-bar {
+                padding: 6px 10px;
+                flex-wrap: nowrap;
+                gap: 8px;
+            }
+            .bottom-stat {
+                gap: 8px;
+                font-size: 9px;
+            }
+            /* Show only essential footer info */
+            .bottom-stat:first-child span:nth-child(2),
+            .bottom-stat:first-child span:nth-child(3),
+            .bottom-stat:last-child span:nth-child(1),
+            .bottom-stat:last-child span:nth-child(2) {
+                display: none;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .market-cards {
+                grid-template-columns: 1fr;
+            }
+            .chart-stats {
+                grid-template-columns: 1fr;
+                gap: 6px;
+            }
+            /* Hide even more table columns on very small screens */
+            .data-table th:nth-child(3),
+            .data-table td:nth-child(3),
+            .data-table th:nth-child(7),
+            .data-table td:nth-child(7) {
+                display: none;
+            }
+        }
+
+        /* Early Access Modal */
+        .early-access-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .early-access-backdrop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+        .early-access-content {
+            position: relative;
+            background: #fff;
+            border-radius: 16px;
+            max-width: 520px;
+            width: 90%;
+            padding: 40px;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+            text-align: center;
+        }
+        .early-access-badge {
+            display: inline-block;
+            background: var(--accent-blue);
+            color: #fff;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+        }
+        .early-access-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #202124;
+            margin: 0 0 12px 0;
+            line-height: 1.2;
+        }
+        .early-access-subtitle {
+            font-size: 1rem;
+            color: #5f6368;
+            margin: 0 0 24px 0;
+            line-height: 1.5;
+        }
+        .early-access-features {
+            text-align: left;
+            margin: 0 0 28px 0;
+            padding: 0;
+            list-style: none;
+        }
+        .early-access-features li {
+            padding: 8px 0;
+            font-size: 0.9rem;
+            color: #3c4043;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .early-access-features li::before {
+            content: '';
+            width: 20px;
+            height: 20px;
+            background: var(--accent-blue);
+            border-radius: 50%;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+        .early-access-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .early-access-form input[type="text"] {
+            flex: 1;
+            padding: 14px 18px;
+            border: 2px solid #dadce0;
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .early-access-form input[type="text"]:focus {
+            border-color: var(--accent-blue);
+        }
+        .early-access-form button {
+            padding: 14px 28px;
+            background: var(--accent-blue);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.2s;
+        }
+        .early-access-form button:hover {
+            background: #1557b0;
+        }
+        .early-access-form button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .early-access-privacy {
+            font-size: 0.75rem;
+            color: #5f6368;
+            line-height: 1.5;
+        }
+        .early-access-privacy a {
+            color: var(--accent-blue);
+        }
+        .early-access-success {
+            padding: 20px 0;
+        }
+        .early-access-success-icon {
+            width: 56px;
+            height: 56px;
+            background: #e6f4ea;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            color: #137333;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        .early-access-success p {
+            color: #137333;
+            font-size: 1rem;
+        }
+        @media (max-width: 500px) {
+            .early-access-content {
+                padding: 28px 20px;
+            }
+            .early-access-form {
+                flex-direction: column;
+            }
+            .early-access-form button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Early Access Modal -->
+    <div class="early-access-modal" id="early-access-modal">
+        <div class="early-access-backdrop"></div>
+        <div class="early-access-content">
+            <span class="early-access-badge">Early Access</span>
+            <h2 class="early-access-title">TeaTrade Exchange</h2>
+            <p class="early-access-subtitle">The world's first real-time tea market terminal. Get priority access to auction data, price indices, and institutional-grade analytics.</p>
+            <ul class="early-access-features">
+                <li>Live auction data from Mombasa, Kolkata, Colombo & more</li>
+                <li>Real-time price indices by grade, origin & buyer</li>
+                <li>Historical trade analytics & trend forecasting</li>
+                <li>Buyer & seller intelligence reports</li>
+            </ul>
+            <form class="early-access-form" id="early-access-form" onsubmit="submitEarlyAccess(event)">
+                <input type="text" id="early-access-email" name="email_address" placeholder="Enter your email address">
+                <button type="submit" id="early-access-btn">Get Early Access</button>
+            </form>
+            <p class="early-access-privacy">Your email is stored securely and used only to notify you when TeaTrade Exchange launches. We never share your data. <a href="/privacy.html" target="_blank">Privacy Policy</a></p>
+        </div>
+    </div>
+
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <div class="logo">
+            <div class="logo-icon">TT</div>
+            <div class="logo-text">TeaTrade <span>Exchange</span></div>
+        </div>
+        <nav class="nav-links">
+            <a href="#" class="active">Markets</a>
+            <a href="#">Auctions</a>
+            <a href="#">Analytics</a>
+            <a href="#">Grades</a>
+            <a href="#">Buyers</a>
+            <a href="#">Sellers</a>
+            <a href="#">Reports</a>
+        </nav>
+        <div class="user-section">
+            <div class="market-status" id="market-status">
+                <div class="status-dot" id="status-dot"></div>
+                <span id="status-text">Mombasa Live</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ticker Strip -->
+    <div class="ticker-strip">
+        <div class="ticker-track">
+            <div class="ticker-item">
+                <span class="ticker-symbol">BP1.KE</span>
+                <span class="ticker-price">$3.42/kg</span>
+                <span class="ticker-change up">+2.4%</span>
+            </div>
+            <div class="ticker-item">
+                <span class="ticker-symbol">PF1.KE</span>
+                <span class="ticker-price">$2.98/kg</span>
+                <span class="ticker-change down">-0.8%</span>
+            </div>
+            <div class="ticker-item">
+                <span class="ticker-symbol">FBOP.IN</span>
+                <span class="ticker-price">₹285/kg</span>
+                <span class="ticker-change up">+1.2%</span>
+            </div>
+            <div class="ticker-item">
+                <span class="ticker-symbol">BOP.LK</span>
+                <span class="ticker-price">LKR 1,245</span>
+                <span class="ticker-change up">+3.1%</span>
+            </div>
+            <div class="ticker-item">
+                <span class="ticker-symbol">OP.MWI</span>
+                <span class="ticker-price">$2.15/kg</span>
+                <span class="ticker-change down">-1.4%</span>
+            </div>
+            <div class="ticker-item">
+                <span class="ticker-symbol">DUST.KE</span>
+                <span class="ticker-price">$2.67/kg</span>
+                <span class="ticker-change up">+0.6%</span>
+            </div>
+            <div class="ticker-item">
+                <span class="ticker-symbol">TGFOP.IN</span>
+                <span class="ticker-price">₹412/kg</span>
+                <span class="ticker-change up">+4.2%</span>
+            </div>
+            <div class="ticker-item">
+                <span class="ticker-symbol">PEKOE.LK</span>
+                <span class="ticker-price">LKR 980</span>
+                <span class="ticker-change down">-0.3%</span>
+            </div>
+            <!-- Duplicate for seamless loop -->
+            <div class="ticker-item">
+                <span class="ticker-symbol">BP1.KE</span>
+                <span class="ticker-price">$3.42/kg</span>
+                <span class="ticker-change up">+2.4%</span>
+            </div>
+            <div class="ticker-item">
+                <span class="ticker-symbol">PF1.KE</span>
+                <span class="ticker-price">$2.98/kg</span>
+                <span class="ticker-change down">-0.8%</span>
+            </div>
+            <div class="ticker-item">
+                <span class="ticker-symbol">FBOP.IN</span>
+                <span class="ticker-price">₹285/kg</span>
+                <span class="ticker-change up">+1.2%</span>
+            </div>
+            <div class="ticker-item">
+                <span class="ticker-symbol">BOP.LK</span>
+                <span class="ticker-price">LKR 1,245</span>
+                <span class="ticker-change up">+3.1%</span>
+            </div>
+            <div class="ticker-item">
+                <span class="ticker-symbol">OP.MWI</span>
+                <span class="ticker-price">$2.15/kg</span>
+                <span class="ticker-change down">-1.4%</span>
+            </div>
+            <div class="ticker-item">
+                <span class="ticker-symbol">DUST.KE</span>
+                <span class="ticker-price">$2.67/kg</span>
+                <span class="ticker-change up">+0.6%</span>
+            </div>
+            <div class="ticker-item">
+                <span class="ticker-symbol">TGFOP.IN</span>
+                <span class="ticker-price">₹412/kg</span>
+                <span class="ticker-change up">+4.2%</span>
+            </div>
+            <div class="ticker-item">
+                <span class="ticker-symbol">PEKOE.LK</span>
+                <span class="ticker-price">LKR 980</span>
+                <span class="ticker-change down">-0.3%</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Market Summary Cards -->
+    <div class="market-cards">
+        <div class="market-card">
+            <div class="market-card-label">Mombasa Auction Volume</div>
+            <div class="market-card-value">8.2M kg</div>
+            <div class="market-card-change up">▲ +12.4% vs LW</div>
+        </div>
+        <div class="market-card">
+            <div class="market-card-label">Kolkata Average Price</div>
+            <div class="market-card-value">₹267.45</div>
+            <div class="market-card-change up">▲ +3.2% MoM</div>
+        </div>
+        <div class="market-card">
+            <div class="market-card-label">Colombo Index</div>
+            <div class="market-card-value">142.8</div>
+            <div class="market-card-change down">▼ -1.8% WoW</div>
+        </div>
+        <div class="market-card">
+            <div class="market-card-label">Global Tea Futures</div>
+            <div class="market-card-value">$3,847</div>
+            <div class="market-card-change up">▲ +0.7% Today</div>
+        </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="main-grid">
+        <!-- Left Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-title">Watchlist</div>
+                <div class="watchlist-item">
+                    <div>
+                        <div class="watchlist-name">Darjeeling FTGFOP1</div>
+                        <div class="watchlist-grade">First Flush • Goomtee</div>
+                    </div>
+                    <div class="watchlist-price">
+                        <div class="watchlist-value">₹1,845</div>
+                        <div class="watchlist-change up">+8.2%</div>
+                    </div>
+                </div>
+                <div class="watchlist-item">
+                    <div>
+                        <div class="watchlist-name">Assam CTC BP</div>
+                        <div class="watchlist-grade">Dikom Estate</div>
+                    </div>
+                    <div class="watchlist-price">
+                        <div class="watchlist-value">₹298</div>
+                        <div class="watchlist-change down">-1.4%</div>
+                    </div>
+                </div>
+                <div class="watchlist-item">
+                    <div>
+                        <div class="watchlist-name">Kenyan BOPF</div>
+                        <div class="watchlist-grade">Kericho Highlands</div>
+                    </div>
+                    <div class="watchlist-price">
+                        <div class="watchlist-value">$3.12</div>
+                        <div class="watchlist-change up">+2.8%</div>
+                    </div>
+                </div>
+                <div class="watchlist-item">
+                    <div>
+                        <div class="watchlist-name">Ceylon OP1</div>
+                        <div class="watchlist-grade">Nuwara Eliya</div>
+                    </div>
+                    <div class="watchlist-price">
+                        <div class="watchlist-value">LKR 1,420</div>
+                        <div class="watchlist-change up">+4.1%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">Top Movers</div>
+                <div class="movers-grid">
+                    <div class="mover-card">
+                        <div class="mover-label">Top Gainer</div>
+                        <div class="mover-name">SFTGFOP1</div>
+                        <div class="mover-value up">+12.4%</div>
+                    </div>
+                    <div class="mover-card">
+                        <div class="mover-label">Top Loser</div>
+                        <div class="mover-name">Fannings</div>
+                        <div class="mover-value down">-4.2%</div>
+                    </div>
+                    <div class="mover-card">
+                        <div class="mover-label">Most Volume</div>
+                        <div class="mover-name">BP1</div>
+                        <div class="mover-value">2.1M kg</div>
+                    </div>
+                    <div class="mover-card">
+                        <div class="mover-label">Highest Bid</div>
+                        <div class="mover-name">Silver Tips</div>
+                        <div class="mover-value up">$128/kg</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">Auction Centers</div>
+                <div class="watchlist-item" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                    <div style="display: flex; justify-content: space-between; width: 100%;">
+                        <span class="watchlist-name">Mombasa</span>
+                        <span class="up" style="font-size: 12px;">● LIVE</span>
+                    </div>
+                    <div class="volume-bar" style="width: 100%;"><div class="volume-fill" style="width: 85%;"></div></div>
+                </div>
+                <div class="watchlist-item" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                    <div style="display: flex; justify-content: space-between; width: 100%;">
+                        <span class="watchlist-name">Kolkata</span>
+                        <span style="color: var(--text-muted); font-size: 12px;">Opens 09:30</span>
+                    </div>
+                    <div class="volume-bar" style="width: 100%;"><div class="volume-fill" style="width: 0%;"></div></div>
+                </div>
+                <div class="watchlist-item" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                    <div style="display: flex; justify-content: space-between; width: 100%;">
+                        <span class="watchlist-name">Colombo</span>
+                        <span style="color: var(--accent-orange); font-size: 12px;">● Pre-Market</span>
+                    </div>
+                    <div class="volume-bar" style="width: 100%;"><div class="volume-fill" style="width: 20%;"></div></div>
+                </div>
+            </div>
+            
+            <!-- IB Chat Section -->
+            <div class="sidebar-section chat-section">
+                <div class="chat-header">
+                    <div class="chat-title">
+                        TT Messenger
+                        <span class="chat-online">3 online</span>
+                    </div>
+                </div>
+                <div class="chat-messages">
+                    <div class="chat-message">
+                        <div class="chat-message-header">
+                            <span class="chat-sender">J.HARRISON@FINLAYS</span>
+                            <span class="chat-time">14:28</span>
+                        </div>
+                        <div class="chat-text">Looking for 20MT BP1 Mombasa. Can you source?</div>
+                    </div>
+                    <div class="chat-message">
+                        <div class="chat-message-header">
+                            <span class="chat-sender">R.PATEL@TATA</span>
+                            <span class="chat-time">14:22</span>
+                        </div>
+                        <div class="chat-text">Confirmed 15MT Assam CTC at 285. Settlement T+2.</div>
+                    </div>
+                    <div class="chat-message">
+                        <div class="chat-message-header">
+                            <span class="chat-sender system">SYSTEM</span>
+                            <span class="chat-time">14:15</span>
+                        </div>
+                        <div class="chat-text">Trade alert: Your bid on Lot #24608 has been matched.</div>
+                    </div>
+                    <div class="chat-message">
+                        <div class="chat-message-header">
+                            <span class="chat-sender">M.WONG@EKATERRA</span>
+                            <span class="chat-time">14:08</span>
+                        </div>
+                        <div class="chat-text">Any visibility on Ceylon OP availability next week?</div>
+                    </div>
+                    <div class="chat-message">
+                        <div class="chat-message-header">
+                            <span class="chat-sender">K.MUTHONI@KTDA</span>
+                            <span class="chat-time">13:55</span>
+                        </div>
+                        <div class="chat-text">New lots arriving from Kericho highlands tomorrow. Premium quality expected.</div>
+                    </div>
+                </div>
+                <div class="chat-input-container">
+                    <input type="text" class="chat-input" placeholder="Type a message...">
+                    <button class="chat-send">Send</button>
+                    <button class="chat-blast" title="BLAST"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Content -->
+        <div class="center-content">
+            <!-- Chart Section -->
+            <div class="chart-section">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">
+                            <h2>Kenyan Tea Price Index</h2>
+                            <span class="chart-badge">Live</span>
+                        </div>
+                        <div class="chart-stats">
+                            <div class="chart-stat">
+                                <div class="chart-stat-value up">$3.42</div>
+                                <div class="chart-stat-label">Last Trade Price (USD/kg)</div>
+                            </div>
+                            <div class="chart-stat">
+                                <div class="chart-stat-value" style="font-size: 20px;">+$0.08 (+2.4%)</div>
+                                <div class="chart-stat-label">Change Today</div>
+                            </div>
+                            <div class="chart-stat">
+                                <div class="chart-stat-value" style="font-size: 20px;">8.2M</div>
+                                <div class="chart-stat-label">Volume (kg)</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-controls">
+                        <button class="chart-btn" onclick="setTimeframe('1D')">1D</button>
+                        <button class="chart-btn active" onclick="setTimeframe('1W')">1W</button>
+                        <button class="chart-btn" onclick="setTimeframe('1M')">1M</button>
+                        <button class="chart-btn" onclick="setTimeframe('3M')">3M</button>
+                        <button class="chart-btn" onclick="setTimeframe('1Y')">1Y</button>
+                        <button class="chart-btn" onclick="setTimeframe('ALL')">ALL</button>
+                        <div class="chart-type-toggle">
+                            <button class="chart-type-btn active" id="btn-line" onclick="setChartType('line')" title="Line Chart">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/></svg>
+                            </button>
+                            <button class="chart-type-btn" id="btn-candle" onclick="setChartType('candle')" title="Candlestick">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="8" width="4" height="8"/><line x1="7" y1="4" x2="7" y2="8"/><line x1="7" y1="16" x2="7" y2="20"/><rect x="15" y="6" width="4" height="10" fill="currentColor"/><line x1="17" y1="2" x2="17" y2="6"/><line x1="17" y1="16" x2="17" y2="22"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="chart-container" id="chart-container">
+                    <canvas id="priceChart" class="chart-canvas"></canvas>
+                    <div class="chart-tooltip" id="chart-tooltip"></div>
+                    <div class="chart-crosshair" id="chart-crosshair">
+                        <div class="crosshair-v"></div>
+                        <div class="crosshair-h"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Auction Data Table -->
+            <div class="auction-section">
+                <div class="section-header">
+                    <div class="section-title">Live Auction Results — Mombasa Sale 06/2026</div>
+                    <div class="section-filters">
+                        <button class="filter-btn active">All Grades</button>
+                        <button class="filter-btn">Orthodox</button>
+                        <button class="filter-btn">CTC</button>
+                        <button class="filter-btn">Green</button>
+                    </div>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Lot #</th>
+                            <th>Grade</th>
+                            <th>Estate / Factory</th>
+                            <th>Origin</th>
+                            <th>Qty (kg)</th>
+                            <th>Bid $/kg</th>
+                            <th>Change</th>
+                            <th>Buyer</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="font-family: 'JetBrains Mono', monospace;">#24601</td>
+                            <td><span class="grade-badge">BP1</span></td>
+                            <td>Kericho Highlands</td>
+                            <td class="auction-center">Kenya</td>
+                            <td>12,400</td>
+                            <td class="price-cell up">$3.45</td>
+                            <td class="up">+4.2%</td>
+                            <td>Unilever</td>
+                            <td><span style="color: var(--accent-green);">SOLD</span></td>
+                        </tr>
+                        <tr>
+                            <td style="font-family: 'JetBrains Mono', monospace;">#24602</td>
+                            <td><span class="grade-badge">PF1</span></td>
+                            <td>Sotik Tea Company</td>
+                            <td class="auction-center">Kenya</td>
+                            <td>8,200</td>
+                            <td class="price-cell">$2.98</td>
+                            <td class="down">-0.8%</td>
+                            <td>Tata Global</td>
+                            <td><span style="color: var(--accent-green);">SOLD</span></td>
+                        </tr>
+                        <tr>
+                            <td style="font-family: 'JetBrains Mono', monospace;">#24603</td>
+                            <td><span class="grade-badge">BOPF</span></td>
+                            <td>Nandi Hills Estate</td>
+                            <td class="auction-center">Kenya</td>
+                            <td>15,600</td>
+                            <td class="price-cell up">$3.12</td>
+                            <td class="up">+2.1%</td>
+                            <td>—</td>
+                            <td><span style="color: var(--accent-orange);">BIDDING</span></td>
+                        </tr>
+                        <tr>
+                            <td style="font-family: 'JetBrains Mono', monospace;">#24604</td>
+                            <td><span class="grade-badge">DUST1</span></td>
+                            <td>Kipkebe Estate</td>
+                            <td class="auction-center">Kenya</td>
+                            <td>22,000</td>
+                            <td class="price-cell">$2.67</td>
+                            <td class="up">+0.6%</td>
+                            <td>Finlays</td>
+                            <td><span style="color: var(--accent-green);">SOLD</span></td>
+                        </tr>
+                        <tr>
+                            <td style="font-family: 'JetBrains Mono', monospace;">#24605</td>
+                            <td><span class="grade-badge">OP</span></td>
+                            <td>Changoi Tea Factory</td>
+                            <td class="auction-center">Kenya</td>
+                            <td>5,400</td>
+                            <td class="price-cell">$3.28</td>
+                            <td>—</td>
+                            <td>—</td>
+                            <td><span style="color: var(--text-muted);">PENDING</span></td>
+                        </tr>
+                        <tr>
+                            <td style="font-family: 'JetBrains Mono', monospace;">#24606</td>
+                            <td><span class="grade-badge">PD</span></td>
+                            <td>Chemomi Tea Factory</td>
+                            <td class="auction-center">Kenya</td>
+                            <td>18,900</td>
+                            <td class="price-cell up">$2.89</td>
+                            <td class="up">+1.8%</td>
+                            <td>—</td>
+                            <td><span style="color: var(--accent-orange);">BIDDING</span></td>
+                        </tr>
+                        <tr>
+                            <td style="font-family: 'JetBrains Mono', monospace;">#24607</td>
+                            <td><span class="grade-badge">BP1</span></td>
+                            <td>Tinderet Tea Estate</td>
+                            <td class="auction-center">Kenya</td>
+                            <td>9,800</td>
+                            <td class="price-cell">$3.38</td>
+                            <td class="down">-0.3%</td>
+                            <td>Van Rees</td>
+                            <td><span style="color: var(--accent-green);">SOLD</span></td>
+                        </tr>
+                        <tr>
+                            <td style="font-family: 'JetBrains Mono', monospace;">#24608</td>
+                            <td><span class="grade-badge">FBOPF</span></td>
+                            <td>Kangaita Tea Factory</td>
+                            <td class="auction-center">Kenya</td>
+                            <td>6,200</td>
+                            <td class="price-cell up">$3.55</td>
+                            <td class="up">+3.5%</td>
+                            <td>—</td>
+                            <td><span style="color: var(--text-muted);">PENDING</span></td>
+                        </tr>
+                        <tr>
+                            <td style="font-family: 'JetBrains Mono', monospace;">#24609</td>
+                            <td><span class="grade-badge">PF1</span></td>
+                            <td>Kaimosi Tea Factory</td>
+                            <td class="auction-center">Kenya</td>
+                            <td>14,500</td>
+                            <td class="price-cell up">$2.78</td>
+                            <td class="up">+2.3%</td>
+                            <td>Ekaterra</td>
+                            <td><span style="color: var(--accent-green);">SOLD</span></td>
+                        </tr>
+                        <tr>
+                            <td style="font-family: 'JetBrains Mono', monospace;">#24610</td>
+                            <td><span class="grade-badge">BP1</span></td>
+                            <td>Marinyn Tea Estate</td>
+                            <td class="auction-center">Kenya</td>
+                            <td>8,700</td>
+                            <td class="price-cell">$3.22</td>
+                            <td class="down">-0.5%</td>
+                            <td>—</td>
+                            <td><span style="color: var(--accent-orange);">BIDDING</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        
+            <!-- Order History Section -->
+            <div class="order-history-section">
+                <div class="order-history-header">
+                    <div class="order-history-title">
+                        Your Confirmed Orders
+                        <span class="order-count">4</span>
+                    </div>
+                <button class="filter-btn active">All</button>
+                </div>
+                <table class="order-table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Order ID</th>
+                            <th>Estate / Factory</th>
+                            <th>Grade</th>
+                            <th>Venue</th>
+                            <th>Qty (kg)</th>
+                            <th>Price</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>13:42</td>
+                            <td style="font-family: 'JetBrains Mono', monospace;">#24589</td>
+                            <td>Nandi Hills Estate</td>
+                            <td><span class="grade-badge">BP1</span></td>
+                            <td>Mombasa</td>
+                            <td class="order-qty">8,500</td>
+                            <td class="order-price">$3.12</td>
+                            <td class="order-price">$26,520</td>
+                            <td><span class="order-status filled">FILLED</span></td>
+                        </tr>
+                        <tr>
+                            <td>11:28</td>
+                            <td style="font-family: 'JetBrains Mono', monospace;">#24572</td>
+                            <td>Kipkebe Estate</td>
+                            <td><span class="grade-badge">PF1</span></td>
+                            <td>Mombasa</td>
+                            <td class="order-qty">12,000</td>
+                            <td class="order-price">$2.94</td>
+                            <td class="order-price">$35,280</td>
+                            <td><span class="order-status filled">FILLED</span></td>
+                        </tr>
+                        <tr>
+                            <td>14:15</td>
+                            <td style="font-family: 'JetBrains Mono', monospace;">#24608</td>
+                            <td>Kangaita Tea Factory</td>
+                            <td><span class="grade-badge">DUST1</span></td>
+                            <td>Mombasa</td>
+                            <td class="order-qty">6,200</td>
+                            <td class="order-price">$2.67</td>
+                            <td class="order-price">$16,554</td>
+                            <td><span class="order-status pending">PENDING</span></td>
+                        </tr>
+                        <tr>
+                            <td>12:55</td>
+                            <td style="font-family: 'JetBrains Mono', monospace;">#24595</td>
+                            <td>Tinderet Tea Estate</td>
+                            <td><span class="grade-badge">BOPF</span></td>
+                            <td>Mombasa</td>
+                            <td class="order-qty">4,800</td>
+                            <td class="order-price">$3.38</td>
+                            <td class="order-price">$16,224</td>
+                            <td><span class="order-status partial">PARTIAL 60%</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Right Panel -->
+        <div class="right-panel">
+            <div class="panel-section">
+                <div class="panel-title">
+                    Market News
+                    <span class="live-badge">LIVE</span>
+                </div>
+                <div class="news-feed">
+                    <div class="news-item">
+                        <div class="news-time">14:32 UTC</div>
+                        <div class="news-headline">
+                            <span class="news-tag kenya">KENYA</span>
+                            Mombasa auction sees record volume as BP1 grades surge 4.2%
+                        </div>
+                    </div>
+                    <div class="news-item">
+                        <div class="news-time">14:18 UTC</div>
+                        <div class="news-headline">
+                            <span class="news-tag india">INDIA</span>
+                            Darjeeling first flush arrives early; quality reports exceptional
+                        </div>
+                    </div>
+                    <div class="news-item">
+                        <div class="news-time">13:45 UTC</div>
+                        <div class="news-headline">
+                            <span class="news-tag sri-lanka">SRI LANKA</span>
+                            Ceylon tea exports up 8% YoY as European demand strengthens
+                        </div>
+                    </div>
+                    <div class="news-item">
+                        <div class="news-time">12:20 UTC</div>
+                        <div class="news-headline">
+                            <span class="news-tag china">CHINA</span>
+                            Yunnan Pu-erh vintage releases fetch premium at Kunming fair
+                        </div>
+                    </div>
+                    <div class="news-item">
+                        <div class="news-time">11:05 UTC</div>
+                        <div class="news-headline">
+                            <span class="news-tag kenya">KENYA</span>
+                            Weather outlook favorable for Q1 harvest across Rift Valley
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order Book / Depth of Market -->
+            <div class="panel-section order-book-section">
+                <div class="panel-title">
+                    Order Book (Mombasa BP1)
+                    <span class="live-badge">LIVE</span>
+                </div>
+                
+                <div class="order-book-container">
+                    <div class="ob-row ob-header">
+                        <span>Price (USD)</span>
+                        <span>Qty (Tons)</span>
+                        <span>Total</span>
+                    </div>
+
+                    <!-- Asks (Sellers) -->
+                    <div class="ob-row">
+                        <span class="ob-price-down">3.48</span>
+                        <span>12.5</span>
+                        <span>45.2</span>
+                        <div class="depth-bar ask-bar" style="width: 20%"></div>
+                    </div>
+                    <div class="ob-row">
+                        <span class="ob-price-down">3.47</span>
+                        <span>45.0</span>
+                        <span>32.7</span>
+                        <div class="depth-bar ask-bar" style="width: 60%"></div>
+                    </div>
+                    <div class="ob-row">
+                        <span class="ob-price-down">3.46</span>
+                        <span>22.1</span>
+                        <span>22.1</span>
+                        <div class="depth-bar ask-bar" style="width: 35%"></div>
+                    </div>
+
+                    <!-- Spread -->
+                    <div class="ob-spread">
+                        <span class="ob-spread-label">Spread: 0.02 (0.58%)</span>
+                        <div class="ob-spread-price">$3.44</div>
+                    </div>
+
+                    <!-- Bids (Buyers) -->
+                    <div class="ob-row">
+                        <span class="ob-price-up">3.44</span>
+                        <span>150.0</span>
+                        <span>150.0</span>
+                        <div class="depth-bar bid-bar" style="width: 90%"></div>
+                    </div>
+                    <div class="ob-row">
+                        <span class="ob-price-up">3.43</span>
+                        <span>80.5</span>
+                        <span>230.5</span>
+                        <div class="depth-bar bid-bar" style="width: 50%"></div>
+                    </div>
+                    <div class="ob-row">
+                        <span class="ob-price-up">3.42</span>
+                        <span>40.2</span>
+                        <span>270.7</span>
+                        <div class="depth-bar bid-bar" style="width: 30%"></div>
+                    </div>
+                    <div class="ob-row">
+                        <span class="ob-price-up">3.41</span>
+                        <span>65.8</span>
+                        <span>336.5</span>
+                        <div class="depth-bar bid-bar" style="width: 45%"></div>
+                    </div>
+                    <div class="ob-row">
+                        <span class="ob-price-up">3.40</span>
+                        <span>28.3</span>
+                        <span>364.8</span>
+                        <div class="depth-bar bid-bar" style="width: 22%"></div>
+                    </div>
+
+                    <!-- Lock Overlay -->
+                    <div class="ob-blur-overlay">
+                        <div class="ob-lock-content">
+                            <div class="ob-lock-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                </svg>
+                            </div>
+                            <h4>Institutional Data</h4>
+                            <p>Real-time bid/ask depth limited to Exchange Partners</p>
+                            <button class="ob-btn-access" onclick="document.getElementById('early-access-modal').style.display='flex'">Request Access</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <div class="panel-title">Upcoming Auctions</div>
+                <div class="calendar-item">
+                    <div class="calendar-date">
+                        <div class="calendar-day">12</div>
+                        <div class="calendar-month">Feb</div>
+                    </div>
+                    <div class="calendar-info">
+                        <div class="calendar-name">Mombasa Sale 06</div>
+                        <div class="calendar-center">Kenya Tea Exchange</div>
+                    </div>
+                    <span class="calendar-status live">LIVE</span>
+                </div>
+                <div class="calendar-item">
+                    <div class="calendar-date">
+                        <div class="calendar-day">13</div>
+                        <div class="calendar-month">Feb</div>
+                    </div>
+                    <div class="calendar-info">
+                        <div class="calendar-name">Kolkata Auction 08</div>
+                        <div class="calendar-center">Calcutta Tea Traders</div>
+                    </div>
+                    <span class="calendar-status upcoming">09:30 IST</span>
+                </div>
+                <div class="calendar-item">
+                    <div class="calendar-date">
+                        <div class="calendar-day">14</div>
+                        <div class="calendar-month">Feb</div>
+                    </div>
+                    <div class="calendar-info">
+                        <div class="calendar-name">Colombo Weekly</div>
+                        <div class="calendar-center">Ceylon Tea Board</div>
+                    </div>
+                    <span class="calendar-status upcoming">10:00 LKT</span>
+                </div>
+                <div class="calendar-item">
+                    <div class="calendar-date">
+                        <div class="calendar-day">17</div>
+                        <div class="calendar-month">Feb</div>
+                    </div>
+                    <div class="calendar-info">
+                        <div class="calendar-name">Guwahati Auction</div>
+                        <div class="calendar-center">Assam Tea Board</div>
+                    </div>
+                    <span class="calendar-status upcoming">11:00 IST</span>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <div class="panel-title">Top Buyers This Week</div>
+                <div style="font-size: 13px;">
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                        <span>1. Unilever</span>
+                        <span style="font-family: 'JetBrains Mono', monospace;">2.4M kg</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                        <span>2. Tata Global</span>
+                        <span style="font-family: 'JetBrains Mono', monospace;">1.8M kg</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                        <span>3. Finlays</span>
+                        <span style="font-family: 'JetBrains Mono', monospace;">1.2M kg</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                        <span>4. Van Rees</span>
+                        <span style="font-family: 'JetBrains Mono', monospace;">980K kg</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+                        <span>5. Ekaterra</span>
+                        <span style="font-family: 'JetBrains Mono', monospace;">850K kg</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Bar -->
+    <div class="bottom-bar">
+        <div class="bottom-stat">
+            <span>Last Update: <span style="color: var(--text-primary);">14:32:08 UTC</span></span>
+            <span>Session: <span style="color: var(--accent-green);">Active</span></span>
+            <span>Latency: <span style="color: var(--text-primary);">24ms</span></span>
+        </div>
+        <div class="bottom-stat">
+            <span>Markets: <span style="color: var(--text-primary);">5 Open</span></span>
+            <span>Lots Today: <span style="color: var(--text-primary);">847</span></span>
+            <span>© 2026 TeaTrade Exchange</span>
+        </div>
+    </div>
+
+    <script>
+        // Chart state
+        let currentTimeframe = '1W';
+        let chartType = 'line'; // 'line' or 'candle'
+        let chartData = [];
+        let chartMetrics = {};
+        const leftMargin = 50;
+        const rightMargin = 20;
+        const bottomMargin = 25;
+        
+        const canvas = document.getElementById('priceChart');
+        const ctx = canvas.getContext('2d');
+        const tooltip = document.getElementById('chart-tooltip');
+        const chartContainer = document.getElementById('chart-container');
+        const crosshair = document.getElementById('chart-crosshair');
+        
+        // Timeframe configurations
+        const timeframeConfig = {
+            '1D': { points: 48, labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'], labelFormat: 'time', baseDate: new Date() },
+            '1W': { points: 7, labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], labelFormat: 'day', baseDate: new Date() },
+            '1M': { points: 30, labels: ['W1', 'W2', 'W3', 'W4'], labelFormat: 'week', baseDate: new Date() },
+            '3M': { points: 12, labels: ['Jan', 'Feb', 'Mar'], labelFormat: 'month', baseDate: new Date() },
+            '1Y': { points: 12, labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], labelFormat: 'month', baseDate: new Date() },
+            'ALL': { points: 60, labels: ['2021', '2022', '2023', '2024', '2025', '2026'], labelFormat: 'year', baseDate: new Date() }
+        };
+        
+        function setTimeframe(tf) {
+            currentTimeframe = tf;
+            document.querySelectorAll('.chart-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent === tf);
+            });
+            drawChart();
+        }
+        
+        function setChartType(type) {
+            chartType = type;
+            document.getElementById('btn-line').classList.toggle('active', type === 'line');
+            document.getElementById('btn-candle').classList.toggle('active', type === 'candle');
+            drawChart();
+        }
+        
+        function generateChartData(timeframe) {
+            const config = timeframeConfig[timeframe];
+            const data = [];
+            let price = 3.20;
+            let volume = 800000;
+            const now = new Date();
+            
+            for (let i = 0; i < config.points; i++) {
+                const open = price;
+                const change = (Math.random() - 0.48) * 0.06;
+                price = Math.max(3.05, Math.min(3.55, price + change));
+                const close = price;
+                const high = Math.max(open, close) + Math.random() * 0.03;
+                const low = Math.min(open, close) - Math.random() * 0.03;
+                volume = Math.max(500000, volume + (Math.random() - 0.5) * 200000);
+                
+                // Generate timestamp based on timeframe
+                let date = new Date(now);
+                if (timeframe === '1D') date.setHours(date.getHours() - (config.points - i));
+                else if (timeframe === '1W') date.setDate(date.getDate() - (config.points - i));
+                else if (timeframe === '1M') date.setDate(date.getDate() - (config.points - i));
+                else if (timeframe === '3M') date.setDate(date.getDate() - (config.points - i) * 7);
+                else if (timeframe === '1Y') date.setMonth(date.getMonth() - (config.points - i));
+                else date.setMonth(date.getMonth() - (config.points - i));
+                
+                data.push({
+                    date: date,
+                    open: open,
+                    high: high,
+                    low: low,
+                    close: close,
+                    volume: Math.round(volume),
+                    change: ((close - open) / open * 100)
+                });
+            }
+            return data;
+        }
+        
+        function formatDate(date, timeframe) {
+            if (timeframe === '1D') {
+                return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            } else if (timeframe === '1W' || timeframe === '1M') {
+                return date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+            } else {
+                return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            }
+        }
+        
+        function formatVolume(vol) {
+            if (vol >= 1000000) return (vol / 1000000).toFixed(1) + 'M';
+            if (vol >= 1000) return (vol / 1000).toFixed(0) + 'K';
+            return vol.toString();
+        }
+        
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+            canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            drawChart();
+        }
+        
+        function drawChart() {
+            const w = canvas.offsetWidth;
+            const h = canvas.offsetHeight;
+            const config = timeframeConfig[currentTimeframe];
+            
+            ctx.clearRect(0, 0, w, h);
+            
+            // Generate data
+            chartData = generateChartData(currentTimeframe);
+            const prices = chartData.map(d => d.close);
+            
+            const minPrice = Math.min(...chartData.map(d => d.low)) - 0.03;
+            const maxPrice = Math.max(...chartData.map(d => d.high)) + 0.03;
+            const priceRange = maxPrice - minPrice;
+            const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
+            const highPrice = Math.max(...prices);
+            const lowPrice = Math.min(...prices);
+            const currentPrice = prices[prices.length - 1];
+            const openPrice = chartData[0].open;
+            const totalChange = ((currentPrice - openPrice) / openPrice * 100);
+            
+            chartMetrics = { minPrice, maxPrice, priceRange, avgPrice, highPrice, lowPrice, currentPrice, openPrice, totalChange };
+            
+            const chartWidth = w - leftMargin - rightMargin;
+            const chartHeight = h - bottomMargin - (h * 0.1);
+            
+            // Draw grid lines and Y-axis labels
+            ctx.strokeStyle = '#1a2332';
+            ctx.lineWidth = 1;
+            ctx.font = '10px JetBrains Mono, monospace';
+            ctx.fillStyle = '#6b7280';
+            ctx.textAlign = 'right';
+            
+            for (let i = 0; i <= 5; i++) {
+                const y = h * 0.1 + chartHeight * (i / 5);
+                const priceLabel = (maxPrice - (priceRange * (i / 5))).toFixed(2);
+                
+                ctx.beginPath();
+                ctx.moveTo(leftMargin, y);
+                ctx.lineTo(w - rightMargin, y);
+                ctx.stroke();
+                
+                ctx.fillText('$' + priceLabel, leftMargin - 8, y + 3);
+            }
+            
+            // Draw X-axis labels
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#6b7280';
+            const labels = config.labels;
+            labels.forEach((label, i) => {
+                const x = leftMargin + (i / (labels.length - 1)) * chartWidth;
+                ctx.fillText(label, x, h - 8);
+            });
+            
+            // Draw average line (dashed)
+            const avgY = h * 0.1 + (1 - (avgPrice - minPrice) / priceRange) * chartHeight;
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(leftMargin, avgY);
+            ctx.lineTo(w - rightMargin, avgY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            const lastX = leftMargin + chartWidth;
+            const lastY = h * 0.1 + (1 - (currentPrice - minPrice) / priceRange) * chartHeight;
+            
+            if (chartType === 'candle') {
+                // Draw candlesticks
+                const candleWidth = Math.max(4, Math.min(20, (chartWidth / chartData.length) * 0.7));
+                const candleGap = (chartWidth / chartData.length);
+                
+                chartData.forEach((d, i) => {
+                    const x = leftMargin + (i / (chartData.length - 1)) * chartWidth;
+                    const openY = h * 0.1 + (1 - (d.open - minPrice) / priceRange) * chartHeight;
+                    const closeY = h * 0.1 + (1 - (d.close - minPrice) / priceRange) * chartHeight;
+                    const highY = h * 0.1 + (1 - (d.high - minPrice) / priceRange) * chartHeight;
+                    const lowY = h * 0.1 + (1 - (d.low - minPrice) / priceRange) * chartHeight;
+                    
+                    const isUp = d.close >= d.open;
+                    const color = isUp ? '#10b981' : '#ef4444';
+                    
+                    // Draw wick (high-low line)
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(x, highY);
+                    ctx.lineTo(x, lowY);
+                    ctx.stroke();
+                    
+                    // Draw candle body
+                    const bodyTop = Math.min(openY, closeY);
+                    const bodyHeight = Math.max(1, Math.abs(closeY - openY));
+                    
+                    if (isUp) {
+                        ctx.fillStyle = color;
+                        ctx.fillRect(x - candleWidth/2, bodyTop, candleWidth, bodyHeight);
+                    } else {
+                        ctx.fillStyle = color;
+                        ctx.fillRect(x - candleWidth/2, bodyTop, candleWidth, bodyHeight);
+                    }
+                    
+                    // Body border for definition
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(x - candleWidth/2, bodyTop, candleWidth, bodyHeight);
+                });
+            } else {
+                // Draw line chart
+                ctx.beginPath();
+                ctx.strokeStyle = '#1a73e8';
+                ctx.lineWidth = 2;
+                
+                prices.forEach((p, i) => {
+                    const x = leftMargin + (i / (prices.length - 1)) * chartWidth;
+                    const y = h * 0.1 + (1 - (p - minPrice) / priceRange) * chartHeight;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+                
+                // Draw area fill
+                ctx.lineTo(lastX, h * 0.1 + chartHeight);
+                ctx.lineTo(leftMargin, h * 0.1 + chartHeight);
+                ctx.closePath();
+                ctx.fillStyle = 'rgba(26, 115, 232, 0.15)';
+                ctx.fill();
+            }
+            
+            // High/Low markers (line chart only)
+            if (chartType === 'line') {
+                const highIndex = prices.indexOf(highPrice);
+                const highX = leftMargin + (highIndex / (prices.length - 1)) * chartWidth;
+                const highY = h * 0.1 + (1 - (highPrice - minPrice) / priceRange) * chartHeight;
+                ctx.fillStyle = '#10b981';
+                ctx.beginPath();
+                ctx.arc(highX, highY, 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.font = '9px JetBrains Mono, monospace';
+                ctx.fillStyle = '#10b981';
+                ctx.textAlign = 'center';
+                ctx.fillText('H $' + highPrice.toFixed(2), highX, highY - 10);
+                
+                const lowIndex = prices.indexOf(lowPrice);
+                const lowX = leftMargin + (lowIndex / (prices.length - 1)) * chartWidth;
+                const lowY = h * 0.1 + (1 - (lowPrice - minPrice) / priceRange) * chartHeight;
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.arc(lowX, lowY, 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#ef4444';
+                ctx.fillText('L $' + lowPrice.toFixed(2), lowX, lowY + 16);
+                
+                // Current price marker
+                ctx.fillStyle = '#1a73e8';
+                ctx.beginPath();
+                ctx.arc(lastX, lastY, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+            
+            // Average label
+            ctx.font = '9px JetBrains Mono, monospace';
+            ctx.fillStyle = '#f59e0b';
+            ctx.textAlign = 'left';
+            ctx.fillText('AVG $' + avgPrice.toFixed(2), leftMargin + 5, avgY - 5);
+        }
+        
+        // Hover functionality
+        canvas.addEventListener('mousemove', function(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const w = canvas.offsetWidth;
+            const h = canvas.offsetHeight;
+            const chartWidth = w - leftMargin - rightMargin;
+            const chartHeight = h - bottomMargin - (h * 0.1);
+            
+            // Check if mouse is in chart area
+            if (x < leftMargin || x > w - rightMargin || y < h * 0.1 || y > h * 0.1 + chartHeight) {
+                tooltip.classList.remove('visible');
+                crosshair.style.display = 'none';
+                return;
+            }
+            
+            // Find data point
+            const relX = x - leftMargin;
+            const index = Math.round((relX / chartWidth) * (chartData.length - 1));
+            const dataPoint = chartData[Math.max(0, Math.min(index, chartData.length - 1))];
+            
+            if (!dataPoint) return;
+            
+            // Show crosshair
+            crosshair.style.display = 'block';
+            crosshair.querySelector('.crosshair-v').style.left = x + 'px';
+            crosshair.querySelector('.crosshair-h').style.top = y + 'px';
+            
+            // Build tooltip content (Bloomberg style)
+            const changeClass = dataPoint.change >= 0 ? 'up' : 'down';
+            const changeSign = dataPoint.change >= 0 ? '+' : '';
+            
+            tooltip.innerHTML = `
+                <div class="tooltip-date">${formatDate(dataPoint.date, currentTimeframe)}</div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Open</span>
+                    <span class="tooltip-value">$${dataPoint.open.toFixed(3)}</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">High</span>
+                    <span class="tooltip-value up">$${dataPoint.high.toFixed(3)}</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Low</span>
+                    <span class="tooltip-value down">$${dataPoint.low.toFixed(3)}</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Close</span>
+                    <span class="tooltip-value">$${dataPoint.close.toFixed(3)}</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Change</span>
+                    <span class="tooltip-value ${changeClass}">${changeSign}${dataPoint.change.toFixed(2)}%</span>
+                </div>
+                <div class="tooltip-row">
+                    <span class="tooltip-label">Volume</span>
+                    <span class="tooltip-value">${formatVolume(dataPoint.volume)} kg</span>
+                </div>
+            `;
+            
+            // Position tooltip
+            let tooltipX = x + 15;
+            let tooltipY = y - 10;
+            
+            // Keep tooltip in bounds
+            if (tooltipX + 180 > w) tooltipX = x - 175;
+            if (tooltipY + 160 > h) tooltipY = y - 150;
+            if (tooltipY < 0) tooltipY = 10;
+            
+            tooltip.style.left = tooltipX + 'px';
+            tooltip.style.top = tooltipY + 'px';
+            tooltip.classList.add('visible');
+        });
+        
+        canvas.addEventListener('mouseleave', function() {
+            tooltip.classList.remove('visible');
+            crosshair.style.display = 'none';
+        });
+        
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        
+        // Simulate live updates
+        setInterval(() => {
+            const cells = document.querySelectorAll('.price-cell');
+            cells.forEach(cell => {
+                if (Math.random() > 0.7) {
+                    cell.style.background = 'rgba(16, 185, 129, 0.2)';
+                    setTimeout(() => cell.style.background = '', 500);
+                }
+            });
+        }, 2000);
+
+        // Early Access form submission - sends to Kit
+        function submitEarlyAccess(e) {
+            e.preventDefault();
+            const email = document.getElementById('early-access-email').value;
+            const form = document.getElementById('early-access-form');
+            const btn = document.getElementById('early-access-btn');
+            
+            // Secret passphrase to view site
+            if (email.toLowerCase().trim() === 'betty the best auctioneer') {
+                document.getElementById('early-access-modal').style.display = 'none';
+                return;
+            }
+            
+            // Validate email format
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                alert('Please enter a valid email address.');
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.textContent = 'Submitting...';
+            
+            const formData = new FormData();
+            formData.append('email_address', email);
+            
+            fetch('https://app.kit.com/forms/9066752/subscriptions', {
+                method: 'POST',
+                body: formData,
+                mode: 'no-cors'
+            })
+            .then(() => {
+                form.innerHTML = `
+                    <div class="early-access-success">
+                        <div class="early-access-success-icon">&#10003;</div>
+                        <p>You're on the list! We'll notify you at <strong>${email}</strong> when TeaTrade Exchange launches.</p>
+                    </div>
+                `;
+            })
+            .catch(() => {
+                btn.disabled = false;
+                btn.textContent = 'Get Early Access';
+                alert('Something went wrong. Please try again.');
+            });
+        }
+
+        // Dynamic Market Status based on Mombasa/Kenya time (EAT = UTC+3)
+        function updateMarketStatus() {
+            const now = new Date();
+            // Get Kenya time (UTC+3)
+            const kenyaOffset = 3 * 60; // minutes
+            const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+            const kenyaTime = new Date(utc + (kenyaOffset * 60000));
+            
+            const hour = kenyaTime.getHours();
+            const day = kenyaTime.getDay(); // 0 = Sunday, 6 = Saturday
+            
+            const statusDot = document.getElementById('status-dot');
+            const statusText = document.getElementById('status-text');
+            
+            // Mombasa Tea Auction: Tuesday sales, but market hours roughly 9am-5pm EAT weekdays
+            const isWeekday = day >= 1 && day <= 5;
+            const isMarketHours = hour >= 9 && hour < 17;
+            
+            if (isWeekday && isMarketHours) {
+                statusDot.classList.remove('closed');
+                statusText.textContent = 'Mombasa OPEN';
+            } else {
+                statusDot.classList.add('closed');
+                const nextOpen = isWeekday ? '09:00 EAT' : 'Monday 09:00 EAT';
+                statusText.textContent = 'CLOSED';
+            }
+        }
+        
+        updateMarketStatus();
+        setInterval(updateMarketStatus, 60000); // Update every minute
+    </script>
+</body>
+</html>
