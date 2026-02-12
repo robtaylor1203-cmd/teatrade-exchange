@@ -3669,7 +3669,7 @@
             if (!currentUser) return;
 
             try {
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('profiles')
                     .select('*')
                     .eq('id', currentUser.id)
@@ -3722,7 +3722,7 @@
 
         async function loadTeas() {
             try {
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('teas')
                     .select('*')
                     .order('symbol');
@@ -3856,7 +3856,7 @@
 
                     // Update cash balance
                     const newBalance = userProfile.cash_balance - total;
-                    const { error: balanceError } = await supabase
+                    const { error: balanceError } = await supabaseClient
                         .from('profiles')
                         .update({ cash_balance: newBalance })
                         .eq('id', currentUser.id);
@@ -3869,7 +3869,7 @@
                         const totalQty = existingPosition.quantity + qty;
                         const newAvgPrice = ((existingPosition.avg_entry_price * existingPosition.quantity) + (price * qty)) / totalQty;
                         
-                        const { error: posError } = await supabase
+                        const { error: posError } = await supabaseClient
                             .from('positions')
                             .update({ 
                                 quantity: totalQty, 
@@ -3879,7 +3879,7 @@
                             .eq('id', existingPosition.id);
                         if (posError) throw posError;
                     } else {
-                        const { error: posError } = await supabase
+                        const { error: posError } = await supabaseClient
                             .from('positions')
                             .insert({
                                 user_id: currentUser.id,
@@ -3891,7 +3891,7 @@
                     }
 
                     // Record trade
-                    const { error: tradeError } = await supabase
+                    const { error: tradeError } = await supabaseClient
                         .from('trades')
                         .insert({
                             user_id: currentUser.id,
@@ -3915,7 +3915,7 @@
 
                     // Update cash balance
                     const newBalance = userProfile.cash_balance + total;
-                    const { error: balanceError } = await supabase
+                    const { error: balanceError } = await supabaseClient
                         .from('profiles')
                         .update({ cash_balance: newBalance })
                         .eq('id', currentUser.id);
@@ -3924,13 +3924,13 @@
                     // Update position
                     const newQty = existingPosition.quantity - qty;
                     if (newQty <= 0) {
-                        const { error: posError } = await supabase
+                        const { error: posError } = await supabaseClient
                             .from('positions')
                             .delete()
                             .eq('id', existingPosition.id);
                         if (posError) throw posError;
                     } else {
-                        const { error: posError } = await supabase
+                        const { error: posError } = await supabaseClient
                             .from('positions')
                             .update({ 
                                 quantity: newQty,
@@ -3941,7 +3941,7 @@
                     }
 
                     // Record trade
-                    const { error: tradeError } = await supabase
+                    const { error: tradeError } = await supabaseClient
                         .from('trades')
                         .insert({
                             user_id: currentUser.id,
@@ -3983,7 +3983,7 @@
             if (!currentUser) return;
 
             try {
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('positions')
                     .select('*, teas(*)')
                     .eq('user_id', currentUser.id);
@@ -4060,7 +4060,7 @@
 
         async function loadLeaderboard() {
             try {
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('leaderboard')
                     .select('*')
                     .order('total_value', { ascending: false })
