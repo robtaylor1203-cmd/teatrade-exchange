@@ -7,6 +7,14 @@
     <title>TeaTrade Exchange | Global Tea Market Terminal</title>
     <link rel="icon" type="image/png" href="images/favicon-nb.png">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Supabase Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // Initialize Supabase
+        const SUPABASE_URL = 'https://uznxzyuknigzlxecjgtb.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_Gu4TYeiRA26yWe51mPZTJw_3ZgQoYME';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    </script>
     <style>
         :root {
             --bg-primary: #0a0e17;
@@ -1595,6 +1603,468 @@
                 width: 100%;
             }
         }
+
+        /* =============================================
+           AUTH MODAL & TRADING PANEL STYLES
+           ============================================= */
+        
+        /* Auth Modal */
+        .auth-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .auth-modal.visible {
+            display: flex;
+        }
+        .auth-backdrop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(5px);
+        }
+        .auth-content {
+            position: relative;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            max-width: 420px;
+            width: 90%;
+            padding: 32px;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+        }
+        .auth-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+        .auth-tab {
+            flex: 1;
+            padding: 10px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .auth-tab.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
+        }
+        .auth-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 0 0 8px 0;
+        }
+        .auth-subtitle {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin: 0 0 24px 0;
+        }
+        .auth-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .auth-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .auth-input-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .auth-input {
+            padding: 12px 14px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .auth-input:focus {
+            border-color: var(--accent-blue);
+        }
+        .auth-input::placeholder {
+            color: var(--text-muted);
+        }
+        .auth-submit {
+            padding: 14px;
+            background: var(--accent-blue);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 8px;
+        }
+        .auth-submit:hover {
+            background: #1557b0;
+        }
+        .auth-submit:disabled {
+            background: var(--text-muted);
+            cursor: not-allowed;
+        }
+        .auth-error {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid var(--accent-red);
+            border-radius: 6px;
+            padding: 12px;
+            color: var(--accent-red);
+            font-size: 13px;
+            display: none;
+        }
+        .auth-error.visible {
+            display: block;
+        }
+        .auth-bonus {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid var(--accent-green);
+            border-radius: 6px;
+            padding: 12px;
+            text-align: center;
+            margin-top: 16px;
+        }
+        .auth-bonus-amount {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent-green);
+        }
+        .auth-bonus-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        .auth-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 24px;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .auth-close:hover {
+            color: var(--text-primary);
+        }
+
+        /* User Menu (logged in state) */
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .user-balance {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            padding: 6px 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+        .user-balance-label {
+            color: var(--text-muted);
+            font-size: 10px;
+            margin-right: 6px;
+        }
+        .user-balance-amount {
+            color: var(--accent-green);
+            font-weight: 600;
+        }
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            background: var(--accent-blue);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .login-btn {
+            padding: 8px 16px;
+            background: var(--accent-blue);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .login-btn:hover {
+            background: #1557b0;
+        }
+
+        /* Trading Panel (replaces Order Book lock) */
+        .trading-panel {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+        .trade-form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .trade-type-toggle {
+            display: flex;
+            gap: 4px;
+        }
+        .trade-type-btn {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .trade-type-btn.buy {
+            background: transparent;
+            color: var(--accent-green);
+            border-color: var(--accent-green);
+        }
+        .trade-type-btn.buy.active {
+            background: var(--accent-green);
+            color: white;
+        }
+        .trade-type-btn.sell {
+            background: transparent;
+            color: var(--accent-red);
+            border-color: var(--accent-red);
+        }
+        .trade-type-btn.sell.active {
+            background: var(--accent-red);
+            color: white;
+        }
+        .trade-select {
+            padding: 10px 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 13px;
+            outline: none;
+            cursor: pointer;
+        }
+        .trade-input-row {
+            display: flex;
+            gap: 8px;
+        }
+        .trade-input-group {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .trade-input-group label {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        .trade-input {
+            padding: 10px 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            outline: none;
+        }
+        .trade-input:focus {
+            border-color: var(--accent-blue);
+        }
+        .trade-summary {
+            background: var(--bg-card);
+            border-radius: 4px;
+            padding: 10px 12px;
+            font-size: 12px;
+        }
+        .trade-summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+        }
+        .trade-summary-label {
+            color: var(--text-muted);
+        }
+        .trade-summary-value {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-primary);
+        }
+        .trade-execute-btn {
+            padding: 14px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .trade-execute-btn.buy {
+            background: var(--accent-green);
+            color: white;
+        }
+        .trade-execute-btn.buy:hover {
+            background: #0d9668;
+        }
+        .trade-execute-btn.sell {
+            background: var(--accent-red);
+            color: white;
+        }
+        .trade-execute-btn.sell:hover {
+            background: #dc2626;
+        }
+        .trade-execute-btn:disabled {
+            background: var(--text-muted);
+            cursor: not-allowed;
+        }
+
+        /* Portfolio Section */
+        .portfolio-section {
+            padding: 16px;
+        }
+        .portfolio-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .portfolio-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        .portfolio-pnl {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+        }
+        .position-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .position-item:last-child {
+            border-bottom: none;
+        }
+        .position-tea {
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .position-qty {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .position-value {
+            text-align: right;
+        }
+        .position-current {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+        }
+        .position-pnl {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+        }
+
+        /* Leaderboard Tab */
+        .leaderboard-section {
+            padding: 16px;
+        }
+        .leaderboard-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .leaderboard-rank {
+            width: 24px;
+            height: 24px;
+            background: var(--bg-card);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .leaderboard-rank.gold { background: #f59e0b; color: #000; }
+        .leaderboard-rank.silver { background: #9ca3af; color: #000; }
+        .leaderboard-rank.bronze { background: #cd7f32; color: #000; }
+        .leaderboard-name {
+            flex: 1;
+            font-size: 13px;
+        }
+        .leaderboard-return {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        /* Trade Success Toast */
+        .trade-toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--accent-green);
+            border-radius: 8px;
+            padding: 16px 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            z-index: 10001;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+        .trade-toast.visible {
+            display: block;
+        }
+        .trade-toast.error {
+            border-color: var(--accent-red);
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .toast-title {
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        .toast-message {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
     </style>
 </head>
 <body>
@@ -1638,6 +2108,18 @@
             <div class="market-status" id="market-status">
                 <div class="status-dot" id="status-dot"></div>
                 <span id="status-text">Mombasa Live</span>
+            </div>
+            <!-- Logged out state -->
+            <div id="logged-out-ui">
+                <button class="login-btn" onclick="openAuthModal()">Sign Up / Log In</button>
+            </div>
+            <!-- Logged in state -->
+            <div id="logged-in-ui" class="user-menu" style="display: none;">
+                <div class="user-balance">
+                    <span class="user-balance-label">BALANCE</span>
+                    <span class="user-balance-amount" id="user-balance">$10,000.00</span>
+                </div>
+                <div class="user-avatar" id="user-avatar" onclick="handleLogout()" title="Click to logout">TT</div>
             </div>
         </div>
     </div>
@@ -2172,6 +2654,97 @@
 
         <!-- Right Panel -->
         <div class="right-panel">
+            <!-- Trading Panel -->
+            <div class="panel-section trading-panel">
+                <div class="panel-title">
+                    Trade
+                    <span class="live-badge">PAPER</span>
+                </div>
+                <div class="trade-form" id="trade-form">
+                    <div class="trade-type-toggle">
+                        <button type="button" class="trade-type-btn buy active" id="btn-trade-buy" onclick="setTradeType('BUY')">BUY</button>
+                        <button type="button" class="trade-type-btn sell" id="btn-trade-sell" onclick="setTradeType('SELL')">SELL</button>
+                    </div>
+                    <select class="trade-select" id="trade-tea-select" onchange="updateTradeSummary()">
+                        <option value="">Select Tea...</option>
+                    </select>
+                    <div class="trade-input-row">
+                        <div class="trade-input-group">
+                            <label>Quantity (kg)</label>
+                            <input type="number" class="trade-input" id="trade-qty" placeholder="100" min="1" step="1" oninput="updateTradeSummary()">
+                        </div>
+                        <div class="trade-input-group">
+                            <label>Price ($/kg)</label>
+                            <input type="number" class="trade-input" id="trade-price" placeholder="3.42" step="0.001" readonly>
+                        </div>
+                    </div>
+                    <div class="trade-summary">
+                        <div class="trade-summary-row">
+                            <span class="trade-summary-label">Order Value</span>
+                            <span class="trade-summary-value" id="trade-value">$0.00</span>
+                        </div>
+                        <div class="trade-summary-row">
+                            <span class="trade-summary-label">Your Balance</span>
+                            <span class="trade-summary-value" id="trade-balance">$10,000.00</span>
+                        </div>
+                    </div>
+                    <button type="button" class="trade-execute-btn buy" id="trade-execute-btn" onclick="executeTrade()" disabled>
+                        Sign in to Trade
+                    </button>
+                </div>
+            </div>
+
+            <!-- Portfolio Section -->
+            <div class="panel-section portfolio-section" id="portfolio-section" style="display: none;">
+                <div class="panel-title">Your Portfolio</div>
+                <div class="portfolio-header">
+                    <div>
+                        <div class="portfolio-value" id="portfolio-value">$10,000.00</div>
+                        <div class="portfolio-pnl up" id="portfolio-pnl">+$0.00 (0.00%)</div>
+                    </div>
+                </div>
+                <div id="positions-list">
+                    <div style="color: var(--text-muted); font-size: 12px; padding: 20px 0; text-align: center;">
+                        No positions yet. Start trading!
+                    </div>
+                </div>
+            </div>
+
+            <!-- Leaderboard Section -->
+            <div class="panel-section leaderboard-section">
+                <div class="panel-title">
+                    Leaderboard
+                    <span style="font-size: 10px; color: var(--accent-orange);">FEB 2026</span>
+                </div>
+                <div id="leaderboard-list">
+                    <div class="leaderboard-item">
+                        <div class="leaderboard-rank gold">1</div>
+                        <div class="leaderboard-name">tea_magnate</div>
+                        <div class="leaderboard-return up">+24.5%</div>
+                    </div>
+                    <div class="leaderboard-item">
+                        <div class="leaderboard-rank silver">2</div>
+                        <div class="leaderboard-name">ceylon_king</div>
+                        <div class="leaderboard-return up">+18.2%</div>
+                    </div>
+                    <div class="leaderboard-item">
+                        <div class="leaderboard-rank bronze">3</div>
+                        <div class="leaderboard-name">mombasa_trader</div>
+                        <div class="leaderboard-return up">+15.7%</div>
+                    </div>
+                    <div class="leaderboard-item">
+                        <div class="leaderboard-rank">4</div>
+                        <div class="leaderboard-name">darjeeling_pro</div>
+                        <div class="leaderboard-return up">+12.1%</div>
+                    </div>
+                    <div class="leaderboard-item">
+                        <div class="leaderboard-rank">5</div>
+                        <div class="leaderboard-name">assam_bull</div>
+                        <div class="leaderboard-return up">+9.8%</div>
+                    </div>
+                </div>
+            </div>
+
             <div class="panel-section">
                 <div class="panel-title">
                     Market News
@@ -2838,6 +3411,621 @@
         
         updateMarketStatus();
         setInterval(updateMarketStatus, 60000); // Update every minute
+
+        // =============================================
+        // TEATRADE EXCHANGE - PAPER TRADING SYSTEM
+        // =============================================
+
+        // Global State
+        let currentUser = null;
+        let userProfile = null;
+        let teas = [];
+        let positions = [];
+        let tradeType = 'BUY';
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkAuthState();
+            await loadTeas();
+            await loadLeaderboard();
+        });
+
+        // =============================================
+        // AUTH FUNCTIONS
+        // =============================================
+
+        async function checkAuthState() {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    currentUser = user;
+                    await loadUserProfile();
+                    updateUIForLoggedInUser();
+                }
+            } catch (error) {
+                console.error('Auth check error:', error);
+            }
+        }
+
+        function openAuthModal() {
+            document.getElementById('auth-modal').classList.add('visible');
+        }
+
+        function closeAuthModal() {
+            document.getElementById('auth-modal').classList.remove('visible');
+            // Clear errors
+            document.getElementById('signup-error').classList.remove('visible');
+            document.getElementById('login-error').classList.remove('visible');
+        }
+
+        function switchAuthTab(tab) {
+            document.getElementById('tab-signup').classList.toggle('active', tab === 'signup');
+            document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+            document.getElementById('signup-form-container').style.display = tab === 'signup' ? 'block' : 'none';
+            document.getElementById('login-form-container').style.display = tab === 'login' ? 'block' : 'none';
+        }
+
+        async function handleSignup(e) {
+            e.preventDefault();
+            const btn = document.getElementById('signup-btn');
+            const errorDiv = document.getElementById('signup-error');
+            
+            const username = document.getElementById('signup-username').value.trim().toLowerCase();
+            const email = document.getElementById('signup-email').value.trim();
+            const password = document.getElementById('signup-password').value;
+
+            // Validate username
+            if (!/^[a-z0-9_]+$/.test(username)) {
+                errorDiv.textContent = 'Username can only contain letters, numbers, and underscores';
+                errorDiv.classList.add('visible');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Creating Account...';
+            errorDiv.classList.remove('visible');
+
+            try {
+                const { data, error } = await supabase.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        data: {
+                            username: username,
+                            display_name: username
+                        }
+                    }
+                });
+
+                if (error) throw error;
+
+                currentUser = data.user;
+                await loadUserProfile();
+                updateUIForLoggedInUser();
+                closeAuthModal();
+                showToast('Welcome to TeaTrade!', `You have $10,000 virtual cash to start trading.`);
+
+            } catch (error) {
+                console.error('Signup error:', error);
+                errorDiv.textContent = error.message || 'Signup failed. Please try again.';
+                errorDiv.classList.add('visible');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Create Account & Start Trading';
+            }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const btn = document.getElementById('login-btn');
+            const errorDiv = document.getElementById('login-error');
+            
+            const email = document.getElementById('login-email').value.trim();
+            const password = document.getElementById('login-password').value;
+
+            btn.disabled = true;
+            btn.textContent = 'Logging in...';
+            errorDiv.classList.remove('visible');
+
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password
+                });
+
+                if (error) throw error;
+
+                currentUser = data.user;
+                await loadUserProfile();
+                updateUIForLoggedInUser();
+                closeAuthModal();
+                showToast('Welcome back!', `Good to see you, ${userProfile?.username || 'trader'}!`);
+
+            } catch (error) {
+                console.error('Login error:', error);
+                errorDiv.textContent = error.message || 'Login failed. Please check your credentials.';
+                errorDiv.classList.add('visible');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Log In';
+            }
+        }
+
+        async function handleLogout() {
+            if (!confirm('Are you sure you want to log out?')) return;
+            
+            try {
+                await supabase.auth.signOut();
+                currentUser = null;
+                userProfile = null;
+                positions = [];
+                updateUIForLoggedOutUser();
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        }
+
+        async function loadUserProfile() {
+            if (!currentUser) return;
+
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', currentUser.id)
+                    .single();
+
+                if (error) throw error;
+                userProfile = data;
+                await loadPositions();
+            } catch (error) {
+                console.error('Profile load error:', error);
+            }
+        }
+
+        function updateUIForLoggedInUser() {
+            document.getElementById('logged-out-ui').style.display = 'none';
+            document.getElementById('logged-in-ui').style.display = 'flex';
+            document.getElementById('portfolio-section').style.display = 'block';
+
+            // Update balance display
+            const balance = userProfile?.cash_balance || 10000;
+            document.getElementById('user-balance').textContent = '$' + balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('trade-balance').textContent = '$' + balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+            // Update avatar
+            const initials = (userProfile?.username || 'TT').substring(0, 2).toUpperCase();
+            document.getElementById('user-avatar').textContent = initials;
+
+            // Update trade button
+            updateTradeButton();
+            
+            // Update portfolio
+            updatePortfolioDisplay();
+        }
+
+        function updateUIForLoggedOutUser() {
+            document.getElementById('logged-out-ui').style.display = 'block';
+            document.getElementById('logged-in-ui').style.display = 'none';
+            document.getElementById('portfolio-section').style.display = 'none';
+            
+            document.getElementById('trade-balance').textContent = '$10,000.00';
+            document.getElementById('trade-execute-btn').textContent = 'Sign in to Trade';
+            document.getElementById('trade-execute-btn').disabled = true;
+        }
+
+        // =============================================
+        // TRADING FUNCTIONS
+        // =============================================
+
+        async function loadTeas() {
+            try {
+                const { data, error } = await supabase
+                    .from('teas')
+                    .select('*')
+                    .order('symbol');
+
+                if (error) throw error;
+                teas = data;
+                populateTeaSelect();
+            } catch (error) {
+                console.error('Failed to load teas:', error);
+            }
+        }
+
+        function populateTeaSelect() {
+            const select = document.getElementById('trade-tea-select');
+            select.innerHTML = '<option value="">Select Tea...</option>';
+            
+            teas.forEach(tea => {
+                const change = tea.previous_price ? ((tea.current_price - tea.previous_price) / tea.previous_price * 100).toFixed(1) : '0.0';
+                const changeSign = change >= 0 ? '+' : '';
+                const option = document.createElement('option');
+                option.value = tea.id;
+                option.textContent = `${tea.symbol} - $${tea.current_price.toFixed(2)} (${changeSign}${change}%)`;
+                option.dataset.price = tea.current_price;
+                select.appendChild(option);
+            });
+        }
+
+        function setTradeType(type) {
+            tradeType = type;
+            document.getElementById('btn-trade-buy').classList.toggle('active', type === 'BUY');
+            document.getElementById('btn-trade-sell').classList.toggle('active', type === 'SELL');
+            
+            const btn = document.getElementById('trade-execute-btn');
+            btn.classList.remove('buy', 'sell');
+            btn.classList.add(type.toLowerCase());
+            
+            updateTradeButton();
+        }
+
+        function updateTradeSummary() {
+            const select = document.getElementById('trade-tea-select');
+            const qtyInput = document.getElementById('trade-qty');
+            const priceInput = document.getElementById('trade-price');
+            const valueEl = document.getElementById('trade-value');
+            
+            const selectedOption = select.options[select.selectedIndex];
+            const price = selectedOption?.dataset?.price ? parseFloat(selectedOption.dataset.price) : 0;
+            const qty = parseFloat(qtyInput.value) || 0;
+            
+            priceInput.value = price > 0 ? price.toFixed(3) : '';
+            const total = price * qty;
+            valueEl.textContent = '$' + total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            
+            updateTradeButton();
+        }
+
+        function updateTradeButton() {
+            const btn = document.getElementById('trade-execute-btn');
+            const select = document.getElementById('trade-tea-select');
+            const qty = parseFloat(document.getElementById('trade-qty').value) || 0;
+            const price = parseFloat(document.getElementById('trade-price').value) || 0;
+            const total = price * qty;
+
+            if (!currentUser) {
+                btn.textContent = 'Sign in to Trade';
+                btn.disabled = true;
+                return;
+            }
+
+            if (!select.value) {
+                btn.textContent = 'Select a Tea';
+                btn.disabled = true;
+                return;
+            }
+
+            if (qty <= 0) {
+                btn.textContent = 'Enter Quantity';
+                btn.disabled = true;
+                return;
+            }
+
+            if (tradeType === 'BUY') {
+                if (total > (userProfile?.cash_balance || 0)) {
+                    btn.textContent = 'Insufficient Balance';
+                    btn.disabled = true;
+                    return;
+                }
+                btn.textContent = `BUY ${qty.toLocaleString()} kg for $${total.toFixed(2)}`;
+            } else {
+                // Check if user has enough to sell
+                const teaId = parseInt(select.value);
+                const position = positions.find(p => p.tea_id === teaId);
+                if (!position || position.quantity < qty) {
+                    btn.textContent = 'Insufficient Holdings';
+                    btn.disabled = true;
+                    return;
+                }
+                btn.textContent = `SELL ${qty.toLocaleString()} kg for $${total.toFixed(2)}`;
+            }
+            btn.disabled = false;
+        }
+
+        async function executeTrade() {
+            if (!currentUser) {
+                openAuthModal();
+                return;
+            }
+
+            const btn = document.getElementById('trade-execute-btn');
+            const select = document.getElementById('trade-tea-select');
+            const teaId = parseInt(select.value);
+            const qty = parseFloat(document.getElementById('trade-qty').value);
+            const price = parseFloat(document.getElementById('trade-price').value);
+            const total = price * qty;
+
+            const tea = teas.find(t => t.id === teaId);
+            if (!tea) return;
+
+            btn.disabled = true;
+            btn.textContent = 'Executing...';
+
+            try {
+                if (tradeType === 'BUY') {
+                    // Check balance
+                    if (total > userProfile.cash_balance) {
+                        throw new Error('Insufficient balance');
+                    }
+
+                    // Update cash balance
+                    const newBalance = userProfile.cash_balance - total;
+                    const { error: balanceError } = await supabase
+                        .from('profiles')
+                        .update({ cash_balance: newBalance })
+                        .eq('id', currentUser.id);
+                    if (balanceError) throw balanceError;
+
+                    // Update or create position
+                    const existingPosition = positions.find(p => p.tea_id === teaId);
+                    if (existingPosition) {
+                        // Calculate new average price
+                        const totalQty = existingPosition.quantity + qty;
+                        const newAvgPrice = ((existingPosition.avg_entry_price * existingPosition.quantity) + (price * qty)) / totalQty;
+                        
+                        const { error: posError } = await supabase
+                            .from('positions')
+                            .update({ 
+                                quantity: totalQty, 
+                                avg_entry_price: newAvgPrice,
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('id', existingPosition.id);
+                        if (posError) throw posError;
+                    } else {
+                        const { error: posError } = await supabase
+                            .from('positions')
+                            .insert({
+                                user_id: currentUser.id,
+                                tea_id: teaId,
+                                quantity: qty,
+                                avg_entry_price: price
+                            });
+                        if (posError) throw posError;
+                    }
+
+                    // Record trade
+                    const { error: tradeError } = await supabase
+                        .from('trades')
+                        .insert({
+                            user_id: currentUser.id,
+                            tea_id: teaId,
+                            side: 'BUY',
+                            quantity: qty,
+                            price: price,
+                            total_value: total
+                        });
+                    if (tradeError) throw tradeError;
+
+                    userProfile.cash_balance = newBalance;
+                    showToast('Trade Executed!', `Bought ${qty.toLocaleString()} kg of ${tea.symbol} at $${price.toFixed(2)}/kg`);
+
+                } else {
+                    // SELL
+                    const existingPosition = positions.find(p => p.tea_id === teaId);
+                    if (!existingPosition || existingPosition.quantity < qty) {
+                        throw new Error('Insufficient holdings');
+                    }
+
+                    // Update cash balance
+                    const newBalance = userProfile.cash_balance + total;
+                    const { error: balanceError } = await supabase
+                        .from('profiles')
+                        .update({ cash_balance: newBalance })
+                        .eq('id', currentUser.id);
+                    if (balanceError) throw balanceError;
+
+                    // Update position
+                    const newQty = existingPosition.quantity - qty;
+                    if (newQty <= 0) {
+                        const { error: posError } = await supabase
+                            .from('positions')
+                            .delete()
+                            .eq('id', existingPosition.id);
+                        if (posError) throw posError;
+                    } else {
+                        const { error: posError } = await supabase
+                            .from('positions')
+                            .update({ 
+                                quantity: newQty,
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('id', existingPosition.id);
+                        if (posError) throw posError;
+                    }
+
+                    // Record trade
+                    const { error: tradeError } = await supabase
+                        .from('trades')
+                        .insert({
+                            user_id: currentUser.id,
+                            tea_id: teaId,
+                            side: 'SELL',
+                            quantity: qty,
+                            price: price,
+                            total_value: total
+                        });
+                    if (tradeError) throw tradeError;
+
+                    userProfile.cash_balance = newBalance;
+                    const pnl = (price - existingPosition.avg_entry_price) * qty;
+                    const pnlText = pnl >= 0 ? `Profit: +$${pnl.toFixed(2)}` : `Loss: -$${Math.abs(pnl).toFixed(2)}`;
+                    showToast('Trade Executed!', `Sold ${qty.toLocaleString()} kg of ${tea.symbol}. ${pnlText}`);
+                }
+
+                // Refresh data
+                await loadPositions();
+                updateUIForLoggedInUser();
+                
+                // Reset form
+                document.getElementById('trade-qty').value = '';
+                updateTradeSummary();
+
+            } catch (error) {
+                console.error('Trade error:', error);
+                showToast('Trade Failed', error.message, true);
+            }
+
+            updateTradeButton();
+        }
+
+        // =============================================
+        // PORTFOLIO FUNCTIONS
+        // =============================================
+
+        async function loadPositions() {
+            if (!currentUser) return;
+
+            try {
+                const { data, error } = await supabase
+                    .from('positions')
+                    .select('*, teas(*)')
+                    .eq('user_id', currentUser.id);
+
+                if (error) throw error;
+                positions = data || [];
+                updatePortfolioDisplay();
+            } catch (error) {
+                console.error('Failed to load positions:', error);
+            }
+        }
+
+        function updatePortfolioDisplay() {
+            const listEl = document.getElementById('positions-list');
+            const valueEl = document.getElementById('portfolio-value');
+            const pnlEl = document.getElementById('portfolio-pnl');
+
+            if (positions.length === 0) {
+                listEl.innerHTML = `
+                    <div style="color: var(--text-muted); font-size: 12px; padding: 20px 0; text-align: center;">
+                        No positions yet. Start trading!
+                    </div>
+                `;
+                const totalValue = userProfile?.cash_balance || 10000;
+                valueEl.textContent = '$' + totalValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                const pnl = totalValue - 10000;
+                const pnlPct = (pnl / 10000 * 100).toFixed(2);
+                pnlEl.textContent = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} (${pnlPct}%)`;
+                pnlEl.className = 'portfolio-pnl ' + (pnl >= 0 ? 'up' : 'down');
+                return;
+            }
+
+            let holdingsValue = 0;
+            let html = '';
+
+            positions.forEach(pos => {
+                const tea = pos.teas || teas.find(t => t.id === pos.tea_id);
+                if (!tea) return;
+
+                const currentValue = pos.quantity * tea.current_price;
+                const costBasis = pos.quantity * pos.avg_entry_price;
+                const pnl = currentValue - costBasis;
+                const pnlPct = (pnl / costBasis * 100).toFixed(1);
+                holdingsValue += currentValue;
+
+                html += `
+                    <div class="position-item">
+                        <div>
+                            <div class="position-tea">${tea.symbol}</div>
+                            <div class="position-qty">${pos.quantity.toLocaleString()} kg @ $${pos.avg_entry_price.toFixed(2)}</div>
+                        </div>
+                        <div class="position-value">
+                            <div class="position-current">$${currentValue.toFixed(2)}</div>
+                            <div class="position-pnl ${pnl >= 0 ? 'up' : 'down'}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} (${pnlPct}%)</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            listEl.innerHTML = html;
+
+            const totalValue = (userProfile?.cash_balance || 0) + holdingsValue;
+            valueEl.textContent = '$' + totalValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            
+            const totalPnl = totalValue - 10000;
+            const totalPnlPct = (totalPnl / 10000 * 100).toFixed(2);
+            pnlEl.textContent = `${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)} (${totalPnlPct}%)`;
+            pnlEl.className = 'portfolio-pnl ' + (totalPnl >= 0 ? 'up' : 'down');
+        }
+
+        // =============================================
+        // LEADERBOARD FUNCTIONS
+        // =============================================
+
+        async function loadLeaderboard() {
+            try {
+                const { data, error } = await supabase
+                    .from('leaderboard')
+                    .select('*')
+                    .order('total_value', { ascending: false })
+                    .limit(10);
+
+                if (error) throw error;
+                
+                if (data && data.length > 0) {
+                    updateLeaderboardDisplay(data);
+                }
+            } catch (error) {
+                console.error('Failed to load leaderboard:', error);
+            }
+        }
+
+        function updateLeaderboardDisplay(leaders) {
+            const listEl = document.getElementById('leaderboard-list');
+            let html = '';
+
+            leaders.forEach((user, index) => {
+                const rank = index + 1;
+                let rankClass = '';
+                if (rank === 1) rankClass = 'gold';
+                else if (rank === 2) rankClass = 'silver';
+                else if (rank === 3) rankClass = 'bronze';
+
+                const returnPct = user.return_pct || 0;
+                const returnClass = returnPct >= 0 ? 'up' : 'down';
+                const returnSign = returnPct >= 0 ? '+' : '';
+
+                html += `
+                    <div class="leaderboard-item">
+                        <div class="leaderboard-rank ${rankClass}">${rank}</div>
+                        <div class="leaderboard-name">${user.username}</div>
+                        <div class="leaderboard-return ${returnClass}">${returnSign}${returnPct.toFixed(1)}%</div>
+                    </div>
+                `;
+            });
+
+            if (html) {
+                listEl.innerHTML = html;
+            }
+        }
+
+        // =============================================
+        // UTILITY FUNCTIONS
+        // =============================================
+
+        function showToast(title, message, isError = false) {
+            const toast = document.getElementById('trade-toast');
+            document.getElementById('toast-title').textContent = title;
+            document.getElementById('toast-message').textContent = message;
+            toast.classList.toggle('error', isError);
+            toast.classList.add('visible');
+
+            setTimeout(() => {
+                toast.classList.remove('visible');
+            }, 4000);
+        }
+
+        // Refresh data periodically
+        setInterval(async () => {
+            await loadTeas();
+            if (currentUser) {
+                await loadPositions();
+                updatePortfolioDisplay();
+            }
+            await loadLeaderboard();
+        }, 30000); // Every 30 seconds
+
     </script>
 </body>
 </html>
