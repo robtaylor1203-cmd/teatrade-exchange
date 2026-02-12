@@ -8,13 +8,7 @@
     <link rel="icon" type="image/png" href="images/favicon-nb.png">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Supabase Client -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script>
-        // Initialize Supabase
-        const SUPABASE_URL = 'https://uznxzyuknigzlxecjgtb.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6bnh6eXVrbmlnemx4ZWNqZ3RiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5Mzc5ODUsImV4cCI6MjA4NjUxMzk4NX0.BVOTqZ9kn2KCrNeF5675PNmMi9oJN3F6OoUnTtbpuIg';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    </script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --bg-primary: #0a0e17;
@@ -3516,6 +3510,11 @@
         // =============================================
         // TEATRADE EXCHANGE - PAPER TRADING SYSTEM
         // =============================================
+
+        // Initialize Supabase
+        const SUPABASE_URL = 'https://uznxzyuknigzlxecjgtb.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6bnh6eXVrbmlnemx4ZWNqZ3RiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5Mzc5ODUsImV4cCI6MjA4NjUxMzk4NX0.BVOTqZ9kn2KCrNeF5675PNmMi9oJN3F6OoUnTtbpuIg';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // Global State
         let currentUser = null;
