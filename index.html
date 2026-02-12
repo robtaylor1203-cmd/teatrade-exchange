@@ -856,11 +856,14 @@
             display: flex;
             flex-direction: column;
             min-height: 100%;
+            overflow: hidden;
+            max-width: 320px;
         }
 
         .panel-section {
             padding: 16px;
             border-bottom: 1px solid var(--border);
+            overflow: hidden;
         }
         
         .panel-section:last-child {
@@ -1831,6 +1834,7 @@
             display: flex;
             flex-direction: column;
             gap: 12px;
+            overflow: hidden;
         }
         .trade-type-toggle {
             display: flex;
@@ -1864,15 +1868,37 @@
             background: var(--accent-red);
             color: white;
         }
+        /* Modern Select Dropdown */
         .trade-select {
-            padding: 10px 12px;
+            padding: 12px 36px 12px 12px;
             background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 4px;
+            border-radius: 6px;
             color: var(--text-primary);
             font-size: 13px;
+            font-family: 'Inter', sans-serif;
             outline: none;
             cursor: pointer;
+            width: 100%;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .trade-select:hover {
+            border-color: var(--border-light);
+        }
+        .trade-select:focus {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+        }
+        .trade-select option {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            padding: 10px;
         }
         .trade-input-row {
             display: flex;
@@ -1883,28 +1909,44 @@
             display: flex;
             flex-direction: column;
             gap: 4px;
+            min-width: 0;
         }
         .trade-input-group label {
             font-size: 10px;
             color: var(--text-muted);
             text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         .trade-input {
             padding: 10px 12px;
             background: var(--bg-card);
             border: 1px solid var(--border);
-            border-radius: 4px;
+            border-radius: 6px;
             color: var(--text-primary);
             font-family: 'JetBrains Mono', monospace;
-            font-size: 14px;
+            font-size: 13px;
             outline: none;
+            width: 100%;
+            box-sizing: border-box;
+            -webkit-appearance: none;
+            -moz-appearance: textfield;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .trade-input::-webkit-outer-spin-button,
+        .trade-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .trade-input:hover {
+            border-color: var(--border-light);
         }
         .trade-input:focus {
             border-color: var(--accent-blue);
+            box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
         }
         .trade-summary {
             background: var(--bg-card);
-            border-radius: 4px;
+            border-radius: 6px;
             padding: 10px 12px;
             font-size: 12px;
         }
@@ -2331,6 +2373,44 @@
                         <span style="color: var(--accent-orange); font-size: 12px;">● Pre-Market</span>
                     </div>
                     <div class="volume-bar" style="width: 100%;"><div class="volume-fill" style="width: 20%;"></div></div>
+                </div>
+            </div>
+
+            <!-- Upcoming Auctions (moved from right panel) -->
+            <div class="sidebar-section">
+                <div class="sidebar-title">Upcoming Auctions</div>
+                <div class="calendar-item">
+                    <div class="calendar-date">
+                        <div class="calendar-day">12</div>
+                        <div class="calendar-month">Feb</div>
+                    </div>
+                    <div class="calendar-info">
+                        <div class="calendar-name">Mombasa Sale 06</div>
+                        <div class="calendar-center">Kenya Tea Exchange</div>
+                    </div>
+                    <span class="calendar-status live">LIVE</span>
+                </div>
+                <div class="calendar-item">
+                    <div class="calendar-date">
+                        <div class="calendar-day">13</div>
+                        <div class="calendar-month">Feb</div>
+                    </div>
+                    <div class="calendar-info">
+                        <div class="calendar-name">Kolkata Auction 08</div>
+                        <div class="calendar-center">Calcutta Tea Traders</div>
+                    </div>
+                    <span class="calendar-status upcoming">09:30 IST</span>
+                </div>
+                <div class="calendar-item">
+                    <div class="calendar-date">
+                        <div class="calendar-day">14</div>
+                        <div class="calendar-month">Feb</div>
+                    </div>
+                    <div class="calendar-info">
+                        <div class="calendar-name">Colombo Weekly</div>
+                        <div class="calendar-center">Ceylon Tea Board</div>
+                    </div>
+                    <span class="calendar-status upcoming">10:00 LKT</span>
                 </div>
             </div>
             
@@ -2875,54 +2955,6 @@
                             <button class="ob-btn-access" onclick="document.getElementById('early-access-modal').style.display='flex'">Request Access</button>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <div class="panel-section">
-                <div class="panel-title">Upcoming Auctions</div>
-                <div class="calendar-item">
-                    <div class="calendar-date">
-                        <div class="calendar-day">12</div>
-                        <div class="calendar-month">Feb</div>
-                    </div>
-                    <div class="calendar-info">
-                        <div class="calendar-name">Mombasa Sale 06</div>
-                        <div class="calendar-center">Kenya Tea Exchange</div>
-                    </div>
-                    <span class="calendar-status live">LIVE</span>
-                </div>
-                <div class="calendar-item">
-                    <div class="calendar-date">
-                        <div class="calendar-day">13</div>
-                        <div class="calendar-month">Feb</div>
-                    </div>
-                    <div class="calendar-info">
-                        <div class="calendar-name">Kolkata Auction 08</div>
-                        <div class="calendar-center">Calcutta Tea Traders</div>
-                    </div>
-                    <span class="calendar-status upcoming">09:30 IST</span>
-                </div>
-                <div class="calendar-item">
-                    <div class="calendar-date">
-                        <div class="calendar-day">14</div>
-                        <div class="calendar-month">Feb</div>
-                    </div>
-                    <div class="calendar-info">
-                        <div class="calendar-name">Colombo Weekly</div>
-                        <div class="calendar-center">Ceylon Tea Board</div>
-                    </div>
-                    <span class="calendar-status upcoming">10:00 LKT</span>
-                </div>
-                <div class="calendar-item">
-                    <div class="calendar-date">
-                        <div class="calendar-day">17</div>
-                        <div class="calendar-month">Feb</div>
-                    </div>
-                    <div class="calendar-info">
-                        <div class="calendar-name">Guwahati Auction</div>
-                        <div class="calendar-center">Assam Tea Board</div>
-                    </div>
-                    <span class="calendar-status upcoming">11:00 IST</span>
                 </div>
             </div>
 
