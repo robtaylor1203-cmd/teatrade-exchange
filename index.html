@@ -856,6 +856,37 @@
         .price-cell {
             font-family: 'JetBrains Mono', monospace;
             font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.3s ease;
+        }
+
+        .price-cell.up {
+            color: var(--accent-green);
+            background: rgba(0, 212, 170, 0.15);
+        }
+
+        .price-cell.down {
+            color: var(--accent-red);
+            background: rgba(255, 107, 107, 0.15);
+        }
+
+        .price-cell.flash-up {
+            animation: flashGreen 0.5s ease;
+        }
+
+        .price-cell.flash-down {
+            animation: flashRed 0.5s ease;
+        }
+
+        @keyframes flashGreen {
+            0% { background: rgba(0, 212, 170, 0.5); }
+            100% { background: rgba(0, 212, 170, 0.15); }
+        }
+
+        @keyframes flashRed {
+            0% { background: rgba(255, 107, 107, 0.5); }
+            100% { background: rgba(255, 107, 107, 0.15); }
         }
 
         .volume-bar {
@@ -3625,9 +3656,22 @@
             }
         }
 
+        // Track previous auction prices for flash detection
+        let previousAuctionPrices = {};
+
         function updateAuctionTable() {
             const tbody = document.getElementById('auction-table-body');
             if (!tbody || !teas.length) return;
+
+            // Detect which prices changed
+            const changedTeas = {};
+            teas.forEach(tea => {
+                if (previousAuctionPrices[tea.symbol] !== undefined && 
+                    previousAuctionPrices[tea.symbol] !== tea.current_price) {
+                    changedTeas[tea.symbol] = tea.current_price > previousAuctionPrices[tea.symbol] ? 'up' : 'down';
+                }
+                previousAuctionPrices[tea.symbol] = tea.current_price;
+            });
 
             tbody.innerHTML = teas.map((tea, index) => {
                 const displayData = teaDisplayData[tea.symbol] || {
@@ -3643,6 +3687,9 @@
                     : 0;
                 const changeStr = change !== 0 ? `${change >= 0 ? '+' : ''}${change.toFixed(1)}%` : '—';
                 const changeClass = change > 0 ? 'up' : change < 0 ? 'down' : '';
+                
+                // Add flash class if price just changed
+                const flashClass = changedTeas[tea.symbol] ? `flash-${changedTeas[tea.symbol]}` : '';
 
                 // Assign status based on price movement (simulated)
                 let status, statusColor, buyer;
@@ -3671,7 +3718,7 @@
                         <td>${displayData.estate}</td>
                         <td class="auction-center">${displayData.origin}</td>
                         <td>${displayData.qty.toLocaleString()}</td>
-                        <td class="price-cell ${changeClass}">$${tea.current_price.toFixed(2)}</td>
+                        <td class="price-cell ${changeClass} ${flashClass}" data-tea="${tea.symbol}">$${tea.current_price.toFixed(2)}</td>
                         <td class="${changeClass}">${changeStr}</td>
                         <td>${buyer}</td>
                         <td><span style="color: ${statusColor};">${status}</span></td>
