@@ -8140,7 +8140,9 @@
                 document.getElementById('depth-ask-volume').textContent = `Vol: ${askVol.toLocaleString()} kg`;
                 
                 // Update mid price based on selected tea
-                const midPrice = (currentTeaPrice || 4.82).toFixed(2);
+                const select = document.getElementById('trade-tea-select');
+                const selectedTea = teas.find(t => t.symbol === select?.value);
+                const midPrice = (selectedTea?.current_price || 4.82).toFixed(2);
                 document.getElementById('depth-mid-price').textContent = `Mid: $${midPrice}`;
             }
         }
