@@ -310,6 +310,8 @@
             scrollbar-width: thin;
             scrollbar-color: var(--border-light) var(--bg-tertiary);
             padding-right: 4px;
+            max-height: 280px;
+            min-height: 150px;
         }
         
         .chat-messages::-webkit-scrollbar {
@@ -324,6 +326,10 @@
         .chat-messages::-webkit-scrollbar-thumb {
             background: var(--border-light);
             border-radius: 3px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
         }
         
         .chat-message {
