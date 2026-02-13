@@ -202,11 +202,14 @@
             padding: 16px;
             display: flex;
             flex-direction: column;
+            max-height: calc(100vh - 85px);
+            overflow: hidden;
         }
         
         .sidebar-section:last-child {
             flex: 1;
             margin-bottom: 0;
+            min-height: 0;
         }
 
         .sidebar-section {
@@ -270,12 +273,13 @@
 
         /* IB Chat Section */
         .chat-section {
-            flex: 1;
+            flex: 1 1 auto;
             display: flex;
             flex-direction: column;
-            min-height: 0;
+            min-height: 200px;
             border-top: 1px solid var(--border);
             margin-top: 16px;
+            position: relative;
         }
         
         .chat-header {
@@ -283,6 +287,7 @@
             justify-content: space-between;
             align-items: center;
             padding-bottom: 8px;
+            flex-shrink: 0;
         }
         
         .chat-title {
@@ -310,8 +315,8 @@
             scrollbar-width: thin;
             scrollbar-color: var(--border-light) var(--bg-tertiary);
             padding-right: 4px;
-            max-height: 280px;
-            min-height: 150px;
+            padding-bottom: 8px;
+            min-height: 0;
         }
         
         .chat-messages::-webkit-scrollbar {
@@ -371,11 +376,16 @@
         }
         
         .chat-input-container {
-            margin-top: 8px;
-            padding-right: 6px;
+            margin-top: auto;
+            padding: 8px 6px 0 0;
             display: flex;
             gap: 4px;
             align-items: center;
+            flex-shrink: 0;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            position: sticky;
+            bottom: 0;
         }
         
         .chat-input {
@@ -444,28 +454,32 @@
             background: #d97706;
         }
         
-        /* Private message styling */
-        .chat-message.private {
-            background: rgba(147, 51, 234, 0.1);
-            border-left: 2px solid var(--accent-purple, #9333ea);
-            padding-left: 8px;
-            margin-left: -8px;
-        }
-        
-        .chat-message.private .chat-sender {
-            color: var(--accent-purple, #9333ea);
-        }
-        
-        .chat-message.private .chat-text::before {
-            content: '🔒 ';
-            font-size: 10px;
-        }
-        
+        /* Own message styling (must come before private for cascade) */
         .chat-message.own {
             background: rgba(26, 115, 232, 0.1);
             border-left: 2px solid var(--accent-blue);
             padding-left: 8px;
             margin-left: -8px;
+        }
+        
+        /* Private message styling - higher priority */
+        .chat-message.private,
+        .chat-message.own.private {
+            background: rgba(147, 51, 234, 0.15) !important;
+            border-left: 2px solid var(--accent-purple, #9333ea) !important;
+            padding-left: 8px;
+            margin-left: -8px;
+        }
+        
+        .chat-message.private .chat-sender,
+        .chat-message.own.private .chat-sender {
+            color: var(--accent-purple, #9333ea) !important;
+        }
+        
+        .chat-message.private .chat-text::before,
+        .chat-message.own.private .chat-text::before {
+            content: '🔒 ';
+            font-size: 10px;
         }
         
         .chat-sender.dm-target {
@@ -8635,7 +8649,7 @@
                 { id: 1, sender_email: 'k.muthoni@ktda.co.ke', sender_name: 'K.MUTHONI', message: 'New lots arriving from Kericho highlands tomorrow. Premium quality expected.', created_at: new Date(now - 35 * 60000).toISOString(), is_private: false },
                 { id: 2, sender_email: 'm.wong@ekaterra.com', sender_name: 'M.WONG', message: 'Any visibility on Ceylon OP availability next week?', created_at: new Date(now - 22 * 60000).toISOString(), is_private: false },
                 { id: 3, sender_email: 'system', sender_name: 'SYSTEM', message: 'Trade alert: Lot #24608 has been matched.', created_at: new Date(now - 15 * 60000).toISOString(), is_private: false, is_system: true },
-                { id: 4, sender_email: 'r.patel@tata.com', sender_name: 'R.PATEL', message: 'Confirmed 15MT Assam CTC at 285. Settlement T+2.', created_at: new Date(now - 8 * 60000).toISOString(), is_private: false },
+                { id: 4, sender_email: 'r.patel@tata.com', sender_name: 'R.PATEL', message: 'Can offer 10MT Kenya BP1 at 3.45. Interested?', created_at: new Date(now - 8 * 60000).toISOString(), is_private: true, recipient_email: 'demo@user.com' },
                 { id: 5, sender_email: 'j.harrison@finlays.com', sender_name: 'J.HARRISON', message: 'Looking for 20MT BP1 Mombasa. Can you source?', created_at: new Date(now - 2 * 60000).toISOString(), is_private: false }
             ];
             renderChatMessages();
@@ -8757,16 +8771,25 @@
                 return;
             }
             
-            // Parse for @username (private message)
+            // Parse for @username (private message) - more flexible regex
             let isPrivate = false;
             let recipientEmail = null;
             let actualMessage = message;
             
-            const dmMatch = message.match(/^@(\S+)\s+(.+)/);
+            // Match @username followed by optional message
+            const dmMatch = message.match(/^@(\S+)(?:\s+(.*))?$/);
             if (dmMatch) {
-                isPrivate = true;
                 const recipientHandle = dmMatch[1].toLowerCase();
-                actualMessage = dmMatch[2];
+                const dmMessage = dmMatch[2]?.trim();
+                
+                if (!dmMessage) {
+                    // Just @username with no message - prompt user
+                    showToast('DM Format', 'Use: @username your message');
+                    return;
+                }
+                
+                isPrivate = true;
+                actualMessage = dmMessage;
                 
                 // Try to find recipient (for demo, just use the handle as email prefix)
                 recipientEmail = recipientHandle.includes('@') ? recipientHandle : `${recipientHandle}@teatrade.exchange`;
