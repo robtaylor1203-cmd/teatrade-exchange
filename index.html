@@ -2309,6 +2309,22 @@
         .pair-symbol .quote {
             color: var(--accent-red);
         }
+        
+        /* Pairs table price cells - no flex, simple display */
+        .pairs-price {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+        
+        .pairs-price.flash-up {
+            animation: flashGreen 1s ease;
+        }
+        
+        .pairs-price.flash-down {
+            animation: flashRed 1s ease;
+        }
 
         .pair-ratio {
             font-family: 'JetBrains Mono', monospace;
@@ -2409,6 +2425,41 @@
             font-family: 'JetBrains Mono', monospace;
             font-size: 20px;
             color: var(--accent-blue);
+        }
+
+        .side-selector {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .side-btn {
+            flex: 1;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .side-btn.long.active {
+            background: var(--accent-green);
+            border-color: var(--accent-green);
+            color: white;
+        }
+
+        .side-btn.short.active {
+            background: var(--accent-red);
+            border-color: var(--accent-red);
+            color: white;
+        }
+
+        .side-btn:hover:not(.active) {
+            background: var(--bg-tertiary);
         }
 
         .leverage-selector {
@@ -4179,6 +4230,10 @@
                 </div>
                 <div class="ratio-display" id="modal-ratio-display">Ratio: 5.76</div>
             </div>
+            <div class="side-selector">
+                <button class="side-btn long active" data-side="LONG" onclick="setPairsSide('LONG')">Long</button>
+                <button class="side-btn short" data-side="SHORT" onclick="setPairsSide('SHORT')">Short</button>
+            </div>
             <div class="leverage-selector">
                 <button class="leverage-btn active" data-leverage="1" onclick="setLeverage(1)">1x</button>
                 <button class="leverage-btn" data-leverage="2" onclick="setLeverage(2)">2x</button>
@@ -4940,12 +4995,11 @@
                     <thead>
                         <tr>
                             <th>Pair</th>
-                            <th>Base Price</th>
-                            <th>Quote Price</th>
+                            <th>Base</th>
+                            <th>Quote</th>
                             <th>Ratio</th>
                             <th>Change</th>
                             <th>Spread</th>
-                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody id="pairs-table-body">
@@ -9515,21 +9569,17 @@
                 const quoteShort = pair.quote_symbol.split('-')[1] || pair.quote_symbol;
 
                 return `
-                    <tr>
+                    <tr onclick="openPairsModal('${pair.id}', 'LONG')" style="cursor: pointer;">
                         <td>
                             <span class="pair-symbol">
                                 <span class="base">${baseShort}</span>/<span class="quote">${quoteShort}</span>
                             </span>
                         </td>
-                        <td class="price-cell ${flashClass}">$${basePrice.toFixed(2)}</td>
-                        <td class="price-cell">$${quotePrice.toFixed(2)}</td>
+                        <td class="pairs-price ${flashClass}">$${basePrice.toFixed(2)}</td>
+                        <td class="pairs-price">$${quotePrice.toFixed(2)}</td>
                         <td><span class="pair-ratio">${ratio.toFixed(4)}</span></td>
                         <td class="${changeClass}">${changeStr}</td>
                         <td>$${spread.toFixed(2)}</td>
-                        <td>
-                            <button class="trade-pair-btn long" onclick="openPairsModal('${pair.id}', 'LONG')">Long</button>
-                            <button class="trade-pair-btn short" onclick="openPairsModal('${pair.id}', 'SHORT')">Short</button>
-                        </td>
                     </tr>
                 `;
             }).join('');
@@ -9581,10 +9631,8 @@
             // Reset leverage
             setLeverage(1);
 
-            // Style confirm button
-            const confirmBtn = document.getElementById('pairs-confirm-btn');
-            confirmBtn.className = `confirm-btn ${side.toLowerCase()}`;
-            confirmBtn.textContent = `${side} ${baseShort}/${quoteShort}`;
+            // Set initial side
+            setPairsSide(side);
 
             updatePairsSummary();
             document.getElementById('pairs-modal').classList.add('active');
@@ -9601,6 +9649,25 @@
                 btn.classList.toggle('active', parseInt(btn.dataset.leverage) === lev);
             });
             updatePairsSummary();
+        }
+
+        function setPairsSide(side) {
+            if (!currentPairTrade) return;
+            
+            currentPairTrade.side = side;
+            
+            // Update side buttons
+            document.querySelectorAll('.side-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.side === side);
+            });
+            
+            // Update modal title and confirm button
+            const { baseShort, quoteShort } = currentPairTrade;
+            document.getElementById('pairs-modal-title').textContent = `${side} ${baseShort}/${quoteShort}`;
+            
+            const confirmBtn = document.getElementById('pairs-confirm-btn');
+            confirmBtn.className = `confirm-btn ${side.toLowerCase()}`;
+            confirmBtn.textContent = `${side} ${baseShort}/${quoteShort}`;
         }
 
         function updatePairsSummary() {
