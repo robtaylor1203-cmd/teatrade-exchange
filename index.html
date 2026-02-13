@@ -4049,7 +4049,7 @@
                     .from('trades')
                     .select('*')
                     .eq('user_id', currentUser.id)
-                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: false })
                     .limit(20);
 
                 if (error) throw error;
@@ -4080,7 +4080,9 @@
 
             let html = '';
             trades.forEach(trade => {
-                const time = new Date(trade.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                const time = trade.created_at 
+                    ? new Date(trade.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                    : '--:--';
                 const orderId = '#' + trade.id.substring(0, 5).toUpperCase();
                 const tea = teas.find(t => t.id === trade.tea_id);
                 const teaSymbol = tea?.symbol || 'Unknown';
