@@ -720,6 +720,17 @@
             color: var(--text-muted);
             border-bottom: 1px solid var(--border);
             font-weight: 600;
+            position: sticky;
+            top: 0;
+            background: var(--bg-secondary);
+            z-index: 1;
+        }
+        
+        .order-table tfoot td {
+            padding: 10px 12px;
+            border-top: 2px solid var(--border);
+            font-weight: 600;
+            background: var(--bg-tertiary);
         }
         
         .order-table td {
@@ -4277,6 +4288,10 @@
             }
 
             let html = '';
+            let openCount = 0;
+            let openTotalValue = 0;
+            let openTotalPnl = 0;
+
             displayTrades.forEach(trade => {
                 const time = trade.created_at 
                     ? new Date(trade.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
@@ -4292,6 +4307,7 @@
                 // Calculate P/L
                 let pnl = 0;
                 let pnlPct = 0;
+                let tradeTotal = trade.quantity * trade.price;
                 if (isClosed && closing) {
                     // Locked-in P/L from the closing trade
                     pnl = (closing.sellPrice - trade.price) * trade.quantity;
@@ -4300,6 +4316,10 @@
                     // Live P/L based on current price
                     pnl = (tea.current_price - trade.price) * trade.quantity;
                     pnlPct = ((tea.current_price - trade.price) / trade.price * 100);
+                    // Track open positions totals
+                    openCount++;
+                    openTotalValue += tradeTotal;
+                    openTotalPnl += pnl;
                 }
                 const pnlClass = pnl >= 0 ? 'up' : 'down';
                 const pnlSign = pnl >= 0 ? '+' : '';
@@ -4326,6 +4346,24 @@
                     </tr>
                 `;
             });
+
+            // Add totals row for open positions
+            if (openCount > 0) {
+                const openPnlClass = openTotalPnl >= 0 ? 'up' : 'down';
+                const openPnlSign = openTotalPnl >= 0 ? '+' : '';
+                const openPnlPct = openTotalValue > 0 ? (openTotalPnl / openTotalValue * 100) : 0;
+                html += `
+                    <tr style="background: var(--bg-tertiary); font-weight: 600;">
+                        <td colspan="4" style="text-align: right; color: var(--text-muted);">OPEN POSITIONS TOTAL</td>
+                        <td></td>
+                        <td></td>
+                        <td class="order-price">$${openTotalValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        <td class="${openPnlClass}">${openPnlSign}$${openTotalPnl.toFixed(2)} (${openPnlPct.toFixed(1)}%)</td>
+                        <td><span style="color: var(--text-muted);">${openCount} open</span></td>
+                        <td></td>
+                    </tr>
+                `;
+            }
 
             tbody.innerHTML = html;
         }
