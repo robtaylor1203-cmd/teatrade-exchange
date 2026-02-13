@@ -1979,6 +1979,31 @@
         .pairs-table-wrapper::-webkit-scrollbar-thumb:hover {
             background: var(--text-muted);
         }
+
+        .auction-table-wrapper {
+            max-height: 420px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-light) var(--bg-tertiary);
+        }
+
+        .auction-table-wrapper::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .auction-table-wrapper::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+        }
+
+        .auction-table-wrapper::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        .auction-table-wrapper::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
         
         .order-table th {
             text-align: left;
@@ -2466,6 +2491,7 @@
             border-bottom: 1px solid var(--border);
             position: sticky;
             top: 0;
+            z-index: 1;
         }
 
         .data-table td {
@@ -4708,6 +4734,7 @@
                 </div>
                 <!-- Singles Table -->
                 <div id="singles-view">
+                <div class="auction-table-wrapper">
                 <table class="data-table" id="auction-table">
                     <thead>
                         <tr>
@@ -4726,6 +4753,7 @@
                         <!-- Populated dynamically from database -->
                     </tbody>
                 </table>
+                </div>
                 </div>
                 <!-- Pairs Table -->
                 <div id="pairs-view" style="display: none;">
@@ -6674,7 +6702,7 @@
         // Tea display data mapping (symbol -> auction display info with fixed buyer/status)
         // soldPrice: final price when sold, soldTime: timestamp for ordering
         const teaDisplayData = {
-            // 13 BIDDING lots - live price updates (10 from DB + 3 display-only)
+            // BIDDING lots - live price updates (10 from DB + additional display-only)
             'CHN-YUN': { grade: 'YUN', estate: 'Yunnan Gold', origin: 'China', lot: 24601, qty: 12400, buyer: '—', status: 'BIDDING' },
             'IND-ASM': { grade: 'ASM', estate: 'Assam Orthodox', origin: 'India', lot: 24602, qty: 8200, buyer: '—', status: 'BIDDING' },
             'IND-DRJ': { grade: 'DRJ', estate: 'Darjeeling First Flush', origin: 'India', lot: 24603, qty: 15600, buyer: '—', status: 'BIDDING' },
@@ -6689,8 +6717,14 @@
             'CHN-YUN-2': { grade: 'YUN', estate: 'Yunnan Special Reserve', origin: 'China', lot: 24611, qty: 6300, buyer: '—', status: 'BIDDING', priceFrom: 'CHN-YUN' },
             'IND-DRJ-2': { grade: 'DRJ', estate: 'Darjeeling Second Flush', origin: 'India', lot: 24612, qty: 11200, buyer: '—', status: 'BIDDING', priceFrom: 'IND-DRJ' },
             'KEN-BP1-2': { grade: 'BP1', estate: 'Kenya Premium BP1', origin: 'Kenya', lot: 24613, qty: 19500, buyer: '—', status: 'BIDDING', priceFrom: 'KEN-BP1' },
-            // 1 SOLD lot at the bottom
-            'SRI-BOP-SOLD': { grade: 'BOP', estate: 'Ceylon Vintage BOP', origin: 'Sri Lanka', lot: 24500, qty: 7800, buyer: 'Tata Global', status: 'SOLD', soldPrice: 4.65, soldTime: 1, priceFrom: 'SRI-BOP' }
+            'IND-ASM-2': { grade: 'ASM', estate: 'Assam Golden Tips', origin: 'India', lot: 24614, qty: 4800, buyer: '—', status: 'BIDDING', priceFrom: 'IND-ASM' },
+            'SRI-PEK-2': { grade: 'PEK', estate: 'Ceylon Highland Pekoe', origin: 'Sri Lanka', lot: 24615, qty: 9200, buyer: '—', status: 'BIDDING', priceFrom: 'SRI-PEK' },
+            'KEN-PF1-2': { grade: 'PF1', estate: 'Kenya Estate PF1', origin: 'Kenya', lot: 24616, qty: 16400, buyer: '—', status: 'BIDDING', priceFrom: 'KEN-PF1' },
+            'MLW-BP1-2': { grade: 'BP1', estate: 'Malawi Estate BP1', origin: 'Malawi', lot: 24617, qty: 7600, buyer: '—', status: 'BIDDING', priceFrom: 'MLW-BP1' },
+            // SOLD lots at the bottom
+            'SRI-BOP-SOLD': { grade: 'BOP', estate: 'Ceylon Vintage BOP', origin: 'Sri Lanka', lot: 24500, qty: 7800, buyer: 'Tata Global', status: 'SOLD', soldPrice: 4.65, soldTime: 3, priceFrom: 'SRI-BOP' },
+            'KEN-BP1-SOLD': { grade: 'BP1', estate: 'Kenya Select BP1', origin: 'Kenya', lot: 24501, qty: 11200, buyer: 'Unilever Tea', status: 'SOLD', soldPrice: 2.94, soldTime: 2, priceFrom: 'KEN-BP1' },
+            'IND-DRJ-SOLD': { grade: 'DRJ', estate: 'Darjeeling Reserve', origin: 'India', lot: 24502, qty: 5400, buyer: 'Harrods Ltd', status: 'SOLD', soldPrice: 8.72, soldTime: 1, priceFrom: 'IND-DRJ' }
         };
 
         async function loadTeas() {
