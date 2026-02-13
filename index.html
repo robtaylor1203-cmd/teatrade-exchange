@@ -3619,22 +3619,19 @@
         // TRADING FUNCTIONS
         // =============================================
 
-        // Tea display data mapping (symbol -> auction display info)
+        // Tea display data mapping (symbol -> auction display info with fixed buyer/status)
         const teaDisplayData = {
-            'ASSAM-CTC': { grade: 'CTC', estate: 'Dikom Estate', origin: 'India', lot: 24601, qty: 12400 },
-            'DARJ-FF': { grade: 'FTGFOP1', estate: 'Goomtee Tea Estate', origin: 'India', lot: 24602, qty: 8200 },
-            'KENYA-BP1': { grade: 'BP1', estate: 'Kericho Highlands', origin: 'Kenya', lot: 24603, qty: 15600 },
-            'CEYLON-OP': { grade: 'OP', estate: 'Nuwara Eliya', origin: 'Sri Lanka', lot: 24604, qty: 22000 },
-            'CHINA-GRN': { grade: 'Gunpowder', estate: 'Zhejiang Province', origin: 'China', lot: 24605, qty: 5400 },
-            'NEPAL-GT': { grade: 'SFTGFOP1', estate: 'Jun Chiyabari', origin: 'Nepal', lot: 24606, qty: 18900 },
-            'RWAND-OP1': { grade: 'OP1', estate: 'Sorwathe Factory', origin: 'Rwanda', lot: 24607, qty: 9800 },
-            'VIETNAM-OP': { grade: 'OP', estate: 'Moc Chau Highland', origin: 'Vietnam', lot: 24608, qty: 6200 },
-            'JAPAN-MAT': { grade: 'Ceremonial', estate: 'Uji Region', origin: 'Japan', lot: 24609, qty: 14500 },
-            'TAIWAN-OOL': { grade: 'High Mountain', estate: 'Alishan', origin: 'Taiwan', lot: 24610, qty: 8700 }
+            'ASSAM-CTC': { grade: 'CTC', estate: 'Dikom Estate', origin: 'India', lot: 24601, qty: 12400, buyer: 'Unilever', status: 'SOLD' },
+            'DARJ-FF': { grade: 'FTGFOP1', estate: 'Goomtee Tea Estate', origin: 'India', lot: 24602, qty: 8200, buyer: 'Tata Global', status: 'SOLD' },
+            'KENYA-BP1': { grade: 'BP1', estate: 'Kericho Highlands', origin: 'Kenya', lot: 24603, qty: 15600, buyer: '—', status: 'BIDDING' },
+            'CEYLON-OP': { grade: 'OP', estate: 'Nuwara Eliya', origin: 'Sri Lanka', lot: 24604, qty: 22000, buyer: 'Finlays', status: 'SOLD' },
+            'CHINA-GRN': { grade: 'Gunpowder', estate: 'Zhejiang Province', origin: 'China', lot: 24605, qty: 5400, buyer: '—', status: 'PENDING' },
+            'NEPAL-GT': { grade: 'SFTGFOP1', estate: 'Jun Chiyabari', origin: 'Nepal', lot: 24606, qty: 18900, buyer: '—', status: 'BIDDING' },
+            'RWAND-OP1': { grade: 'OP1', estate: 'Sorwathe Factory', origin: 'Rwanda', lot: 24607, qty: 9800, buyer: 'Van Rees', status: 'SOLD' },
+            'VIETNAM-OP': { grade: 'OP', estate: 'Moc Chau Highland', origin: 'Vietnam', lot: 24608, qty: 6200, buyer: '—', status: 'PENDING' },
+            'JAPAN-MAT': { grade: 'Ceremonial', estate: 'Uji Region', origin: 'Japan', lot: 24609, qty: 14500, buyer: 'Ekaterra', status: 'SOLD' },
+            'TAIWAN-OOL': { grade: 'High Mountain', estate: 'Alishan', origin: 'Taiwan', lot: 24610, qty: 8700, buyer: '—', status: 'BIDDING' }
         };
-
-        const buyers = ['Unilever', 'Tata Global', 'Finlays', 'Van Rees', 'Ekaterra', 'Twinings', 'Ahmad Tea', '—'];
-        const statuses = ['SOLD', 'BIDDING', 'PENDING'];
 
         async function loadTeas() {
             try {
@@ -3676,7 +3673,9 @@
                     estate: tea.name || tea.symbol,
                     origin: 'Kenya',
                     lot: 24600 + index + 1,
-                    qty: Math.floor(Math.random() * 20000) + 5000
+                    qty: 10000,
+                    buyer: '—',
+                    status: 'PENDING'
                 };
 
                 const change = tea.previous_price 
@@ -3688,24 +3687,16 @@
                 // Add flash class if price just changed
                 const flashClass = changedTeas[tea.symbol] ? `flash-${changedTeas[tea.symbol]}` : '';
 
-                // Assign status based on price movement (simulated)
-                let status, statusColor, buyer;
-                if (change > 1) {
-                    status = 'SOLD';
+                // Use fixed status/buyer from display data
+                const status = displayData.status;
+                const buyer = displayData.buyer;
+                let statusColor;
+                if (status === 'SOLD') {
                     statusColor = 'var(--accent-green)';
-                    buyer = buyers[Math.floor(Math.random() * (buyers.length - 1))];
-                } else if (change < -0.5) {
-                    status = 'BIDDING';
+                } else if (status === 'BIDDING') {
                     statusColor = 'var(--accent-orange)';
-                    buyer = '—';
-                } else if (change === 0) {
-                    status = 'PENDING';
-                    statusColor = 'var(--text-muted)';
-                    buyer = '—';
                 } else {
-                    status = Math.random() > 0.5 ? 'SOLD' : 'BIDDING';
-                    statusColor = status === 'SOLD' ? 'var(--accent-green)' : 'var(--accent-orange)';
-                    buyer = status === 'SOLD' ? buyers[Math.floor(Math.random() * (buyers.length - 1))] : '—';
+                    statusColor = 'var(--text-muted)';
                 }
 
                 return `
