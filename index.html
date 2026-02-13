@@ -3017,6 +3017,18 @@
             .sidebar, .right-panel {
                 display: none;
             }
+            /* Show sidebar when mobile menu is active */
+            .sidebar.mobile-open {
+                display: flex;
+                position: fixed;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                width: 280px;
+                z-index: 9999;
+                box-shadow: 4px 0 20px rgba(0,0,0,0.5);
+                animation: slideInLeft 0.25s ease;
+            }
             .market-cards {
                 grid-template-columns: repeat(2, 1fr);
             }
@@ -3024,12 +3036,103 @@
                 grid-template-columns: repeat(5, 1fr);
             }
         }
+        
+        @keyframes slideInLeft {
+            from {
+                transform: translateX(-100%);
+            }
+            to {
+                transform: translateX(0);
+            }
+        }
+        
+        /* Mobile Menu Hamburger Button */
+        .mobile-menu-btn {
+            display: none;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            cursor: pointer;
+            padding: 8px;
+            margin-right: 8px;
+        }
+        
+        .mobile-menu-btn svg {
+            width: 24px;
+            height: 24px;
+        }
+        
+        @media (max-width: 1200px) {
+            .mobile-menu-btn {
+                display: flex;
+                align-items: center;
+            }
+        }
+        
+        /* Mobile overlay when sidebar is open */
+        .mobile-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 9998;
+        }
+        
+        .mobile-overlay.active {
+            display: block;
+        }
+        
+        /* Mobile close button for sidebar */
+        .mobile-sidebar-header {
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            margin: -16px -16px 16px -16px;
+        }
+        
+        @media (max-width: 1200px) {
+            .sidebar.mobile-open .mobile-sidebar-header {
+                display: flex;
+            }
+        }
+        
+        .mobile-close-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+        }
 
         /* Mobile Styles */
         @media (max-width: 768px) {
             /* Prevent any overflow */
             body {
                 overflow-x: hidden;
+            }
+            
+            /* Hide ticker strip and bottom bar on mobile */
+            .ticker-strip {
+                display: none;
+            }
+            
+            .bottom-bar {
+                display: none;
+            }
+            
+            /* Make chart hero - full width */
+            .chart-container {
+                height: 250px;
+            }
+            
+            .chart-section {
+                margin: 0 -10px;
+                border-radius: 0;
             }
 
             .quote-board {
@@ -4129,8 +4232,16 @@
         </div>
     </div>
 
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay" id="mobile-overlay" onclick="closeMobileMenu()"></div>
+
     <!-- Top Bar -->
     <div class="top-bar">
+        <button class="mobile-menu-btn" id="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 12h18M3 6h18M3 18h18"/>
+            </svg>
+        </button>
         <div class="logo">
             <div class="logo-icon">TT</div>
             <div class="logo-text">TeaTrade <span>Exchange</span></div>
@@ -4283,7 +4394,16 @@
     <!-- Main Grid -->
     <div class="main-grid">
         <!-- Left Sidebar -->
-        <div class="sidebar">
+        <div class="sidebar" id="mobile-sidebar">
+            <!-- Mobile sidebar header (hidden on desktop) -->
+            <div class="mobile-sidebar-header">
+                <span style="font-weight: 600; color: var(--text-primary);">Menu</span>
+                <button class="mobile-close-btn" onclick="closeMobileMenu()" aria-label="Close menu">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
             <div class="sidebar-section">
                 <div class="sidebar-title">Watchlist</div>
                 <div class="watchlist-tabs">
@@ -6120,10 +6240,86 @@
             ctx.textAlign = 'left';
             ctx.fillText('AVG $' + avgPrice.toFixed(2), leftMargin + 5, avgY - 5);
             
+            // =============================================
+            // DRAW ORDER POSITION LINES (Trading212 style)
+            // =============================================
+            drawOrderAnnotations(ctx, w, h, chartWidth, chartHeight, minPrice, maxPrice, priceRange, currentPrice);
+            
             // Draw RSI if active
             if (activeStudies.rsi) {
                 drawRSIChart();
             }
+        }
+        
+        // Draw order position annotations on chart
+        function drawOrderAnnotations(ctx, w, h, chartWidth, chartHeight, minPrice, maxPrice, priceRange, currentPrice) {
+            if (!positions || positions.length === 0) return;
+            
+            // Get the currently selected tea from trade form
+            const select = document.getElementById('trade-tea-select');
+            const selectedTeaId = select?.value ? parseInt(select.value) : null;
+            
+            positions.forEach(position => {
+                // Only show positions for the currently selected tea (or all if none selected)
+                if (selectedTeaId && position.tea_id !== selectedTeaId) return;
+                
+                const entryPrice = position.avg_entry_price;
+                if (!entryPrice || entryPrice < minPrice || entryPrice > maxPrice) return;
+                
+                // Get current price for this tea
+                const tea = teas.find(t => t.id === position.tea_id);
+                if (!tea) return;
+                
+                const teaCurrentPrice = tea.current_price;
+                
+                // Calculate P/L
+                const pnl = (teaCurrentPrice - entryPrice) * position.quantity;
+                const pnlPercent = ((teaCurrentPrice - entryPrice) / entryPrice * 100);
+                const isProfit = pnl >= 0;
+                
+                // Calculate Y position
+                const entryY = h * 0.1 + (1 - (entryPrice - minPrice) / priceRange) * chartHeight;
+                
+                // Draw dotted line
+                ctx.strokeStyle = isProfit ? '#10b981' : '#ef4444';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.moveTo(leftMargin, entryY);
+                ctx.lineTo(w - rightMargin, entryY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                // Draw entry marker (small triangle on left)
+                ctx.fillStyle = isProfit ? '#10b981' : '#ef4444';
+                ctx.beginPath();
+                ctx.moveTo(leftMargin - 6, entryY);
+                ctx.lineTo(leftMargin, entryY - 4);
+                ctx.lineTo(leftMargin, entryY + 4);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Draw P/L label on right side
+                const pnlText = `${isProfit ? '+' : ''}$${pnl.toFixed(2)} (${isProfit ? '+' : ''}${pnlPercent.toFixed(1)}%)`;
+                ctx.font = 'bold 10px JetBrains Mono, monospace';
+                ctx.fillStyle = isProfit ? '#10b981' : '#ef4444';
+                ctx.textAlign = 'right';
+                
+                // Background for P/L label
+                const textWidth = ctx.measureText(pnlText).width;
+                ctx.fillStyle = 'rgba(13, 17, 23, 0.85)';
+                ctx.fillRect(w - rightMargin - textWidth - 12, entryY - 16, textWidth + 8, 14);
+                
+                // P/L text
+                ctx.fillStyle = isProfit ? '#10b981' : '#ef4444';
+                ctx.fillText(pnlText, w - rightMargin - 8, entryY - 6);
+                
+                // Entry price label on left
+                ctx.font = '9px JetBrains Mono, monospace';
+                ctx.textAlign = 'left';
+                ctx.fillStyle = isProfit ? '#10b981' : '#ef4444';
+                ctx.fillText('ENTRY $' + entryPrice.toFixed(2), leftMargin + 5, entryY - 6);
+            });
         }
         
         // =============================================
@@ -8309,6 +8505,39 @@
                 }
             }
         }
+
+        // =============================================
+        // MOBILE MENU FUNCTIONS
+        // =============================================
+        
+        function toggleMobileMenu() {
+            const sidebar = document.getElementById('mobile-sidebar');
+            const overlay = document.getElementById('mobile-overlay');
+            
+            if (sidebar.classList.contains('mobile-open')) {
+                closeMobileMenu();
+            } else {
+                sidebar.classList.add('mobile-open');
+                overlay.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+        }
+        
+        function closeMobileMenu() {
+            const sidebar = document.getElementById('mobile-sidebar');
+            const overlay = document.getElementById('mobile-overlay');
+            
+            sidebar.classList.remove('mobile-open');
+            overlay.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+        
+        // Close mobile menu on window resize to desktop
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 1200) {
+                closeMobileMenu();
+            }
+        });
 
         // =============================================
         // MAXIMIZE FUNCTIONS
