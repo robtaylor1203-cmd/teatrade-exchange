@@ -265,8 +265,8 @@
             font-size: 11px;
         }
 
-        .up { color: var(--accent-green); }
-        .down { color: var(--accent-red); }
+        .up { color: var(--accent-green); font-weight: 600; }
+        .down { color: var(--accent-red); font-weight: 600; }
 
         /* IB Chat Section */
         .chat-section {
@@ -3397,17 +3397,6 @@
         
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
-        
-        // Simulate live updates
-        setInterval(() => {
-            const cells = document.querySelectorAll('.price-cell');
-            cells.forEach(cell => {
-                if (Math.random() > 0.7) {
-                    cell.style.background = 'rgba(16, 185, 129, 0.2)';
-                    setTimeout(() => cell.style.background = '', 500);
-                }
-            });
-        }, 2000);
 
         // Early Access form submission - sends to Kit
         function submitEarlyAccess(e) {
