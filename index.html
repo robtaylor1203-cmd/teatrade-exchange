@@ -4087,7 +4087,7 @@
                 const time = trade.created_at 
                     ? new Date(trade.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
                     : '--:--';
-                const orderId = '#' + trade.id.substring(0, 5).toUpperCase();
+                const orderId = '#' + String(trade.id).substring(0, 5).toUpperCase();
                 const tea = teas.find(t => t.id === trade.tea_id);
                 const teaSymbol = tea?.symbol || 'Unknown';
                 const sideClass = trade.side === 'BUY' ? 'buy-side' : 'sell-side';
