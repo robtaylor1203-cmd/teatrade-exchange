@@ -858,35 +858,32 @@
             font-weight: 600;
             padding: 4px 8px;
             border-radius: 4px;
-            transition: background-color 0.3s ease;
         }
 
         .price-cell.up {
             color: var(--accent-green);
-            background: rgba(0, 212, 170, 0.15);
         }
 
         .price-cell.down {
             color: var(--accent-red);
-            background: rgba(255, 107, 107, 0.15);
         }
 
         .price-cell.flash-up {
-            animation: flashGreen 0.5s ease;
+            animation: flashGreen 1s ease;
         }
 
         .price-cell.flash-down {
-            animation: flashRed 0.5s ease;
+            animation: flashRed 1s ease;
         }
 
         @keyframes flashGreen {
             0% { background: rgba(0, 212, 170, 0.5); }
-            100% { background: rgba(0, 212, 170, 0.15); }
+            100% { background: transparent; }
         }
 
         @keyframes flashRed {
             0% { background: rgba(255, 107, 107, 0.5); }
-            100% { background: rgba(255, 107, 107, 0.15); }
+            100% { background: transparent; }
         }
 
         .volume-bar {
