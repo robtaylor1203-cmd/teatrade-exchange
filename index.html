@@ -3747,13 +3747,13 @@
                 await triggerPriceUpdate();
             }
 
-            // Set up random intervals for price updates (1-5 minutes)
+            // Set up random intervals for price updates (10 sec - 5 min)
             schedulePriceUpdate();
         }
 
         function schedulePriceUpdate() {
-            // Random interval between 1 and 5 minutes
-            const interval = Math.floor(Math.random() * 240000) + 60000; // 60-300 seconds
+            // Random interval between 10 seconds and 5 minutes
+            const interval = Math.floor(Math.random() * 290000) + 10000; // 10-300 seconds
             setTimeout(async () => {
                 await triggerPriceUpdate();
                 schedulePriceUpdate(); // Schedule next update
