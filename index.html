@@ -2776,7 +2776,8 @@
                         Your Confirmed Orders
                         <span class="order-count" id="order-count">0</span>
                     </div>
-                <button class="filter-btn active">All</button>
+                <button class="filter-btn active" id="filter-all" onclick="setOrdersFilter('all')">All</button>
+                <button class="filter-btn" id="filter-open" onclick="setOrdersFilter('open')">Open</button>
                 </div>
                 <div class="order-table-wrapper">
                 <table class="order-table" id="orders-table">
@@ -4266,6 +4267,16 @@
         let ordersSortColumn = 'time';
         let ordersSortDirection = 'desc';
         let currentTradesData = [];
+        let ordersFilter = 'all'; // 'all' or 'open'
+
+        function setOrdersFilter(filter) {
+            ordersFilter = filter;
+            // Update button states
+            document.getElementById('filter-all').classList.toggle('active', filter === 'all');
+            document.getElementById('filter-open').classList.toggle('active', filter === 'open');
+            // Re-display with filter
+            displayUserTrades(currentTradesData);
+        }
 
         function sortOrdersTable(column) {
             // Toggle direction if same column, otherwise default desc
@@ -4341,15 +4352,18 @@
                 }
             });
 
-            // Only show BUY trades (open or closed)
+            // Filter based on current filter setting
             let displayTrades = buyTrades;
+            if (ordersFilter === 'open') {
+                displayTrades = buyTrades.filter(t => !closedBuyIds.has(t.id));
+            }
             countEl.textContent = displayTrades.length;
 
             if (displayTrades.length === 0) {
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 20px;">
-                            No orders yet. Start trading!
+                            ${ordersFilter === 'open' ? 'No open positions.' : 'No orders yet. Start trading!'}
                         </td>
                     </tr>
                 `;
