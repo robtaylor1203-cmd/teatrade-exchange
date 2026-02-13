@@ -3730,29 +3730,16 @@
 
         // Check if prices need updating and set up periodic updates
         async function initPriceVolatility() {
-            // Check last update time
-            const { data: latestTea } = await supabaseClient
-                .from('teas')
-                .select('updated_at')
-                .order('updated_at', { ascending: false })
-                .limit(1)
-                .single();
+            // Trigger first price update immediately for testing
+            await triggerPriceUpdate();
 
-            const lastUpdate = latestTea?.updated_at ? new Date(latestTea.updated_at) : new Date(0);
-            const minutesSinceUpdate = (Date.now() - lastUpdate.getTime()) / 60000;
-
-            // If prices haven't been updated in 5+ minutes, update now
-            if (minutesSinceUpdate > 5) {
-                await triggerPriceUpdate();
-            }
-
-            // Set up random intervals for price updates (10 sec - 5 min)
+            // Set up random intervals for price updates (2-5 seconds for testing)
             schedulePriceUpdate();
         }
 
         function schedulePriceUpdate() {
-            // Random interval between 10 seconds and 5 minutes
-            const interval = Math.floor(Math.random() * 290000) + 10000; // 10-300 seconds
+            // Random interval between 2 and 5 seconds (for testing)
+            const interval = Math.floor(Math.random() * 3000) + 2000; // 2-5 seconds
             setTimeout(async () => {
                 await triggerPriceUpdate();
                 schedulePriceUpdate(); // Schedule next update
