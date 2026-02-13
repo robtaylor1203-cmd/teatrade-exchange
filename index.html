@@ -914,6 +914,272 @@
             color: white;
         }
 
+        /* Market Toggle (Singles/Pairs) */
+        .market-toggle {
+            display: flex;
+            gap: 0;
+            margin-right: 16px;
+        }
+
+        .toggle-btn {
+            padding: 5px 14px;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .toggle-btn:first-child {
+            border-radius: 4px 0 0 4px;
+            border-right: none;
+        }
+
+        .toggle-btn:last-child {
+            border-radius: 0 4px 4px 0;
+        }
+
+        .toggle-btn.active {
+            background: var(--accent-purple);
+            border-color: var(--accent-purple);
+            color: white;
+        }
+
+        .toggle-btn:hover:not(.active) {
+            background: var(--bg-tertiary);
+        }
+
+        /* Pairs table styles */
+        .pair-symbol {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .pair-symbol .base {
+            color: var(--accent-green);
+        }
+
+        .pair-symbol .quote {
+            color: var(--accent-red);
+        }
+
+        .pair-ratio {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--accent-blue);
+        }
+
+        .trade-pair-btn {
+            padding: 4px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .trade-pair-btn.long {
+            background: var(--accent-green);
+            color: white;
+        }
+
+        .trade-pair-btn.short {
+            background: var(--accent-red);
+            color: white;
+            margin-left: 6px;
+        }
+
+        .trade-pair-btn:hover {
+            opacity: 0.85;
+            transform: translateY(-1px);
+        }
+
+        /* Pairs Modal */
+        .pairs-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .pairs-modal-overlay.active {
+            display: flex;
+        }
+
+        .pairs-modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            width: 420px;
+            max-width: 95%;
+        }
+
+        .pairs-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .pairs-modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .pairs-modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .pairs-modal-pair {
+            text-align: center;
+            padding: 16px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .pairs-modal-pair .pair-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .pairs-modal-pair .ratio-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 20px;
+            color: var(--accent-blue);
+        }
+
+        .leverage-selector {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .leverage-btn {
+            flex: 1;
+            padding: 10px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .leverage-btn.active {
+            background: var(--accent-purple);
+            border-color: var(--accent-purple);
+            color: white;
+        }
+
+        .leverage-btn:hover:not(.active) {
+            background: var(--bg-tertiary);
+        }
+
+        .pairs-input-group {
+            margin-bottom: 16px;
+        }
+
+        .pairs-input-group label {
+            display: block;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .pairs-input-group input {
+            width: 100%;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+        }
+
+        .pairs-summary {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 20px;
+        }
+
+        .pairs-summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 13px;
+        }
+
+        .pairs-summary-row .label {
+            color: var(--text-muted);
+        }
+
+        .pairs-summary-row .value {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+        }
+
+        .pairs-summary-row.exposure .value {
+            color: var(--accent-orange);
+        }
+
+        .pairs-modal-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .pairs-modal-actions button {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .pairs-modal-actions .cancel-btn {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .pairs-modal-actions .confirm-btn {
+            color: white;
+        }
+
+        .pairs-modal-actions .confirm-btn.long {
+            background: var(--accent-green);
+        }
+
+        .pairs-modal-actions .confirm-btn.short {
+            background: var(--accent-red);
+        }
+
         .data-table {
             width: 100%;
             border-collapse: collapse;
@@ -2355,6 +2621,54 @@
         <div class="toast-message" id="toast-message"></div>
     </div>
 
+    <!-- Pairs Trade Modal -->
+    <div class="pairs-modal-overlay" id="pairs-modal">
+        <div class="pairs-modal">
+            <div class="pairs-modal-header">
+                <div class="pairs-modal-title" id="pairs-modal-title">Trade Pair</div>
+                <button class="pairs-modal-close" onclick="closePairsModal()">&times;</button>
+            </div>
+            <div class="pairs-modal-pair">
+                <div class="pair-display" id="modal-pair-display">
+                    <span class="base">DRJ</span>/<span class="quote">ASM</span>
+                </div>
+                <div class="ratio-display" id="modal-ratio-display">Ratio: 5.76</div>
+            </div>
+            <div class="leverage-selector">
+                <button class="leverage-btn active" data-leverage="1" onclick="setLeverage(1)">1x</button>
+                <button class="leverage-btn" data-leverage="2" onclick="setLeverage(2)">2x</button>
+                <button class="leverage-btn" data-leverage="5" onclick="setLeverage(5)">5x</button>
+                <button class="leverage-btn" data-leverage="10" onclick="setLeverage(10)">10x</button>
+            </div>
+            <div class="pairs-input-group">
+                <label>Position Size (USD)</label>
+                <input type="number" id="pairs-amount" value="100" min="10" step="10" oninput="updatePairsSummary()">
+            </div>
+            <div class="pairs-summary">
+                <div class="pairs-summary-row">
+                    <span class="label">Position Size</span>
+                    <span class="value" id="summary-size">$100.00</span>
+                </div>
+                <div class="pairs-summary-row">
+                    <span class="label">Leverage</span>
+                    <span class="value" id="summary-leverage">1x</span>
+                </div>
+                <div class="pairs-summary-row exposure">
+                    <span class="label">Total Exposure</span>
+                    <span class="value" id="summary-exposure">$100.00</span>
+                </div>
+                <div class="pairs-summary-row">
+                    <span class="label">Entry Ratio</span>
+                    <span class="value" id="summary-ratio">5.76</span>
+                </div>
+            </div>
+            <div class="pairs-modal-actions">
+                <button class="cancel-btn" onclick="closePairsModal()">Cancel</button>
+                <button class="confirm-btn" id="pairs-confirm-btn" onclick="executePairTrade()">Confirm Trade</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Top Bar -->
     <div class="top-bar">
         <div class="logo">
@@ -2748,12 +3062,20 @@
                 <div class="section-header">
                     <div class="section-title">Live Auction Results — Mombasa Sale 06/2026</div>
                     <div class="section-filters">
-                        <button class="filter-btn active">All Grades</button>
-                        <button class="filter-btn">Orthodox</button>
-                        <button class="filter-btn">CTC</button>
-                        <button class="filter-btn">Green</button>
+                        <div class="market-toggle">
+                            <button class="toggle-btn active" id="toggle-singles" onclick="setMarketView('singles')">Singles</button>
+                            <button class="toggle-btn" id="toggle-pairs" onclick="setMarketView('pairs')">Pairs</button>
+                        </div>
+                        <div class="grade-filters" id="grade-filters">
+                            <button class="filter-btn active">All Grades</button>
+                            <button class="filter-btn">Orthodox</button>
+                            <button class="filter-btn">CTC</button>
+                            <button class="filter-btn">Green</button>
+                        </div>
                     </div>
                 </div>
+                <!-- Singles Table -->
+                <div id="singles-view">
                 <table class="data-table" id="auction-table">
                     <thead>
                         <tr>
@@ -2772,6 +3094,26 @@
                         <!-- Populated dynamically from database -->
                     </tbody>
                 </table>
+                </div>
+                <!-- Pairs Table -->
+                <div id="pairs-view" style="display: none;">
+                <table class="data-table" id="pairs-table">
+                    <thead>
+                        <tr>
+                            <th>Pair</th>
+                            <th>Base Price</th>
+                            <th>Quote Price</th>
+                            <th>Ratio</th>
+                            <th>Change</th>
+                            <th>Spread</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pairs-table-body">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+                </div>
             </div>
         
             <!-- Order History Section -->
@@ -3546,6 +3888,7 @@
         document.addEventListener('DOMContentLoaded', async () => {
             await checkAuthState();
             await loadTeas();
+            await loadTeaPairs();
             await loadLeaderboard();
             await loadUserTrades();
             initPriceVolatility(); // Start random price updates
@@ -3774,6 +4117,7 @@
                 teas = data;
                 populateTeaSelect();
                 updateAuctionTable(); // Update live auction results
+                updatePairsTable(); // Update pairs with new ratios
                 updatePortfolioDisplay(); // Refresh portfolio with new prices
             } catch (error) {
                 console.error('Failed to load teas:', error);
@@ -4233,6 +4577,97 @@
             }
         }
 
+        async function closePairPosition(tradeId) {
+            if (!currentUser) {
+                openAuthModal();
+                return;
+            }
+
+            try {
+                // Get the original trade
+                const { data: trade, error: fetchError } = await supabaseClient
+                    .from('trades')
+                    .select('*')
+                    .eq('id', tradeId)
+                    .single();
+                
+                if (fetchError) throw fetchError;
+                if (!trade || !trade.is_pair_trade) {
+                    showToast('Error', 'Pair trade not found', true);
+                    return;
+                }
+
+                // Find the pair
+                const pair = teaPairs.find(p => p.id === trade.pair_id);
+                if (!pair) {
+                    showToast('Error', 'Pair not found', true);
+                    return;
+                }
+
+                // Calculate current ratio and P/L
+                const teaMap = {};
+                teas.forEach(t => teaMap[t.symbol] = t);
+                const baseTea = teaMap[pair.base_symbol];
+                const quoteTea = teaMap[pair.quote_symbol];
+
+                if (!baseTea || !quoteTea) {
+                    showToast('Error', 'Could not get current prices', true);
+                    return;
+                }
+
+                const currentRatio = baseTea.current_price / quoteTea.current_price;
+                const entryRatio = trade.price;
+                const ratioChange = (currentRatio - entryRatio) / entryRatio;
+                const direction = trade.side === 'BUY' ? 1 : -1; // LONG = BUY, SHORT = SELL
+                const leverage = trade.leverage || 1;
+                const margin = trade.quantity;
+                const pnl = margin * ratioChange * leverage * direction;
+
+                // Return margin + P/L to user
+                const returnAmount = margin + pnl;
+                const newBalance = userProfile.cash_balance + returnAmount;
+
+                const { error: balanceError } = await supabaseClient
+                    .from('profiles')
+                    .update({ cash_balance: newBalance })
+                    .eq('id', currentUser.id);
+                if (balanceError) throw balanceError;
+
+                // Record the closing trade
+                const { error: closeError } = await supabaseClient
+                    .from('trades')
+                    .insert({
+                        user_id: currentUser.id,
+                        tea_id: trade.tea_id,
+                        side: trade.side === 'BUY' ? 'SELL' : 'BUY', // Opposite side to close
+                        quantity: margin,
+                        price: currentRatio,
+                        total_value: returnAmount,
+                        pair_id: trade.pair_id,
+                        leverage: leverage,
+                        is_pair_trade: true
+                    });
+                if (closeError) throw closeError;
+
+                userProfile.cash_balance = newBalance;
+
+                const baseShort = pair.base_symbol.split('-')[1] || pair.base_symbol;
+                const quoteShort = pair.quote_symbol.split('-')[1] || pair.quote_symbol;
+                const pnlText = pnl >= 0 ? `Profit: +$${pnl.toFixed(2)}` : `Loss: -$${Math.abs(pnl).toFixed(2)}`;
+                const posType = trade.side === 'BUY' ? 'LONG' : 'SHORT';
+                
+                showToast('Pair Position Closed!', `Closed ${posType} ${baseShort}/${quoteShort} ${leverage}x. ${pnlText}`);
+
+                // Refresh data
+                await loadUserTrades();
+                updateUIForLoggedInUser();
+
+            } catch (error) {
+                console.error('Close pair position error:', error);
+                showToast('Error', error.message, true);
+            }
+        }
+
         // =============================================
         // PORTFOLIO FUNCTIONS
         // =============================================
@@ -4432,21 +4867,65 @@
                     : '--:--';
                 const orderId = '#' + String(trade.id).substring(0, 5).toUpperCase();
                 const tea = teas.find(t => t.id === trade.tea_id);
-                const teaSymbol = tea?.symbol || 'Unknown';
-                const total = trade.quantity * trade.price;
                 
                 const isClosed = closedBuyIds.has(trade.id);
                 const closing = closingInfo[trade.id];
                 
-                // Calculate P/L
-                let pnl = 0;
-                let pnlPct = 0;
-                if (isClosed && closing) {
-                    pnl = (closing.sellPrice - trade.price) * trade.quantity;
-                    pnlPct = ((closing.sellPrice - trade.price) / trade.price * 100);
-                } else if (tea) {
-                    pnl = (tea.current_price - trade.price) * trade.quantity;
-                    pnlPct = ((tea.current_price - trade.price) / trade.price * 100);
+                // Handle pair trades differently
+                const isPairTrade = trade.is_pair_trade || false;
+                const leverage = trade.leverage || 1;
+                let teaSymbol, total, pnl, pnlPct;
+                
+                if (isPairTrade && trade.pair_id) {
+                    // Find the pair
+                    const pair = teaPairs.find(p => p.id === trade.pair_id);
+                    if (pair) {
+                        const baseShort = pair.base_symbol.split('-')[1] || pair.base_symbol;
+                        const quoteShort = pair.quote_symbol.split('-')[1] || pair.quote_symbol;
+                        teaSymbol = `${baseShort}/${quoteShort} ${leverage}x`;
+                        
+                        // For pairs: quantity = margin, price = entry ratio
+                        total = trade.quantity; // Margin amount
+                        const entryRatio = trade.price;
+                        
+                        // Get current ratio
+                        const teaMap = {};
+                        teas.forEach(t => teaMap[t.symbol] = t);
+                        const baseTea = teaMap[pair.base_symbol];
+                        const quoteTea = teaMap[pair.quote_symbol];
+                        
+                        if (baseTea && quoteTea && quoteTea.current_price > 0) {
+                            const currentRatio = baseTea.current_price / quoteTea.current_price;
+                            const ratioChange = (currentRatio - entryRatio) / entryRatio;
+                            // LONG profits when ratio goes up, SHORT profits when ratio goes down
+                            const direction = trade.side === 'BUY' ? 1 : -1;
+                            pnl = total * ratioChange * leverage * direction;
+                            pnlPct = ratioChange * 100 * leverage * direction;
+                        } else {
+                            pnl = 0;
+                            pnlPct = 0;
+                        }
+                    } else {
+                        teaSymbol = 'PAIR';
+                        total = trade.quantity;
+                        pnl = 0;
+                        pnlPct = 0;
+                    }
+                } else {
+                    // Regular single tea trade
+                    teaSymbol = tea?.symbol || 'Unknown';
+                    total = trade.quantity * trade.price;
+                    
+                    if (isClosed && closing) {
+                        pnl = (closing.sellPrice - trade.price) * trade.quantity;
+                        pnlPct = ((closing.sellPrice - trade.price) / trade.price * 100);
+                    } else if (tea) {
+                        pnl = (tea.current_price - trade.price) * trade.quantity;
+                        pnlPct = ((tea.current_price - trade.price) / trade.price * 100);
+                    } else {
+                        pnl = 0;
+                        pnlPct = 0;
+                    }
                 }
                 
                 const status = isClosed ? 'CLOSED' : 'OPEN';
@@ -4463,7 +4942,9 @@
                     closing,
                     pnl,
                     pnlPct,
-                    status
+                    status,
+                    isPairTrade,
+                    leverage
                 };
             });
 
@@ -4503,13 +4984,20 @@
             let openTotalValue = 0;
             let openTotalPnl = 0;
 
-            processedTrades.forEach(({ trade, timeStr, orderId, tea, teaSymbol, total, isClosed, pnl, pnlPct, status }) => {
+            processedTrades.forEach(({ trade, timeStr, orderId, tea, teaSymbol, total, isClosed, pnl, pnlPct, status, isPairTrade, leverage }) => {
                 const pnlClass = pnl >= 0 ? 'up' : 'down';
                 const pnlSign = pnl >= 0 ? '+' : '';
                 const statusClass = isClosed ? 'closed' : 'filled';
-                const actionBtn = isClosed 
-                    ? `<span style="color: var(--text-muted);">—</span>`
-                    : `<button class="close-position-btn" onclick="closePosition(${trade.tea_id}, ${trade.quantity}, '${teaSymbol}')">Close</button>`;
+                
+                // Different close action for pairs vs singles
+                let actionBtn;
+                if (isClosed) {
+                    actionBtn = `<span style="color: var(--text-muted);">\u2014</span>`;
+                } else if (isPairTrade) {
+                    actionBtn = `<button class="close-position-btn" onclick="closePairPosition('${trade.id}')">Close</button>`;
+                } else {
+                    actionBtn = `<button class="close-position-btn" onclick="closePosition(${trade.tea_id}, ${trade.quantity}, '${teaSymbol}')">Close</button>`;
+                }
 
                 if (!isClosed) {
                     openCount++;
@@ -4517,14 +5005,29 @@
                     openTotalPnl += pnl;
                 }
 
+                // Different display for pair trades
+                let sideLabel, sideClass, entryDisplay, qtyDisplay;
+                if (isPairTrade) {
+                    const isLong = trade.side === 'BUY';
+                    sideLabel = isLong ? 'LONG' : 'SHORT';
+                    sideClass = isLong ? 'buy-side' : 'sell-side';
+                    entryDisplay = trade.price.toFixed(4); // Ratio with 4 decimals
+                    qtyDisplay = '$' + trade.quantity.toLocaleString(); // Margin amount
+                } else {
+                    sideLabel = 'BUY';
+                    sideClass = 'buy-side';
+                    entryDisplay = '$' + trade.price.toFixed(2);
+                    qtyDisplay = trade.quantity.toLocaleString();
+                }
+
                 html += `
                     <tr>
                         <td>${timeStr}</td>
                         <td style="font-family: 'JetBrains Mono', monospace;">${orderId}</td>
                         <td>${teaSymbol}</td>
-                        <td><span class="order-side buy-side">BUY</span></td>
-                        <td class="order-qty">${trade.quantity.toLocaleString()}</td>
-                        <td class="order-price">$${trade.price.toFixed(2)}</td>
+                        <td><span class="order-side ${sideClass}">${sideLabel}</span></td>
+                        <td class="order-qty">${qtyDisplay}</td>
+                        <td class="order-price">${entryDisplay}</td>
                         <td class="order-price">$${parseFloat(total.toFixed(2)).toLocaleString()}</td>
                         <td class="${pnlClass}">${pnlSign}$${pnl.toFixed(2)} (${pnlPct.toFixed(1)}%)</td>
                         <td><span class="order-status ${statusClass}">${status}</span></td>
@@ -4603,6 +5106,247 @@
 
             if (html) {
                 listEl.innerHTML = html;
+            }
+        }
+
+        // =============================================
+        // PAIRS TRADING SYSTEM
+        // =============================================
+
+        let teaPairs = [];
+        let currentPairTrade = null;
+        let selectedLeverage = 1;
+        let previousPairRatios = {};
+
+        async function loadTeaPairs() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('tea_pairs')
+                    .select('*');
+                
+                if (error) throw error;
+                teaPairs = data;
+                updatePairsTable();
+            } catch (error) {
+                console.error('Failed to load pairs:', error);
+            }
+        }
+
+        function setMarketView(view) {
+            const singlesView = document.getElementById('singles-view');
+            const pairsView = document.getElementById('pairs-view');
+            const toggleSingles = document.getElementById('toggle-singles');
+            const togglePairs = document.getElementById('toggle-pairs');
+            const gradeFilters = document.getElementById('grade-filters');
+
+            if (view === 'singles') {
+                singlesView.style.display = 'block';
+                pairsView.style.display = 'none';
+                toggleSingles.classList.add('active');
+                togglePairs.classList.remove('active');
+                gradeFilters.style.display = 'flex';
+            } else {
+                singlesView.style.display = 'none';
+                pairsView.style.display = 'block';
+                toggleSingles.classList.remove('active');
+                togglePairs.classList.add('active');
+                gradeFilters.style.display = 'none';
+                if (teaPairs.length === 0) loadTeaPairs();
+                updatePairsTable();
+            }
+        }
+
+        function updatePairsTable() {
+            const tbody = document.getElementById('pairs-table-body');
+            if (!tbody || !teaPairs.length || !teas.length) return;
+
+            // Build tea price map
+            const teaMap = {};
+            teas.forEach(tea => teaMap[tea.symbol] = tea);
+
+            const changedPairs = {};
+
+            tbody.innerHTML = teaPairs.map(pair => {
+                const baseTea = teaMap[pair.base_symbol];
+                const quoteTea = teaMap[pair.quote_symbol];
+
+                if (!baseTea || !quoteTea) return '';
+
+                const basePrice = baseTea.current_price;
+                const quotePrice = quoteTea.current_price;
+                const ratio = quotePrice > 0 ? basePrice / quotePrice : 0;
+                const pairKey = `${pair.base_symbol}/${pair.quote_symbol}`;
+
+                // Calculate change from previous ratio
+                let changeStr = '—';
+                let changeClass = '';
+                let flashClass = '';
+
+                if (previousPairRatios[pairKey] !== undefined) {
+                    const prevRatio = previousPairRatios[pairKey];
+                    if (prevRatio !== ratio) {
+                        const changePct = ((ratio - prevRatio) / prevRatio) * 100;
+                        changeStr = `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`;
+                        changeClass = changePct > 0 ? 'up' : 'down';
+                        flashClass = changePct > 0 ? 'flash-up' : 'flash-down';
+                    }
+                }
+                previousPairRatios[pairKey] = ratio;
+
+                // Spread (price difference)
+                const spread = Math.abs(basePrice - quotePrice);
+
+                // Format symbols for display
+                const baseShort = pair.base_symbol.split('-')[1] || pair.base_symbol;
+                const quoteShort = pair.quote_symbol.split('-')[1] || pair.quote_symbol;
+
+                return `
+                    <tr>
+                        <td>
+                            <span class="pair-symbol">
+                                <span class="base">${baseShort}</span>/<span class="quote">${quoteShort}</span>
+                            </span>
+                        </td>
+                        <td class="price-cell ${flashClass}">$${basePrice.toFixed(2)}</td>
+                        <td class="price-cell">$${quotePrice.toFixed(2)}</td>
+                        <td><span class="pair-ratio">${ratio.toFixed(4)}</span></td>
+                        <td class="${changeClass}">${changeStr}</td>
+                        <td>$${spread.toFixed(2)}</td>
+                        <td>
+                            <button class="trade-pair-btn long" onclick="openPairsModal('${pair.id}', 'LONG')">Long</button>
+                            <button class="trade-pair-btn short" onclick="openPairsModal('${pair.id}', 'SHORT')">Short</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function openPairsModal(pairId, side) {
+            if (!currentUser) {
+                showToast('Login Required', 'Please sign in to trade pairs', true);
+                return;
+            }
+
+            const pair = teaPairs.find(p => p.id === pairId);
+            if (!pair) return;
+
+            const teaMap = {};
+            teas.forEach(tea => teaMap[tea.symbol] = tea);
+
+            const baseTea = teaMap[pair.base_symbol];
+            const quoteTea = teaMap[pair.quote_symbol];
+            if (!baseTea || !quoteTea) return;
+
+            const ratio = baseTea.current_price / quoteTea.current_price;
+            const baseShort = pair.base_symbol.split('-')[1] || pair.base_symbol;
+            const quoteShort = pair.quote_symbol.split('-')[1] || pair.quote_symbol;
+
+            currentPairTrade = {
+                pairId,
+                pair,
+                side,
+                baseTea,
+                quoteTea,
+                ratio,
+                baseShort,
+                quoteShort
+            };
+
+            // Update modal display
+            document.getElementById('pairs-modal-title').textContent = `${side} ${baseShort}/${quoteShort}`;
+            document.getElementById('modal-pair-display').innerHTML = 
+                `<span class="base">${baseShort}</span>/<span class="quote">${quoteShort}</span>`;
+            document.getElementById('modal-ratio-display').textContent = `Ratio: ${ratio.toFixed(4)}`;
+
+            // Reset leverage
+            setLeverage(1);
+
+            // Style confirm button
+            const confirmBtn = document.getElementById('pairs-confirm-btn');
+            confirmBtn.className = `confirm-btn ${side.toLowerCase()}`;
+            confirmBtn.textContent = `${side} ${baseShort}/${quoteShort}`;
+
+            updatePairsSummary();
+            document.getElementById('pairs-modal').classList.add('active');
+        }
+
+        function closePairsModal() {
+            document.getElementById('pairs-modal').classList.remove('active');
+            currentPairTrade = null;
+        }
+
+        function setLeverage(lev) {
+            selectedLeverage = lev;
+            document.querySelectorAll('.leverage-btn').forEach(btn => {
+                btn.classList.toggle('active', parseInt(btn.dataset.leverage) === lev);
+            });
+            updatePairsSummary();
+        }
+
+        function updatePairsSummary() {
+            const amount = parseFloat(document.getElementById('pairs-amount').value) || 0;
+            const exposure = amount * selectedLeverage;
+
+            document.getElementById('summary-size').textContent = `$${amount.toFixed(2)}`;
+            document.getElementById('summary-leverage').textContent = `${selectedLeverage}x`;
+            document.getElementById('summary-exposure').textContent = `$${exposure.toFixed(2)}`;
+            document.getElementById('summary-ratio').textContent = currentPairTrade ? 
+                currentPairTrade.ratio.toFixed(4) : '—';
+        }
+
+        async function executePairTrade() {
+            if (!currentPairTrade || !currentUser) return;
+
+            const amount = parseFloat(document.getElementById('pairs-amount').value);
+            if (!amount || amount < 10) {
+                showToast('Invalid Amount', 'Minimum position size is $10', true);
+                return;
+            }
+
+            if (amount > userProfile.cash_balance) {
+                showToast('Insufficient Funds', 'Not enough cash balance', true);
+                return;
+            }
+
+            try {
+                // Deduct cash (margin)
+                const newBalance = userProfile.cash_balance - amount;
+                const { error: balanceError } = await supabaseClient
+                    .from('profiles')
+                    .update({ cash_balance: newBalance })
+                    .eq('id', currentUser.id);
+                if (balanceError) throw balanceError;
+
+                // Record pair trade
+                const { error: tradeError } = await supabaseClient
+                    .from('trades')
+                    .insert({
+                        user_id: currentUser.id,
+                        tea_id: currentPairTrade.baseTea.id,
+                        side: currentPairTrade.side === 'LONG' ? 'BUY' : 'SELL',
+                        quantity: amount, // Using quantity as the margin amount
+                        price: currentPairTrade.ratio,
+                        total_value: amount * selectedLeverage,
+                        pair_id: currentPairTrade.pairId,
+                        leverage: selectedLeverage,
+                        is_pair_trade: true
+                    });
+                if (tradeError) throw tradeError;
+
+                userProfile.cash_balance = newBalance;
+                closePairsModal();
+                
+                const exposure = amount * selectedLeverage;
+                showToast('Pair Trade Executed!', 
+                    `${currentPairTrade.side} ${currentPairTrade.baseShort}/${currentPairTrade.quoteShort} @ ${currentPairTrade.ratio.toFixed(4)} with ${selectedLeverage}x leverage ($${exposure.toFixed(2)} exposure)`);
+
+                await loadUserTrades();
+                await loadPositions();
+                updatePortfolioDisplay();
+
+            } catch (error) {
+                console.error('Pair trade failed:', error);
+                showToast('Trade Failed', error.message, true);
             }
         }
 
