@@ -4007,6 +4007,9 @@
             const valueEl = document.getElementById('portfolio-value');
             const pnlEl = document.getElementById('portfolio-pnl');
 
+            console.log('updatePortfolioDisplay: positions count', positions.length);
+            console.log('updatePortfolioDisplay: listEl found', !!listEl);
+
             if (positions.length === 0) {
                 listEl.innerHTML = `
                     <div style="color: var(--text-muted); font-size: 12px; padding: 20px 0; text-align: center;">
@@ -4025,8 +4028,9 @@
             let holdingsValue = 0;
             let html = '';
 
-            positions.forEach(pos => {
+            positions.forEach((pos, idx) => {
                 const tea = pos.teas || teas.find(t => t.id === pos.tea_id);
+                console.log('Position', idx, 'tea:', tea, 'pos:', pos);
                 if (!tea) return;
 
                 const currentValue = pos.quantity * tea.current_price;
@@ -4049,6 +4053,7 @@
                 `;
             });
 
+            console.log('updatePortfolioDisplay: html length', html.length, 'holdingsValue', holdingsValue);
             listEl.innerHTML = html;
 
             const totalValue = (userProfile?.cash_balance || 0) + holdingsValue;
