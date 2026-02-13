@@ -2101,6 +2101,36 @@
             color: var(--accent-blue);
         }
         
+        /* Sortable data-table headers */
+        .data-table th.sortable {
+            cursor: pointer;
+            user-select: none;
+            transition: color 0.2s ease;
+        }
+
+        .data-table th.sortable:hover {
+            color: var(--text-primary);
+        }
+
+        .data-table th.sortable::after {
+            content: '';
+            display: inline-block;
+            margin-left: 4px;
+            opacity: 0.3;
+        }
+
+        .data-table th.sortable.asc::after {
+            content: '▲';
+            opacity: 1;
+            color: var(--accent-blue);
+        }
+
+        .data-table th.sortable.desc::after {
+            content: '▼';
+            opacity: 1;
+            color: var(--accent-blue);
+        }
+        
         .order-table tfoot td {
             padding: 10px 12px;
             border-top: 2px solid var(--border);
@@ -4994,12 +5024,12 @@
                 <table class="data-table" id="pairs-table">
                     <thead>
                         <tr>
-                            <th>Pair</th>
-                            <th>Base</th>
-                            <th>Quote</th>
-                            <th>Ratio</th>
-                            <th>Change</th>
-                            <th>Spread</th>
+                            <th class="sortable" data-sort="pair" onclick="sortPairsTable('pair')">Pair</th>
+                            <th class="sortable" data-sort="base" onclick="sortPairsTable('base')">Base</th>
+                            <th class="sortable" data-sort="quote" onclick="sortPairsTable('quote')">Quote</th>
+                            <th class="sortable" data-sort="ratio" onclick="sortPairsTable('ratio')">Ratio</th>
+                            <th class="sortable" data-sort="change" onclick="sortPairsTable('change')">Change</th>
+                            <th class="sortable" data-sort="spread" onclick="sortPairsTable('spread')">Spread</th>
                         </tr>
                     </thead>
                     <tbody id="pairs-table-body">
@@ -9524,6 +9554,29 @@
             }
         }
 
+        // Pairs table sorting state
+        let pairsSortColumn = 'pair';
+        let pairsSortDirection = 'asc';
+
+        function sortPairsTable(column) {
+            if (pairsSortColumn === column) {
+                pairsSortDirection = pairsSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                pairsSortColumn = column;
+                pairsSortDirection = 'asc';
+            }
+            
+            // Update header classes
+            document.querySelectorAll('#pairs-table th.sortable').forEach(th => {
+                th.classList.remove('asc', 'desc');
+                if (th.dataset.sort === column) {
+                    th.classList.add(pairsSortDirection);
+                }
+            });
+            
+            updatePairsTable();
+        }
+
         function updatePairsTable() {
             const tbody = document.getElementById('pairs-table-body');
             if (!tbody || !teaPairs.length || !teas.length) return;
@@ -9532,13 +9585,12 @@
             const teaMap = {};
             teas.forEach(tea => teaMap[tea.symbol] = tea);
 
-            const changedPairs = {};
-
-            tbody.innerHTML = teaPairs.map(pair => {
+            // Build data array for sorting
+            const pairsData = teaPairs.map(pair => {
                 const baseTea = teaMap[pair.base_symbol];
                 const quoteTea = teaMap[pair.quote_symbol];
 
-                if (!baseTea || !quoteTea) return '';
+                if (!baseTea || !quoteTea) return null;
 
                 const basePrice = baseTea.current_price;
                 const quotePrice = quoteTea.current_price;
@@ -9546,6 +9598,7 @@
                 const pairKey = `${pair.base_symbol}/${pair.quote_symbol}`;
 
                 // Calculate change from previous ratio
+                let changePct = 0;
                 let changeStr = '—';
                 let changeClass = '';
                 let flashClass = '';
@@ -9553,7 +9606,7 @@
                 if (previousPairRatios[pairKey] !== undefined) {
                     const prevRatio = previousPairRatios[pairKey];
                     if (prevRatio !== ratio) {
-                        const changePct = ((ratio - prevRatio) / prevRatio) * 100;
+                        changePct = ((ratio - prevRatio) / prevRatio) * 100;
                         changeStr = `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`;
                         changeClass = changePct > 0 ? 'up' : 'down';
                         flashClass = changePct > 0 ? 'flash-up' : 'flash-down';
@@ -9568,18 +9621,64 @@
                 const baseShort = pair.base_symbol.split('-')[1] || pair.base_symbol;
                 const quoteShort = pair.quote_symbol.split('-')[1] || pair.quote_symbol;
 
+                return {
+                    pair, basePrice, quotePrice, ratio, changePct, changeStr, changeClass, flashClass, spread, baseShort, quoteShort
+                };
+            }).filter(Boolean);
+
+            // Sort the data
+            pairsData.sort((a, b) => {
+                let valA, valB;
+                switch (pairsSortColumn) {
+                    case 'pair':
+                        valA = `${a.baseShort}/${a.quoteShort}`;
+                        valB = `${b.baseShort}/${b.quoteShort}`;
+                        break;
+                    case 'base':
+                        valA = a.basePrice;
+                        valB = b.basePrice;
+                        break;
+                    case 'quote':
+                        valA = a.quotePrice;
+                        valB = b.quotePrice;
+                        break;
+                    case 'ratio':
+                        valA = a.ratio;
+                        valB = b.ratio;
+                        break;
+                    case 'change':
+                        valA = a.changePct;
+                        valB = b.changePct;
+                        break;
+                    case 'spread':
+                        valA = a.spread;
+                        valB = b.spread;
+                        break;
+                    default:
+                        valA = a.baseShort;
+                        valB = b.baseShort;
+                }
+                
+                if (typeof valA === 'string') {
+                    return pairsSortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                }
+                return pairsSortDirection === 'asc' ? valA - valB : valB - valA;
+            });
+
+            // Render sorted data
+            tbody.innerHTML = pairsData.map(data => {
                 return `
-                    <tr onclick="openPairsModal('${pair.id}', 'LONG')" style="cursor: pointer;">
+                    <tr onclick="openPairsModal('${data.pair.id}', 'LONG')" style="cursor: pointer;">
                         <td>
                             <span class="pair-symbol">
-                                <span class="base">${baseShort}</span>/<span class="quote">${quoteShort}</span>
+                                <span class="base">${data.baseShort}</span>/<span class="quote">${data.quoteShort}</span>
                             </span>
                         </td>
-                        <td class="pairs-price ${flashClass}">$${basePrice.toFixed(2)}</td>
-                        <td class="pairs-price">$${quotePrice.toFixed(2)}</td>
-                        <td><span class="pair-ratio">${ratio.toFixed(4)}</span></td>
-                        <td class="${changeClass}">${changeStr}</td>
-                        <td>$${spread.toFixed(2)}</td>
+                        <td class="pairs-price ${data.flashClass}">$${data.basePrice.toFixed(2)}</td>
+                        <td class="pairs-price">$${data.quotePrice.toFixed(2)}</td>
+                        <td><span class="pair-ratio">${data.ratio.toFixed(4)}</span></td>
+                        <td class="${data.changeClass}">${data.changeStr}</td>
+                        <td>$${data.spread.toFixed(2)}</td>
                     </tr>
                 `;
             }).join('');
