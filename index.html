@@ -4063,6 +4063,9 @@
             const tbody = document.getElementById('orders-tbody');
             const countEl = document.getElementById('order-count');
             
+            console.log('displayUserTrades called with', trades.length, 'trades');
+            console.log('tbody element:', tbody);
+            
             if (!tbody) return;
 
             countEl.textContent = trades.length;
@@ -4079,7 +4082,8 @@
             }
 
             let html = '';
-            trades.forEach(trade => {
+            trades.forEach((trade, idx) => {
+                console.log('Processing trade', idx, trade);
                 const time = trade.created_at 
                     ? new Date(trade.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
                     : '--:--';
@@ -4103,6 +4107,7 @@
                 `;
             });
 
+            console.log('Final html length:', html.length);
             tbody.innerHTML = html;
         }
 
