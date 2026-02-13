@@ -3742,16 +3742,17 @@
         // =============================================
 
         // Tea display data mapping (symbol -> auction display info with fixed buyer/status)
+        // soldPrice: final price when sold, soldTime: timestamp for ordering
         const teaDisplayData = {
-            'CHN-YUN': { grade: 'YUN', estate: 'Yunnan Gold', origin: 'China', lot: 24601, qty: 12400, buyer: 'Unilever', status: 'SOLD' },
-            'IND-ASM': { grade: 'ASM', estate: 'Assam Orthodox', origin: 'India', lot: 24602, qty: 8200, buyer: 'Tata Global', status: 'SOLD' },
+            'CHN-YUN': { grade: 'YUN', estate: 'Yunnan Gold', origin: 'China', lot: 24601, qty: 12400, buyer: 'Unilever', status: 'SOLD', soldPrice: 8.25, soldTime: 5 },
+            'IND-ASM': { grade: 'ASM', estate: 'Assam Orthodox', origin: 'India', lot: 24602, qty: 8200, buyer: 'Tata Global', status: 'SOLD', soldPrice: 4.15, soldTime: 3 },
             'IND-DRJ': { grade: 'DRJ', estate: 'Darjeeling First Flush', origin: 'India', lot: 24603, qty: 15600, buyer: '—', status: 'BIDDING' },
-            'KEN-BP1': { grade: 'BP1', estate: 'Kenya BP1', origin: 'Kenya', lot: 24604, qty: 22000, buyer: 'Finlays', status: 'SOLD' },
+            'KEN-BP1': { grade: 'BP1', estate: 'Kenya BP1', origin: 'Kenya', lot: 24604, qty: 22000, buyer: 'Finlays', status: 'SOLD', soldPrice: 3.42, soldTime: 4 },
             'KEN-DUST': { grade: 'DUST', estate: 'Kenya Dust', origin: 'Kenya', lot: 24605, qty: 5400, buyer: '—', status: 'BIDDING' },
             'KEN-PF1': { grade: 'PF1', estate: 'Kenya PF1', origin: 'Kenya', lot: 24606, qty: 18900, buyer: '—', status: 'BIDDING' },
-            'MLW-BP1': { grade: 'BP1', estate: 'Malawi BP1', origin: 'Malawi', lot: 24607, qty: 9800, buyer: 'Van Rees', status: 'SOLD' },
+            'MLW-BP1': { grade: 'BP1', estate: 'Malawi BP1', origin: 'Malawi', lot: 24607, qty: 9800, buyer: 'Van Rees', status: 'SOLD', soldPrice: 2.48, soldTime: 2 },
             'RWA-OP': { grade: 'OP', estate: 'Rwanda OP', origin: 'Rwanda', lot: 24608, qty: 6200, buyer: '—', status: 'PENDING' },
-            'SRI-BOP': { grade: 'BOP', estate: 'Ceylon BOP', origin: 'Sri Lanka', lot: 24609, qty: 14500, buyer: 'Ekaterra', status: 'SOLD' },
+            'SRI-BOP': { grade: 'BOP', estate: 'Ceylon BOP', origin: 'Sri Lanka', lot: 24609, qty: 14500, buyer: 'Ekaterra', status: 'SOLD', soldPrice: 4.35, soldTime: 1 },
             'SRI-PEK': { grade: 'PEK', estate: 'Ceylon Pekoe', origin: 'Sri Lanka', lot: 24610, qty: 8700, buyer: '—', status: 'PENDING' }
         };
 
@@ -3772,24 +3773,15 @@
             }
         }
 
-        // Track previous auction prices for flash detection
+        // Track previous auction prices for flash detection (only for BIDDING lots)
         let previousAuctionPrices = {};
 
         function updateAuctionTable() {
             const tbody = document.getElementById('auction-table-body');
             if (!tbody || !teas.length) return;
 
-            // Detect which prices changed
-            const changedTeas = {};
-            teas.forEach(tea => {
-                if (previousAuctionPrices[tea.symbol] !== undefined && 
-                    previousAuctionPrices[tea.symbol] !== tea.current_price) {
-                    changedTeas[tea.symbol] = tea.current_price > previousAuctionPrices[tea.symbol] ? 'up' : 'down';
-                }
-                previousAuctionPrices[tea.symbol] = tea.current_price;
-            });
-
-            tbody.innerHTML = teas.map((tea, index) => {
+            // Build auction items with display data
+            const auctionItems = teas.map((tea, index) => {
                 const displayData = teaDisplayData[tea.symbol] || {
                     grade: tea.symbol.split('-')[1] || 'STD',
                     estate: tea.name || tea.symbol,
@@ -3800,18 +3792,62 @@
                     status: 'PENDING'
                 };
 
-                const change = tea.previous_price 
-                    ? ((tea.current_price - tea.previous_price) / tea.previous_price * 100)
-                    : 0;
-                const changeStr = change !== 0 ? `${change >= 0 ? '+' : ''}${change.toFixed(1)}%` : '—';
-                const changeClass = change > 0 ? 'up' : change < 0 ? 'down' : '';
-                
-                // Add flash class if price just changed
-                const flashClass = changedTeas[tea.symbol] ? `flash-${changedTeas[tea.symbol]}` : '';
+                return { tea, displayData };
+            });
 
-                // Use fixed status/buyer from display data
+            // Sort: BIDDING first, then PENDING, then SOLD (by soldTime desc)
+            const statusOrder = { 'BIDDING': 0, 'PENDING': 1, 'SOLD': 2 };
+            auctionItems.sort((a, b) => {
+                const statusDiff = statusOrder[a.displayData.status] - statusOrder[b.displayData.status];
+                if (statusDiff !== 0) return statusDiff;
+                // Within SOLD, sort by soldTime descending (most recent first)
+                if (a.displayData.status === 'SOLD') {
+                    return (b.displayData.soldTime || 0) - (a.displayData.soldTime || 0);
+                }
+                return 0;
+            });
+
+            // Detect price changes only for BIDDING lots
+            const changedTeas = {};
+            auctionItems.forEach(({ tea, displayData }) => {
+                if (displayData.status === 'BIDDING') {
+                    if (previousAuctionPrices[tea.symbol] !== undefined && 
+                        previousAuctionPrices[tea.symbol] !== tea.current_price) {
+                        changedTeas[tea.symbol] = tea.current_price > previousAuctionPrices[tea.symbol] ? 'up' : 'down';
+                    }
+                    previousAuctionPrices[tea.symbol] = tea.current_price;
+                }
+            });
+
+            tbody.innerHTML = auctionItems.map(({ tea, displayData }) => {
                 const status = displayData.status;
                 const buyer = displayData.buyer;
+
+                // Determine price to display
+                let displayPrice;
+                let changeStr;
+                let changeClass = '';
+                let flashClass = '';
+
+                if (status === 'SOLD') {
+                    // Fixed sold price, no change
+                    displayPrice = displayData.soldPrice || tea.current_price;
+                    changeStr = '—';
+                } else if (status === 'PENDING') {
+                    // Fixed price, no change (not being bid on yet)
+                    displayPrice = tea.current_price;
+                    changeStr = '—';
+                } else {
+                    // BIDDING - live price with changes
+                    displayPrice = tea.current_price;
+                    const change = tea.previous_price 
+                        ? ((tea.current_price - tea.previous_price) / tea.previous_price * 100)
+                        : 0;
+                    changeStr = change !== 0 ? `${change >= 0 ? '+' : ''}${change.toFixed(1)}%` : '—';
+                    changeClass = change > 0 ? 'up' : change < 0 ? 'down' : '';
+                    flashClass = changedTeas[tea.symbol] ? `flash-${changedTeas[tea.symbol]}` : '';
+                }
+
                 let statusColor;
                 if (status === 'SOLD') {
                     statusColor = 'var(--accent-green)';
@@ -3828,7 +3864,7 @@
                         <td>${displayData.estate}</td>
                         <td class="auction-center">${displayData.origin}</td>
                         <td>${displayData.qty.toLocaleString()}</td>
-                        <td class="price-cell ${changeClass} ${flashClass}" data-tea="${tea.symbol}">$${tea.current_price.toFixed(2)}</td>
+                        <td class="price-cell ${changeClass} ${flashClass}" data-tea="${tea.symbol}">$${displayPrice.toFixed(2)}</td>
                         <td class="${changeClass}">${changeStr}</td>
                         <td>${buyer}</td>
                         <td><span style="color: ${statusColor};">${status}</span></td>
