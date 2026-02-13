@@ -746,6 +746,24 @@
             color: var(--accent-blue);
         }
 
+        .order-side {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        
+        .order-side.buy-side {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+        }
+        
+        .order-side.sell-side {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+        }
+
         .section-header {
             display: flex;
             justify-content: space-between;
@@ -2727,7 +2745,7 @@
                 <div class="order-history-header">
                     <div class="order-history-title">
                         Your Confirmed Orders
-                        <span class="order-count">4</span>
+                        <span class="order-count" id="order-count">0</span>
                     </div>
                 <button class="filter-btn active">All</button>
                 </div>
@@ -2736,59 +2754,19 @@
                         <tr>
                             <th>Time</th>
                             <th>Order ID</th>
-                            <th>Estate / Factory</th>
-                            <th>Grade</th>
-                            <th>Venue</th>
+                            <th>Tea</th>
+                            <th>Side</th>
                             <th>Qty (kg)</th>
                             <th>Price</th>
                             <th>Total</th>
                             <th>Status</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="orders-tbody">
                         <tr>
-                            <td>13:42</td>
-                            <td style="font-family: 'JetBrains Mono', monospace;">#24589</td>
-                            <td>Nandi Hills Estate</td>
-                            <td><span class="grade-badge">BP1</span></td>
-                            <td>Mombasa</td>
-                            <td class="order-qty">8,500</td>
-                            <td class="order-price">$3.12</td>
-                            <td class="order-price">$26,520</td>
-                            <td><span class="order-status filled">FILLED</span></td>
-                        </tr>
-                        <tr>
-                            <td>11:28</td>
-                            <td style="font-family: 'JetBrains Mono', monospace;">#24572</td>
-                            <td>Kipkebe Estate</td>
-                            <td><span class="grade-badge">PF1</span></td>
-                            <td>Mombasa</td>
-                            <td class="order-qty">12,000</td>
-                            <td class="order-price">$2.94</td>
-                            <td class="order-price">$35,280</td>
-                            <td><span class="order-status filled">FILLED</span></td>
-                        </tr>
-                        <tr>
-                            <td>14:15</td>
-                            <td style="font-family: 'JetBrains Mono', monospace;">#24608</td>
-                            <td>Kangaita Tea Factory</td>
-                            <td><span class="grade-badge">DUST1</span></td>
-                            <td>Mombasa</td>
-                            <td class="order-qty">6,200</td>
-                            <td class="order-price">$2.67</td>
-                            <td class="order-price">$16,554</td>
-                            <td><span class="order-status pending">PENDING</span></td>
-                        </tr>
-                        <tr>
-                            <td>12:55</td>
-                            <td style="font-family: 'JetBrains Mono', monospace;">#24595</td>
-                            <td>Tinderet Tea Estate</td>
-                            <td><span class="grade-badge">BOPF</span></td>
-                            <td>Mombasa</td>
-                            <td class="order-qty">4,800</td>
-                            <td class="order-price">$3.38</td>
-                            <td class="order-price">$16,224</td>
-                            <td><span class="order-status partial">PARTIAL 60%</span></td>
+                            <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                                No orders yet. Start trading!
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -3528,6 +3506,7 @@
             await checkAuthState();
             await loadTeas();
             await loadLeaderboard();
+            await loadUserTrades();
         });
 
         // =============================================
@@ -3961,6 +3940,7 @@
 
                 // Refresh data
                 await loadPositions();
+                await loadUserTrades();
                 updateUIForLoggedInUser();
                 
                 // Reset form
@@ -3980,22 +3960,16 @@
         // =============================================
 
         async function loadPositions() {
-            if (!currentUser) {
-                console.log('loadPositions: No current user');
-                return;
-            }
+            if (!currentUser) return;
 
             try {
-                console.log('loadPositions: Fetching for user', currentUser.id);
                 const { data, error } = await supabaseClient
                     .from('positions')
                     .select('*, teas(*)')
                     .eq('user_id', currentUser.id);
 
-                console.log('loadPositions: Result', { data, error });
                 if (error) throw error;
                 positions = data || [];
-                console.log('loadPositions: Positions set to', positions);
                 updatePortfolioDisplay();
             } catch (error) {
                 console.error('Failed to load positions:', error);
@@ -4006,9 +3980,6 @@
             const listEl = document.getElementById('positions-list');
             const valueEl = document.getElementById('portfolio-value');
             const pnlEl = document.getElementById('portfolio-pnl');
-
-            console.log('updatePortfolioDisplay: positions count', positions.length);
-            console.log('updatePortfolioDisplay: listEl found', !!listEl);
 
             if (positions.length === 0) {
                 listEl.innerHTML = `
@@ -4028,9 +3999,8 @@
             let holdingsValue = 0;
             let html = '';
 
-            positions.forEach((pos, idx) => {
+            positions.forEach(pos => {
                 const tea = pos.teas || teas.find(t => t.id === pos.tea_id);
-                console.log('Position', idx, 'tea:', tea, 'pos:', pos);
                 if (!tea) return;
 
                 const currentValue = pos.quantity * tea.current_price;
@@ -4053,7 +4023,6 @@
                 `;
             });
 
-            console.log('updatePortfolioDisplay: html length', html.length, 'holdingsValue', holdingsValue);
             listEl.innerHTML = html;
 
             const totalValue = (userProfile?.cash_balance || 0) + holdingsValue;
@@ -4063,6 +4032,75 @@
             const totalPnlPct = (totalPnl / 10000 * 100).toFixed(2);
             pnlEl.textContent = `${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)} (${totalPnlPct}%)`;
             pnlEl.className = 'portfolio-pnl ' + (totalPnl >= 0 ? 'up' : 'down');
+        }
+
+        // =============================================
+        // ORDER HISTORY FUNCTIONS
+        // =============================================
+
+        async function loadUserTrades() {
+            if (!currentUser) {
+                displayUserTrades([]);
+                return;
+            }
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('trades')
+                    .select('*, teas(symbol)')
+                    .eq('user_id', currentUser.id)
+                    .order('created_at', { ascending: false })
+                    .limit(20);
+
+                if (error) throw error;
+                displayUserTrades(data || []);
+            } catch (error) {
+                console.error('Failed to load trades:', error);
+            }
+        }
+
+        function displayUserTrades(trades) {
+            const tbody = document.getElementById('orders-tbody');
+            const countEl = document.getElementById('order-count');
+            
+            if (!tbody) return;
+
+            countEl.textContent = trades.length;
+
+            if (trades.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                            No orders yet. Start trading!
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            let html = '';
+            trades.forEach(trade => {
+                const time = new Date(trade.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                const orderId = '#' + trade.id.substring(0, 5).toUpperCase();
+                const teaSymbol = trade.teas?.symbol || 'Unknown';
+                const sideClass = trade.side === 'BUY' ? 'buy-side' : 'sell-side';
+                const total = (trade.quantity * trade.price).toFixed(2);
+
+                html += `
+                    <tr>
+                        <td>${time}</td>
+                        <td style="font-family: 'JetBrains Mono', monospace;">${orderId}</td>
+                        <td>${teaSymbol}</td>
+                        <td><span class="order-side ${sideClass}">${trade.side}</span></td>
+                        <td class="order-qty">${trade.quantity.toLocaleString()}</td>
+                        <td class="order-price">$${trade.price.toFixed(2)}</td>
+                        <td class="order-price">$${parseFloat(total).toLocaleString()}</td>
+                        <td><span class="order-status filled">FILLED</span></td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
         }
 
         // =============================================
