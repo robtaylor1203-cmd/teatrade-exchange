@@ -2759,12 +2759,13 @@
                             <th>Qty (kg)</th>
                             <th>Price</th>
                             <th>Total</th>
+                            <th>P/L</th>
                             <th>Status</th>
                         </tr>
                     </thead>
                     <tbody id="orders-tbody">
                         <tr>
-                            <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                            <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">
                                 No orders yet. Start trading!
                             </td>
                         </tr>
@@ -3723,6 +3724,7 @@
                 if (error) throw error;
                 console.log('Prices updated');
                 await loadTeas(); // Reload prices after update
+                await loadUserTrades(); // Refresh P/L on orders
             } catch (error) {
                 console.error('Failed to update prices:', error);
             }
@@ -4115,7 +4117,7 @@
             if (trades.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                        <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">
                             No orders yet. Start trading!
                         </td>
                     </tr>
@@ -4133,6 +4135,20 @@
                 const teaSymbol = tea?.symbol || 'Unknown';
                 const sideClass = trade.side === 'BUY' ? 'buy-side' : 'sell-side';
                 const total = (trade.quantity * trade.price).toFixed(2);
+                
+                // Calculate P/L based on current price vs entry price
+                let pnl = 0;
+                let pnlPct = 0;
+                if (tea && trade.side === 'BUY') {
+                    pnl = (tea.current_price - trade.price) * trade.quantity;
+                    pnlPct = ((tea.current_price - trade.price) / trade.price * 100);
+                } else if (tea && trade.side === 'SELL') {
+                    // For sells, P/L is locked in at trade time
+                    pnl = 0;
+                    pnlPct = 0;
+                }
+                const pnlClass = pnl >= 0 ? 'up' : 'down';
+                const pnlSign = pnl >= 0 ? '+' : '';
 
                 html += `
                     <tr>
@@ -4143,6 +4159,7 @@
                         <td class="order-qty">${trade.quantity.toLocaleString()}</td>
                         <td class="order-price">$${trade.price.toFixed(2)}</td>
                         <td class="order-price">$${parseFloat(total).toLocaleString()}</td>
+                        <td class="${pnlClass}">${trade.side === 'BUY' ? pnlSign + '$' + pnl.toFixed(2) : '—'}</td>
                         <td><span class="order-status filled">FILLED</span></td>
                     </tr>
                 `;
