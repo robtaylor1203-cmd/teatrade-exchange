@@ -1674,6 +1674,76 @@
             border-color: var(--accent-blue);
         }
         
+        /* Quick Quote Crosshair and Tooltip */
+        .qq-crosshair {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+        }
+        
+        .qq-crosshair-v, .qq-crosshair-h {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .qq-crosshair-v {
+            width: 1px;
+            top: 0;
+            bottom: 0;
+        }
+        
+        .qq-crosshair-h {
+            height: 1px;
+            left: 0;
+            right: 0;
+        }
+        
+        .qq-tooltip {
+            display: none;
+            position: absolute;
+            background: rgba(17, 24, 39, 0.95);
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-primary);
+            pointer-events: none;
+            z-index: 100;
+            white-space: nowrap;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        
+        .qq-tooltip-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 4px;
+        }
+        
+        .qq-tooltip-row:last-child {
+            margin-bottom: 0;
+        }
+        
+        .qq-tooltip-label {
+            color: var(--text-muted);
+        }
+        
+        .qq-tooltip-value {
+            font-weight: 500;
+        }
+        
+        .qq-tooltip-value.up { color: var(--accent-green); }
+        .qq-tooltip-value.down { color: var(--accent-red); }
+        
+        .quick-quote-chart {
+            position: relative;
+        }
+        
         .quick-trade-summary {
             background: var(--bg-tertiary);
             border-radius: 6px;
@@ -3922,6 +3992,11 @@
                 <div class="quick-quote-chart-area">
                     <div class="quick-quote-chart">
                         <canvas id="qq-chart"></canvas>
+                        <div class="qq-crosshair" id="qq-crosshair">
+                            <div class="qq-crosshair-v"></div>
+                            <div class="qq-crosshair-h"></div>
+                        </div>
+                        <div class="qq-tooltip" id="qq-tooltip"></div>
                     </div>
                     <div class="quick-quote-stats">
                         <div class="quick-stat">
@@ -6765,8 +6840,53 @@
             }, interval);
         }
 
+        // Track if user is actively interacting with trade form
+        let isTradeFormActive = false;
+        
+        // Set up focus tracking on trade form inputs
+        document.addEventListener('DOMContentLoaded', () => {
+            const tradeFormInputs = ['trade-tea-select', 'trade-qty', 'trade-price', 'sl-input', 'tp-input'];
+            tradeFormInputs.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('focus', () => { isTradeFormActive = true; });
+                    el.addEventListener('blur', () => { 
+                        // Small delay to allow for tab navigation between fields
+                        setTimeout(() => {
+                            const activeEl = document.activeElement;
+                            if (!tradeFormInputs.includes(activeEl?.id)) {
+                                isTradeFormActive = false;
+                            }
+                        }, 100);
+                    });
+                }
+            });
+        });
+
         function populateTeaSelect() {
             const select = document.getElementById('trade-tea-select');
+            
+            // Preserve current selection
+            const currentValue = select.value;
+            const currentQty = document.getElementById('trade-qty')?.value;
+            
+            // Skip full rebuild if user is actively using the form
+            if (isTradeFormActive && currentValue) {
+                // Just update the prices in existing options without rebuilding
+                teas.forEach(tea => {
+                    const option = select.querySelector(`option[value="${tea.id}"]`);
+                    if (option) {
+                        const change = tea.previous_price ? ((tea.current_price - tea.previous_price) / tea.previous_price * 100).toFixed(1) : '0.0';
+                        const changeSign = change >= 0 ? '+' : '';
+                        option.textContent = `${tea.symbol} - $${tea.current_price.toFixed(2)} (${changeSign}${change}%)`;
+                        option.dataset.price = tea.current_price;
+                    }
+                });
+                // Update the trade summary with new price
+                updateTradeSummary();
+                return;
+            }
+            
             select.innerHTML = '<option value="">Select Tea...</option>';
             
             teas.forEach(tea => {
@@ -6778,6 +6898,16 @@
                 option.dataset.price = tea.current_price;
                 select.appendChild(option);
             });
+            
+            // Restore selection if it still exists
+            if (currentValue) {
+                select.value = currentValue;
+                // Only restore qty if we had a selection
+                if (currentQty && document.getElementById('trade-qty')) {
+                    document.getElementById('trade-qty').value = currentQty;
+                }
+                updateTradeSummary();
+            }
         }
 
         function setTradeType(type) {
@@ -8174,12 +8304,16 @@
             setQuickTradeType('BUY');
             updateQuickTradeSummary();
             
-            // Draw the mini chart
-            drawQuickQuoteChart(tea);
-            
-            // Show modal
+            // Show modal FIRST so canvas has dimensions
             modal.classList.add('active');
             document.body.style.overflow = 'hidden';
+            
+            // Draw the chart AFTER modal is visible (needs a small delay for layout)
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    drawQuickQuoteChart(tea);
+                });
+            });
         }
         
         function closeQuickQuoteModal() {
@@ -8218,6 +8352,18 @@
             execBtn.textContent = `${quickQuoteTradeType} ${qty} kg`;
         }
         
+        // Store Quick Quote chart metadata for crosshair
+        let qqChartMeta = {
+            data: [],
+            padding: { top: 20, right: 70, bottom: 30, left: 60 },
+            minPrice: 0,
+            maxPrice: 0,
+            chartWidth: 0,
+            chartHeight: 0,
+            w: 0,
+            h: 0
+        };
+        
         function drawQuickQuoteChart(tea) {
             const canvas = document.getElementById('qq-chart');
             if (!canvas || !tea) return;
@@ -8226,8 +8372,16 @@
             const rect = canvas.parentElement.getBoundingClientRect();
             if (rect.width <= 0 || rect.height <= 0) return;
             
-            canvas.width = rect.width;
-            canvas.height = rect.height;
+            // High DPI support
+            const dpr = window.devicePixelRatio || 1;
+            const w = rect.width;
+            const h = rect.height;
+            
+            canvas.width = w * dpr;
+            canvas.height = h * dpr;
+            canvas.style.width = w + 'px';
+            canvas.style.height = h + 'px';
+            ctx.scale(dpr, dpr);
             
             const price = tea.current_price || 3.5;
             const change = tea.price_change_24h || 0;
@@ -8240,18 +8394,21 @@
             const historySlice = fullHistory.slice(-48); // Last 48 hours
             if (historySlice.length === 0) return;
             
-            const padding = { top: 20, right: 20, bottom: 30, left: 60 };
-            const chartWidth = canvas.width - padding.left - padding.right;
-            const chartHeight = canvas.height - padding.top - padding.bottom;
+            const padding = { top: 20, right: 70, bottom: 30, left: 60 };
+            const chartWidth = w - padding.left - padding.right;
+            const chartHeight = h - padding.top - padding.bottom;
             
             const allHighs = historySlice.map(d => d.high);
             const allLows = historySlice.map(d => d.low);
             const minPrice = Math.min(...allLows) * 0.998;
             const maxPrice = Math.max(...allHighs) * 1.002;
             
+            // Store metadata for crosshair
+            qqChartMeta = { data: historySlice, padding, minPrice, maxPrice, chartWidth, chartHeight, w, h };
+            
             // Clear
             ctx.fillStyle = '#1f2937';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillRect(0, 0, w, h);
             
             // Draw grid
             ctx.strokeStyle = 'rgba(255,255,255,0.05)';
@@ -8260,7 +8417,7 @@
                 const y = padding.top + (chartHeight / 4) * i;
                 ctx.beginPath();
                 ctx.moveTo(padding.left, y);
-                ctx.lineTo(canvas.width - padding.right, y);
+                ctx.lineTo(w - padding.right, y);
                 ctx.stroke();
                 
                 const priceLabel = maxPrice - ((maxPrice - minPrice) / 4) * i;
@@ -8280,7 +8437,7 @@
                     const x = padding.left + (i / (historySlice.length - 1)) * chartWidth;
                     const date = historySlice[i].date;
                     const label = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-                    ctx.fillText(label, x, canvas.height - 8);
+                    ctx.fillText(label, x, h - 8);
                 }
             });
             
@@ -8317,7 +8474,7 @@
             ctx.beginPath();
             ctx.setLineDash([4, 4]);
             ctx.moveTo(padding.left, currentY);
-            ctx.lineTo(canvas.width - padding.right, currentY);
+            ctx.lineTo(w - padding.right, currentY);
             ctx.strokeStyle = isUp ? '#10b981' : '#ef4444';
             ctx.lineWidth = 1;
             ctx.stroke();
@@ -8325,11 +8482,110 @@
             
             // Current price label
             ctx.fillStyle = isUp ? '#10b981' : '#ef4444';
-            ctx.fillRect(canvas.width - padding.right + 2, currentY - 8, 55, 16);
+            ctx.fillRect(w - padding.right + 2, currentY - 8, 55, 16);
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 10px JetBrains Mono';
             ctx.textAlign = 'left';
-            ctx.fillText(`$${price.toFixed(2)}`, canvas.width - padding.right + 6, currentY + 3);
+            ctx.fillText(`$${price.toFixed(2)}`, w - padding.right + 6, currentY + 3);
+            
+            // Setup crosshair events (once)
+            if (!canvas.dataset.crosshairSetup) {
+                canvas.dataset.crosshairSetup = 'true';
+                setupQQChartCrosshair(canvas);
+            }
+        }
+        
+        function setupQQChartCrosshair(canvas) {
+            const crosshair = document.getElementById('qq-crosshair');
+            const tooltip = document.getElementById('qq-tooltip');
+            if (!crosshair || !tooltip) return;
+            
+            canvas.addEventListener('mousemove', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                const { data, padding, minPrice, maxPrice, chartWidth, chartHeight, w, h } = qqChartMeta;
+                if (!data || data.length === 0) return;
+                
+                // Check if within chart area
+                if (x < padding.left || x > w - padding.right || y < padding.top || y > h - padding.bottom) {
+                    crosshair.style.display = 'none';
+                    tooltip.style.display = 'none';
+                    return;
+                }
+                
+                // Find nearest candle
+                const normalizedX = (x - padding.left) / chartWidth;
+                const candleIndex = Math.round(normalizedX * (data.length - 1));
+                const candle = data[Math.max(0, Math.min(data.length - 1, candleIndex))];
+                if (!candle) return;
+                
+                // Calculate candle X position
+                const candleX = padding.left + (candleIndex / (data.length - 1)) * chartWidth;
+                
+                // Show crosshair
+                crosshair.style.display = 'block';
+                crosshair.querySelector('.qq-crosshair-v').style.left = candleX + 'px';
+                crosshair.querySelector('.qq-crosshair-h').style.top = y + 'px';
+                
+                // Calculate price at cursor Y
+                const priceAtY = maxPrice - ((y - padding.top) / chartHeight) * (maxPrice - minPrice);
+                
+                // Format tooltip
+                const candleUp = candle.close >= candle.open;
+                const changeAmount = candle.close - candle.open;
+                const changePercent = (changeAmount / candle.open * 100).toFixed(2);
+                const timeStr = candle.date.toLocaleString('en-GB', { 
+                    weekday: 'short', 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+                
+                tooltip.innerHTML = `
+                    <div class="qq-tooltip-row">
+                        <span class="qq-tooltip-label">Time</span>
+                        <span class="qq-tooltip-value">${timeStr}</span>
+                    </div>
+                    <div class="qq-tooltip-row">
+                        <span class="qq-tooltip-label">Open</span>
+                        <span class="qq-tooltip-value">$${candle.open.toFixed(2)}</span>
+                    </div>
+                    <div class="qq-tooltip-row">
+                        <span class="qq-tooltip-label">High</span>
+                        <span class="qq-tooltip-value">$${candle.high.toFixed(2)}</span>
+                    </div>
+                    <div class="qq-tooltip-row">
+                        <span class="qq-tooltip-label">Low</span>
+                        <span class="qq-tooltip-value">$${candle.low.toFixed(2)}</span>
+                    </div>
+                    <div class="qq-tooltip-row">
+                        <span class="qq-tooltip-label">Close</span>
+                        <span class="qq-tooltip-value ${candleUp ? 'up' : 'down'}">$${candle.close.toFixed(2)}</span>
+                    </div>
+                    <div class="qq-tooltip-row">
+                        <span class="qq-tooltip-label">Change</span>
+                        <span class="qq-tooltip-value ${candleUp ? 'up' : 'down'}">${candleUp ? '+' : ''}${changePercent}%</span>
+                    </div>
+                `;
+                
+                // Position tooltip
+                tooltip.style.display = 'block';
+                let tooltipX = candleX + 15;
+                let tooltipY = y - 60;
+                
+                // Keep tooltip in bounds
+                if (tooltipX + 150 > w) tooltipX = candleX - 165;
+                if (tooltipY < 10) tooltipY = y + 15;
+                
+                tooltip.style.left = tooltipX + 'px';
+                tooltip.style.top = tooltipY + 'px';
+            });
+            
+            canvas.addEventListener('mouseleave', () => {
+                crosshair.style.display = 'none';
+                tooltip.style.display = 'none';
+            });
         }
         
         async function executeQuickTrade() {
