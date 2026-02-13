@@ -462,21 +462,82 @@
         .chart-title {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
+            white-space: nowrap;
         }
 
         .chart-title h2 {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 600;
+            margin: 0;
         }
 
         .chart-badge {
-            padding: 4px 10px;
+            padding: 3px 8px;
             background: var(--accent-blue);
             border-radius: 4px;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 600;
             text-transform: uppercase;
+        }
+        
+        /* Timeframe Dropdown */
+        .timeframe-dropdown {
+            position: relative;
+        }
+        
+        .timeframe-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .timeframe-btn:hover {
+            border-color: var(--accent-blue);
+        }
+        
+        .timeframe-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 4px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 4px 0;
+            min-width: 80px;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+        
+        .timeframe-menu.visible {
+            display: block;
+        }
+        
+        .timeframe-item {
+            padding: 6px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        
+        .timeframe-item:hover {
+            background: var(--bg-tertiary);
+        }
+        
+        .timeframe-item.active {
+            color: var(--accent-blue);
+            background: rgba(26, 115, 232, 0.1);
         }
 
         .chart-stats {
@@ -556,12 +617,1121 @@
             height: 14px;
         }
 
+        /* Studies Dropdown */
+        .studies-dropdown {
+            position: relative;
+            margin-left: 16px;
+            padding-left: 16px;
+            border-left: 1px solid var(--border);
+        }
+
+        .studies-btn {
+            padding: 6px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .studies-btn:hover {
+            background: var(--bg-card);
+            border-color: var(--border-light);
+        }
+
+        .studies-btn.has-active {
+            background: var(--accent-purple);
+            border-color: var(--accent-purple);
+            color: white;
+        }
+
+        .studies-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 4px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 0;
+            min-width: 180px;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+
+        .studies-menu.visible {
+            display: block;
+        }
+
+        .studies-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 14px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .studies-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .studies-item-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .studies-color {
+            width: 12px;
+            height: 3px;
+            border-radius: 2px;
+        }
+
+        .studies-toggle {
+            width: 36px;
+            height: 20px;
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .studies-toggle.active {
+            background: var(--accent-blue);
+        }
+
+        .studies-toggle::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+
+        .studies-toggle.active::after {
+            left: 18px;
+        }
+
+        /* Price Alert Bell */
+        .price-alert-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .price-alert-btn:hover {
+            color: var(--accent-orange);
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .price-alert-btn.has-alert {
+            color: var(--accent-orange);
+        }
+
+        .price-alert-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* SL/TP Inputs */
+        .sltp-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .sltp-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 0;
+            position: relative;
+        }
+
+        .sltp-label {
+            font-size: 9px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+        }
+
+        .sltp-label .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .sltp-label .dot.sl {
+            background: var(--accent-red);
+        }
+
+        .sltp-label .dot.tp {
+            background: var(--accent-green);
+        }
+
+        .sltp-input {
+            padding: 6px 8px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            width: 100%;
+            box-sizing: border-box;
+            -moz-appearance: textfield;
+        }
+        
+        .sltp-input::-webkit-outer-spin-button,
+        .sltp-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        
+        .sltp-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        
+        .sltp-input-wrapper input {
+            padding-right: 28px;
+        }
+        
+        .sltp-arrows {
+            position: absolute;
+            right: 4px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+        
+        .sltp-arrow {
+            width: 18px;
+            height: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-tertiary);
+            border: none;
+            border-radius: 2px;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: all 0.15s;
+            padding: 0;
+        }
+        
+        .sltp-arrow:hover {
+            background: var(--accent-blue);
+            color: white;
+        }
+        
+        .sltp-arrow svg {
+            width: 10px;
+            height: 10px;
+        }
+
+        .sltp-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .sltp-input::placeholder {
+            color: var(--text-muted);
+        }
+
         .chart-container {
             height: 280px;
             background: var(--bg-card);
             border-radius: 8px;
             position: relative;
             overflow: hidden;
+        }
+        
+        /* RSI Sub-Chart */
+        .rsi-chart-container {
+            height: 80px;
+            background: var(--bg-card);
+            border-radius: 8px;
+            margin-top: 8px;
+            padding: 8px 0;
+            position: relative;
+        }
+        
+        .rsi-header {
+            position: absolute;
+            top: 8px;
+            left: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 5;
+        }
+        
+        .rsi-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: #ec4899;
+            text-transform: uppercase;
+        }
+        
+        .rsi-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+        
+        .rsi-canvas {
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+        
+        .rsi-crosshair {
+            position: absolute;
+            pointer-events: none;
+            display: none;
+        }
+        
+        .rsi-crosshair .crosshair-v {
+            position: absolute;
+            top: 0;
+            width: 1px;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .rsi-crosshair .crosshair-h {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .rsi-tooltip {
+            position: absolute;
+            background: rgba(17, 24, 39, 0.95);
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            padding: 6px 10px;
+            font-size: 10px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+            z-index: 10;
+            white-space: nowrap;
+        }
+        
+        .rsi-tooltip.visible {
+            opacity: 1;
+        }
+        
+        /* Market Depth Heatmap */
+        .market-depth-container {
+            background: var(--bg-card);
+            border-radius: 8px;
+            margin-top: 8px;
+            padding: 12px;
+        }
+        
+        .market-depth-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .market-depth-title {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .market-depth-ratio {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+        
+        .market-depth-bar {
+            height: 24px;
+            border-radius: 4px;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .depth-bids {
+            background: linear-gradient(90deg, rgba(16, 185, 129, 0.3), rgba(16, 185, 129, 0.6));
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            padding-left: 8px;
+        }
+        
+        .depth-asks {
+            background: linear-gradient(90deg, rgba(239, 68, 68, 0.6), rgba(239, 68, 68, 0.3));
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 8px;
+        }
+        
+        .depth-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+        
+        .market-depth-levels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 6px;
+            font-size: 9px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        /* Watchlist Tabs */
+        .watchlist-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 12px;
+        }
+        
+        .watchlist-tab {
+            flex: 1;
+            padding: 6px 8px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            background: var(--bg-card);
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        
+        .watchlist-tab:hover {
+            color: var(--text-primary);
+        }
+        
+        .watchlist-tab.active {
+            background: var(--accent-blue);
+            color: white;
+        }
+        
+        /* Macro Indicators */
+        .macro-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            background: var(--bg-card);
+            border-radius: 6px;
+            margin-bottom: 6px;
+        }
+        
+        .macro-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .macro-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        
+        .macro-icon.currency { background: rgba(59, 130, 246, 0.2); }
+        .macro-icon.oil { background: rgba(245, 158, 11, 0.2); }
+        .macro-icon.shipping { background: rgba(139, 92, 246, 0.2); }
+        .macro-icon.weather { background: rgba(16, 185, 129, 0.2); }
+        
+        .macro-name {
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .macro-subtext {
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+        
+        .macro-value {
+            text-align: right;
+        }
+        
+        .macro-price {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        
+        .macro-change {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            justify-content: flex-end;
+        }
+        
+        .macro-impact {
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-top: 4px;
+            display: inline-block;
+        }
+        
+        .macro-impact.bullish { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); }
+        .macro-impact.bearish { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+        .macro-impact.neutral { background: rgba(156, 163, 175, 0.2); color: var(--text-muted); }
+        
+        /* Trade Log */
+        .portfolio-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 12px;
+        }
+        
+        .portfolio-tab {
+            padding: 6px 12px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            background: var(--bg-card);
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        
+        .portfolio-tab:hover {
+            color: var(--text-primary);
+        }
+        
+        .portfolio-tab.active {
+            background: var(--accent-blue);
+            color: white;
+        }
+        
+        .trade-log-container {
+            display: none;
+            overflow-x: auto;
+        }
+        
+        .trade-log-container.active {
+            display: block;
+        }
+        
+        .trade-log-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+        
+        .trade-stat {
+            background: var(--bg-card);
+            padding: 8px 4px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        
+        .trade-stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .trade-stat-label {
+            font-size: 8px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+        
+        .trade-log-table {
+            width: 100%;
+            font-size: 10px;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        
+        .trade-log-table th {
+            text-align: left;
+            padding: 6px 4px;
+            font-size: 8px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .trade-log-table td {
+            padding: 6px 4px;
+            border-bottom: 1px solid var(--border);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .trade-log-table tr:hover {
+            background: var(--bg-tertiary);
+        }
+        
+        .trade-type-badge {
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .trade-type-badge.long { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); }
+        .trade-type-badge.short { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+        
+        /* Command Line */
+        .command-line-container {
+            position: relative;
+            flex: 1;
+            max-width: 400px;
+            margin: 0 24px;
+        }
+        
+        .command-line {
+            width: 100%;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 12px 8px 36px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            outline: none;
+            transition: all 0.2s;
+        }
+        
+        .command-line:focus {
+            border-color: var(--accent-blue);
+            background: var(--bg-card);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .command-line::placeholder {
+            color: var(--text-muted);
+        }
+        
+        .command-line-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+        
+        .command-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin-top: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .command-suggestions.active {
+            display: block;
+        }
+        
+        .command-suggestion {
+            padding: 8px 12px;
+            font-size: 11px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.1s;
+        }
+        
+        .command-suggestion:hover, .command-suggestion.selected {
+            background: var(--bg-tertiary);
+        }
+        
+        .command-suggestion-cmd {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-blue);
+        }
+        
+        .command-suggestion-desc {
+            color: var(--text-muted);
+            font-size: 10px;
+        }
+        
+        /* Maximize Functionality */
+        .maximize-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .maximize-btn:hover {
+            color: var(--text-primary);
+            background: var(--bg-tertiary);
+        }
+        
+        .panel-maximized {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 9999 !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+            background: var(--bg-primary) !important;
+            overflow: auto;
+        }
+        
+        .panel-maximized .chart-container {
+            height: calc(100vh - 200px) !important;
+        }
+        
+        .maximize-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 9998;
+        }
+        
+        .maximize-overlay.active {
+            display: block;
+        }
+        
+        /* Flash Quote Board */
+        .quote-board-section {
+            padding: 0 16px;
+            margin-bottom: 16px;
+        }
+        
+        .quote-board {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+        }
+        
+        .quote-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .quote-card:hover {
+            border-color: var(--border-light);
+            transform: translateY(-2px);
+        }
+        
+        .quote-card.selected {
+            border-color: var(--accent-blue);
+            background: rgba(59, 130, 246, 0.1);
+        }
+        
+        .quote-card.flash-green {
+            animation: flashQuoteGreen 0.5s ease;
+        }
+        
+        .quote-card.flash-red {
+            animation: flashQuoteRed 0.5s ease;
+        }
+        
+        @keyframes flashQuoteGreen {
+            0%, 100% { background: var(--bg-card); }
+            50% { background: rgba(16, 185, 129, 0.3); }
+        }
+        
+        @keyframes flashQuoteRed {
+            0%, 100% { background: var(--bg-card); }
+            50% { background: rgba(239, 68, 68, 0.3); }
+        }
+        
+        .quote-symbol {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        
+        .quote-price {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        
+        .quote-change {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .quote-volume {
+            font-size: 9px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        
+        /* Quick Quote Modal */
+        .quick-quote-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .quick-quote-modal-overlay.active {
+            display: flex;
+        }
+        
+        .quick-quote-modal {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            width: 100%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+        }
+        
+        .quick-quote-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-card);
+        }
+        
+        .quick-quote-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .quick-quote-symbol {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        
+        .quick-quote-name {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+        
+        .quick-quote-price-info {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+        }
+        
+        .quick-quote-current-price {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 28px;
+            font-weight: 700;
+        }
+        
+        .quick-quote-change {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .quick-quote-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 28px;
+            cursor: pointer;
+            padding: 0 8px;
+            line-height: 1;
+        }
+        
+        .quick-quote-close:hover {
+            color: var(--text-primary);
+        }
+        
+        .quick-quote-body {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .quick-quote-chart-area {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow: hidden;
+        }
+        
+        .quick-quote-chart {
+            flex: 1;
+            background: var(--bg-card);
+            border-radius: 8px;
+            position: relative;
+            min-height: 280px;
+        }
+        
+        .quick-quote-chart canvas {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .quick-quote-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+        
+        .quick-stat {
+            background: var(--bg-card);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .quick-stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .quick-stat-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+        
+        .quick-quote-trade-panel {
+            background: var(--bg-card);
+            border-left: 1px solid var(--border);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        .quick-trade-type-toggle {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .quick-trade-type-btn {
+            flex: 1;
+            padding: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .quick-trade-type-btn.buy {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+        }
+        
+        .quick-trade-type-btn.buy.active {
+            background: var(--accent-green);
+            color: white;
+        }
+        
+        .quick-trade-type-btn.sell {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+        }
+        
+        .quick-trade-type-btn.sell.active {
+            background: var(--accent-red);
+            color: white;
+        }
+        
+        .quick-trade-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .quick-trade-input-group label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        
+        .quick-trade-input {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            -webkit-appearance: none;
+            -moz-appearance: textfield;
+        }
+        
+        .quick-trade-input::-webkit-outer-spin-button,
+        .quick-trade-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        
+        .quick-trade-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+        
+        .quick-trade-summary {
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            padding: 12px;
+        }
+        
+        .quick-trade-summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .quick-trade-summary-row:last-child {
+            margin-bottom: 0;
+            padding-top: 8px;
+            border-top: 1px solid var(--border);
+            font-weight: 600;
+        }
+        
+        .quick-trade-execute {
+            padding: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .quick-trade-execute.buy {
+            background: var(--accent-green);
+            color: white;
+        }
+        
+        .quick-trade-execute.sell {
+            background: var(--accent-red);
+            color: white;
+        }
+        
+        .quick-trade-execute:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        
+        @media (max-width: 900px) {
+            .quick-quote-body {
+                grid-template-columns: 1fr;
+            }
+            .quick-quote-trade-panel {
+                border-left: none;
+                border-top: 1px solid var(--border);
+            }
+        }
+        
+        .studies-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 4px 0;
         }
 
         .chart-canvas {
@@ -715,6 +1885,29 @@
         .order-table-wrapper::-webkit-scrollbar-thumb:hover {
             background: var(--text-muted);
         }
+
+        .pairs-table-wrapper {
+            max-height: 760px;
+            overflow-y: auto;
+        }
+
+        .pairs-table-wrapper::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .pairs-table-wrapper::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+        }
+
+        .pairs-table-wrapper::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        .pairs-table-wrapper::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
         
         .order-table th {
             text-align: left;
@@ -848,6 +2041,9 @@
             opacity: 0.5;
             cursor: not-allowed;
         }
+
+        .order-status.filled {
+            background: rgba(16, 185, 129, 0.15);
             color: var(--accent-green);
         }
         
@@ -942,8 +2138,8 @@
         }
 
         .toggle-btn.active {
-            background: var(--accent-purple);
-            border-color: var(--accent-purple);
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
             color: white;
         }
 
@@ -1170,6 +2366,7 @@
 
         .pairs-modal-actions .confirm-btn {
             color: white;
+            background: var(--accent-blue);
         }
 
         .pairs-modal-actions .confirm-btn.long {
@@ -1229,6 +2426,28 @@
             font-weight: 600;
             padding: 4px 8px;
             border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 100px;
+        }
+        
+        .price-cell span {
+            flex: 1;
+        }
+        
+        .price-cell .price-alert-btn {
+            opacity: 0.4;
+            transition: opacity 0.2s;
+        }
+        
+        .price-cell:hover .price-alert-btn {
+            opacity: 1;
+        }
+        
+        .price-cell .price-alert-btn.has-alert {
+            opacity: 1;
+            color: var(--accent-orange);
         }
 
         .price-cell.up {
@@ -1686,6 +2905,9 @@
             .market-cards {
                 grid-template-columns: repeat(2, 1fr);
             }
+            .quote-board {
+                grid-template-columns: repeat(5, 1fr);
+            }
         }
 
         /* Mobile Styles */
@@ -1693,6 +2915,19 @@
             /* Prevent any overflow */
             body {
                 overflow-x: hidden;
+            }
+
+            .quote-board {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .quote-card {
+                padding: 8px;
+            }
+            .quote-symbol {
+                font-size: 12px;
+            }
+            .quote-price {
+                font-size: 14px;
             }
 
             /* Top Bar - Logo only, no text */
@@ -2669,11 +3904,121 @@
         </div>
     </div>
 
+    <!-- Quick Quote Modal -->
+    <div class="quick-quote-modal-overlay" id="quick-quote-modal">
+        <div class="quick-quote-modal">
+            <div class="quick-quote-header">
+                <div class="quick-quote-title">
+                    <span class="quick-quote-symbol" id="qq-symbol">BP1</span>
+                    <span class="quick-quote-name" id="qq-name">Kenya BP1</span>
+                </div>
+                <div class="quick-quote-price-info">
+                    <span class="quick-quote-current-price up" id="qq-price">$3.42</span>
+                    <span class="quick-quote-change up" id="qq-change">+2.4%</span>
+                </div>
+                <button class="quick-quote-close" onclick="closeQuickQuoteModal()">&times;</button>
+            </div>
+            <div class="quick-quote-body">
+                <div class="quick-quote-chart-area">
+                    <div class="quick-quote-chart">
+                        <canvas id="qq-chart"></canvas>
+                    </div>
+                    <div class="quick-quote-stats">
+                        <div class="quick-stat">
+                            <div class="quick-stat-value" id="qq-high">$3.56</div>
+                            <div class="quick-stat-label">24h High</div>
+                        </div>
+                        <div class="quick-stat">
+                            <div class="quick-stat-value" id="qq-low">$3.28</div>
+                            <div class="quick-stat-label">24h Low</div>
+                        </div>
+                        <div class="quick-stat">
+                            <div class="quick-stat-value" id="qq-volume">24.5K</div>
+                            <div class="quick-stat-label">Volume</div>
+                        </div>
+                        <div class="quick-stat">
+                            <div class="quick-stat-value" id="qq-avg">$3.41</div>
+                            <div class="quick-stat-label">Avg Price</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="quick-quote-trade-panel">
+                    <div class="quick-trade-type-toggle">
+                        <button class="quick-trade-type-btn buy active" id="qq-btn-buy" onclick="setQuickTradeType('BUY')">BUY</button>
+                        <button class="quick-trade-type-btn sell" id="qq-btn-sell" onclick="setQuickTradeType('SELL')">SELL</button>
+                    </div>
+                    <div class="quick-trade-input-group">
+                        <label>Quantity (kg)</label>
+                        <input type="number" class="quick-trade-input" id="qq-qty" value="100" min="1" oninput="updateQuickTradeSummary()">
+                    </div>
+                    <div class="quick-trade-input-group">
+                        <label>Price ($/kg)</label>
+                        <input type="number" class="quick-trade-input" id="qq-trade-price" readonly>
+                    </div>
+                    <div class="quick-trade-summary">
+                        <div class="quick-trade-summary-row">
+                            <span>Order Value</span>
+                            <span id="qq-order-value">$342.00</span>
+                        </div>
+                        <div class="quick-trade-summary-row">
+                            <span>Your Balance</span>
+                            <span id="qq-balance">$10,000.00</span>
+                        </div>
+                        <div class="quick-trade-summary-row">
+                            <span>After Trade</span>
+                            <span id="qq-after-trade">$9,658.00</span>
+                        </div>
+                    </div>
+                    <button class="quick-trade-execute buy" id="qq-execute-btn" onclick="executeQuickTrade()">BUY 100 kg</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Price Alert Modal -->
+    <div class="pairs-modal-overlay" id="price-alert-modal">
+        <div class="pairs-modal" style="max-width: 340px;">
+            <div class="pairs-modal-header">
+                <div class="pairs-modal-title" id="alert-modal-title">Set Price Alert</div>
+                <button class="pairs-modal-close" onclick="closePriceAlertModal()">&times;</button>
+            </div>
+            <div class="pairs-modal-pair">
+                <div class="pair-display" style="gap: 8px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                    <span id="alert-symbol" style="font-size: 18px; font-weight: 600;">DRJ</span>
+                </div>
+                <div class="ratio-display" id="alert-current-price">Current: $3.45</div>
+            </div>
+            <div class="sltp-section" style="margin: 16px 0;">
+                <div class="sltp-group">
+                    <label class="sltp-label"><span class="dot sl"></span>Alert Below</label>
+                    <input type="number" class="sltp-input" id="alert-below" placeholder="e.g. 3.20" step="0.01">
+                </div>
+                <div class="sltp-group">
+                    <label class="sltp-label"><span class="dot tp"></span>Alert Above</label>
+                    <input type="number" class="sltp-input" id="alert-above" placeholder="e.g. 3.80" step="0.01">
+                </div>
+            </div>
+            <div class="pairs-modal-actions">
+                <button class="cancel-btn" onclick="deletePriceAlert()" id="alert-delete-btn" style="display: none;">Delete Alert</button>
+                <button class="confirm-btn" onclick="savePriceAlert()">Save Alert</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Top Bar -->
     <div class="top-bar">
         <div class="logo">
             <div class="logo-icon">TT</div>
             <div class="logo-text">TeaTrade <span>Exchange</span></div>
+        </div>
+        <div class="command-line-container">
+            <span class="command-line-icon">⌘</span>
+            <input type="text" class="command-line" id="command-line" placeholder="Type command... (BP1, NEWS, BUY 50)" autocomplete="off">
+            <div class="command-suggestions" id="command-suggestions"></div>
         </div>
         <nav class="nav-links">
             <a href="#" class="active">Markets</a>
@@ -2821,6 +4166,11 @@
         <div class="sidebar">
             <div class="sidebar-section">
                 <div class="sidebar-title">Watchlist</div>
+                <div class="watchlist-tabs">
+                    <button class="watchlist-tab active" onclick="switchWatchlistTab('teas')">Teas</button>
+                    <button class="watchlist-tab" onclick="switchWatchlistTab('macro')">Macro</button>
+                </div>
+                <div id="watchlist-teas">
                 <div class="watchlist-item">
                     <div>
                         <div class="watchlist-name">Darjeeling FTGFOP1</div>
@@ -2859,6 +4209,79 @@
                     <div class="watchlist-price">
                         <div class="watchlist-value">LKR 1,420</div>
                         <div class="watchlist-change up">+4.1%</div>
+                    </div>
+                </div>
+                </div>
+                <div id="watchlist-macro" style="display: none;">
+                    <div class="macro-item">
+                        <div class="macro-info">
+                            <div class="macro-icon currency">💱</div>
+                            <div>
+                                <div class="macro-name">USD/KES</div>
+                                <div class="macro-subtext">Kenyan Shilling</div>
+                            </div>
+                        </div>
+                        <div class="macro-value">
+                            <div class="macro-price" id="macro-usdkes">129.45</div>
+                            <div class="macro-change up" id="macro-usdkes-change">▲ +0.32%</div>
+                            <div class="macro-impact bearish">Bearish Tea</div>
+                        </div>
+                    </div>
+                    <div class="macro-item">
+                        <div class="macro-info">
+                            <div class="macro-icon oil">🛢️</div>
+                            <div>
+                                <div class="macro-name">Brent Crude</div>
+                                <div class="macro-subtext">Shipping costs</div>
+                            </div>
+                        </div>
+                        <div class="macro-value">
+                            <div class="macro-price" id="macro-oil">$82.40</div>
+                            <div class="macro-change down" id="macro-oil-change">▼ -1.2%</div>
+                            <div class="macro-impact bullish">Bullish Tea</div>
+                        </div>
+                    </div>
+                    <div class="macro-item">
+                        <div class="macro-info">
+                            <div class="macro-icon shipping">🚢</div>
+                            <div>
+                                <div class="macro-name">BDI Index</div>
+                                <div class="macro-subtext">Baltic Dry Index</div>
+                            </div>
+                        </div>
+                        <div class="macro-value">
+                            <div class="macro-price" id="macro-bdi">1,842</div>
+                            <div class="macro-change up" id="macro-bdi-change">▲ +2.8%</div>
+                            <div class="macro-impact bearish">Bearish Tea</div>
+                        </div>
+                    </div>
+                    <div class="macro-item">
+                        <div class="macro-info">
+                            <div class="macro-icon weather">🌧️</div>
+                            <div>
+                                <div class="macro-name">Kericho Rain</div>
+                                <div class="macro-subtext">Kenya highlands</div>
+                            </div>
+                        </div>
+                        <div class="macro-value">
+                            <div class="macro-price" id="macro-rain">+24mm</div>
+                            <div class="macro-change up" id="macro-rain-change">Above avg</div>
+                            <div class="macro-impact bearish">Bearish Price</div>
+                        </div>
+                    </div>
+                    <div class="macro-item">
+                        <div class="macro-info">
+                            <div class="macro-icon weather">☀️</div>
+                            <div>
+                                <div class="macro-name">Assam Weather</div>
+                                <div class="macro-subtext">India region</div>
+                            </div>
+                        </div>
+                        <div class="macro-value">
+                            <div class="macro-price" id="macro-assam">-12mm</div>
+                            <div class="macro-change down" id="macro-assam-change">Below avg</div>
+                            <div class="macro-impact bullish">Bullish Price</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -3008,7 +4431,7 @@
         <!-- Center Content -->
         <div class="center-content">
             <!-- Chart Section -->
-            <div class="chart-section">
+            <div class="chart-section" id="chart-section">
                 <div class="chart-header">
                     <div>
                         <div class="chart-title">
@@ -3031,12 +4454,25 @@
                         </div>
                     </div>
                     <div class="chart-controls">
-                        <button class="chart-btn" onclick="setTimeframe('1D')">1D</button>
-                        <button class="chart-btn active" onclick="setTimeframe('1W')">1W</button>
-                        <button class="chart-btn" onclick="setTimeframe('1M')">1M</button>
-                        <button class="chart-btn" onclick="setTimeframe('3M')">3M</button>
-                        <button class="chart-btn" onclick="setTimeframe('1Y')">1Y</button>
-                        <button class="chart-btn" onclick="setTimeframe('ALL')">ALL</button>
+                        <button class="maximize-btn" onclick="toggleMaximize('chart-section')" title="Maximize">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                            </svg>
+                        </button>
+                        <div class="timeframe-dropdown">
+                            <button class="timeframe-btn" id="timeframe-btn" onclick="toggleTimeframeMenu()">
+                                <span id="timeframe-label">1W</span>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="timeframe-menu" id="timeframe-menu">
+                                <div class="timeframe-item" onclick="setTimeframe('1D')">1D</div>
+                                <div class="timeframe-item active" onclick="setTimeframe('1W')">1W</div>
+                                <div class="timeframe-item" onclick="setTimeframe('1M')">1M</div>
+                                <div class="timeframe-item" onclick="setTimeframe('3M')">3M</div>
+                                <div class="timeframe-item" onclick="setTimeframe('1Y')">1Y</div>
+                                <div class="timeframe-item" onclick="setTimeframe('ALL')">ALL</div>
+                            </div>
+                        </div>
                         <div class="chart-type-toggle">
                             <button class="chart-type-btn active" id="btn-line" onclick="setChartType('line')" title="Line Chart">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/></svg>
@@ -3044,6 +4480,67 @@
                             <button class="chart-type-btn" id="btn-candle" onclick="setChartType('candle')" title="Candlestick">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="8" width="4" height="8"/><line x1="7" y1="4" x2="7" y2="8"/><line x1="7" y1="16" x2="7" y2="20"/><rect x="15" y="6" width="4" height="10" fill="currentColor"/><line x1="17" y1="2" x2="17" y2="6"/><line x1="17" y1="16" x2="17" y2="22"/></svg>
                             </button>
+                        </div>
+                        <div class="studies-dropdown">
+                            <button class="studies-btn" id="studies-btn" onclick="toggleStudiesMenu()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 5-9"/></svg>
+                                Studies
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="studies-menu" id="studies-menu">
+                                <div class="studies-item" onclick="toggleStudy('sma10')">
+                                    <div class="studies-item-label">
+                                        <span class="studies-color" style="background: #facc15;"></span>
+                                        SMA (10)
+                                    </div>
+                                    <div class="studies-toggle" id="toggle-sma10"></div>
+                                </div>
+                                <div class="studies-item" onclick="toggleStudy('sma20')">
+                                    <div class="studies-item-label">
+                                        <span class="studies-color" style="background: #f59e0b;"></span>
+                                        SMA (20)
+                                    </div>
+                                    <div class="studies-toggle" id="toggle-sma20"></div>
+                                </div>
+                                <div class="studies-item" onclick="toggleStudy('sma50')">
+                                    <div class="studies-item-label">
+                                        <span class="studies-color" style="background: #8b5cf6;"></span>
+                                        SMA (50)
+                                    </div>
+                                    <div class="studies-toggle" id="toggle-sma50"></div>
+                                </div>
+                                <div class="studies-divider"></div>
+                                <div class="studies-item" onclick="toggleStudy('ema10')">
+                                    <div class="studies-item-label">
+                                        <span class="studies-color" style="background: #34d399;"></span>
+                                        EMA (10)
+                                    </div>
+                                    <div class="studies-toggle" id="toggle-ema10"></div>
+                                </div>
+                                <div class="studies-item" onclick="toggleStudy('ema20')">
+                                    <div class="studies-item-label">
+                                        <span class="studies-color" style="background: #10b981;"></span>
+                                        EMA (20)
+                                    </div>
+                                    <div class="studies-toggle" id="toggle-ema20"></div>
+                                </div>
+                                <div class="studies-divider"></div>
+                                <div class="studies-item" onclick="toggleStudy('bollinger')">
+                                    <div class="studies-item-label">
+                                        <span class="studies-color" style="background: #60a5fa;"></span>
+                                        Bollinger Bands
+                                    </div>
+                                    <div class="studies-toggle" id="toggle-bollinger"></div>
+                                </div>
+                                <div class="studies-divider"></div>
+                                <div class="studies-item" onclick="toggleStudy('rsi')">
+                                    <div class="studies-item-label">
+                                        <span class="studies-color" style="background: #ec4899;"></span>
+                                        RSI (14)
+                                    </div>
+                                    <div class="studies-toggle" id="toggle-rsi"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -3054,6 +4551,48 @@
                         <div class="crosshair-v"></div>
                         <div class="crosshair-h"></div>
                     </div>
+                </div>
+                
+                <!-- RSI Sub-Chart -->
+                <div class="rsi-chart-container" id="rsi-chart-container" style="display: none;">
+                    <div class="rsi-header">
+                        <span class="rsi-label">RSI (14)</span>
+                        <span class="rsi-value" id="rsi-value">—</span>
+                    </div>
+                    <canvas id="rsiChart" class="rsi-canvas"></canvas>
+                    <div class="rsi-crosshair" id="rsi-crosshair">
+                        <div class="crosshair-v"></div>
+                        <div class="crosshair-h"></div>
+                    </div>
+                    <div class="rsi-tooltip" id="rsi-tooltip"></div>
+                </div>
+                
+                <!-- Market Depth Heatmap -->
+                <div class="market-depth-container" id="market-depth-container">
+                    <div class="market-depth-header">
+                        <span class="market-depth-title">Market Depth</span>
+                        <span class="market-depth-ratio" id="depth-ratio">Bid/Ask: 1.12</span>
+                    </div>
+                    <div class="market-depth-bar">
+                        <div class="depth-bids" id="depth-bids" style="width: 52%;">
+                            <span class="depth-label">BIDS 52%</span>
+                        </div>
+                        <div class="depth-asks" id="depth-asks" style="width: 48%;">
+                            <span class="depth-label">ASKS 48%</span>
+                        </div>
+                    </div>
+                    <div class="market-depth-levels">
+                        <span id="depth-bid-volume">Vol: 12,450 kg</span>
+                        <span id="depth-mid-price">Mid: $4.82</span>
+                        <span id="depth-ask-volume">Vol: 11,200 kg</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Flash Quote Board -->
+            <div class="quote-board-section">
+                <div class="quote-board" id="quote-board">
+                    <!-- Populated by JS -->
                 </div>
             </div>
 
@@ -3070,7 +4609,6 @@
                             <button class="filter-btn active">All Grades</button>
                             <button class="filter-btn">Orthodox</button>
                             <button class="filter-btn">CTC</button>
-                            <button class="filter-btn">Green</button>
                         </div>
                     </div>
                 </div>
@@ -3097,6 +4635,7 @@
                 </div>
                 <!-- Pairs Table -->
                 <div id="pairs-view" style="display: none;">
+                <div class="pairs-table-wrapper">
                 <table class="data-table" id="pairs-table">
                     <thead>
                         <tr>
@@ -3113,6 +4652,7 @@
                         <!-- Populated dynamically -->
                     </tbody>
                 </table>
+                </div>
                 </div>
             </div>
         
@@ -3203,6 +4743,36 @@
                             <span class="trade-summary-value" id="trade-balance">$10,000.00</span>
                         </div>
                     </div>
+                    <div class="sltp-section">
+                        <div class="sltp-group">
+                            <label class="sltp-label"><span class="dot sl"></span>Stop Loss</label>
+                            <div class="sltp-input-wrapper">
+                                <input type="number" class="sltp-input" id="trade-sl" placeholder="3.20" step="0.01">
+                                <div class="sltp-arrows">
+                                    <button type="button" class="sltp-arrow" onclick="adjustSlTp('trade-sl', 0.01)">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 15l-6-6-6 6"/></svg>
+                                    </button>
+                                    <button type="button" class="sltp-arrow" onclick="adjustSlTp('trade-sl', -0.01)">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="sltp-group">
+                            <label class="sltp-label"><span class="dot tp"></span>Take Profit</label>
+                            <div class="sltp-input-wrapper">
+                                <input type="number" class="sltp-input" id="trade-tp" placeholder="3.80" step="0.01">
+                                <div class="sltp-arrows">
+                                    <button type="button" class="sltp-arrow" onclick="adjustSlTp('trade-tp', 0.01)">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 15l-6-6-6 6"/></svg>
+                                    </button>
+                                    <button type="button" class="sltp-arrow" onclick="adjustSlTp('trade-tp', -0.01)">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <button type="button" class="trade-execute-btn buy" id="trade-execute-btn" onclick="executeTrade()">
                         Sign in to Trade
                     </button>
@@ -3212,16 +4782,59 @@
             <!-- Portfolio Section -->
             <div class="panel-section portfolio-section" id="portfolio-section" style="display: none;">
                 <div class="panel-title">Your Portfolio</div>
-                <div class="portfolio-header">
-                    <div>
-                        <div class="portfolio-value" id="portfolio-value">$10,000.00</div>
-                        <div class="portfolio-pnl up" id="portfolio-pnl">+$0.00 (0.00%)</div>
+                <div class="portfolio-tabs">
+                    <button class="portfolio-tab active" onclick="switchPortfolioTab('positions')">Positions</button>
+                    <button class="portfolio-tab" onclick="switchPortfolioTab('history')">History</button>
+                </div>
+                <div id="portfolio-positions" class="trade-log-container active">
+                    <div class="portfolio-header">
+                        <div>
+                            <div class="portfolio-value" id="portfolio-value">$10,000.00</div>
+                            <div class="portfolio-pnl up" id="portfolio-pnl">+$0.00 (0.00%)</div>
+                        </div>
+                    </div>
+                    <div id="positions-list">
+                        <div style="color: var(--text-muted); font-size: 12px; padding: 20px 0; text-align: center;">
+                            No positions yet. Start trading!
+                        </div>
                     </div>
                 </div>
-                <div id="positions-list">
-                    <div style="color: var(--text-muted); font-size: 12px; padding: 20px 0; text-align: center;">
-                        No positions yet. Start trading!
+                <div id="portfolio-history" class="trade-log-container">
+                    <div class="trade-log-stats">
+                        <div class="trade-stat">
+                            <div class="trade-stat-value up" id="stat-total-pnl">+$0.00</div>
+                            <div class="trade-stat-label">Total P&L</div>
+                        </div>
+                        <div class="trade-stat">
+                            <div class="trade-stat-value" id="stat-win-rate">0%</div>
+                            <div class="trade-stat-label">Win Rate</div>
+                        </div>
+                        <div class="trade-stat">
+                            <div class="trade-stat-value" id="stat-trades">0</div>
+                            <div class="trade-stat-label">Total Trades</div>
+                        </div>
+                        <div class="trade-stat">
+                            <div class="trade-stat-value" id="stat-avg-hold">—</div>
+                            <div class="trade-stat-label">Avg Hold</div>
+                        </div>
                     </div>
+                    <table class="trade-log-table">
+                        <thead>
+                            <tr>
+                                <th>Tea</th>
+                                <th>Type</th>
+                                <th>Entry</th>
+                                <th>Exit</th>
+                                <th>P&L</th>
+                                <th>Hold</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trade-log-body">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No closed trades yet</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -3436,14 +5049,105 @@
     </div>
 
     <script>
+        // =============================================
+        // SUPABASE INITIALIZATION - MUST BE FIRST
+        // =============================================
+        const SUPABASE_URL = 'https://uznxzyuknigzlxecjgtb.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6bnh6eXVrbmlnemx4ZWNqZ3RiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5Mzc5ODUsImV4cCI6MjA4NjUxMzk4NX0.BVOTqZ9kn2KCrNeF5675PNmMi9oJN3F6OoUnTtbpuIg';
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // Global State
+        let currentUser = null;
+        let userProfile = null;
+        let teas = [];
+        let positions = [];
+        
         // Chart state
         let currentTimeframe = '1W';
         let chartType = 'line'; // 'line' or 'candle'
         let chartData = [];
+        let teaHistoricalData = {}; // Stores price history per tea symbol
+        
+        // Generate and cache historical data for a specific tea
+        function generateTeaHistory(tea) {
+            if (!tea || !tea.symbol) return [];
+            
+            const symbol = tea.symbol;
+            if (teaHistoricalData[symbol]) return teaHistoricalData[symbol];
+            
+            const currentPrice = tea.current_price || 3.20;
+            const change24h = tea.price_change_24h || 0;
+            const volatility = Math.abs(change24h) / 100 + 0.02; // More volatile teas have bigger swings
+            
+            // Generate realistic historical data points (30 days of hourly data = 720 points)
+            const data = [];
+            const points = 720;
+            const now = new Date();
+            
+            // Work backwards from current price
+            let price = currentPrice;
+            for (let i = points - 1; i >= 0; i--) {
+                const date = new Date(now);
+                date.setHours(date.getHours() - i);
+                
+                // Add some trend based on the 24h change
+                const trendBias = i < 24 ? (change24h / 100) / 24 : 0;
+                const noise = (Math.random() - 0.5) * volatility * currentPrice;
+                
+                const open = price;
+                price = Math.max(currentPrice * 0.8, Math.min(currentPrice * 1.2, price + noise + trendBias * currentPrice));
+                const close = i === 0 ? currentPrice : price; // Last point = current price
+                const high = Math.max(open, close) * (1 + Math.random() * 0.01);
+                const low = Math.min(open, close) * (1 - Math.random() * 0.01);
+                const volume = Math.round(50000 + Math.random() * 200000);
+                
+                data.push({
+                    date: date,
+                    open: open,
+                    high: high,
+                    low: low,
+                    close: close,
+                    volume: volume,
+                    change: ((close - open) / open * 100)
+                });
+            }
+            
+            teaHistoricalData[symbol] = data;
+            return data;
+        }
         let chartMetrics = {};
+        let cachedTimeframe = null; // Track which timeframe data was generated for
         const leftMargin = 50;
         const rightMargin = 20;
         const bottomMargin = 25;
+        
+        // Studies state
+        let activeStudies = {
+            sma10: false,
+            sma20: false,
+            sma50: false,
+            ema10: false,
+            ema20: false,
+            bollinger: false,
+            rsi: false
+        };
+        
+        const studyColors = {
+            sma10: '#facc15',
+            sma20: '#f59e0b',
+            sma50: '#8b5cf6',
+            ema10: '#34d399',
+            ema20: '#10b981',
+            bollinger: '#60a5fa',
+            rsi: '#ec4899'
+        };
+        
+        // Price alerts
+        let priceAlerts = {};
+        
+        // Stop Loss / Take Profit pending orders
+        // Structure: { teaId: { sl: number|null, tp: number|null, side: 'BUY'|'SELL', qty: number } }
+        let pendingSlTpOrders = {};
         
         const canvas = document.getElementById('priceChart');
         const ctx = canvas.getContext('2d');
@@ -3451,23 +5155,45 @@
         const chartContainer = document.getElementById('chart-container');
         const crosshair = document.getElementById('chart-crosshair');
         
-        // Timeframe configurations
+        // Timeframe configurations - need enough data points for indicators
         const timeframeConfig = {
-            '1D': { points: 48, labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'], labelFormat: 'time', baseDate: new Date() },
-            '1W': { points: 7, labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], labelFormat: 'day', baseDate: new Date() },
-            '1M': { points: 30, labels: ['W1', 'W2', 'W3', 'W4'], labelFormat: 'week', baseDate: new Date() },
-            '3M': { points: 12, labels: ['Jan', 'Feb', 'Mar'], labelFormat: 'month', baseDate: new Date() },
-            '1Y': { points: 12, labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], labelFormat: 'month', baseDate: new Date() },
-            'ALL': { points: 60, labels: ['2021', '2022', '2023', '2024', '2025', '2026'], labelFormat: 'year', baseDate: new Date() }
+            '1D': { points: 96, labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'], labelFormat: 'time', baseDate: new Date() },
+            '1W': { points: 56, labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], labelFormat: 'day', baseDate: new Date() },
+            '1M': { points: 60, labels: ['W1', 'W2', 'W3', 'W4'], labelFormat: 'week', baseDate: new Date() },
+            '3M': { points: 90, labels: ['Jan', 'Feb', 'Mar'], labelFormat: 'month', baseDate: new Date() },
+            '1Y': { points: 120, labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], labelFormat: 'month', baseDate: new Date() },
+            'ALL': { points: 180, labels: ['2021', '2022', '2023', '2024', '2025', '2026'], labelFormat: 'year', baseDate: new Date() }
         };
+        
+        function toggleTimeframeMenu() {
+            const menu = document.getElementById('timeframe-menu');
+            menu.classList.toggle('visible');
+        }
         
         function setTimeframe(tf) {
             currentTimeframe = tf;
-            document.querySelectorAll('.chart-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.textContent === tf);
+            
+            // Update dropdown label
+            document.getElementById('timeframe-label').textContent = tf;
+            
+            // Update active state in menu
+            document.querySelectorAll('.timeframe-item').forEach(item => {
+                item.classList.toggle('active', item.textContent === tf);
             });
+            
+            // Close menu
+            document.getElementById('timeframe-menu').classList.remove('visible');
+            
             drawChart();
         }
+        
+        // Close timeframe menu when clicking outside
+        document.addEventListener('click', (e) => {
+            const dropdown = document.querySelector('.timeframe-dropdown');
+            if (dropdown && !dropdown.contains(e.target)) {
+                document.getElementById('timeframe-menu').classList.remove('visible');
+            }
+        });
         
         function setChartType(type) {
             chartType = type;
@@ -3478,6 +5204,43 @@
         
         function generateChartData(timeframe) {
             const config = timeframeConfig[timeframe];
+            if (!config) return generateDefaultChartData({ points: 50 }, timeframe || '1W');
+            
+            // Check if a tea is selected
+            const select = document.getElementById('trade-tea-select');
+            const selectedSymbol = select?.value;
+            const selectedTea = teas && teas.find(t => t.symbol === selectedSymbol);
+            
+            // If we have a selected tea with history, use it
+            if (selectedTea) {
+                const fullHistory = generateTeaHistory(selectedTea);
+                
+                // Sample the data based on timeframe
+                let sampledData = [];
+                if (timeframe === '1D') {
+                    sampledData = fullHistory.slice(-24); // Last 24 hours
+                } else if (timeframe === '1W') {
+                    // Sample every 4 hours for a week
+                    const startIndex = Math.max(0, fullHistory.length - 168);
+                    for (let i = startIndex; i < fullHistory.length; i += 4) {
+                        sampledData.push(fullHistory[i]);
+                    }
+                } else if (timeframe === '1M') {
+                    // Sample every 24 hours for a month
+                    for (let i = 0; i < fullHistory.length; i += 24) {
+                        sampledData.push(fullHistory[i]);
+                    }
+                } else {
+                    sampledData = fullHistory.slice(-config.points);
+                }
+                
+                return sampledData.length > 0 ? sampledData : generateDefaultChartData(config, timeframe);
+            }
+            
+            return generateDefaultChartData(config, timeframe);
+        }
+        
+        function generateDefaultChartData(config, timeframe) {
             const data = [];
             let price = 3.20;
             let volume = 800000;
@@ -3530,6 +5293,314 @@
             return vol.toString();
         }
         
+        // =============================================
+        // TECHNICAL INDICATOR CALCULATIONS
+        // =============================================
+        
+        function calculateSMA(data, period) {
+            const sma = [];
+            let firstValue = null;
+            
+            for (let i = 0; i < data.length; i++) {
+                if (i < period - 1) {
+                    sma.push(null); // Will backfill later
+                } else {
+                    let sum = 0;
+                    for (let j = 0; j < period; j++) {
+                        sum += data[i - j].close;
+                    }
+                    const val = sum / period;
+                    if (firstValue === null) firstValue = val;
+                    sma.push(val);
+                }
+            }
+            
+            // Backfill nulls with first calculated value
+            for (let i = 0; i < sma.length; i++) {
+                if (sma[i] === null && firstValue !== null) {
+                    sma[i] = firstValue;
+                } else {
+                    break;
+                }
+            }
+            
+            return sma;
+        }
+        
+        function calculateEMA(data, period) {
+            const ema = [];
+            const multiplier = 2 / (period + 1);
+            let firstValue = null;
+            
+            // Start with SMA for first EMA value
+            let sum = 0;
+            for (let i = 0; i < period && i < data.length; i++) {
+                sum += data[i].close;
+            }
+            let prevEma = sum / Math.min(period, data.length);
+            
+            for (let i = 0; i < data.length; i++) {
+                if (i < period - 1) {
+                    ema.push(null);
+                } else if (i === period - 1) {
+                    if (firstValue === null) firstValue = prevEma;
+                    ema.push(prevEma);
+                } else {
+                    const currentEma = (data[i].close - prevEma) * multiplier + prevEma;
+                    ema.push(currentEma);
+                    prevEma = currentEma;
+                }
+            }
+            
+            // Backfill nulls with first calculated value
+            for (let i = 0; i < ema.length; i++) {
+                if (ema[i] === null && firstValue !== null) {
+                    ema[i] = firstValue;
+                } else {
+                    break;
+                }
+            }
+            
+            return ema;
+        }
+        
+        function calculateBollingerBands(data, period = 20, stdDev = 2) {
+            const sma = calculateSMA(data, period);
+            const upper = [];
+            const lower = [];
+            let firstUpper = null;
+            let firstLower = null;
+            
+            for (let i = 0; i < data.length; i++) {
+                if (i < period - 1) {
+                    upper.push(null);
+                    lower.push(null);
+                } else {
+                    // Calculate standard deviation
+                    let sumSquares = 0;
+                    for (let j = 0; j < period; j++) {
+                        sumSquares += Math.pow(data[i - j].close - sma[i], 2);
+                    }
+                    const std = Math.sqrt(sumSquares / period);
+                    const u = sma[i] + stdDev * std;
+                    const l = sma[i] - stdDev * std;
+                    if (firstUpper === null) {
+                        firstUpper = u;
+                        firstLower = l;
+                    }
+                    upper.push(u);
+                    lower.push(l);
+                }
+            }
+            
+            // Backfill nulls
+            for (let i = 0; i < upper.length; i++) {
+                if (upper[i] === null && firstUpper !== null) {
+                    upper[i] = firstUpper;
+                    lower[i] = firstLower;
+                } else {
+                    break;
+                }
+            }
+            
+            return { middle: sma, upper, lower };
+        }
+        
+        function calculateRSI(data, period = 14) {
+            const rsi = [];
+            let gains = [];
+            let losses = [];
+            let firstValue = null;
+            
+            for (let i = 0; i < data.length; i++) {
+                if (i === 0) {
+                    rsi.push(null);
+                    continue;
+                }
+                
+                const change = data[i].close - data[i - 1].close;
+                const gain = change > 0 ? change : 0;
+                const loss = change < 0 ? Math.abs(change) : 0;
+                
+                gains.push(gain);
+                losses.push(loss);
+                
+                if (i < period) {
+                    rsi.push(null);
+                } else if (i === period) {
+                    const avgGain = gains.reduce((a, b) => a + b, 0) / period;
+                    const avgLoss = losses.reduce((a, b) => a + b, 0) / period;
+                    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+                    const val = 100 - (100 / (1 + rs));
+                    if (firstValue === null) firstValue = val;
+                    rsi.push(val);
+                } else {
+                    // Smoothed averages
+                    const prevRsi = rsi[rsi.length - 1];
+                    const prevAvgGain = gains.slice(-period - 1, -1).reduce((a, b) => a + b, 0) / period;
+                    const prevAvgLoss = losses.slice(-period - 1, -1).reduce((a, b) => a + b, 0) / period;
+                    const avgGain = (prevAvgGain * (period - 1) + gain) / period;
+                    const avgLoss = (prevAvgLoss * (period - 1) + loss) / period;
+                    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+                    rsi.push(100 - (100 / (1 + rs)));
+                }
+            }
+            
+            // Backfill nulls with first calculated value
+            for (let i = 0; i < rsi.length; i++) {
+                if (rsi[i] === null && firstValue !== null) {
+                    rsi[i] = firstValue;
+                } else if (rsi[i] !== null) {
+                    break;
+                }
+            }
+            
+            return rsi;
+        }
+        
+        function toggleStudiesMenu() {
+            const menu = document.getElementById('studies-menu');
+            menu.classList.toggle('visible');
+        }
+        
+        function toggleStudy(study) {
+            activeStudies[study] = !activeStudies[study];
+            const toggle = document.getElementById('toggle-' + study);
+            toggle.classList.toggle('active', activeStudies[study]);
+            
+            // Update button appearance
+            const hasActive = Object.values(activeStudies).some(v => v);
+            document.getElementById('studies-btn').classList.toggle('has-active', hasActive);
+            
+            // Show/hide RSI panel
+            if (study === 'rsi') {
+                const rsiContainer = document.getElementById('rsi-chart-container');
+                rsiContainer.style.display = activeStudies.rsi ? 'block' : 'none';
+            }
+            
+            drawChart();
+            
+            // Draw RSI if active
+            if (activeStudies.rsi) {
+                drawRSIChart();
+            }
+        }
+        
+        // Close studies menu when clicking outside
+        document.addEventListener('click', (e) => {
+            const dropdown = document.querySelector('.studies-dropdown');
+            if (dropdown && !dropdown.contains(e.target)) {
+                document.getElementById('studies-menu').classList.remove('visible');
+            }
+        });
+        
+        // =============================================
+        // PRICE ALERT SYSTEM
+        // =============================================
+        
+        let currentAlertSymbol = null;
+        
+        function openPriceAlertModal(symbol, currentPrice) {
+            currentAlertSymbol = symbol;
+            const modal = document.getElementById('price-alert-modal');
+            const existing = priceAlerts[symbol];
+            
+            document.getElementById('alert-symbol').textContent = symbol;
+            document.getElementById('alert-current-price').textContent = `Current: $${currentPrice.toFixed(2)}`;
+            document.getElementById('alert-below').value = existing?.below || '';
+            document.getElementById('alert-above').value = existing?.above || '';
+            document.getElementById('alert-delete-btn').style.display = existing ? 'block' : 'none';
+            
+            modal.classList.add('active');
+        }
+        
+        function closePriceAlertModal() {
+            document.getElementById('price-alert-modal').classList.remove('active');
+            currentAlertSymbol = null;
+        }
+        
+        function savePriceAlert() {
+            if (!currentAlertSymbol) return;
+            
+            const below = document.getElementById('alert-below').value ? parseFloat(document.getElementById('alert-below').value) : null;
+            const above = document.getElementById('alert-above').value ? parseFloat(document.getElementById('alert-above').value) : null;
+            
+            if (!below && !above) {
+                delete priceAlerts[currentAlertSymbol];
+                showToast('Alert Removed', `Price alert for ${currentAlertSymbol} cleared`);
+            } else {
+                priceAlerts[currentAlertSymbol] = { below, above };
+                const alertText = [];
+                if (below) alertText.push(`Below $${below.toFixed(2)}`);
+                if (above) alertText.push(`Above $${above.toFixed(2)}`);
+                showToast('Alert Set!', `${currentAlertSymbol}: ${alertText.join(' | ')}`);
+                
+                // Request notification permission
+                requestNotificationPermission();
+            }
+            
+            closePriceAlertModal();
+            updateAuctionTable();
+        }
+        
+        function deletePriceAlert() {
+            if (!currentAlertSymbol) return;
+            delete priceAlerts[currentAlertSymbol];
+            showToast('Alert Deleted', `Price alert for ${currentAlertSymbol} removed`);
+            closePriceAlertModal();
+            updateAuctionTable();
+        }
+        
+        async function checkPriceAlerts() {
+            for (const symbol of Object.keys(priceAlerts)) {
+                const alert = priceAlerts[symbol];
+                
+                // Find the tea (might be actual symbol or display symbol)
+                const displayData = teaDisplayData[symbol];
+                const priceSymbol = displayData?.priceFrom || symbol;
+                const tea = teas.find(t => t.symbol === priceSymbol);
+                
+                if (!tea) continue;
+                
+                const currentPrice = tea.current_price;
+                let triggered = false;
+                let triggerText = '';
+                
+                if (alert.below && currentPrice <= alert.below) {
+                    triggered = true;
+                    triggerText = `${symbol} dropped below $${alert.below.toFixed(2)}`;
+                } else if (alert.above && currentPrice >= alert.above) {
+                    triggered = true;
+                    triggerText = `${symbol} rose above $${alert.above.toFixed(2)}`;
+                }
+                
+                if (triggered) {
+                    // Remove the alert (one-time trigger)
+                    delete priceAlerts[symbol];
+                    
+                    // Show toast notification
+                    showToast('🔔 Price Alert!', `${triggerText} - Now at $${currentPrice.toFixed(2)}`);
+                    
+                    // Try browser notification
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        new Notification('TeaTrade Price Alert', {
+                            body: triggerText,
+                            icon: '/favicon.ico'
+                        });
+                    }
+                    
+                    updateAuctionTable();
+                }
+            }
+        }
+        
+        // Request notification permission on first alert
+        function requestNotificationPermission() {
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        }
+        
         function resizeCanvas() {
             canvas.width = canvas.offsetWidth * window.devicePixelRatio;
             canvas.height = canvas.offsetHeight * window.devicePixelRatio;
@@ -3542,11 +5613,26 @@
             const h = canvas.offsetHeight;
             const config = timeframeConfig[currentTimeframe];
             
+            if (!config || !w || !h) return;
+            
             ctx.clearRect(0, 0, w, h);
             
-            // Generate data
-            chartData = generateChartData(currentTimeframe);
+            // Generate data only when timeframe changes
+            if (cachedTimeframe !== currentTimeframe || chartData.length === 0) {
+                chartData = generateChartData(currentTimeframe);
+                cachedTimeframe = currentTimeframe;
+            }
+            
+            // Guard against empty data
+            if (!chartData || chartData.length === 0) {
+                chartData = generateDefaultChartData(config, currentTimeframe);
+            }
+            
+            // Final check - if still no data, return
+            if (!chartData || chartData.length === 0) return;
+            
             const prices = chartData.map(d => d.close);
+            if (prices.length === 0) return;
             
             const minPrice = Math.min(...chartData.map(d => d.low)) - 0.03;
             const maxPrice = Math.max(...chartData.map(d => d.high)) + 0.03;
@@ -3667,6 +5753,100 @@
                 ctx.fill();
             }
             
+            // =============================================
+            // DRAW TECHNICAL INDICATORS
+            // =============================================
+            
+            function drawIndicatorLine(values, color, lineWidth = 2) {
+                ctx.beginPath();
+                ctx.strokeStyle = color;
+                ctx.lineWidth = lineWidth;
+                let started = false;
+                
+                values.forEach((val, i) => {
+                    if (val === null) return;
+                    const x = leftMargin + (i / (values.length - 1)) * chartWidth;
+                    const y = h * 0.1 + (1 - (val - minPrice) / priceRange) * chartHeight;
+                    if (!started) {
+                        ctx.moveTo(x, y);
+                        started = true;
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                });
+                ctx.stroke();
+            }
+            
+            // SMA 10
+            if (activeStudies.sma10) {
+                const sma10 = calculateSMA(chartData, 10);
+                drawIndicatorLine(sma10, studyColors.sma10, 1.5);
+            }
+            
+            // SMA 20
+            if (activeStudies.sma20) {
+                const sma20 = calculateSMA(chartData, 20);
+                drawIndicatorLine(sma20, studyColors.sma20, 1.5);
+            }
+            
+            // SMA 50
+            if (activeStudies.sma50) {
+                const sma50 = calculateSMA(chartData, 50);
+                drawIndicatorLine(sma50, studyColors.sma50, 1.5);
+            }
+            
+            // EMA 10
+            if (activeStudies.ema10) {
+                const ema10 = calculateEMA(chartData, 10);
+                drawIndicatorLine(ema10, studyColors.ema10, 1.5);
+            }
+            
+            // EMA 20
+            if (activeStudies.ema20) {
+                const ema20 = calculateEMA(chartData, 20);
+                drawIndicatorLine(ema20, studyColors.ema20, 1.5);
+            }
+            
+            // Bollinger Bands
+            if (activeStudies.bollinger) {
+                const bb = calculateBollingerBands(chartData, 20, 2);
+                
+                // Draw upper band
+                drawIndicatorLine(bb.upper, studyColors.bollinger, 1);
+                
+                // Draw lower band
+                drawIndicatorLine(bb.lower, studyColors.bollinger, 1);
+                
+                // Draw middle band (SMA)
+                ctx.setLineDash([4, 4]);
+                drawIndicatorLine(bb.middle, studyColors.bollinger, 1);
+                ctx.setLineDash([]);
+                
+                // Fill between bands
+                ctx.beginPath();
+                let started = false;
+                bb.upper.forEach((val, i) => {
+                    if (val === null) return;
+                    const x = leftMargin + (i / (bb.upper.length - 1)) * chartWidth;
+                    const y = h * 0.1 + (1 - (val - minPrice) / priceRange) * chartHeight;
+                    if (!started) {
+                        ctx.moveTo(x, y);
+                        started = true;
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                });
+                for (let i = bb.lower.length - 1; i >= 0; i--) {
+                    if (bb.lower[i] === null) continue;
+                    const x = leftMargin + (i / (bb.lower.length - 1)) * chartWidth;
+                    const y = h * 0.1 + (1 - (bb.lower[i] - minPrice) / priceRange) * chartHeight;
+                    ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.fillStyle = 'rgba(96, 165, 250, 0.1)';
+                ctx.fill();
+            }
+            
             // High/Low markers (line chart only)
             if (chartType === 'line') {
                 const highIndex = prices.indexOf(highPrice);
@@ -3706,7 +5886,219 @@
             ctx.fillStyle = '#f59e0b';
             ctx.textAlign = 'left';
             ctx.fillText('AVG $' + avgPrice.toFixed(2), leftMargin + 5, avgY - 5);
+            
+            // Draw RSI if active
+            if (activeStudies.rsi) {
+                drawRSIChart();
+            }
         }
+        
+        // =============================================
+        // RSI SUB-CHART
+        // =============================================
+        
+        function drawRSIChart() {
+            const rsiCanvas = document.getElementById('rsiChart');
+            if (!rsiCanvas) return;
+            
+            const rsiCtx = rsiCanvas.getContext('2d');
+            
+            // Set canvas size
+            rsiCanvas.width = rsiCanvas.offsetWidth * window.devicePixelRatio;
+            rsiCanvas.height = rsiCanvas.offsetHeight * window.devicePixelRatio;
+            rsiCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            
+            const w = rsiCanvas.offsetWidth;
+            const h = rsiCanvas.offsetHeight;
+            const chartWidth = w - leftMargin - rightMargin;
+            const topPadding = 20;
+            const bottomPadding = 5;
+            const chartHeight = h - topPadding - bottomPadding;
+            
+            // Clear
+            rsiCtx.clearRect(0, 0, w, h);
+            
+            // Calculate RSI
+            const rsiData = calculateRSI(chartData, 14);
+            
+            // Update RSI value display
+            const currentRSI = rsiData[rsiData.length - 1];
+            const rsiValueEl = document.getElementById('rsi-value');
+            if (currentRSI !== null) {
+                let rsiColor = '#fff';
+                if (currentRSI >= 70) rsiColor = '#ef4444';
+                else if (currentRSI <= 30) rsiColor = '#10b981';
+                rsiValueEl.textContent = currentRSI.toFixed(1);
+                rsiValueEl.style.color = rsiColor;
+            }
+            
+            // Draw background bands
+            // Overbought zone (70-100)
+            rsiCtx.fillStyle = 'rgba(239, 68, 68, 0.1)';
+            rsiCtx.fillRect(leftMargin, topPadding, chartWidth, chartHeight * 0.3);
+            
+            // Oversold zone (0-30)
+            rsiCtx.fillStyle = 'rgba(16, 185, 129, 0.1)';
+            rsiCtx.fillRect(leftMargin, topPadding + chartHeight * 0.7, chartWidth, chartHeight * 0.3);
+            
+            // Draw horizontal reference lines
+            rsiCtx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            rsiCtx.lineWidth = 1;
+            
+            // 70 line (overbought)
+            const y70 = topPadding + chartHeight * 0.3;
+            rsiCtx.beginPath();
+            rsiCtx.setLineDash([4, 4]);
+            rsiCtx.moveTo(leftMargin, y70);
+            rsiCtx.lineTo(w - rightMargin, y70);
+            rsiCtx.stroke();
+            
+            // 50 line (middle)
+            const y50 = topPadding + chartHeight * 0.5;
+            rsiCtx.beginPath();
+            rsiCtx.moveTo(leftMargin, y50);
+            rsiCtx.lineTo(w - rightMargin, y50);
+            rsiCtx.stroke();
+            
+            // 30 line (oversold)
+            const y30 = topPadding + chartHeight * 0.7;
+            rsiCtx.beginPath();
+            rsiCtx.moveTo(leftMargin, y30);
+            rsiCtx.lineTo(w - rightMargin, y30);
+            rsiCtx.stroke();
+            
+            rsiCtx.setLineDash([]);
+            
+            // Draw Y-axis labels
+            rsiCtx.font = '9px JetBrains Mono, monospace';
+            rsiCtx.fillStyle = '#6b7280';
+            rsiCtx.textAlign = 'right';
+            rsiCtx.fillText('70', leftMargin - 5, y70 + 3);
+            rsiCtx.fillText('50', leftMargin - 5, y50 + 3);
+            rsiCtx.fillText('30', leftMargin - 5, y30 + 3);
+            
+            // Draw RSI line
+            rsiCtx.beginPath();
+            rsiCtx.strokeStyle = studyColors.rsi;
+            rsiCtx.lineWidth = 1.5;
+            
+            let started = false;
+            rsiData.forEach((val, i) => {
+                if (val === null) return;
+                
+                const x = leftMargin + (i / (rsiData.length - 1)) * chartWidth;
+                const y = topPadding + (1 - val / 100) * chartHeight;
+                
+                if (!started) {
+                    rsiCtx.moveTo(x, y);
+                    started = true;
+                } else {
+                    rsiCtx.lineTo(x, y);
+                }
+            });
+            rsiCtx.stroke();
+            
+            // Draw fill under line
+            if (started) {
+                rsiCtx.lineTo(w - rightMargin, topPadding + chartHeight);
+                rsiCtx.lineTo(leftMargin, topPadding + chartHeight);
+                rsiCtx.closePath();
+                rsiCtx.fillStyle = 'rgba(236, 72, 153, 0.1)';
+                rsiCtx.fill();
+            }
+        }
+        
+        // RSI Chart hover functionality
+        let rsiData = []; // Store RSI data for hover
+        
+        function setupRSIHover() {
+            const rsiCanvas = document.getElementById('rsiChart');
+            const rsiContainer = document.getElementById('rsi-chart-container');
+            const rsiTooltip = document.getElementById('rsi-tooltip');
+            const rsiCrosshair = document.getElementById('rsi-crosshair');
+            
+            if (!rsiCanvas || !rsiContainer) return;
+            
+            rsiCanvas.addEventListener('mousemove', function(e) {
+                if (!activeStudies.rsi) return;
+                
+                const rect = rsiCanvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const w = rsiCanvas.offsetWidth;
+                const h = rsiCanvas.offsetHeight;
+                const chartWidth = w - leftMargin - rightMargin;
+                const topPadding = 20;
+                const bottomPadding = 5;
+                const chartHeight = h - topPadding - bottomPadding;
+                
+                // Check if mouse is in chart area
+                if (x < leftMargin || x > w - rightMargin || y < topPadding || y > topPadding + chartHeight) {
+                    rsiTooltip.classList.remove('visible');
+                    rsiCrosshair.style.display = 'none';
+                    return;
+                }
+                
+                // Calculate RSI data if needed
+                const currentRsiData = calculateRSI(chartData, 14);
+                
+                // Find data point
+                const relX = x - leftMargin;
+                const index = Math.round((relX / chartWidth) * (chartData.length - 1));
+                const dataPoint = chartData[Math.max(0, Math.min(index, chartData.length - 1))];
+                const rsiValue = currentRsiData[Math.max(0, Math.min(index, currentRsiData.length - 1))];
+                
+                if (!dataPoint || rsiValue === null) {
+                    rsiTooltip.classList.remove('visible');
+                    rsiCrosshair.style.display = 'none';
+                    return;
+                }
+                
+                // Show crosshair
+                rsiCrosshair.style.display = 'block';
+                rsiCrosshair.querySelector('.crosshair-v').style.left = x + 'px';
+                rsiCrosshair.querySelector('.crosshair-h').style.top = y + 'px';
+                
+                // Determine RSI condition
+                let rsiCondition = '';
+                let rsiColor = '#fff';
+                if (rsiValue >= 70) {
+                    rsiCondition = 'Overbought';
+                    rsiColor = '#ef4444';
+                } else if (rsiValue <= 30) {
+                    rsiCondition = 'Oversold';
+                    rsiColor = '#10b981';
+                } else {
+                    rsiCondition = 'Neutral';
+                    rsiColor = '#9ca3af';
+                }
+                
+                // Build tooltip
+                rsiTooltip.innerHTML = `
+                    <div style="color: ${rsiColor}; font-weight: 600;">RSI: ${rsiValue.toFixed(1)}</div>
+                    <div style="color: ${rsiColor}; font-size: 9px;">${rsiCondition}</div>
+                `;
+                
+                // Position tooltip
+                let tooltipX = x + 15;
+                let tooltipY = y - 30;
+                
+                if (tooltipX + 100 > w) tooltipX = x - 100;
+                if (tooltipY < 0) tooltipY = y + 20;
+                
+                rsiTooltip.style.left = tooltipX + 'px';
+                rsiTooltip.style.top = tooltipY + 'px';
+                rsiTooltip.classList.add('visible');
+            });
+            
+            rsiCanvas.addEventListener('mouseleave', function() {
+                rsiTooltip.classList.remove('visible');
+                rsiCrosshair.style.display = 'none';
+            });
+        }
+        
+        // Initialize RSI hover after DOM is ready
+        document.addEventListener('DOMContentLoaded', setupRSIHover);
         
         // Hover functionality
         canvas.addEventListener('mousemove', function(e) {
@@ -3872,16 +6264,6 @@
         // TEATRADE EXCHANGE - PAPER TRADING SYSTEM
         // =============================================
 
-        // Initialize Supabase
-        const SUPABASE_URL = 'https://uznxzyuknigzlxecjgtb.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6bnh6eXVrbmlnemx4ZWNqZ3RiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5Mzc5ODUsImV4cCI6MjA4NjUxMzk4NX0.BVOTqZ9kn2KCrNeF5675PNmMi9oJN3F6OoUnTtbpuIg';
-        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-        // Global State
-        let currentUser = null;
-        let userProfile = null;
-        let teas = [];
-        let positions = [];
         let tradeType = 'BUY';
 
         // Initialize on page load
@@ -4119,6 +6501,7 @@
                 updateAuctionTable(); // Update live auction results
                 updatePairsTable(); // Update pairs with new ratios
                 updatePortfolioDisplay(); // Refresh portfolio with new prices
+                updateQuoteBoard(); // Update flash quote board
             } catch (error) {
                 console.error('Failed to load teas:', error);
             }
@@ -4217,7 +6600,15 @@
                         <td>${displayData.estate}</td>
                         <td class="auction-center">${displayData.origin}</td>
                         <td>${displayData.qty.toLocaleString()}</td>
-                        <td class="price-cell ${changeClass} ${flashClass}" data-tea="${symbol}">$${displayPrice.toFixed(2)}</td>
+                        <td class="price-cell ${changeClass} ${flashClass}" data-tea="${symbol}">
+                            <span>$${displayPrice.toFixed(2)}</span>
+                            <button class="price-alert-btn ${priceAlerts[symbol] ? 'has-alert' : ''}" onclick="event.stopPropagation(); openPriceAlertModal('${symbol}', ${displayPrice})" title="Set price alert">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                                </svg>
+                            </button>
+                        </td>
                         <td class="${changeClass}">${changeStr}</td>
                         <td>${buyer}</td>
                         <td><span style="color: ${statusColor};">${status}</span></td>
@@ -4234,8 +6625,125 @@
                 console.log('Prices updated');
                 await loadTeas(); // Reload prices after update
                 await loadUserTrades(); // Refresh P/L on orders
+                
+                // Check SL/TP triggers
+                if (currentUser) {
+                    await checkSlTpOrders();
+                }
+                
+                // Check price alerts
+                await checkPriceAlerts();
             } catch (error) {
                 console.error('Failed to update prices:', error);
+            }
+        }
+        
+        // Check and execute Stop Loss / Take Profit orders
+        async function checkSlTpOrders() {
+            for (const teaId of Object.keys(pendingSlTpOrders)) {
+                const order = pendingSlTpOrders[teaId];
+                const tea = teas.find(t => t.id === parseInt(teaId));
+                if (!tea) continue;
+                
+                const currentPrice = tea.current_price;
+                let triggered = false;
+                let triggerType = '';
+                
+                // For a BUY position:
+                // - Stop Loss triggers when price falls below SL (sell to limit loss)
+                // - Take Profit triggers when price rises above TP (sell to lock in profit)
+                if (order.side === 'BUY') {
+                    if (order.sl && currentPrice <= order.sl) {
+                        triggered = true;
+                        triggerType = 'Stop Loss';
+                    } else if (order.tp && currentPrice >= order.tp) {
+                        triggered = true;
+                        triggerType = 'Take Profit';
+                    }
+                }
+                
+                if (triggered) {
+                    // Execute the closing trade
+                    await executeSlTpClose(parseInt(teaId), order, currentPrice, triggerType);
+                }
+            }
+        }
+        
+        // Execute SL/TP close order
+        async function executeSlTpClose(teaId, order, currentPrice, triggerType) {
+            const tea = teas.find(t => t.id === teaId);
+            if (!tea) return;
+            
+            const position = positions.find(p => p.tea_id === teaId);
+            if (!position) {
+                // Position no longer exists, remove pending order
+                delete pendingSlTpOrders[teaId];
+                return;
+            }
+            
+            // Close the position at current price
+            const qty = Math.min(order.qty, position.quantity);
+            const total = currentPrice * qty;
+            
+            try {
+                // Update cash balance
+                const newBalance = userProfile.cash_balance + total;
+                const { error: balanceError } = await supabaseClient
+                    .from('profiles')
+                    .update({ cash_balance: newBalance })
+                    .eq('id', currentUser.id);
+                if (balanceError) throw balanceError;
+                
+                // Update position
+                const newQty = position.quantity - qty;
+                if (newQty <= 0) {
+                    const { error: posError } = await supabaseClient
+                        .from('positions')
+                        .delete()
+                        .eq('id', position.id);
+                    if (posError) throw posError;
+                } else {
+                    const { error: posError } = await supabaseClient
+                        .from('positions')
+                        .update({ 
+                            quantity: newQty,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', position.id);
+                    if (posError) throw posError;
+                }
+                
+                // Record trade
+                const { error: tradeError } = await supabaseClient
+                    .from('trades')
+                    .insert({
+                        user_id: currentUser.id,
+                        tea_id: teaId,
+                        side: 'SELL',
+                        quantity: qty,
+                        price: currentPrice,
+                        total_value: total
+                    });
+                if (tradeError) throw tradeError;
+                
+                // Calculate P/L
+                const pnl = (currentPrice - order.entryPrice) * qty;
+                const pnlText = pnl >= 0 ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`;
+                
+                // Remove pending order
+                delete pendingSlTpOrders[teaId];
+                
+                // Update UI
+                userProfile.cash_balance = newBalance;
+                await loadPositions();
+                updateUIForLoggedInUser();
+                
+                // Show notification
+                showToast(`${triggerType} Triggered!`, `${order.symbol} closed at $${currentPrice.toFixed(2)} (${pnlText})`);
+                
+            } catch (error) {
+                console.error('SL/TP execution error:', error);
+                showToast('SL/TP Error', error.message, true);
             }
         }
 
@@ -4282,6 +6790,13 @@
             btn.classList.add(type.toLowerCase());
             
             updateTradeButton();
+        }
+        
+        function adjustSlTp(inputId, delta) {
+            const input = document.getElementById(inputId);
+            const currentVal = parseFloat(input.value) || 0;
+            const newVal = Math.max(0, currentVal + delta);
+            input.value = newVal.toFixed(2);
         }
 
         function updateTradeSummary() {
@@ -4362,6 +6877,12 @@
             const qty = parseFloat(document.getElementById('trade-qty').value);
             const price = parseFloat(document.getElementById('trade-price').value);
             const total = price * qty;
+            
+            // Get SL/TP values
+            const slInput = document.getElementById('trade-sl');
+            const tpInput = document.getElementById('trade-tp');
+            const stopLoss = slInput.value ? parseFloat(slInput.value) : null;
+            const takeProfit = tpInput.value ? parseFloat(tpInput.value) : null;
 
             const tea = teas.find(t => t.id === teaId);
             if (!tea) return;
@@ -4427,6 +6948,25 @@
 
                     userProfile.cash_balance = newBalance;
                     showToast('Trade Executed!', `Bought ${qty.toLocaleString()} kg of ${tea.symbol} at $${price.toFixed(2)}/kg`);
+                    
+                    // Register SL/TP orders if set
+                    if (stopLoss || takeProfit) {
+                        pendingSlTpOrders[teaId] = {
+                            sl: stopLoss,
+                            tp: takeProfit,
+                            side: 'BUY', // Original trade side
+                            qty: qty,
+                            symbol: tea.symbol,
+                            entryPrice: price
+                        };
+                        if (stopLoss && takeProfit) {
+                            showToast('SL/TP Set', `SL: $${stopLoss.toFixed(2)} | TP: $${takeProfit.toFixed(2)}`);
+                        } else if (stopLoss) {
+                            showToast('Stop Loss Set', `Will close at $${stopLoss.toFixed(2)}`);
+                        } else {
+                            showToast('Take Profit Set', `Will close at $${takeProfit.toFixed(2)}`);
+                        }
+                    }
 
                 } else {
                     // SELL
@@ -4488,6 +7028,8 @@
                 
                 // Reset form
                 document.getElementById('trade-qty').value = '';
+                document.getElementById('trade-sl').value = '';
+                document.getElementById('trade-tp').value = '';
                 updateTradeSummary();
 
             } catch (error) {
@@ -4565,6 +7107,14 @@
                 const pnl = (price - position.avg_entry_price) * quantity;
                 const pnlText = pnl >= 0 ? `Profit: +$${pnl.toFixed(2)}` : `Loss: -$${Math.abs(pnl).toFixed(2)}`;
                 showToast('Position Closed!', `Sold ${quantity.toLocaleString()} kg of ${teaSymbol}. ${pnlText}`);
+
+                // Record to trade history log
+                recordClosedTrade({
+                    ...position,
+                    symbol: teaSymbol,
+                    quantity: quantity,
+                    type: 'long'
+                }, price);
 
                 // Refresh data
                 await loadPositions();
@@ -4657,6 +7207,15 @@
                 const posType = trade.side === 'BUY' ? 'LONG' : 'SHORT';
                 
                 showToast('Pair Position Closed!', `Closed ${posType} ${baseShort}/${quoteShort} ${leverage}x. ${pnlText}`);
+
+                // Record to trade history log
+                recordClosedTrade({
+                    symbol: `${baseShort}/${quoteShort}`,
+                    type: trade.side === 'BUY' ? 'long' : 'short',
+                    quantity: margin,
+                    avg_price: entryRatio,
+                    created_at: trade.created_at
+                }, currentRatio);
 
                 // Refresh data
                 await loadUserTrades();
@@ -5059,6 +7618,776 @@
         }
 
         // =============================================
+        // MARKET DEPTH & MACRO FUNCTIONS
+        // =============================================
+
+        let marketDepthBids = 52;
+        let tradeHistory = [];
+
+        function updateMarketDepth() {
+            // Simulate market depth shifting
+            const shift = (Math.random() - 0.5) * 4;
+            marketDepthBids = Math.max(35, Math.min(65, marketDepthBids + shift));
+            const asks = 100 - marketDepthBids;
+            
+            const bidsEl = document.getElementById('depth-bids');
+            const asksEl = document.getElementById('depth-asks');
+            const ratioEl = document.getElementById('depth-ratio');
+            
+            if (bidsEl && asksEl) {
+                bidsEl.style.width = `${marketDepthBids}%`;
+                bidsEl.querySelector('.depth-label').textContent = `BIDS ${Math.round(marketDepthBids)}%`;
+                asksEl.style.width = `${asks}%`;
+                asksEl.querySelector('.depth-label').textContent = `ASKS ${Math.round(asks)}%`;
+                
+                const ratio = (marketDepthBids / asks).toFixed(2);
+                ratioEl.textContent = `Bid/Ask: ${ratio}`;
+                
+                // Update volumes
+                const bidVol = Math.round(8000 + marketDepthBids * 100 + Math.random() * 2000);
+                const askVol = Math.round(8000 + asks * 100 + Math.random() * 2000);
+                document.getElementById('depth-bid-volume').textContent = `Vol: ${bidVol.toLocaleString()} kg`;
+                document.getElementById('depth-ask-volume').textContent = `Vol: ${askVol.toLocaleString()} kg`;
+                
+                // Update mid price based on selected tea
+                const midPrice = (currentTeaPrice || 4.82).toFixed(2);
+                document.getElementById('depth-mid-price').textContent = `Mid: $${midPrice}`;
+            }
+        }
+
+        function switchWatchlistTab(tab) {
+            document.querySelectorAll('.watchlist-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.getElementById('watchlist-teas').style.display = tab === 'teas' ? 'block' : 'none';
+            document.getElementById('watchlist-macro').style.display = tab === 'macro' ? 'block' : 'none';
+        }
+
+        function updateMacroIndicators() {
+            // Simulate small changes
+            const usdkes = 129.45 + (Math.random() - 0.5) * 0.3;
+            const oil = 82.40 + (Math.random() - 0.5) * 0.5;
+            const bdi = 1842 + Math.round((Math.random() - 0.5) * 20);
+            
+            const usdkesEl = document.getElementById('macro-usdkes');
+            const oilEl = document.getElementById('macro-oil');
+            const bdiEl = document.getElementById('macro-bdi');
+            
+            if (usdkesEl) usdkesEl.textContent = usdkes.toFixed(2);
+            if (oilEl) oilEl.textContent = `$${oil.toFixed(2)}`;
+            if (bdiEl) bdiEl.textContent = bdi.toLocaleString();
+        }
+
+        function switchPortfolioTab(tab) {
+            document.querySelectorAll('.portfolio-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            const positionsEl = document.getElementById('portfolio-positions');
+            const historyEl = document.getElementById('portfolio-history');
+            
+            if (positionsEl && historyEl) {
+                positionsEl.classList.toggle('active', tab === 'positions');
+                historyEl.classList.toggle('active', tab === 'history');
+            }
+            
+            if (tab === 'history') {
+                updateTradeLogDisplay();
+            }
+        }
+
+        function recordClosedTrade(position, exitPrice) {
+            const entryPrice = position.avg_price;
+            const pnl = position.type === 'long' 
+                ? (exitPrice - entryPrice) * position.quantity
+                : (entryPrice - exitPrice) * position.quantity;
+            const pnlPercent = ((exitPrice - entryPrice) / entryPrice * 100) * (position.type === 'long' ? 1 : -1);
+            
+            const now = new Date();
+            const entryDate = new Date(position.created_at || now);
+            const duration = now - entryDate;
+            
+            const trade = {
+                id: Date.now(),
+                symbol: position.teas?.symbol || position.symbol,
+                type: position.type,
+                quantity: position.quantity,
+                entryPrice: entryPrice,
+                exitPrice: exitPrice,
+                pnl: pnl,
+                pnlPercent: pnlPercent,
+                duration: duration,
+                fees: Math.abs(pnl * 0.002), // 0.2% fee simulation
+                closedAt: now
+            };
+            
+            tradeHistory.push(trade);
+            localStorage.setItem('tradeHistory', JSON.stringify(tradeHistory));
+            updateTradeLogDisplay();
+        }
+
+        function formatDuration(ms) {
+            const seconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+            
+            if (days > 0) return `${days}d ${hours % 24}h`;
+            if (hours > 0) return `${hours}h ${minutes % 60}m`;
+            if (minutes > 0) return `${minutes}m`;
+            return `${seconds}s`;
+        }
+
+        function updateTradeLogDisplay() {
+            const tbody = document.getElementById('trade-log-body');
+            const statPnl = document.getElementById('stat-total-pnl');
+            const statWinRate = document.getElementById('stat-win-rate');
+            const statTrades = document.getElementById('stat-trades');
+            const statAvgHold = document.getElementById('stat-avg-hold');
+            
+            if (!tbody) return;
+            
+            // Build closed trades from currentTradesData (Supabase)
+            const closedTrades = [];
+            
+            if (currentTradesData && currentTradesData.length > 0) {
+                const buyTrades = currentTradesData.filter(t => t.side === 'BUY');
+                const sellTrades = currentTradesData.filter(t => t.side === 'SELL');
+                const closedBuyIds = new Set();
+                
+                // Match SELL trades to BUY trades
+                sellTrades.forEach(sell => {
+                    const matchingBuy = buyTrades.find(buy => 
+                        buy.tea_id === sell.tea_id && 
+                        !closedBuyIds.has(buy.id) &&
+                        buy.id < sell.id
+                    );
+                    if (matchingBuy) {
+                        closedBuyIds.add(matchingBuy.id);
+                        
+                        // Find tea symbol
+                        const tea = teas.find(t => t.id === matchingBuy.tea_id);
+                        const symbol = tea?.symbol || 'Unknown';
+                        
+                        const entryPrice = matchingBuy.price;
+                        const exitPrice = sell.price;
+                        const quantity = Math.min(matchingBuy.quantity, sell.quantity);
+                        const pnl = (exitPrice - entryPrice) * quantity;
+                        const pnlPercent = ((exitPrice - entryPrice) / entryPrice) * 100;
+                        
+                        const entryDate = new Date(matchingBuy.created_at);
+                        const exitDate = new Date(sell.created_at);
+                        const duration = exitDate - entryDate;
+                        
+                        closedTrades.push({
+                            id: sell.id,
+                            symbol: symbol,
+                            type: 'long',
+                            quantity: quantity,
+                            entryPrice: entryPrice,
+                            exitPrice: exitPrice,
+                            pnl: pnl,
+                            pnlPercent: pnlPercent,
+                            duration: duration,
+                            fees: Math.abs(pnl * 0.002),
+                            closedAt: exitDate
+                        });
+                    }
+                });
+            }
+            
+            if (closedTrades.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No closed trades yet</td></tr>`;
+                if (statPnl) statPnl.textContent = '+$0.00';
+                if (statWinRate) statWinRate.textContent = '0%';
+                if (statTrades) statTrades.textContent = '0';
+                if (statAvgHold) statAvgHold.textContent = '—';
+                return;
+            }
+            
+            // Calculate stats
+            const totalPnl = closedTrades.reduce((sum, t) => sum + t.pnl, 0);
+            const wins = closedTrades.filter(t => t.pnl > 0).length;
+            const winRate = (wins / closedTrades.length * 100).toFixed(0);
+            const avgHold = closedTrades.reduce((sum, t) => sum + t.duration, 0) / closedTrades.length;
+            
+            statPnl.textContent = `${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)}`;
+            statPnl.className = `trade-stat-value ${totalPnl >= 0 ? 'up' : 'down'}`;
+            statWinRate.textContent = `${winRate}%`;
+            statTrades.textContent = closedTrades.length;
+            statAvgHold.textContent = formatDuration(avgHold);
+            
+            // Sort by most recent and render table
+            closedTrades.sort((a, b) => b.closedAt - a.closedAt);
+            tbody.innerHTML = closedTrades.slice(0, 20).map(t => `
+                <tr>
+                    <td style="font-weight: 500;">${t.symbol}</td>
+                    <td><span class="trade-type-badge ${t.type}">${t.type}</span></td>
+                    <td style="font-family: 'JetBrains Mono', monospace;">$${t.entryPrice.toFixed(2)}</td>
+                    <td style="font-family: 'JetBrains Mono', monospace;">$${t.exitPrice.toFixed(2)}</td>
+                    <td class="${t.pnl >= 0 ? 'up' : 'down'}" style="font-family: 'JetBrains Mono', monospace;">
+                        ${t.pnl >= 0 ? '+' : ''}$${t.pnl.toFixed(2)}<br>
+                        <span style="font-size: 8px; opacity: 0.7;">${t.pnlPercent >= 0 ? '+' : ''}${t.pnlPercent.toFixed(1)}%</span>
+                    </td>
+                    <td style="color: var(--text-muted); font-size: 9px;">${formatDuration(t.duration)}</td>
+                </tr>
+            `).join('');
+        }
+
+        // =============================================
+        // COMMAND LINE FUNCTIONS
+        // =============================================
+
+        const commandAliases = {
+            // Tea symbols
+            'BP1': { action: 'selectTea', symbol: 'KEN-BP1', desc: 'Kenya BP1' },
+            'PF1': { action: 'selectTea', symbol: 'KEN-PF1', desc: 'Kenya PF1' },
+            'DUST': { action: 'selectTea', symbol: 'KEN-DUST', desc: 'Kenya Dust' },
+            'YUN': { action: 'selectTea', symbol: 'CHN-YUN', desc: 'Yunnan Gold' },
+            'DRJ': { action: 'selectTea', symbol: 'IND-DRJ', desc: 'Darjeeling First Flush' },
+            'ASM': { action: 'selectTea', symbol: 'IND-ASM', desc: 'Assam Orthodox' },
+            'BOP': { action: 'selectTea', symbol: 'SRI-BOP', desc: 'Ceylon BOP' },
+            'PEK': { action: 'selectTea', symbol: 'SRI-PEK', desc: 'Ceylon Pekoe' },
+            // Commands
+            'NEWS': { action: 'scrollTo', target: 'news', desc: 'Jump to News' },
+            'CHART': { action: 'scrollTo', target: 'chart', desc: 'Jump to Chart' },
+            'ORDERS': { action: 'scrollTo', target: 'orders', desc: 'View Orders' },
+            'PORTFOLIO': { action: 'showPortfolio', desc: 'Show Portfolio' },
+            'HISTORY': { action: 'showHistory', desc: 'Trade History' },
+            'MACRO': { action: 'showMacro', desc: 'Macro Indicators' },
+            'LONG': { action: 'setTradeType', type: 'long', desc: 'Set Long Position' },
+            'SHORT': { action: 'setTradeType', type: 'short', desc: 'Set Short Position' },
+            'MAX': { action: 'maximizeChart', desc: 'Maximize Chart' },
+            'CLEAR': { action: 'clearCommand', desc: 'Clear Input' },
+        };
+
+        function initCommandLine() {
+            const input = document.getElementById('command-line');
+            const suggestions = document.getElementById('command-suggestions');
+            
+            if (!input) return;
+
+            input.addEventListener('input', (e) => {
+                const val = e.target.value.toUpperCase().trim();
+                if (val.length === 0) {
+                    suggestions.classList.remove('active');
+                    return;
+                }
+                
+                // Find matching commands
+                const matches = [];
+                
+                // Check for BUY/SELL commands
+                if (val.startsWith('BUY ') || val.startsWith('SELL ')) {
+                    const parts = val.split(' ');
+                    const qty = parts[1] || '';
+                    matches.push({
+                        cmd: val,
+                        desc: `${parts[0]} ${qty || '?'} lots of selected tea`
+                    });
+                }
+                
+                // Check for tea symbols and commands
+                Object.keys(commandAliases).forEach(key => {
+                    if (key.includes(val) || val.includes(key)) {
+                        matches.push({
+                            cmd: key,
+                            desc: commandAliases[key].desc
+                        });
+                    }
+                });
+                
+                if (matches.length > 0) {
+                    suggestions.innerHTML = matches.slice(0, 6).map((m, i) => `
+                        <div class="command-suggestion ${i === 0 ? 'selected' : ''}" data-cmd="${m.cmd}">
+                            <span class="command-suggestion-cmd">${m.cmd}</span>
+                            <span class="command-suggestion-desc">${m.desc}</span>
+                        </div>
+                    `).join('');
+                    suggestions.classList.add('active');
+                } else {
+                    suggestions.classList.remove('active');
+                }
+            });
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    executeCommand(input.value);
+                    input.value = '';
+                    suggestions.classList.remove('active');
+                } else if (e.key === 'Escape') {
+                    input.value = '';
+                    suggestions.classList.remove('active');
+                    input.blur();
+                }
+            });
+
+            // Click on suggestion
+            suggestions.addEventListener('click', (e) => {
+                const item = e.target.closest('.command-suggestion');
+                if (item) {
+                    input.value = item.dataset.cmd;
+                    executeCommand(input.value);
+                    input.value = '';
+                    suggestions.classList.remove('active');
+                }
+            });
+
+            // Global keyboard shortcut
+            document.addEventListener('keydown', (e) => {
+                if (e.key === '/' && !e.ctrlKey && !e.metaKey && document.activeElement !== input) {
+                    e.preventDefault();
+                    input.focus();
+                }
+            });
+        }
+
+        function executeCommand(cmd) {
+            const parts = cmd.toUpperCase().trim().split(' ');
+            const command = parts[0];
+            const arg = parts[1];
+
+            // Check for BUY/SELL
+            if (command === 'BUY' || command === 'SELL') {
+                const qty = parseInt(arg) || 100;
+                const selectedTea = document.getElementById('trade-tea-select')?.value;
+                if (selectedTea) {
+                    document.getElementById('trade-qty').value = qty;
+                    if (command === 'BUY') {
+                        setTradeType('BUY');
+                    } else {
+                        setTradeType('SELL');
+                    }
+                    updateTradeSummary();
+                    showToast('Trade Ready', `${command} ${qty} kg of ${selectedTea}`);
+                } else {
+                    showToast('Select a tea first', 'Click on a tea in Quick Quotes', true);
+                }
+                return;
+            }
+
+            // Check command aliases
+            const alias = commandAliases[command];
+            if (alias) {
+                switch (alias.action) {
+                    case 'selectTea':
+                        const tea = teas.find(t => t.symbol === alias.symbol);
+                        if (tea) {
+                            selectTeaForTrading(tea.symbol);
+                            showToast('Selected', alias.desc);
+                        }
+                        break;
+                    case 'scrollTo':
+                        if (alias.target === 'chart') {
+                            document.getElementById('chart-section')?.scrollIntoView({ behavior: 'smooth' });
+                        } else if (alias.target === 'orders') {
+                            document.getElementById('orders-section')?.scrollIntoView({ behavior: 'smooth' });
+                        }
+                        break;
+                    case 'showPortfolio':
+                        document.getElementById('portfolio-section').style.display = 'block';
+                        switchPortfolioTab('positions');
+                        break;
+                    case 'showHistory':
+                        document.getElementById('portfolio-section').style.display = 'block';
+                        switchPortfolioTab('history');
+                        break;
+                    case 'showMacro':
+                        switchWatchlistTab('macro');
+                        break;
+                    case 'setTradeType':
+                        setTradeType(alias.type);
+                        break;
+                    case 'maximizeChart':
+                        toggleMaximize('chart-section');
+                        break;
+                    case 'clearCommand':
+                        break;
+                }
+            } else {
+                // Try to find tea by searching
+                const foundTea = teas.find(t => 
+                    t.symbol.toUpperCase().includes(command) || 
+                    t.name.toUpperCase().includes(command)
+                );
+                if (foundTea) {
+                    selectTeaForTrading(foundTea.symbol);
+                    showToast('Selected', foundTea.name);
+                }
+            }
+        }
+
+        // =============================================
+        // MAXIMIZE FUNCTIONS
+        // =============================================
+
+        let maximizedPanel = null;
+
+        function toggleMaximize(panelId) {
+            const panel = document.getElementById(panelId);
+            if (!panel) return;
+
+            if (panel.classList.contains('panel-maximized')) {
+                // Restore
+                panel.classList.remove('panel-maximized');
+                document.body.style.overflow = '';
+                maximizedPanel = null;
+            } else {
+                // Maximize
+                if (maximizedPanel) {
+                    maximizedPanel.classList.remove('panel-maximized');
+                }
+                panel.classList.add('panel-maximized');
+                document.body.style.overflow = 'hidden';
+                maximizedPanel = panel;
+            }
+
+            // Trigger resize for chart redraw
+            setTimeout(() => {
+                window.dispatchEvent(new Event('resize'));
+                drawChart();
+            }, 100);
+        }
+
+        // Escape key to close maximized panel
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && maximizedPanel) {
+                toggleMaximize(maximizedPanel.id);
+            }
+        });
+
+        // =============================================
+        // FLASH QUOTE BOARD FUNCTIONS
+        // =============================================
+
+        let previousQuotePrices = {};
+
+        function initQuoteBoard() {
+            updateQuoteBoard();
+        }
+
+        let selectedQuoteSymbol = null;
+
+        function updateQuoteBoard() {
+            const board = document.getElementById('quote-board');
+            if (!board || !teas || teas.length === 0) return;
+
+            // Show 10 teas for 2 complete rows of 5
+            const topTeas = teas.slice(0, 10);
+            
+            board.innerHTML = topTeas.map(tea => {
+                const symbol = tea.symbol.split('-')[1] || tea.symbol;
+                const price = tea.current_price || 0;
+                const change = tea.price_change_24h || 0;
+                const volume = tea.volume_24h || 0;
+                const isUp = change >= 0;
+                const prevPrice = previousQuotePrices[tea.symbol];
+                let flashClass = '';
+                const selectedClass = selectedQuoteSymbol === tea.symbol ? 'selected' : '';
+                
+                if (prevPrice !== undefined && prevPrice !== price) {
+                    flashClass = price > prevPrice ? 'flash-green' : 'flash-red';
+                }
+                previousQuotePrices[tea.symbol] = price;
+                
+                const volDisplay = volume >= 1000 ? `${Math.round(volume / 1000)}K` : volume.toString();
+
+                return `
+                    <div class="quote-card ${flashClass} ${selectedClass}" onclick="selectTeaForTrading('${tea.symbol}')">
+                        <div class="quote-symbol">${symbol}</div>
+                        <div class="quote-price ${isUp ? 'up' : 'down'}">$${price.toFixed(2)}</div>
+                        <div class="quote-change ${isUp ? 'up' : 'down'}">${isUp ? '▲' : '▼'} ${change >= 0 ? '+' : ''}${change.toFixed(1)}%</div>
+                        <div class="quote-volume">Vol: ${volDisplay}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function selectTeaForTrading(symbol) {
+            // Track selected symbol
+            selectedQuoteSymbol = symbol;
+            
+            // Find the tea data
+            const tea = teas.find(t => t.symbol === symbol);
+            if (!tea) return;
+            
+            // Open the quick quote modal
+            openQuickQuoteModal(tea);
+        }
+        
+        let quickQuoteTradeType = 'BUY';
+        let quickQuoteTea = null;
+        
+        function openQuickQuoteModal(tea) {
+            quickQuoteTea = tea;
+            const modal = document.getElementById('quick-quote-modal');
+            if (!modal) return;
+            
+            const shortSymbol = tea.symbol.split('-')[1] || tea.symbol;
+            const price = tea.current_price || 0;
+            const change = tea.price_change_24h || 0;
+            const isUp = change >= 0;
+            const volume = tea.volume_24h || 0;
+            
+            // Populate header
+            document.getElementById('qq-symbol').textContent = shortSymbol;
+            document.getElementById('qq-name').textContent = tea.name;
+            
+            const priceEl = document.getElementById('qq-price');
+            priceEl.textContent = `$${price.toFixed(2)}`;
+            priceEl.className = `quick-quote-current-price ${isUp ? 'up' : 'down'}`;
+            
+            const changeEl = document.getElementById('qq-change');
+            changeEl.textContent = `${isUp ? '+' : ''}${change.toFixed(1)}%`;
+            changeEl.className = `quick-quote-change ${isUp ? 'up' : 'down'}`;
+            
+            // Get historical data and compute real stats
+            const history = generateTeaHistory(tea);
+            const last24h = history.length >= 24 ? history.slice(-24) : history;
+            
+            // Guard against empty data
+            let high24h = price * 1.04;
+            let low24h = price * 0.96;
+            let avg24h = price;
+            let totalVolume = 0;
+            
+            if (last24h.length > 0) {
+                high24h = Math.max(...last24h.map(d => d.high));
+                low24h = Math.min(...last24h.map(d => d.low));
+                avg24h = last24h.reduce((sum, d) => sum + d.close, 0) / last24h.length;
+                totalVolume = last24h.reduce((sum, d) => sum + d.volume, 0);
+            }
+            
+            document.getElementById('qq-high').textContent = `$${high24h.toFixed(2)}`;
+            document.getElementById('qq-low').textContent = `$${low24h.toFixed(2)}`;
+            document.getElementById('qq-volume').textContent = totalVolume >= 1000000 ? `${Math.round(totalVolume / 1000000)}M` : totalVolume >= 1000 ? `${Math.round(totalVolume / 1000)}K` : totalVolume.toString();
+            document.getElementById('qq-avg').textContent = `$${avg24h.toFixed(2)}`;
+            
+            // Set trade price
+            document.getElementById('qq-trade-price').value = price.toFixed(2);
+            document.getElementById('qq-qty').value = 100;
+            
+            // Update balance
+            const balance = userProfile?.cash_balance || 10000;
+            document.getElementById('qq-balance').textContent = `$${balance.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+            
+            // Reset trade type to BUY
+            setQuickTradeType('BUY');
+            updateQuickTradeSummary();
+            
+            // Draw the mini chart
+            drawQuickQuoteChart(tea);
+            
+            // Show modal
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function closeQuickQuoteModal() {
+            const modal = document.getElementById('quick-quote-modal');
+            if (modal) {
+                modal.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        }
+        
+        function setQuickTradeType(type) {
+            quickQuoteTradeType = type;
+            
+            const buyBtn = document.getElementById('qq-btn-buy');
+            const sellBtn = document.getElementById('qq-btn-sell');
+            const execBtn = document.getElementById('qq-execute-btn');
+            
+            buyBtn.classList.toggle('active', type === 'BUY');
+            sellBtn.classList.toggle('active', type === 'SELL');
+            
+            execBtn.className = `quick-trade-execute ${type.toLowerCase()}`;
+            updateQuickTradeSummary();
+        }
+        
+        function updateQuickTradeSummary() {
+            const qty = parseFloat(document.getElementById('qq-qty').value) || 0;
+            const price = parseFloat(document.getElementById('qq-trade-price').value) || 0;
+            const total = qty * price;
+            const balance = userProfile?.cash_balance || 10000;
+            const afterTrade = quickQuoteTradeType === 'BUY' ? balance - total : balance + total;
+            
+            document.getElementById('qq-order-value').textContent = `$${total.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+            document.getElementById('qq-after-trade').textContent = `$${afterTrade.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+            
+            const execBtn = document.getElementById('qq-execute-btn');
+            execBtn.textContent = `${quickQuoteTradeType} ${qty} kg`;
+        }
+        
+        function drawQuickQuoteChart(tea) {
+            const canvas = document.getElementById('qq-chart');
+            if (!canvas || !tea) return;
+            
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.parentElement.getBoundingClientRect();
+            if (rect.width <= 0 || rect.height <= 0) return;
+            
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            
+            const price = tea.current_price || 3.5;
+            const change = tea.price_change_24h || 0;
+            const isUp = change >= 0;
+            
+            // Get historical data for this tea (last 48 hours = 48 candles at hourly)
+            const fullHistory = generateTeaHistory(tea);
+            if (!fullHistory || fullHistory.length === 0) return;
+            
+            const historySlice = fullHistory.slice(-48); // Last 48 hours
+            if (historySlice.length === 0) return;
+            
+            const padding = { top: 20, right: 20, bottom: 30, left: 60 };
+            const chartWidth = canvas.width - padding.left - padding.right;
+            const chartHeight = canvas.height - padding.top - padding.bottom;
+            
+            const allHighs = historySlice.map(d => d.high);
+            const allLows = historySlice.map(d => d.low);
+            const minPrice = Math.min(...allLows) * 0.998;
+            const maxPrice = Math.max(...allHighs) * 1.002;
+            
+            // Clear
+            ctx.fillStyle = '#1f2937';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 4; i++) {
+                const y = padding.top + (chartHeight / 4) * i;
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(canvas.width - padding.right, y);
+                ctx.stroke();
+                
+                const priceLabel = maxPrice - ((maxPrice - minPrice) / 4) * i;
+                ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                ctx.font = '10px JetBrains Mono';
+                ctx.textAlign = 'right';
+                ctx.fillText(`$${priceLabel.toFixed(2)}`, padding.left - 8, y + 3);
+            }
+            
+            // Draw time labels
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.font = '9px JetBrains Mono';
+            ctx.textAlign = 'center';
+            const timeLabels = [0, Math.floor(historySlice.length / 4), Math.floor(historySlice.length / 2), Math.floor(3 * historySlice.length / 4), historySlice.length - 1];
+            timeLabels.forEach(i => {
+                if (historySlice[i]) {
+                    const x = padding.left + (i / (historySlice.length - 1)) * chartWidth;
+                    const date = historySlice[i].date;
+                    const label = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                    ctx.fillText(label, x, canvas.height - 8);
+                }
+            });
+            
+            // Draw candlesticks
+            const candleWidth = Math.max(3, Math.min(10, (chartWidth / historySlice.length) * 0.7));
+            
+            historySlice.forEach((candle, i) => {
+                const x = padding.left + (i / (historySlice.length - 1)) * chartWidth;
+                const candleUp = candle.close >= candle.open;
+                const color = candleUp ? '#10b981' : '#ef4444';
+                
+                const openY = padding.top + ((maxPrice - candle.open) / (maxPrice - minPrice)) * chartHeight;
+                const closeY = padding.top + ((maxPrice - candle.close) / (maxPrice - minPrice)) * chartHeight;
+                const highY = padding.top + ((maxPrice - candle.high) / (maxPrice - minPrice)) * chartHeight;
+                const lowY = padding.top + ((maxPrice - candle.low) / (maxPrice - minPrice)) * chartHeight;
+                
+                // Wick
+                ctx.beginPath();
+                ctx.moveTo(x, highY);
+                ctx.lineTo(x, lowY);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                
+                // Body
+                const bodyTop = Math.min(openY, closeY);
+                const bodyHeight = Math.max(1, Math.abs(closeY - openY));
+                ctx.fillStyle = color;
+                ctx.fillRect(x - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
+            });
+            
+            // Draw current price line
+            const currentY = padding.top + ((maxPrice - price) / (maxPrice - minPrice)) * chartHeight;
+            ctx.beginPath();
+            ctx.setLineDash([4, 4]);
+            ctx.moveTo(padding.left, currentY);
+            ctx.lineTo(canvas.width - padding.right, currentY);
+            ctx.strokeStyle = isUp ? '#10b981' : '#ef4444';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Current price label
+            ctx.fillStyle = isUp ? '#10b981' : '#ef4444';
+            ctx.fillRect(canvas.width - padding.right + 2, currentY - 8, 55, 16);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 10px JetBrains Mono';
+            ctx.textAlign = 'left';
+            ctx.fillText(`$${price.toFixed(2)}`, canvas.width - padding.right + 6, currentY + 3);
+        }
+        
+        async function executeQuickTrade() {
+            if (!currentUser) {
+                closeQuickQuoteModal();
+                openAuthModal();
+                return;
+            }
+            
+            if (!quickQuoteTea) return;
+            
+            const qty = parseFloat(document.getElementById('qq-qty').value) || 0;
+            const price = quickQuoteTea.current_price;
+            const total = qty * price;
+            
+            if (qty <= 0) {
+                showToast('Invalid quantity', 'Please enter a valid quantity', true);
+                return;
+            }
+            
+            // Use existing trade logic
+            const select = document.getElementById('trade-tea-select');
+            if (select) {
+                select.value = quickQuoteTea.symbol;
+            }
+            document.getElementById('trade-qty').value = qty;
+            setTradeType(quickQuoteTradeType);
+            
+            // Execute the trade
+            await executeTrade();
+            
+            // Close modal
+            closeQuickQuoteModal();
+        }
+        
+        // Close modal on escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeQuickQuoteModal();
+            }
+        });
+        
+        // Close modal on overlay click
+        document.getElementById('quick-quote-modal')?.addEventListener('click', (e) => {
+            if (e.target.classList.contains('quick-quote-modal-overlay')) {
+                closeQuickQuoteModal();
+            }
+        });
+
+        // Start market depth animation
+        setInterval(updateMarketDepth, 2000);
+        setInterval(updateMacroIndicators, 5000);
+        setInterval(updateQuoteBoard, 3000);
+
+        // Initialize command line
+        initCommandLine();
+
+        // =============================================
         // LEADERBOARD FUNCTIONS
         // =============================================
 
@@ -5228,14 +8557,20 @@
             }
 
             const pair = teaPairs.find(p => p.id === pairId);
-            if (!pair) return;
+            if (!pair) {
+                showToast('Error', 'Pair not found. Please refresh the page.', true);
+                return;
+            }
 
             const teaMap = {};
             teas.forEach(tea => teaMap[tea.symbol] = tea);
 
             const baseTea = teaMap[pair.base_symbol];
             const quoteTea = teaMap[pair.quote_symbol];
-            if (!baseTea || !quoteTea) return;
+            if (!baseTea || !quoteTea) {
+                showToast('Error', 'Tea prices not available. Please refresh.', true);
+                return;
+            }
 
             const ratio = baseTea.current_price / quoteTea.current_price;
             const baseShort = pair.base_symbol.split('-')[1] || pair.base_symbol;
@@ -5295,7 +8630,15 @@
         }
 
         async function executePairTrade() {
-            if (!currentPairTrade || !currentUser) return;
+            if (!currentPairTrade || !currentUser) {
+                showToast('Error', 'Trade data not available. Please try again.', true);
+                return;
+            }
+
+            if (!currentPairTrade.side) {
+                showToast('Error', 'Invalid trade direction. Please reopen the trade modal.', true);
+                return;
+            }
 
             const amount = parseFloat(document.getElementById('pairs-amount').value);
             if (!amount || amount < 10) {
@@ -5334,11 +8677,20 @@
                 if (tradeError) throw tradeError;
 
                 userProfile.cash_balance = newBalance;
+                
+                // Save values before closing modal (which nulls currentPairTrade)
+                const tradeInfo = {
+                    side: currentPairTrade.side,
+                    baseShort: currentPairTrade.baseShort,
+                    quoteShort: currentPairTrade.quoteShort,
+                    ratio: currentPairTrade.ratio
+                };
+                
                 closePairsModal();
                 
                 const exposure = amount * selectedLeverage;
                 showToast('Pair Trade Executed!', 
-                    `${currentPairTrade.side} ${currentPairTrade.baseShort}/${currentPairTrade.quoteShort} @ ${currentPairTrade.ratio.toFixed(4)} with ${selectedLeverage}x leverage ($${exposure.toFixed(2)} exposure)`);
+                    `${tradeInfo.side} ${tradeInfo.baseShort}/${tradeInfo.quoteShort} @ ${tradeInfo.ratio.toFixed(4)} with ${selectedLeverage}x leverage ($${exposure.toFixed(2)} exposure)`);
 
                 await loadUserTrades();
                 await loadPositions();
