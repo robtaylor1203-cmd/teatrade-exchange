@@ -747,6 +747,35 @@
         }
         
         .order-status.pending {
+            background: rgba(251, 191, 36, 0.15);
+            color: var(--accent-orange);
+        }
+
+        .close-position-btn {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 12px;
+            border-radius: 12px;
+            border: none;
+            cursor: pointer;
+            background: rgba(255, 107, 107, 0.15);
+            color: var(--accent-red);
+            transition: all 0.2s ease;
+        }
+
+        .close-position-btn:hover {
+            background: var(--accent-red);
+            color: white;
+        }
+
+        .close-position-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+            color: var(--accent-green);
+        }
+        
+        .order-status.pending {
             background: rgba(245, 158, 11, 0.15);
             color: var(--accent-orange);
         }
@@ -2690,11 +2719,12 @@
                             <th>Total</th>
                             <th>P/L</th>
                             <th>Status</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody id="orders-tbody">
                         <tr>
-                            <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                            <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 20px;">
                                 No orders yet. Start trading!
                             </td>
                         </tr>
@@ -3987,6 +4017,85 @@
             updateTradeButton();
         }
 
+        async function closePosition(teaId, quantity, teaSymbol) {
+            if (!currentUser) {
+                openAuthModal();
+                return;
+            }
+
+            const tea = teas.find(t => t.id === teaId);
+            if (!tea) {
+                showToast('Error', 'Tea not found', true);
+                return;
+            }
+
+            // Find the user's position
+            const position = positions.find(p => p.tea_id === teaId);
+            if (!position || position.quantity < quantity) {
+                showToast('Error', 'Position not found or insufficient quantity', true);
+                return;
+            }
+
+            const price = tea.current_price;
+            const total = price * quantity;
+
+            try {
+                // Update cash balance
+                const newBalance = userProfile.cash_balance + total;
+                const { error: balanceError } = await supabaseClient
+                    .from('profiles')
+                    .update({ cash_balance: newBalance })
+                    .eq('id', currentUser.id);
+                if (balanceError) throw balanceError;
+
+                // Update or delete position
+                const newQty = position.quantity - quantity;
+                if (newQty <= 0) {
+                    const { error: posError } = await supabaseClient
+                        .from('positions')
+                        .delete()
+                        .eq('id', position.id);
+                    if (posError) throw posError;
+                } else {
+                    const { error: posError } = await supabaseClient
+                        .from('positions')
+                        .update({ 
+                            quantity: newQty,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', position.id);
+                    if (posError) throw posError;
+                }
+
+                // Record the closing trade
+                const { error: tradeError } = await supabaseClient
+                    .from('trades')
+                    .insert({
+                        user_id: currentUser.id,
+                        tea_id: teaId,
+                        side: 'SELL',
+                        quantity: quantity,
+                        price: price,
+                        total_value: total
+                    });
+                if (tradeError) throw tradeError;
+
+                userProfile.cash_balance = newBalance;
+                const pnl = (price - position.avg_entry_price) * quantity;
+                const pnlText = pnl >= 0 ? `Profit: +$${pnl.toFixed(2)}` : `Loss: -$${Math.abs(pnl).toFixed(2)}`;
+                showToast('Position Closed!', `Sold ${quantity.toLocaleString()} kg of ${teaSymbol}. ${pnlText}`);
+
+                // Refresh data
+                await loadPositions();
+                await loadUserTrades();
+                updateUIForLoggedInUser();
+
+            } catch (error) {
+                console.error('Close position error:', error);
+                showToast('Error', error.message, true);
+            }
+        }
+
         // =============================================
         // PORTFOLIO FUNCTIONS
         // =============================================
@@ -4102,7 +4211,7 @@
             if (trades.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                        <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 20px;">
                             No orders yet. Start trading!
                         </td>
                     </tr>
@@ -4146,6 +4255,7 @@
                         <td class="order-price">$${parseFloat(total).toLocaleString()}</td>
                         <td class="${pnlClass}">${trade.side === 'BUY' ? pnlSign + '$' + pnl.toFixed(2) : '—'}</td>
                         <td><span class="order-status filled">FILLED</span></td>
+                        <td>${trade.side === 'BUY' ? `<button class="close-position-btn" onclick="closePosition(${trade.tea_id}, ${trade.quantity}, '${teaSymbol}')">Close</button>` : '—'}</td>
                     </tr>
                 `;
             });
