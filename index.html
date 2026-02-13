@@ -3507,6 +3507,7 @@
             await loadTeas();
             await loadLeaderboard();
             await loadUserTrades();
+            initPriceVolatility(); // Start random price updates
         });
 
         // =============================================
@@ -3709,9 +3710,53 @@
                 if (error) throw error;
                 teas = data;
                 populateTeaSelect();
+                updatePortfolioDisplay(); // Refresh portfolio with new prices
             } catch (error) {
                 console.error('Failed to load teas:', error);
             }
+        }
+
+        // Random price volatility system
+        async function triggerPriceUpdate() {
+            try {
+                const { error } = await supabaseClient.rpc('update_tea_prices');
+                if (error) throw error;
+                console.log('Prices updated');
+                await loadTeas(); // Reload prices after update
+            } catch (error) {
+                console.error('Failed to update prices:', error);
+            }
+        }
+
+        // Check if prices need updating and set up periodic updates
+        async function initPriceVolatility() {
+            // Check last update time
+            const { data: latestTea } = await supabaseClient
+                .from('teas')
+                .select('updated_at')
+                .order('updated_at', { ascending: false })
+                .limit(1)
+                .single();
+
+            const lastUpdate = latestTea?.updated_at ? new Date(latestTea.updated_at) : new Date(0);
+            const minutesSinceUpdate = (Date.now() - lastUpdate.getTime()) / 60000;
+
+            // If prices haven't been updated in 5+ minutes, update now
+            if (minutesSinceUpdate > 5) {
+                await triggerPriceUpdate();
+            }
+
+            // Set up random intervals for price updates (1-5 minutes)
+            schedulePriceUpdate();
+        }
+
+        function schedulePriceUpdate() {
+            // Random interval between 1 and 5 minutes
+            const interval = Math.floor(Math.random() * 240000) + 60000; // 60-300 seconds
+            setTimeout(async () => {
+                await triggerPriceUpdate();
+                schedulePriceUpdate(); // Schedule next update
+            }, interval);
         }
 
         function populateTeaSelect() {
@@ -4063,9 +4108,6 @@
             const tbody = document.getElementById('orders-tbody');
             const countEl = document.getElementById('order-count');
             
-            console.log('displayUserTrades called with', trades.length, 'trades');
-            console.log('tbody element:', tbody);
-            
             if (!tbody) return;
 
             countEl.textContent = trades.length;
@@ -4082,8 +4124,7 @@
             }
 
             let html = '';
-            trades.forEach((trade, idx) => {
-                console.log('Processing trade', idx, trade);
+            trades.forEach(trade => {
                 const time = trade.created_at 
                     ? new Date(trade.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
                     : '--:--';
@@ -4107,7 +4148,6 @@
                 `;
             });
 
-            console.log('Final html length:', html.length);
             tbody.innerHTML = html;
         }
 
