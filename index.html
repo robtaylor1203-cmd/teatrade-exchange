@@ -3980,16 +3980,22 @@
         // =============================================
 
         async function loadPositions() {
-            if (!currentUser) return;
+            if (!currentUser) {
+                console.log('loadPositions: No current user');
+                return;
+            }
 
             try {
+                console.log('loadPositions: Fetching for user', currentUser.id);
                 const { data, error } = await supabaseClient
                     .from('positions')
                     .select('*, teas(*)')
                     .eq('user_id', currentUser.id);
 
+                console.log('loadPositions: Result', { data, error });
                 if (error) throw error;
                 positions = data || [];
+                console.log('loadPositions: Positions set to', positions);
                 updatePortfolioDisplay();
             } catch (error) {
                 console.error('Failed to load positions:', error);
