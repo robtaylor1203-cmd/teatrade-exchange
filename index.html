@@ -1335,29 +1335,129 @@
             border: 1px solid var(--border);
             border-radius: 6px;
             margin-top: 4px;
-            max-height: 200px;
+            max-height: 350px;
             overflow-y: auto;
             display: none;
             z-index: 1000;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
         
+        .command-suggestions::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .command-suggestions::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 3px;
+        }
+        
+        .command-suggestions::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+            transition: background 0.2s;
+        }
+        
+        .command-suggestions::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-blue);
+        }
+        
         .command-suggestions.active {
             display: block;
         }
         
+        .search-category {
+            padding: 6px 12px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+        }
+        
         .command-suggestion {
-            padding: 8px 12px;
-            font-size: 11px;
+            padding: 10px 12px;
+            font-size: 12px;
             cursor: pointer;
             display: flex;
             justify-content: space-between;
             align-items: center;
             transition: background 0.1s;
+            gap: 12px;
         }
         
         .command-suggestion:hover, .command-suggestion.selected {
             background: var(--bg-tertiary);
+        }
+        
+        .search-result-info {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .search-result-symbol {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .search-result-symbol .origin {
+            color: var(--accent-blue);
+        }
+        
+        .search-result-name {
+            font-size: 11px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .search-result-price {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            font-size: 12px;
+            text-align: right;
+        }
+        
+        .search-result-price.up { color: var(--accent-green); }
+        .search-result-price.down { color: var(--accent-red); }
+        
+        .search-result-actions {
+            display: flex;
+            gap: 4px;
+        }
+        
+        .search-action-btn {
+            padding: 4px 8px;
+            font-size: 10px;
+            font-weight: 600;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        
+        .search-action-btn:hover {
+            opacity: 0.8;
+        }
+        
+        .search-action-btn.chart {
+            background: var(--accent-blue);
+            color: white;
+        }
+        
+        .search-action-btn.buy {
+            background: var(--accent-green);
+            color: white;
+        }
+        
+        .search-action-btn.sell {
+            background: var(--accent-red);
+            color: white;
         }
         
         .command-suggestion-cmd {
@@ -1550,32 +1650,33 @@
         
         .quick-quote-symbol {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 20px;
-            font-weight: 700;
+            font-size: 14px;
+            font-weight: 600;
             color: var(--text-primary);
         }
         
         .quick-quote-name {
-            font-size: 14px;
+            font-size: 12px;
             color: var(--text-muted);
+            font-weight: 400;
         }
         
         .quick-quote-price-info {
             display: flex;
             align-items: baseline;
-            gap: 12px;
+            gap: 8px;
         }
         
         .quick-quote-current-price {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 28px;
-            font-weight: 700;
+            font-size: 18px;
+            font-weight: 600;
         }
         
         .quick-quote-change {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 14px;
-            font-weight: 600;
+            font-size: 11px;
+            font-weight: 500;
         }
         
         .quick-quote-close {
@@ -1594,7 +1695,7 @@
         
         .quick-quote-body {
             display: grid;
-            grid-template-columns: 1fr 320px;
+            grid-template-columns: 1fr 260px;
             flex: 1;
             overflow: hidden;
         }
@@ -1635,36 +1736,40 @@
         
         .quick-stat-value {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 16px;
+            font-size: 13px;
             font-weight: 600;
             color: var(--text-primary);
         }
         
         .quick-stat-label {
-            font-size: 10px;
+            font-size: 9px;
             color: var(--text-muted);
             text-transform: uppercase;
             margin-top: 4px;
+            font-weight: 400;
         }
         
         .quick-quote-trade-panel {
             background: var(--bg-card);
             border-left: 1px solid var(--border);
-            padding: 20px;
+            padding: 16px;
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 12px;
+            width: 260px;
+            min-width: 260px;
+            max-width: 260px;
         }
         
         .quick-trade-type-toggle {
             display: flex;
-            gap: 8px;
+            gap: 6px;
         }
         
         .quick-trade-type-btn {
             flex: 1;
-            padding: 12px;
-            font-size: 14px;
+            padding: 10px;
+            font-size: 12px;
             font-weight: 600;
             border: none;
             border-radius: 6px;
@@ -1699,21 +1804,24 @@
         }
         
         .quick-trade-input-group label {
-            font-size: 11px;
+            font-size: 10px;
             color: var(--text-muted);
             text-transform: uppercase;
+            font-weight: 500;
         }
         
         .quick-trade-input {
             background: var(--bg-tertiary);
             border: 1px solid var(--border);
             border-radius: 6px;
-            padding: 12px;
+            padding: 10px;
             color: var(--text-primary);
             font-family: 'JetBrains Mono', monospace;
-            font-size: 16px;
+            font-size: 13px;
             -webkit-appearance: none;
             -moz-appearance: textfield;
+            width: 100%;
+            box-sizing: border-box;
         }
         
         .quick-trade-input::-webkit-outer-spin-button,
@@ -1817,8 +1925,8 @@
         }
         
         .quick-trade-execute {
-            padding: 14px;
-            font-size: 16px;
+            padding: 12px;
+            font-size: 13px;
             font-weight: 600;
             border: none;
             border-radius: 6px;
@@ -1841,6 +1949,291 @@
             transform: translateY(-1px);
         }
         
+        /* Quick Quote Chart Toolbar */
+        .qq-chart-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: var(--bg-card);
+            border-radius: 8px;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .qq-timeframe-selector {
+            display: flex;
+            gap: 4px;
+        }
+        
+        .qq-tf-btn {
+            padding: 6px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .qq-tf-btn:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+        
+        .qq-tf-btn.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
+        }
+        
+        .qq-indicator-toggle {
+            display: flex;
+            gap: 6px;
+        }
+        
+        .qq-indicator-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 5px 10px;
+            font-size: 10px;
+            font-weight: 600;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .qq-indicator-btn:hover {
+            background: var(--bg-secondary);
+        }
+        
+        .qq-indicator-btn.active {
+            background: var(--bg-secondary);
+            border-color: var(--accent-blue);
+            color: var(--text-primary);
+        }
+        
+        .indicator-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        
+        .indicator-dot.sma { background: #f59e0b; }
+        .indicator-dot.ema { background: #8b5cf6; }
+        .indicator-dot.bollinger { background: #3b82f6; }
+        
+        .qq-chart-type-toggle {
+            display: flex;
+            gap: 4px;
+        }
+        
+        .qq-chart-type-btn {
+            padding: 6px 10px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .qq-chart-type-btn:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+        
+        .qq-chart-type-btn.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
+        }
+        
+        /* Open Positions in Modal */
+        .qq-open-positions {
+            display: none;
+        }
+        
+        .qq-open-positions.has-positions {
+            display: block;
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 12px;
+        }
+        
+        .qq-positions-header {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        
+        .qq-position-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 10px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            margin-bottom: 6px;
+        }
+        
+        .qq-position-row:last-child {
+            margin-bottom: 0;
+        }
+        
+        .qq-position-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .qq-position-side {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 3px 6px;
+            border-radius: 3px;
+        }
+        
+        .qq-position-side.buy {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--accent-green);
+        }
+        
+        .qq-position-side.sell {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--accent-red);
+        }
+        
+        .qq-position-details {
+            font-size: 12px;
+        }
+        
+        .qq-position-qty {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-primary);
+        }
+        
+        .qq-position-entry {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        
+        .qq-position-pnl {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        
+        .qq-position-pnl.profit { color: var(--accent-green); }
+        .qq-position-pnl.loss { color: var(--accent-red); }
+        
+        /* SL/TP Section in Modal */
+        .qq-sltp-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .qq-sltp-group label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+        
+        .qq-sltp-group .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        
+        .qq-sltp-group .dot.sl { background: var(--accent-red); }
+        .qq-sltp-group .dot.tp { background: var(--accent-green); }
+        
+        /* Trade Annotations on Chart */
+        .qq-trade-annotations {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+        }
+        
+        .qq-trade-annotation {
+            position: absolute;
+            right: 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+        }
+        
+        .qq-trade-annotation.entry {
+            background: rgba(59, 130, 246, 0.9);
+            color: white;
+        }
+        
+        .qq-trade-annotation.sl {
+            background: rgba(239, 68, 68, 0.9);
+            color: white;
+        }
+        
+        .qq-trade-annotation.tp {
+            background: rgba(16, 185, 129, 0.9);
+            color: white;
+        }
+        
+        /* Price Animation */
+        .qq-price-flash {
+            animation: priceFlash 0.5s ease;
+        }
+        
+        @keyframes priceFlash {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .qq-price-up {
+            animation: priceUp 0.3s ease;
+        }
+        
+        .qq-price-down {
+            animation: priceDown 0.3s ease;
+        }
+        
+        @keyframes priceUp {
+            0% { background: transparent; }
+            50% { background: rgba(16, 185, 129, 0.3); }
+            100% { background: transparent; }
+        }
+        
+        @keyframes priceDown {
+            0% { background: transparent; }
+            50% { background: rgba(239, 68, 68, 0.3); }
+            100% { background: transparent; }
+        }
+        
         @media (max-width: 900px) {
             .quick-quote-body {
                 grid-template-columns: 1fr;
@@ -1848,6 +2241,305 @@
             .quick-quote-trade-panel {
                 border-left: none;
                 border-top: 1px solid var(--border);
+            }
+            .qq-chart-toolbar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+        
+        /* Multi-Chart Dashboard Modal */
+        .multi-chart-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 10000;
+            padding: 20px;
+        }
+        
+        .multi-chart-modal-overlay.active {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .multi-chart-modal {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .multi-chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .multi-chart-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .multi-chart-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .mc-add-chart-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background: var(--accent-blue);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .mc-add-chart-btn:hover {
+            background: #2563eb;
+        }
+        
+        .multi-chart-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 28px;
+            cursor: pointer;
+            padding: 0 8px;
+            line-height: 1;
+        }
+        
+        .multi-chart-close:hover {
+            color: var(--text-primary);
+        }
+        
+        .multi-chart-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 8px;
+            padding: 8px;
+            overflow: hidden;
+        }
+        
+        .multi-chart-grid.single {
+            grid-template-columns: 1fr;
+            grid-template-rows: 1fr;
+        }
+        
+        .multi-chart-grid.double {
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: 1fr;
+        }
+        
+        .multi-chart-grid.triple {
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+        }
+        
+        .mc-chart-panel {
+            background: var(--bg-card);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+            transition: border-color 0.2s;
+        }
+        
+        .mc-chart-panel:hover {
+            border-color: var(--border-light);
+        }
+        
+        .mc-chart-panel.empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        
+        .mc-empty-placeholder {
+            text-align: center;
+            color: var(--text-muted);
+        }
+        
+        .mc-empty-placeholder svg {
+            margin-bottom: 8px;
+            opacity: 0.5;
+        }
+        
+        .mc-empty-placeholder span {
+            font-size: 12px;
+        }
+        
+        .mc-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .mc-panel-symbol {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .mc-panel-symbol-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            font-size: 13px;
+        }
+        
+        .mc-panel-price {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+        }
+        
+        .mc-panel-price.up { color: var(--accent-green); }
+        .mc-panel-price.down { color: var(--accent-red); }
+        
+        .mc-panel-actions {
+            display: flex;
+            gap: 6px;
+        }
+        
+        .mc-panel-btn {
+            padding: 4px 8px;
+            font-size: 10px;
+            font-weight: 600;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .mc-panel-btn.trade {
+            background: var(--accent-blue);
+            color: white;
+        }
+        
+        .mc-panel-btn.close {
+            background: var(--bg-tertiary);
+            color: var(--text-muted);
+        }
+        
+        .mc-panel-btn:hover {
+            opacity: 0.8;
+        }
+        
+        .mc-panel-chart {
+            flex: 1;
+            position: relative;
+            min-height: 120px;
+        }
+        
+        .mc-panel-chart canvas {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .mc-resize-handle {
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            width: 16px;
+            height: 16px;
+            cursor: se-resize;
+            opacity: 0.3;
+            transition: opacity 0.2s;
+        }
+        
+        .mc-resize-handle:hover {
+            opacity: 0.7;
+        }
+        
+        .mc-resize-handle svg {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Tea Selector for Multi-Chart */
+        .mc-tea-selector {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            width: 280px;
+            max-height: 300px;
+            z-index: 100;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+        
+        .mc-tea-selector-header {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        
+        .mc-tea-selector-list {
+            max-height: 220px;
+            overflow-y: auto;
+        }
+        
+        .mc-tea-option {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .mc-tea-option:hover {
+            background: var(--bg-tertiary);
+        }
+        
+        .mc-tea-option-symbol {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        
+        .mc-tea-option-price {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+        }
+        
+        @media (max-width: 768px) {
+            .multi-chart-grid {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto;
             }
         }
         
@@ -2330,6 +3022,9 @@
             font-family: 'JetBrains Mono', monospace;
             font-weight: 600;
             font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .pair-symbol .base {
@@ -2338,6 +3033,24 @@
 
         .pair-symbol .quote {
             color: var(--accent-red);
+        }
+        
+        .index-badge {
+            font-size: 8px;
+            font-weight: 700;
+            background: var(--accent-purple);
+            color: white;
+            padding: 2px 4px;
+            border-radius: 3px;
+            letter-spacing: 0.5px;
+        }
+        
+        .index-pair-row {
+            background: rgba(147, 51, 234, 0.05);
+        }
+        
+        .index-pair-row:hover td {
+            background: rgba(147, 51, 234, 0.1) !important;
         }
         
         /* Pairs table price cells - no flex, simple display */
@@ -4315,6 +5028,42 @@
             </div>
             <div class="quick-quote-body">
                 <div class="quick-quote-chart-area">
+                    <div class="qq-chart-toolbar">
+                        <div class="qq-timeframe-selector">
+                            <button class="qq-tf-btn" data-tf="1H" onclick="setQQTimeframe('1H')">1H</button>
+                            <button class="qq-tf-btn active" data-tf="1D" onclick="setQQTimeframe('1D')">1D</button>
+                            <button class="qq-tf-btn" data-tf="1W" onclick="setQQTimeframe('1W')">1W</button>
+                            <button class="qq-tf-btn" data-tf="1M" onclick="setQQTimeframe('1M')">1M</button>
+                        </div>
+                        <div class="qq-indicator-toggle">
+                            <button class="qq-indicator-btn" data-ind="sma" onclick="toggleQQIndicator('sma')">
+                                <span class="indicator-dot sma"></span>SMA
+                            </button>
+                            <button class="qq-indicator-btn" data-ind="ema" onclick="toggleQQIndicator('ema')">
+                                <span class="indicator-dot ema"></span>EMA
+                            </button>
+                            <button class="qq-indicator-btn" data-ind="bollinger" onclick="toggleQQIndicator('bollinger')">
+                                <span class="indicator-dot bollinger"></span>BB
+                            </button>
+                        </div>
+                        <div class="qq-chart-type-toggle">
+                            <button class="qq-chart-type-btn active" data-type="line" onclick="setQQChartType('line')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="2,18 8,12 14,16 22,6"></polyline>
+                                </svg>
+                            </button>
+                            <button class="qq-chart-type-btn" data-type="candle" onclick="setQQChartType('candle')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="6" y="8" width="4" height="8"></rect>
+                                    <line x1="8" y1="4" x2="8" y2="8"></line>
+                                    <line x1="8" y1="16" x2="8" y2="20"></line>
+                                    <rect x="14" y="10" width="4" height="6"></rect>
+                                    <line x1="16" y1="6" x2="16" y2="10"></line>
+                                    <line x1="16" y1="16" x2="16" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
                     <div class="quick-quote-chart">
                         <canvas id="qq-chart"></canvas>
                         <div class="qq-crosshair" id="qq-crosshair">
@@ -4322,6 +5071,7 @@
                             <div class="qq-crosshair-h"></div>
                         </div>
                         <div class="qq-tooltip" id="qq-tooltip"></div>
+                        <div class="qq-trade-annotations" id="qq-trade-annotations"></div>
                     </div>
                     <div class="quick-quote-stats">
                         <div class="quick-stat">
@@ -4341,6 +5091,7 @@
                             <div class="quick-stat-label">Avg Price</div>
                         </div>
                     </div>
+                    <div class="qq-open-positions" id="qq-open-positions"></div>
                 </div>
                 <div class="quick-quote-trade-panel">
                     <div class="quick-trade-type-toggle">
@@ -4354,6 +5105,16 @@
                     <div class="quick-trade-input-group">
                         <label>Price ($/kg)</label>
                         <input type="number" class="quick-trade-input" id="qq-trade-price" readonly>
+                    </div>
+                    <div class="qq-sltp-section">
+                        <div class="qq-sltp-group">
+                            <label><span class="dot sl"></span>Stop Loss</label>
+                            <input type="number" class="quick-trade-input" id="qq-sl" placeholder="0.00" step="0.01">
+                        </div>
+                        <div class="qq-sltp-group">
+                            <label><span class="dot tp"></span>Take Profit</label>
+                            <input type="number" class="quick-trade-input" id="qq-tp" placeholder="0.00" step="0.01">
+                        </div>
                     </div>
                     <div class="quick-trade-summary">
                         <div class="quick-trade-summary-row">
@@ -4371,6 +5132,36 @@
                     </div>
                     <button class="quick-trade-execute buy" id="qq-execute-btn" onclick="executeQuickTrade()">BUY 100 kg</button>
                 </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Multi-Chart Dashboard Modal -->
+    <div class="multi-chart-modal-overlay" id="multi-chart-modal">
+        <div class="multi-chart-modal">
+            <div class="multi-chart-header">
+                <div class="multi-chart-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    Multi-Chart Dashboard
+                </div>
+                <div class="multi-chart-actions">
+                    <button class="mc-add-chart-btn" onclick="addMultiChart()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Add Chart
+                    </button>
+                    <button class="multi-chart-close" onclick="closeMultiChartModal()">&times;</button>
+                </div>
+            </div>
+            <div class="multi-chart-grid" id="multi-chart-grid">
+                <!-- Charts will be dynamically added here -->
             </div>
         </div>
     </div>
@@ -4425,17 +5216,14 @@
         </div>
         <div class="command-line-container">
             <span class="command-line-icon">⌘</span>
-            <input type="text" class="command-line" id="command-line" placeholder="Type command... (BP1, NEWS, BUY 50)" autocomplete="off">
+            <input type="text" class="command-line" id="command-line" placeholder="Search teas, pairs, indexes... (press /)" autocomplete="off">
             <div class="command-suggestions" id="command-suggestions"></div>
         </div>
         <nav class="nav-links">
             <a href="#" class="active">Markets</a>
             <a href="#">Auctions</a>
+            <a href="#" onclick="openMultiChartModal(); return false;">Dashboard</a>
             <a href="#">Analytics</a>
-            <a href="#">Grades</a>
-            <a href="#">Buyers</a>
-            <a href="#">Sellers</a>
-            <a href="#">Reports</a>
         </nav>
         <div class="user-section">
             <div class="market-status" id="market-status">
@@ -4588,46 +5376,7 @@
                     <button class="watchlist-tab" onclick="switchWatchlistTab('macro')">Macro</button>
                 </div>
                 <div id="watchlist-teas">
-                <div class="watchlist-item">
-                    <div>
-                        <div class="watchlist-name">Darjeeling FTGFOP1</div>
-                        <div class="watchlist-grade">First Flush • Goomtee</div>
-                    </div>
-                    <div class="watchlist-price">
-                        <div class="watchlist-value">₹1,845</div>
-                        <div class="watchlist-change up">+8.2%</div>
-                    </div>
-                </div>
-                <div class="watchlist-item">
-                    <div>
-                        <div class="watchlist-name">Assam CTC BP</div>
-                        <div class="watchlist-grade">Dikom Estate</div>
-                    </div>
-                    <div class="watchlist-price">
-                        <div class="watchlist-value">₹298</div>
-                        <div class="watchlist-change down">-1.4%</div>
-                    </div>
-                </div>
-                <div class="watchlist-item">
-                    <div>
-                        <div class="watchlist-name">Kenyan BOPF</div>
-                        <div class="watchlist-grade">Kericho Highlands</div>
-                    </div>
-                    <div class="watchlist-price">
-                        <div class="watchlist-value">$3.12</div>
-                        <div class="watchlist-change up">+2.8%</div>
-                    </div>
-                </div>
-                <div class="watchlist-item">
-                    <div>
-                        <div class="watchlist-name">Ceylon OP1</div>
-                        <div class="watchlist-grade">Nuwara Eliya</div>
-                    </div>
-                    <div class="watchlist-price">
-                        <div class="watchlist-value">LKR 1,420</div>
-                        <div class="watchlist-change up">+4.1%</div>
-                    </div>
-                </div>
+                <!-- Dynamically populated -->
                 </div>
                 <div id="watchlist-macro" style="display: none;">
                     <div class="macro-item">
@@ -5602,6 +6351,54 @@
             teaHistoricalData[symbol] = data;
             return data;
         }
+        
+        // Generate historical data for a regional index
+        function generateIndexHistoricalData(indexSymbol) {
+            const cacheKey = `INDEX_${indexSymbol}`;
+            if (teaHistoricalData[cacheKey]) return teaHistoricalData[cacheKey];
+            
+            const indexes = calculateRegionalIndexes();
+            const idx = indexes.find(i => i.symbol === indexSymbol);
+            if (!idx) return [];
+            
+            const currentPrice = idx.price;
+            const change = idx.change || 0;
+            const volatility = Math.abs(change) / 100 + 0.015; // Indexes are slightly less volatile
+            
+            // Generate historical data (30 days hourly = 720 points)
+            const data = [];
+            const points = 720;
+            const now = new Date();
+            
+            let price = currentPrice;
+            for (let i = points - 1; i >= 0; i--) {
+                const date = new Date(now);
+                date.setHours(date.getHours() - i);
+                
+                const trendBias = i < 24 ? (change / 100) / 24 : 0;
+                const noise = (Math.random() - 0.5) * volatility * currentPrice;
+                
+                const open = price;
+                price = Math.max(currentPrice * 0.85, Math.min(currentPrice * 1.15, price + noise + trendBias * currentPrice));
+                const close = i === 0 ? currentPrice : price;
+                const high = Math.max(open, close) * (1 + Math.random() * 0.008);
+                const low = Math.min(open, close) * (1 - Math.random() * 0.008);
+                const volume = Math.round(100000 + Math.random() * 500000);
+                
+                data.push({
+                    date: date,
+                    open: open,
+                    high: high,
+                    low: low,
+                    close: close,
+                    volume: volume,
+                    change: ((close - open) / open * 100)
+                });
+            }
+            
+            teaHistoricalData[cacheKey] = data;
+            return data;
+        }
         let chartMetrics = {};
         let cachedTimeframe = null; // Track which timeframe data was generated for
         const leftMargin = 50;
@@ -5714,22 +6511,25 @@
                 return generateDefaultChartData(config, timeframe);
             }
             
+            // Include extra points for indicator warm-up (BB needs 20 periods)
+            const warmupPeriod = 25;
             let sampledData = [];
             if (timeframe === '1D') {
-                sampledData = fullHistory.slice(-24); // Last 24 hours
+                sampledData = fullHistory.slice(-(24 + warmupPeriod)); // Extra for BB warm-up
             } else if (timeframe === '1W') {
-                // Sample every 4 hours for a week
-                const startIndex = Math.max(0, fullHistory.length - 168);
+                // Sample every 4 hours for a week, with extra warm-up
+                const startIndex = Math.max(0, fullHistory.length - (168 + warmupPeriod * 4));
                 for (let i = startIndex; i < fullHistory.length; i += 4) {
                     sampledData.push(fullHistory[i]);
                 }
             } else if (timeframe === '1M') {
-                // Sample every 24 hours for a month
-                for (let i = 0; i < fullHistory.length; i += 24) {
+                // Sample every 24 hours for a month, with warm-up
+                const startIndex = Math.max(0, fullHistory.length - (720 + warmupPeriod * 24));
+                for (let i = startIndex; i < fullHistory.length; i += 24) {
                     sampledData.push(fullHistory[i]);
                 }
             } else {
-                sampledData = fullHistory.slice(-config.points);
+                sampledData = fullHistory.slice(-(config.points + warmupPeriod));
             }
             
             return sampledData.length > 0 ? sampledData : generateDefaultChartData(config, timeframe);
@@ -7079,6 +7879,7 @@
                 updatePairsTable(); // Update pairs with new ratios
                 updatePortfolioDisplay(); // Refresh portfolio with new prices
                 updateQuoteBoard(); // Update flash quote board
+                updateWatchlistTeas(); // Update watchlist with live prices
             } catch (error) {
                 console.error('Failed to load teas:', error);
             }
@@ -7364,6 +8165,48 @@
                 }
             });
         });
+        
+        // Update watchlist with live tea data
+        function updateWatchlistTeas() {
+            const container = document.getElementById('watchlist-teas');
+            if (!container || !teas || teas.length === 0) return;
+            
+            // Show top 5 teas with most volume/activity (or just first 5)
+            const watchlistTeas = teas.slice(0, 5);
+            
+            let html = '';
+            watchlistTeas.forEach(tea => {
+                const change = tea.previous_price > 0 
+                    ? ((tea.current_price - tea.previous_price) / tea.previous_price) * 100 
+                    : (tea.price_change_24h || 0);
+                const isUp = change >= 0;
+                const shortSymbol = tea.symbol.split('-')[1] || tea.symbol;
+                const origin = tea.symbol.split('-')[0] || '';
+                
+                html += `
+                    <div class="watchlist-item" onclick="openWatchlistChart('${tea.symbol}')" data-symbol="${tea.symbol}">
+                        <div>
+                            <div class="watchlist-name">${tea.name || shortSymbol}</div>
+                            <div class="watchlist-grade">${origin} ${tea.grade || shortSymbol}</div>
+                        </div>
+                        <div class="watchlist-price">
+                            <div class="watchlist-value">$${tea.current_price.toFixed(2)}</div>
+                            <div class="watchlist-change ${isUp ? 'up' : 'down'}">${isUp ? '+' : ''}${change.toFixed(1)}%</div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        // Open chart modal from watchlist click
+        function openWatchlistChart(symbol) {
+            const tea = teas.find(t => t.symbol === symbol);
+            if (tea) {
+                openQuickQuoteModal(tea);
+            }
+        }
 
         function populateTeaSelect() {
             const select = document.getElementById('trade-tea-select');
@@ -7391,6 +8234,9 @@
             
             select.innerHTML = '<option value="">Select Tea...</option>';
             
+            // Add teas
+            const teaOptgroup = document.createElement('optgroup');
+            teaOptgroup.label = 'Teas';
             teas.forEach(tea => {
                 const change = tea.previous_price ? ((tea.current_price - tea.previous_price) / tea.previous_price * 100).toFixed(1) : '0.0';
                 const changeSign = change >= 0 ? '+' : '';
@@ -7398,8 +8244,27 @@
                 option.value = tea.id;
                 option.textContent = `${tea.symbol} - $${tea.current_price.toFixed(2)} (${changeSign}${change}%)`;
                 option.dataset.price = tea.current_price;
-                select.appendChild(option);
+                option.dataset.type = 'tea';
+                teaOptgroup.appendChild(option);
             });
+            select.appendChild(teaOptgroup);
+            
+            // Add regional indexes
+            const indexes = calculateRegionalIndexes();
+            if (indexes && indexes.length > 0) {
+                const indexOptgroup = document.createElement('optgroup');
+                indexOptgroup.label = 'Indexes';
+                indexes.forEach(idx => {
+                    const changeSign = idx.change >= 0 ? '+' : '';
+                    const option = document.createElement('option');
+                    option.value = `INDEX_${idx.symbol}`;
+                    option.textContent = `${idx.symbol} Index - $${idx.price.toFixed(2)} (${changeSign}${idx.change.toFixed(1)}%)`;
+                    option.dataset.price = idx.price;
+                    option.dataset.type = 'index';
+                    indexOptgroup.appendChild(option);
+                });
+                select.appendChild(indexOptgroup);
+            }
             
             // Restore selection if it still exists
             if (currentValue) {
@@ -7485,14 +8350,23 @@
                 btn.textContent = `BUY ${qty.toLocaleString()} kg for $${total.toFixed(2)}`;
             } else {
                 // Check if user has enough to sell
-                const teaId = parseInt(select.value);
-                const position = positions.find(p => p.tea_id === teaId);
-                if (!position || position.quantity < qty) {
-                    btn.textContent = 'Insufficient Holdings';
-                    btn.disabled = true;
-                    return;
+                // Handle both tea IDs and index symbols
+                const selectValue = select.value;
+                const isIndex = selectValue.startsWith('INDEX_');
+                
+                if (isIndex) {
+                    // For indexes, we don't track holdings - allow sell if balance allows
+                    btn.textContent = `SELL ${qty.toLocaleString()} kg for $${total.toFixed(2)}`;
+                } else {
+                    const teaId = parseInt(selectValue);
+                    const position = positions.find(p => p.tea_id === teaId);
+                    if (!position || position.quantity < qty) {
+                        btn.textContent = 'Insufficient Holdings';
+                        btn.disabled = true;
+                        return;
+                    }
+                    btn.textContent = `SELL ${qty.toLocaleString()} kg for $${total.toFixed(2)}`;
                 }
-                btn.textContent = `SELL ${qty.toLocaleString()} kg for $${total.toFixed(2)}`;
             }
             btn.disabled = false;
         }
@@ -8468,31 +9342,85 @@
         }
 
         // =============================================
-        // COMMAND LINE FUNCTIONS
+        // COMMAND LINE / UNIVERSAL SEARCH
         // =============================================
 
         const commandAliases = {
-            // Tea symbols
-            'BP1': { action: 'selectTea', symbol: 'KEN-BP1', desc: 'Kenya BP1' },
-            'PF1': { action: 'selectTea', symbol: 'KEN-PF1', desc: 'Kenya PF1' },
-            'DUST': { action: 'selectTea', symbol: 'KEN-DUST', desc: 'Kenya Dust' },
-            'YUN': { action: 'selectTea', symbol: 'CHN-YUN', desc: 'Yunnan Gold' },
-            'DRJ': { action: 'selectTea', symbol: 'IND-DRJ', desc: 'Darjeeling First Flush' },
-            'ASM': { action: 'selectTea', symbol: 'IND-ASM', desc: 'Assam Orthodox' },
-            'BOP': { action: 'selectTea', symbol: 'SRI-BOP', desc: 'Ceylon BOP' },
-            'PEK': { action: 'selectTea', symbol: 'SRI-PEK', desc: 'Ceylon Pekoe' },
             // Commands
             'NEWS': { action: 'scrollTo', target: 'news', desc: 'Jump to News' },
             'CHART': { action: 'scrollTo', target: 'chart', desc: 'Jump to Chart' },
             'ORDERS': { action: 'scrollTo', target: 'orders', desc: 'View Orders' },
             'PORTFOLIO': { action: 'showPortfolio', desc: 'Show Portfolio' },
             'HISTORY': { action: 'showHistory', desc: 'Trade History' },
-            'MACRO': { action: 'showMacro', desc: 'Macro Indicators' },
-            'LONG': { action: 'setTradeType', type: 'long', desc: 'Set Long Position' },
-            'SHORT': { action: 'setTradeType', type: 'short', desc: 'Set Short Position' },
+            'PAIRS': { action: 'showPairs', desc: 'View Tea Pairs' },
+            'SINGLES': { action: 'showSingles', desc: 'View Single Teas' },
             'MAX': { action: 'maximizeChart', desc: 'Maximize Chart' },
             'CLEAR': { action: 'clearCommand', desc: 'Clear Input' },
         };
+
+        // Regional Indexes calculated from tea prices
+        function calculateRegionalIndexes() {
+            if (!teas.length) return [];
+            
+            const teaMap = {};
+            teas.forEach(tea => teaMap[tea.symbol] = tea);
+            
+            const indexes = [
+                { 
+                    symbol: 'KENYA', 
+                    name: 'Kenya Tea Index',
+                    teas: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST'],
+                    color: 'var(--accent-green)'
+                },
+                { 
+                    symbol: 'INDIA', 
+                    name: 'India Tea Index',
+                    teas: ['IND-ASM', 'IND-DRJ'],
+                    color: 'var(--accent-orange)'
+                },
+                { 
+                    symbol: 'CEYLON', 
+                    name: 'Ceylon Tea Index',
+                    teas: ['SRI-BOP', 'SRI-PEK'],
+                    color: 'var(--accent-purple)'
+                },
+                { 
+                    symbol: 'CHINA', 
+                    name: 'China Tea Index',
+                    teas: ['CHN-YUN'],
+                    color: 'var(--accent-red)'
+                },
+                { 
+                    symbol: 'AFRICA', 
+                    name: 'African Tea Index',
+                    teas: ['KEN-BP1', 'KEN-PF1', 'MLW-BP1', 'RWA-OP'],
+                    color: 'var(--accent-green)'
+                },
+                { 
+                    symbol: 'ASIA', 
+                    name: 'Asian Tea Index',
+                    teas: ['IND-ASM', 'IND-DRJ', 'SRI-BOP', 'SRI-PEK', 'CHN-YUN'],
+                    color: 'var(--accent-blue)'
+                }
+            ];
+            
+            return indexes.map(idx => {
+                const prices = idx.teas.map(s => teaMap[s]?.current_price || 0).filter(p => p > 0);
+                const prevPrices = idx.teas.map(s => teaMap[s]?.previous_price || 0).filter(p => p > 0);
+                
+                const avgPrice = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
+                const avgPrevPrice = prevPrices.length > 0 ? prevPrices.reduce((a, b) => a + b, 0) / prevPrices.length : avgPrice;
+                const change = avgPrevPrice > 0 ? ((avgPrice - avgPrevPrice) / avgPrevPrice) * 100 : 0;
+                
+                return {
+                    ...idx,
+                    price: avgPrice,
+                    previousPrice: avgPrevPrice,
+                    change: change,
+                    isIndex: true
+                };
+            });
+        }
 
         function initCommandLine() {
             const input = document.getElementById('command-line');
@@ -8501,51 +9429,137 @@
             if (!input) return;
 
             input.addEventListener('input', (e) => {
-                const val = e.target.value.toUpperCase().trim();
+                const val = e.target.value.trim();
+                const valUpper = val.toUpperCase();
+                
                 if (val.length === 0) {
                     suggestions.classList.remove('active');
                     return;
                 }
                 
-                // Find matching commands
-                const matches = [];
+                let html = '';
                 
-                // Check for BUY/SELL commands
-                if (val.startsWith('BUY ') || val.startsWith('SELL ')) {
-                    const parts = val.split(' ');
-                    const qty = parts[1] || '';
-                    matches.push({
-                        cmd: val,
-                        desc: `${parts[0]} ${qty || '?'} lots of selected tea`
+                // Search teas
+                const teaMatches = teas.filter(tea => {
+                    const searchStr = `${tea.symbol} ${tea.name || ''} ${tea.grade || ''}`.toUpperCase();
+                    return searchStr.includes(valUpper);
+                }).slice(0, 4);
+                
+                if (teaMatches.length > 0) {
+                    html += '<div class="search-category">Teas</div>';
+                    teaMatches.forEach(tea => {
+                        const change = tea.previous_price > 0 ? 
+                            ((tea.current_price - tea.previous_price) / tea.previous_price) * 100 : 0;
+                        const changeClass = change >= 0 ? 'up' : 'down';
+                        const changeStr = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+                        const shortSymbol = tea.symbol.split('-')[1] || tea.symbol;
+                        const origin = tea.symbol.split('-')[0] || '';
+                        
+                        html += `
+                            <div class="command-suggestion" data-type="tea" data-symbol="${tea.symbol}">
+                                <div class="search-result-info">
+                                    <span class="search-result-symbol"><span class="origin">${origin}</span> ${shortSymbol}</span>
+                                    <span class="search-result-name">${tea.name || tea.symbol}</span>
+                                </div>
+                                <span class="search-result-price ${changeClass}">$${tea.current_price.toFixed(2)} <small>${changeStr}</small></span>
+                                <div class="search-result-actions">
+                                    <button class="search-action-btn chart" onclick="event.stopPropagation(); openTeaChart('${tea.symbol}')">Chart</button>
+                                    <button class="search-action-btn buy" onclick="event.stopPropagation(); quickTrade('${tea.symbol}', 'BUY')">Buy</button>
+                                    <button class="search-action-btn sell" onclick="event.stopPropagation(); quickTrade('${tea.symbol}', 'SELL')">Sell</button>
+                                </div>
+                            </div>
+                        `;
                     });
                 }
                 
-                // Check for tea symbols and commands
-                Object.keys(commandAliases).forEach(key => {
-                    if (key.includes(val) || val.includes(key)) {
-                        matches.push({
-                            cmd: key,
-                            desc: commandAliases[key].desc
+                // Search indexes
+                const indexes = calculateRegionalIndexes();
+                const indexMatches = indexes.filter(idx => 
+                    idx.symbol.includes(valUpper) || idx.name.toUpperCase().includes(valUpper)
+                ).slice(0, 3);
+                
+                if (indexMatches.length > 0) {
+                    html += '<div class="search-category">Indexes</div>';
+                    indexMatches.forEach(idx => {
+                        const changeClass = idx.change >= 0 ? 'up' : 'down';
+                        const changeStr = `${idx.change >= 0 ? '+' : ''}${idx.change.toFixed(2)}%`;
+                        
+                        html += `
+                            <div class="command-suggestion" data-type="index" data-symbol="${idx.symbol}">
+                                <div class="search-result-info">
+                                    <span class="search-result-symbol" style="color: ${idx.color};">${idx.symbol}</span>
+                                    <span class="search-result-name">${idx.name}</span>
+                                </div>
+                                <span class="search-result-price ${changeClass}">$${idx.price.toFixed(2)} <small>${changeStr}</small></span>
+                                <div class="search-result-actions">
+                                    <button class="search-action-btn chart" onclick="event.stopPropagation(); openIndexChart('${idx.symbol}')">Chart</button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+                
+                // Search pairs
+                if (teaPairs.length > 0) {
+                    const pairMatches = teaPairs.filter(pair => {
+                        const pairStr = `${pair.base_symbol}/${pair.quote_symbol}`.toUpperCase();
+                        return pairStr.includes(valUpper);
+                    }).slice(0, 3);
+                    
+                    if (pairMatches.length > 0) {
+                        html += '<div class="search-category">Pairs</div>';
+                        pairMatches.forEach(pair => {
+                            const baseShort = pair.base_symbol.split('-')[1] || pair.base_symbol;
+                            const quoteShort = pair.quote_symbol.split('-')[1] || pair.quote_symbol;
+                            
+                            html += `
+                                <div class="command-suggestion" data-type="pair" data-id="${pair.id}">
+                                    <div class="search-result-info">
+                                        <span class="search-result-symbol"><span style="color: var(--accent-green);">${baseShort}</span>/<span style="color: var(--accent-red);">${quoteShort}</span></span>
+                                        <span class="search-result-name">Tea Pair</span>
+                                    </div>
+                                    <div class="search-result-actions">
+                                        <button class="search-action-btn buy" onclick="event.stopPropagation(); openPairsModal('${pair.id}', 'LONG')">Long</button>
+                                        <button class="search-action-btn sell" onclick="event.stopPropagation(); openPairsModal('${pair.id}', 'SHORT')">Short</button>
+                                    </div>
+                                </div>
+                            `;
                         });
                     }
-                });
+                }
                 
-                if (matches.length > 0) {
-                    suggestions.innerHTML = matches.slice(0, 6).map((m, i) => `
-                        <div class="command-suggestion ${i === 0 ? 'selected' : ''}" data-cmd="${m.cmd}">
-                            <span class="command-suggestion-cmd">${m.cmd}</span>
-                            <span class="command-suggestion-desc">${m.desc}</span>
-                        </div>
-                    `).join('');
+                // Search commands
+                const cmdMatches = Object.entries(commandAliases)
+                    .filter(([key]) => key.includes(valUpper))
+                    .slice(0, 3);
+                
+                if (cmdMatches.length > 0) {
+                    html += '<div class="search-category">Commands</div>';
+                    cmdMatches.forEach(([key, data]) => {
+                        html += `
+                            <div class="command-suggestion" data-type="command" data-cmd="${key}">
+                                <span class="command-suggestion-cmd">${key}</span>
+                                <span class="command-suggestion-desc">${data.desc}</span>
+                            </div>
+                        `;
+                    });
+                }
+                
+                if (html) {
+                    suggestions.innerHTML = html;
                     suggestions.classList.add('active');
                 } else {
-                    suggestions.classList.remove('active');
+                    suggestions.innerHTML = '<div class="search-category">No results found</div>';
+                    suggestions.classList.add('active');
                 }
             });
 
             input.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
-                    executeCommand(input.value);
+                    const firstResult = suggestions.querySelector('.command-suggestion');
+                    if (firstResult) {
+                        handleSearchResult(firstResult);
+                    }
                     input.value = '';
                     suggestions.classList.remove('active');
                 } else if (e.key === 'Escape') {
@@ -8559,11 +9573,25 @@
             suggestions.addEventListener('click', (e) => {
                 const item = e.target.closest('.command-suggestion');
                 if (item) {
-                    input.value = item.dataset.cmd;
-                    executeCommand(input.value);
+                    handleSearchResult(item);
                     input.value = '';
                     suggestions.classList.remove('active');
                 }
+            });
+            
+            // Close on click outside
+            document.addEventListener('click', (e) => {
+                const commandWrapper = input.closest('.command-line-wrapper');
+                if (commandWrapper && !commandWrapper.contains(e.target)) {
+                    suggestions.classList.remove('active');
+                }
+            });
+            
+            // Close on blur (after short delay to allow clicks)
+            input.addEventListener('blur', () => {
+                setTimeout(() => {
+                    suggestions.classList.remove('active');
+                }, 150);
             });
 
             // Global keyboard shortcut
@@ -8573,6 +9601,164 @@
                     input.focus();
                 }
             });
+        }
+        
+        function handleSearchResult(item) {
+            const type = item.dataset.type;
+            
+            switch (type) {
+                case 'tea':
+                    openTeaChart(item.dataset.symbol);
+                    break;
+                case 'index':
+                    openIndexChart(item.dataset.symbol);
+                    break;
+                case 'pair':
+                    openPairsModal(item.dataset.id, 'LONG');
+                    break;
+                case 'command':
+                    executeCommand(item.dataset.cmd);
+                    break;
+            }
+        }
+        
+        // Open full chart for a tea (opens modal)
+        function openTeaChart(symbol) {
+            const tea = teas.find(t => t.symbol === symbol);
+            if (!tea) {
+                showToast('Tea Not Found', 'Could not find tea data', true);
+                return;
+            }
+            
+            // Open the professional chart modal
+            openQuickQuoteModal(tea);
+        }
+        
+        // Switch main chart to display a specific tea
+        function switchToTea(symbol) {
+            const tea = teas.find(t => t.symbol === symbol);
+            if (!tea) return;
+            
+            const shortSymbol = symbol.split('-')[1] || symbol;
+            const origin = symbol.split('-')[0] || '';
+            const change = tea.previous_price > 0 ? 
+                ((tea.current_price - tea.previous_price) / tea.previous_price) * 100 : 0;
+            
+            // Animate transition
+            const chartSection = document.getElementById('chart-section');
+            chartSection.style.opacity = '0.7';
+            chartSection.style.transform = 'scale(0.98)';
+            
+            setTimeout(() => {
+                // Update main chart data
+                mainChartData = {
+                    name: tea.name || `${origin} ${shortSymbol}`,
+                    symbol: symbol,
+                    basePrice: tea.current_price,
+                    currency: '$',
+                    change: change,
+                    volume: '12.5K MT',
+                    isTea: true
+                };
+                
+                document.getElementById('main-chart-title').textContent = mainChartData.name;
+                const priceEl = document.getElementById('main-chart-price');
+                priceEl.textContent = `$${tea.current_price.toFixed(2)}`;
+                priceEl.className = 'chart-stat-value ' + (change >= 0 ? 'up' : 'down');
+                
+                const changeVal = change >= 0 ? '+' : '';
+                document.getElementById('main-chart-change').textContent = `${changeVal}${change.toFixed(2)}%`;
+                
+                // Generate tea historical data and redraw chart
+                cachedTimeframe = null;
+                chartData = generateTeaHistory(tea);
+                drawChart();
+                
+                // Animate back in
+                chartSection.style.opacity = '1';
+                chartSection.style.transform = 'scale(1)';
+                
+                showToast('Chart Updated', `Now viewing ${mainChartData.name}`);
+            }, 150);
+        }
+        
+        // Open index chart (switch main chart to show index)
+        function openIndexChart(indexSymbol) {
+            const indexes = calculateRegionalIndexes();
+            const idx = indexes.find(i => i.symbol === indexSymbol);
+            
+            if (!idx) {
+                showToast('Index Not Found', 'Could not find index data', true);
+                return;
+            }
+            
+            // Animate transition
+            const chartSection = document.getElementById('chart-section');
+            chartSection.style.opacity = '0.7';
+            chartSection.style.transform = 'scale(0.98)';
+            
+            setTimeout(() => {
+                // Update main chart data
+                mainChartData = {
+                    name: idx.name,
+                    symbol: idx.symbol,
+                    basePrice: idx.price,
+                    currency: '$',
+                    change: idx.change,
+                    volume: '—',
+                    isIndex: true
+                };
+                
+                document.getElementById('main-chart-title').textContent = mainChartData.name;
+                const priceEl = document.getElementById('main-chart-price');
+                priceEl.textContent = `$${idx.price.toFixed(2)}`;
+                priceEl.className = 'chart-stat-value ' + (idx.change >= 0 ? 'up' : 'down');
+                
+                const changeVal = idx.change >= 0 ? '+' : '';
+                document.getElementById('main-chart-change').textContent = `${changeVal}${idx.change.toFixed(2)}%`;
+                
+                // Generate index historical data
+                cachedTimeframe = null;
+                chartData = generateIndexHistoricalData(idx.symbol);
+                drawChart();
+                
+                // Animate back in
+                chartSection.style.opacity = '1';
+                chartSection.style.transform = 'scale(1)';
+                
+                showToast('Index Chart', `Now viewing ${idx.name}`);
+            }, 150);
+            
+            document.getElementById('chart-section')?.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Quick trade from search
+        function quickTrade(symbol, side) {
+            if (!currentUser) {
+                showToast('Login Required', 'Please sign in to trade', true);
+                openAuthModal();
+                return;
+            }
+            
+            const tea = teas.find(t => t.symbol === symbol);
+            if (!tea) return;
+            
+            // Set the trade panel to this tea (use tea.id as that's what the select uses)
+            const teaSelect = document.getElementById('trade-tea-select');
+            if (teaSelect) {
+                teaSelect.value = tea.id;
+            }
+            
+            // Set the trade type
+            setTradeType(side);
+            
+            // Update summary
+            updateTradeSummary();
+            
+            // Scroll to trade panel
+            document.querySelector('.trade-panel')?.scrollIntoView({ behavior: 'smooth' });
+            
+            showToast('Trade Ready', `${side} ${tea.name || symbol}`);
         }
 
         function executeCommand(cmd) {
@@ -9071,6 +10257,20 @@
             const isUp = change >= 0;
             const volume = tea.volume_24h || 0;
             
+            // Reset modal state
+            qqTimeframe = '1D';
+            qqChartType = 'line';
+            qqIndicators = { sma: false, ema: false, bollinger: false };
+            document.querySelectorAll('.qq-tf-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tf === '1D'));
+            document.querySelectorAll('.qq-chart-type-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.type === 'line'));
+            document.querySelectorAll('.qq-indicator-btn').forEach(btn => btn.classList.remove('active'));
+            
+            // Clear SL/TP inputs
+            const slInput = document.getElementById('qq-sl');
+            const tpInput = document.getElementById('qq-tp');
+            if (slInput) slInput.value = '';
+            if (tpInput) tpInput.value = '';
+            
             // Populate header
             document.getElementById('qq-symbol').textContent = shortSymbol;
             document.getElementById('qq-name').textContent = tea.name;
@@ -9117,6 +10317,9 @@
             setQuickTradeType('BUY');
             updateQuickTradeSummary();
             
+            // Update open positions display
+            updateQQOpenPositions(tea.symbol);
+            
             // Show modal FIRST so canvas has dimensions
             modal.classList.add('active');
             document.body.style.overflow = 'hidden';
@@ -9125,6 +10328,7 @@
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                     drawQuickQuoteChart(tea);
+                    updateQQTradeAnnotations();
                 });
             });
         }
@@ -9165,6 +10369,438 @@
             execBtn.textContent = `${quickQuoteTradeType} ${qty} kg`;
         }
         
+        // Quick Quote Modal State
+        let qqTimeframe = '1D';
+        let qqChartType = 'line';
+        let qqIndicators = { sma: false, ema: false, bollinger: false };
+        
+        function setQQTimeframe(tf) {
+            qqTimeframe = tf;
+            document.querySelectorAll('.qq-tf-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tf === tf);
+            });
+            if (quickQuoteTea) {
+                drawQuickQuoteChart(quickQuoteTea);
+            }
+        }
+        
+        function setQQChartType(type) {
+            qqChartType = type;
+            document.querySelectorAll('.qq-chart-type-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.type === type);
+            });
+            if (quickQuoteTea) {
+                drawQuickQuoteChart(quickQuoteTea);
+            }
+        }
+        
+        function toggleQQIndicator(ind) {
+            qqIndicators[ind] = !qqIndicators[ind];
+            document.querySelectorAll('.qq-indicator-btn').forEach(btn => {
+                if (btn.dataset.ind === ind) {
+                    btn.classList.toggle('active', qqIndicators[ind]);
+                }
+            });
+            if (quickQuoteTea) {
+                drawQuickQuoteChart(quickQuoteTea);
+            }
+        }
+        
+        function updateQQOpenPositions(symbol) {
+            const container = document.getElementById('qq-open-positions');
+            if (!container) return;
+            
+            // Get positions for this symbol
+            const positions = (userProfile?.positions || []).filter(p => p.symbol === symbol && p.status === 'OPEN');
+            
+            if (positions.length === 0) {
+                container.classList.remove('has-positions');
+                container.innerHTML = '';
+                return;
+            }
+            
+            container.classList.add('has-positions');
+            
+            const currentPrice = quickQuoteTea?.current_price || 0;
+            
+            let html = '<div class="qq-positions-header">Your Open Positions</div>';
+            positions.forEach(pos => {
+                const entryPrice = pos.entry_price || pos.price;
+                const qty = pos.quantity;
+                const side = pos.type || pos.side;
+                const pnl = side === 'BUY' 
+                    ? (currentPrice - entryPrice) * qty 
+                    : (entryPrice - currentPrice) * qty;
+                const pnlClass = pnl >= 0 ? 'profit' : 'loss';
+                const pnlSign = pnl >= 0 ? '+' : '';
+                
+                html += `
+                    <div class="qq-position-row">
+                        <div class="qq-position-info">
+                            <span class="qq-position-side ${side.toLowerCase()}">${side}</span>
+                            <div class="qq-position-details">
+                                <span class="qq-position-qty">${qty} kg</span>
+                                <span class="qq-position-entry">@ $${entryPrice.toFixed(2)}</span>
+                            </div>
+                        </div>
+                        <span class="qq-position-pnl ${pnlClass}">${pnlSign}$${pnl.toFixed(2)}</span>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        function updateQQTradeAnnotations() {
+            const container = document.getElementById('qq-trade-annotations');
+            if (!container || !quickQuoteTea || !qqChartMeta.maxPrice) return;
+            
+            const positions = (userProfile?.positions || []).filter(
+                p => p.symbol === quickQuoteTea.symbol && p.status === 'OPEN'
+            );
+            
+            if (positions.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+            
+            const { minPrice, maxPrice, chartHeight, padding } = qqChartMeta;
+            const priceRange = maxPrice - minPrice;
+            
+            let html = '';
+            positions.forEach(pos => {
+                const entryPrice = pos.entry_price || pos.price;
+                const yEntry = padding.top + ((maxPrice - entryPrice) / priceRange) * chartHeight;
+                
+                if (yEntry >= padding.top && yEntry <= padding.top + chartHeight) {
+                    html += `<div class="qq-trade-annotation entry" style="top: ${yEntry - 10}px;">Entry $${entryPrice.toFixed(2)}</div>`;
+                }
+                
+                // Add SL/TP annotations if set
+                if (pos.stop_loss) {
+                    const ySL = padding.top + ((maxPrice - pos.stop_loss) / priceRange) * chartHeight;
+                    if (ySL >= padding.top && ySL <= padding.top + chartHeight) {
+                        html += `<div class="qq-trade-annotation sl" style="top: ${ySL - 10}px;">SL $${pos.stop_loss.toFixed(2)}</div>`;
+                    }
+                }
+                
+                if (pos.take_profit) {
+                    const yTP = padding.top + ((maxPrice - pos.take_profit) / priceRange) * chartHeight;
+                    if (yTP >= padding.top && yTP <= padding.top + chartHeight) {
+                        html += `<div class="qq-trade-annotation tp" style="top: ${yTP - 10}px;">TP $${pos.take_profit.toFixed(2)}</div>`;
+                    }
+                }
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        // Animate price change in modal
+        function animateQQPriceChange(newPrice, oldPrice) {
+            const priceEl = document.getElementById('qq-price');
+            if (!priceEl) return;
+            
+            const isUp = newPrice > oldPrice;
+            priceEl.classList.remove('qq-price-flash', 'qq-price-up', 'qq-price-down');
+            
+            // Force reflow
+            void priceEl.offsetWidth;
+            
+            priceEl.classList.add('qq-price-flash');
+            priceEl.classList.add(isUp ? 'qq-price-up' : 'qq-price-down');
+            
+            setTimeout(() => {
+                priceEl.classList.remove('qq-price-flash', 'qq-price-up', 'qq-price-down');
+            }, 500);
+        }
+        
+        // ===== Multi-Chart Dashboard Modal =====
+        let multiChartPanels = []; // Array of panel data: { id, symbol, tea }
+        let multiChartNextId = 1;
+        
+        function openMultiChartModal() {
+            const modal = document.getElementById('multi-chart-modal');
+            if (!modal) return;
+            
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+            
+            // Initialize with one empty panel if no panels exist
+            if (multiChartPanels.length === 0) {
+                addMultiChart();
+            } else {
+                renderMultiChartPanels();
+            }
+        }
+        
+        function closeMultiChartModal() {
+            const modal = document.getElementById('multi-chart-modal');
+            if (modal) {
+                modal.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        }
+        
+        function addMultiChart(prefillSymbol = null) {
+            if (multiChartPanels.length >= 4) {
+                showToast('Maximum Charts', 'You can add up to 4 charts');
+                return;
+            }
+            
+            const panelId = multiChartNextId++;
+            let tea = null;
+            
+            if (prefillSymbol) {
+                tea = teas.find(t => t.symbol === prefillSymbol);
+            }
+            
+            multiChartPanels.push({ id: panelId, symbol: prefillSymbol, tea: tea });
+            updateMultiChartGridClass();
+            renderMultiChartPanels();
+        }
+        
+        function removeMultiChartPanel(panelId) {
+            multiChartPanels = multiChartPanels.filter(p => p.id !== panelId);
+            updateMultiChartGridClass();
+            renderMultiChartPanels();
+        }
+        
+        function updateMultiChartGridClass() {
+            const grid = document.getElementById('multi-chart-grid');
+            if (!grid) return;
+            
+            grid.classList.remove('single', 'double', 'triple');
+            
+            switch (multiChartPanels.length) {
+                case 1:
+                    grid.classList.add('single');
+                    break;
+                case 2:
+                    grid.classList.add('double');
+                    break;
+                case 3:
+                    grid.classList.add('triple');
+                    break;
+                // 4 panels uses default 2x2 grid
+            }
+        }
+        
+        function renderMultiChartPanels() {
+            const grid = document.getElementById('multi-chart-grid');
+            if (!grid) return;
+            
+            let html = '';
+            
+            multiChartPanels.forEach(panel => {
+                if (panel.tea && panel.symbol) {
+                    // Panel with a tea selected
+                    const change = panel.tea.price_change_24h || 0;
+                    const isUp = change >= 0;
+                    const shortSymbol = panel.symbol.split('-')[1] || panel.symbol;
+                    const origin = panel.symbol.split('-')[0] || '';
+                    
+                    html += `
+                        <div class="mc-chart-panel" data-panel-id="${panel.id}">
+                            <div class="mc-panel-header">
+                                <div class="mc-panel-symbol">
+                                    <span class="mc-panel-symbol-name">${origin} ${shortSymbol}</span>
+                                    <span class="mc-panel-price ${isUp ? 'up' : 'down'}">$${panel.tea.current_price.toFixed(2)} (${isUp ? '+' : ''}${change.toFixed(1)}%)</span>
+                                </div>
+                                <div class="mc-panel-actions">
+                                    <button class="mc-panel-btn trade" onclick="openQuickQuoteModal(teas.find(t => t.symbol === '${panel.symbol}'))">Trade</button>
+                                    <button class="mc-panel-btn close" onclick="removeMultiChartPanel(${panel.id})">×</button>
+                                </div>
+                            </div>
+                            <div class="mc-panel-chart">
+                                <canvas id="mc-chart-${panel.id}"></canvas>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // Empty panel - show tea selector
+                    html += `
+                        <div class="mc-chart-panel empty" data-panel-id="${panel.id}" onclick="showMultiChartTeaSelector(${panel.id}, event)">
+                            <div class="mc-empty-placeholder">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                <span>Click to add chart</span>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+            
+            grid.innerHTML = html;
+            
+            // Draw charts for panels with teas
+            requestAnimationFrame(() => {
+                multiChartPanels.forEach(panel => {
+                    if (panel.tea) {
+                        drawMultiChartPanel(panel.id, panel.tea);
+                    }
+                });
+            });
+        }
+        
+        function showMultiChartTeaSelector(panelId, event) {
+            event.stopPropagation();
+            
+            // Remove any existing selector
+            const existingSelector = document.querySelector('.mc-tea-selector');
+            if (existingSelector) existingSelector.remove();
+            
+            // Create tea selector dropdown
+            const selector = document.createElement('div');
+            selector.className = 'mc-tea-selector';
+            
+            let options = '<div class="mc-tea-selector-header">Select a Tea</div><div class="mc-tea-selector-list">';
+            
+            teas.slice(0, 15).forEach(tea => {
+                const shortSymbol = tea.symbol.split('-')[1] || tea.symbol;
+                const origin = tea.symbol.split('-')[0] || '';
+                const isUp = (tea.price_change_24h || 0) >= 0;
+                
+                options += `
+                    <div class="mc-tea-option" onclick="selectMultiChartTea(${panelId}, '${tea.symbol}')">
+                        <span class="mc-tea-option-symbol">${origin} ${shortSymbol}</span>
+                        <span class="mc-tea-option-price ${isUp ? 'up' : 'down'}">$${tea.current_price.toFixed(2)}</span>
+                    </div>
+                `;
+            });
+            
+            options += '</div>';
+            selector.innerHTML = options;
+            
+            // Add to grid
+            document.getElementById('multi-chart-grid').appendChild(selector);
+            
+            // Close on outside click
+            setTimeout(() => {
+                document.addEventListener('click', function closeSelector(e) {
+                    if (!selector.contains(e.target)) {
+                        selector.remove();
+                        document.removeEventListener('click', closeSelector);
+                    }
+                });
+            }, 10);
+        }
+        
+        function selectMultiChartTea(panelId, symbol) {
+            const panel = multiChartPanels.find(p => p.id === panelId);
+            if (!panel) return;
+            
+            const tea = teas.find(t => t.symbol === symbol);
+            panel.symbol = symbol;
+            panel.tea = tea;
+            
+            // Remove selector
+            const selector = document.querySelector('.mc-tea-selector');
+            if (selector) selector.remove();
+            
+            renderMultiChartPanels();
+        }
+        
+        function drawMultiChartPanel(panelId, tea) {
+            const canvas = document.getElementById(`mc-chart-${panelId}`);
+            if (!canvas || !tea) return;
+            
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.parentElement.getBoundingClientRect();
+            if (rect.width <= 0 || rect.height <= 0) return;
+            
+            const dpr = window.devicePixelRatio || 1;
+            const w = rect.width;
+            const h = rect.height;
+            
+            canvas.width = w * dpr;
+            canvas.height = h * dpr;
+            canvas.style.width = w + 'px';
+            canvas.style.height = h + 'px';
+            ctx.scale(dpr, dpr);
+            
+            const price = tea.current_price || 3.5;
+            const change = tea.price_change_24h || 0;
+            const isUp = change >= 0;
+            
+            // Get historical data
+            const fullHistory = generateTeaHistory(tea);
+            if (!fullHistory || fullHistory.length === 0) return;
+            
+            const historySlice = fullHistory.slice(-48);
+            
+            const padding = { top: 15, right: 50, bottom: 20, left: 40 };
+            const chartWidth = w - padding.left - padding.right;
+            const chartHeight = h - padding.top - padding.bottom;
+            
+            const minPrice = Math.min(...historySlice.map(d => d.low)) * 0.998;
+            const maxPrice = Math.max(...historySlice.map(d => d.high)) * 1.002;
+            
+            // Clear
+            ctx.fillStyle = '#1f2937';
+            ctx.fillRect(0, 0, w, h);
+            
+            // Draw simple grid
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 3; i++) {
+                const y = padding.top + (chartHeight / 3) * i;
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(w - padding.right, y);
+                ctx.stroke();
+            }
+            
+            // Draw line chart with gradient
+            const gradient = ctx.createLinearGradient(0, padding.top, 0, h - padding.bottom);
+            gradient.addColorStop(0, isUp ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            
+            ctx.beginPath();
+            ctx.moveTo(padding.left, h - padding.bottom);
+            
+            historySlice.forEach((candle, i) => {
+                const x = padding.left + (i / (historySlice.length - 1)) * chartWidth;
+                const y = padding.top + ((maxPrice - candle.close) / (maxPrice - minPrice)) * chartHeight;
+                ctx.lineTo(x, y);
+            });
+            
+            ctx.lineTo(padding.left + chartWidth, h - padding.bottom);
+            ctx.closePath();
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            
+            // Draw line
+            ctx.beginPath();
+            historySlice.forEach((candle, i) => {
+                const x = padding.left + (i / (historySlice.length - 1)) * chartWidth;
+                const y = padding.top + ((maxPrice - candle.close) / (maxPrice - minPrice)) * chartHeight;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.strokeStyle = isUp ? '#10b981' : '#ef4444';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Current price label
+            const currentY = padding.top + ((maxPrice - price) / (maxPrice - minPrice)) * chartHeight;
+            ctx.fillStyle = isUp ? '#10b981' : '#ef4444';
+            ctx.fillRect(w - padding.right + 2, currentY - 7, 45, 14);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 9px JetBrains Mono';
+            ctx.textAlign = 'left';
+            ctx.fillText(`$${price.toFixed(2)}`, w - padding.right + 5, currentY + 3);
+        }
+        
+        // Add keyboard shortcut to open multi-chart
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'm' && e.ctrlKey) {
+                e.preventDefault();
+                openMultiChartModal();
+            }
+        });
+        
         // Store Quick Quote chart metadata for crosshair
         let qqChartMeta = {
             data: [],
@@ -9200,12 +10836,34 @@
             const change = tea.price_change_24h || 0;
             const isUp = change >= 0;
             
-            // Get historical data for this tea (last 48 hours = 48 candles at hourly)
+            // Get historical data based on timeframe
             const fullHistory = generateTeaHistory(tea);
             if (!fullHistory || fullHistory.length === 0) return;
             
-            const historySlice = fullHistory.slice(-48); // Last 48 hours
-            if (historySlice.length === 0) return;
+            // Include extra points for indicator warm-up (BB needs 20 periods)
+            const warmupPeriod = 25;
+            
+            // Sample data based on selected timeframe with warm-up buffer
+            let historySlice;
+            switch (qqTimeframe) {
+                case '1H':
+                    historySlice = fullHistory.slice(-(12 + warmupPeriod)); // Extra for BB warm-up
+                    break;
+                case '1D':
+                    historySlice = fullHistory.slice(-(24 + warmupPeriod)); // Extra for BB warm-up
+                    break;
+                case '1W':
+                    // Sample every 4h with warm-up
+                    historySlice = fullHistory.slice(-(168 + warmupPeriod * 4)).filter((_, i) => i % 4 === 0);
+                    break;
+                case '1M':
+                    // Daily candles with warm-up
+                    historySlice = fullHistory.slice(-(720 + warmupPeriod * 24)).filter((_, i) => i % 24 === 0);
+                    break;
+                default:
+                    historySlice = fullHistory.slice(-(48 + warmupPeriod));
+            }
+            if (historySlice.length === 0) historySlice = fullHistory.slice(-50);
             
             const padding = { top: 20, right: 70, bottom: 30, left: 60 };
             const chartWidth = w - padding.left - padding.right;
@@ -9216,7 +10874,7 @@
             const minPrice = Math.min(...allLows) * 0.998;
             const maxPrice = Math.max(...allHighs) * 1.002;
             
-            // Store metadata for crosshair
+            // Store metadata for crosshair and annotations
             qqChartMeta = { data: historySlice, padding, minPrice, maxPrice, chartWidth, chartHeight, w, h };
             
             // Clear
@@ -9249,38 +10907,165 @@
                 if (historySlice[i]) {
                     const x = padding.left + (i / (historySlice.length - 1)) * chartWidth;
                     const date = historySlice[i].date;
-                    const label = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                    const label = qqTimeframe === '1M' 
+                        ? date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+                        : date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
                     ctx.fillText(label, x, h - 8);
                 }
             });
             
-            // Draw candlesticks
-            const candleWidth = Math.max(3, Math.min(10, (chartWidth / historySlice.length) * 0.7));
+            // Calculate indicators if enabled
+            const closes = historySlice.map(d => d.close);
             
-            historySlice.forEach((candle, i) => {
-                const x = padding.left + (i / (historySlice.length - 1)) * chartWidth;
-                const candleUp = candle.close >= candle.open;
-                const color = candleUp ? '#10b981' : '#ef4444';
-                
-                const openY = padding.top + ((maxPrice - candle.open) / (maxPrice - minPrice)) * chartHeight;
-                const closeY = padding.top + ((maxPrice - candle.close) / (maxPrice - minPrice)) * chartHeight;
-                const highY = padding.top + ((maxPrice - candle.high) / (maxPrice - minPrice)) * chartHeight;
-                const lowY = padding.top + ((maxPrice - candle.low) / (maxPrice - minPrice)) * chartHeight;
-                
-                // Wick
+            // Draw Bollinger Bands first (behind everything)
+            if (qqIndicators.bollinger && closes.length >= 20) {
+                const period = 20;
+                const mult = 2;
                 ctx.beginPath();
-                ctx.moveTo(x, highY);
-                ctx.lineTo(x, lowY);
-                ctx.strokeStyle = color;
+                ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)';
                 ctx.lineWidth = 1;
-                ctx.stroke();
                 
-                // Body
-                const bodyTop = Math.min(openY, closeY);
-                const bodyHeight = Math.max(1, Math.abs(closeY - openY));
-                ctx.fillStyle = color;
-                ctx.fillRect(x - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
-            });
+                const upper = [], lower = [], middle = [];
+                for (let i = period - 1; i < closes.length; i++) {
+                    const slice = closes.slice(i - period + 1, i + 1);
+                    const sma = slice.reduce((a, b) => a + b, 0) / period;
+                    const variance = slice.reduce((sum, val) => sum + Math.pow(val - sma, 2), 0) / period;
+                    const stdDev = Math.sqrt(variance);
+                    upper.push(sma + mult * stdDev);
+                    lower.push(sma - mult * stdDev);
+                    middle.push(sma);
+                }
+                
+                // Draw bands with fill
+                ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
+                ctx.beginPath();
+                for (let i = 0; i < upper.length; i++) {
+                    const x = padding.left + ((i + period - 1) / (historySlice.length - 1)) * chartWidth;
+                    const y = padding.top + ((maxPrice - upper[i]) / (maxPrice - minPrice)) * chartHeight;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                for (let i = lower.length - 1; i >= 0; i--) {
+                    const x = padding.left + ((i + period - 1) / (historySlice.length - 1)) * chartWidth;
+                    const y = padding.top + ((maxPrice - lower[i]) / (maxPrice - minPrice)) * chartHeight;
+                    ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.fill();
+                
+                // Draw middle line
+                ctx.beginPath();
+                ctx.strokeStyle = 'rgba(59, 130, 246, 0.7)';
+                middle.forEach((val, i) => {
+                    const x = padding.left + ((i + period - 1) / (historySlice.length - 1)) * chartWidth;
+                    const y = padding.top + ((maxPrice - val) / (maxPrice - minPrice)) * chartHeight;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+            }
+            
+            // Draw chart based on type
+            if (qqChartType === 'candle') {
+                // Draw candlesticks
+                const candleWidth = Math.max(3, Math.min(10, (chartWidth / historySlice.length) * 0.7));
+                
+                historySlice.forEach((candle, i) => {
+                    const x = padding.left + (i / (historySlice.length - 1)) * chartWidth;
+                    const candleUp = candle.close >= candle.open;
+                    const color = candleUp ? '#10b981' : '#ef4444';
+                    
+                    const openY = padding.top + ((maxPrice - candle.open) / (maxPrice - minPrice)) * chartHeight;
+                    const closeY = padding.top + ((maxPrice - candle.close) / (maxPrice - minPrice)) * chartHeight;
+                    const highY = padding.top + ((maxPrice - candle.high) / (maxPrice - minPrice)) * chartHeight;
+                    const lowY = padding.top + ((maxPrice - candle.low) / (maxPrice - minPrice)) * chartHeight;
+                    
+                    // Wick
+                    ctx.beginPath();
+                    ctx.moveTo(x, highY);
+                    ctx.lineTo(x, lowY);
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                    
+                    // Body
+                    const bodyTop = Math.min(openY, closeY);
+                    const bodyHeight = Math.max(1, Math.abs(closeY - openY));
+                    ctx.fillStyle = color;
+                    ctx.fillRect(x - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
+                });
+            } else {
+                // Draw line chart with gradient fill
+                const gradient = ctx.createLinearGradient(0, padding.top, 0, h - padding.bottom);
+                gradient.addColorStop(0, isUp ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)');
+                gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                
+                ctx.beginPath();
+                ctx.moveTo(padding.left, h - padding.bottom);
+                
+                historySlice.forEach((candle, i) => {
+                    const x = padding.left + (i / (historySlice.length - 1)) * chartWidth;
+                    const y = padding.top + ((maxPrice - candle.close) / (maxPrice - minPrice)) * chartHeight;
+                    ctx.lineTo(x, y);
+                });
+                
+                ctx.lineTo(padding.left + chartWidth, h - padding.bottom);
+                ctx.closePath();
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                
+                // Draw line
+                ctx.beginPath();
+                historySlice.forEach((candle, i) => {
+                    const x = padding.left + (i / (historySlice.length - 1)) * chartWidth;
+                    const y = padding.top + ((maxPrice - candle.close) / (maxPrice - minPrice)) * chartHeight;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                });
+                ctx.strokeStyle = isUp ? '#10b981' : '#ef4444';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+            
+            // Draw SMA if enabled
+            if (qqIndicators.sma && closes.length >= 10) {
+                const sma10 = [];
+                for (let i = 9; i < closes.length; i++) {
+                    const avg = closes.slice(i - 9, i + 1).reduce((a, b) => a + b, 0) / 10;
+                    sma10.push(avg);
+                }
+                
+                ctx.beginPath();
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = 1.5;
+                sma10.forEach((val, i) => {
+                    const x = padding.left + ((i + 9) / (historySlice.length - 1)) * chartWidth;
+                    const y = padding.top + ((maxPrice - val) / (maxPrice - minPrice)) * chartHeight;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+            }
+            
+            // Draw EMA if enabled
+            if (qqIndicators.ema && closes.length >= 10) {
+                const multiplier = 2 / (10 + 1);
+                const ema = [closes[0]];
+                for (let i = 1; i < closes.length; i++) {
+                    ema.push((closes[i] - ema[i - 1]) * multiplier + ema[i - 1]);
+                }
+                
+                ctx.beginPath();
+                ctx.strokeStyle = '#8b5cf6';
+                ctx.lineWidth = 1.5;
+                ema.forEach((val, i) => {
+                    const x = padding.left + (i / (historySlice.length - 1)) * chartWidth;
+                    const y = padding.top + ((maxPrice - val) / (maxPrice - minPrice)) * chartHeight;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+            }
             
             // Draw current price line
             const currentY = padding.top + ((maxPrice - price) / (maxPrice - minPrice)) * chartHeight;
@@ -9300,6 +11085,9 @@
             ctx.font = 'bold 10px JetBrains Mono';
             ctx.textAlign = 'left';
             ctx.fillText(`$${price.toFixed(2)}`, w - padding.right + 6, currentY + 3);
+            
+            // Update trade annotations after chart is drawn
+            updateQQTradeAnnotations();
             
             // Setup crosshair events (once)
             if (!canvas.dataset.crosshairSetup) {
@@ -9413,25 +11201,136 @@
             const qty = parseFloat(document.getElementById('qq-qty').value) || 0;
             const price = quickQuoteTea.current_price;
             const total = qty * price;
+            const slInput = document.getElementById('qq-sl');
+            const tpInput = document.getElementById('qq-tp');
+            const stopLoss = slInput?.value ? parseFloat(slInput.value) : null;
+            const takeProfit = tpInput?.value ? parseFloat(tpInput.value) : null;
             
             if (qty <= 0) {
                 showToast('Invalid quantity', 'Please enter a valid quantity', true);
                 return;
             }
             
-            // Use existing trade logic
-            const select = document.getElementById('trade-tea-select');
-            if (select) {
-                select.value = quickQuoteTea.symbol;
+            // Check balance for BUY
+            if (quickQuoteTradeType === 'BUY' && total > (userProfile?.cash_balance || 0)) {
+                showToast('Insufficient Balance', 'You don\'t have enough funds', true);
+                return;
             }
-            document.getElementById('trade-qty').value = qty;
-            setTradeType(quickQuoteTradeType);
             
-            // Execute the trade
-            await executeTrade();
+            const execBtn = document.getElementById('qq-execute-btn');
+            execBtn.disabled = true;
+            execBtn.textContent = 'Executing...';
             
-            // Close modal
-            closeQuickQuoteModal();
+            try {
+                if (quickQuoteTradeType === 'BUY') {
+                    // Deduct from balance
+                    const { error: balanceError } = await supabaseClient
+                        .from('profiles')
+                        .update({ cash_balance: (userProfile?.cash_balance || 0) - total })
+                        .eq('id', currentUser.id);
+                    
+                    if (balanceError) throw balanceError;
+                    
+                    // Update local balance
+                    if (userProfile) userProfile.cash_balance -= total;
+                }
+                
+                // Record the trade
+                const tradeData = {
+                    user_id: currentUser.id,
+                    tea_id: quickQuoteTea.id,
+                    side: quickQuoteTradeType,
+                    quantity: qty,
+                    price: price,
+                    total_value: total
+                };
+                
+                const { data: trade, error: tradeError } = await supabaseClient
+                    .from('trades')
+                    .insert(tradeData)
+                    .select()
+                    .single();
+                
+                if (tradeError) throw tradeError;
+                
+                // Update positions
+                const existingPos = positions.find(p => p.tea_id === quickQuoteTea.id);
+                
+                if (quickQuoteTradeType === 'BUY') {
+                    if (existingPos) {
+                        // Average up
+                        const newQty = existingPos.quantity + qty;
+                        const newAvgPrice = ((existingPos.avg_entry_price * existingPos.quantity) + (price * qty)) / newQty;
+                        
+                        await supabaseClient
+                            .from('positions')
+                            .update({ quantity: newQty, avg_entry_price: newAvgPrice })
+                            .eq('id', existingPos.id);
+                        
+                        existingPos.quantity = newQty;
+                        existingPos.avg_entry_price = newAvgPrice;
+                    } else {
+                        const posData = {
+                            user_id: currentUser.id,
+                            tea_id: quickQuoteTea.id,
+                            quantity: qty,
+                            avg_entry_price: price
+                        };
+                        
+                        const { data: newPos } = await supabaseClient
+                            .from('positions')
+                            .insert(posData)
+                            .select()
+                            .single();
+                        
+                        if (newPos) positions.push(newPos);
+                    }
+                } else {
+                    // SELL - reduce position
+                    if (existingPos && existingPos.quantity >= qty) {
+                        const newQty = existingPos.quantity - qty;
+                        
+                        if (newQty <= 0) {
+                            await supabaseClient
+                                .from('positions')
+                                .delete()
+                                .eq('id', existingPos.id);
+                            
+                            positions = positions.filter(p => p.id !== existingPos.id);
+                        } else {
+                            await supabaseClient
+                                .from('positions')
+                                .update({ quantity: newQty })
+                                .eq('id', existingPos.id);
+                            
+                            existingPos.quantity = newQty;
+                        }
+                        
+                        // Credit balance
+                        const { error: creditError } = await supabaseClient
+                            .from('profiles')
+                            .update({ cash_balance: (userProfile?.cash_balance || 0) + total })
+                            .eq('id', currentUser.id);
+                        
+                        if (!creditError && userProfile) {
+                            userProfile.cash_balance += total;
+                        }
+                    }
+                }
+                
+                // Refresh trades and UI
+                await loadUserTrades();
+                updatePortfolioDisplay();
+                
+                showToast(`${quickQuoteTradeType} Order Filled`, `${qty} kg of ${quickQuoteTea.name || quickQuoteTea.symbol} @ $${price.toFixed(2)}`);
+                closeQuickQuoteModal();
+                
+            } catch (error) {
+                console.error('Trade error:', error);
+                showToast('Trade Failed', error.message || 'Failed to execute trade', true);
+                execBtn.disabled = false;
+                execBtn.textContent = `${quickQuoteTradeType} ${qty} kg`;
+            }
         }
         
         // Close modal on escape
@@ -9516,6 +11415,15 @@
         let selectedLeverage = 1;
         let previousPairRatios = {};
 
+        // Regional Index Pairs (calculated from tea averages)
+        const indexPairs = [
+            { id: 'idx-kenya-india', base_symbol: 'KENYA', quote_symbol: 'INDIA', isIndex: true },
+            { id: 'idx-india-ceylon', base_symbol: 'INDIA', quote_symbol: 'CEYLON', isIndex: true },
+            { id: 'idx-africa-asia', base_symbol: 'AFRICA', quote_symbol: 'ASIA', isIndex: true },
+            { id: 'idx-kenya-ceylon', base_symbol: 'KENYA', quote_symbol: 'CEYLON', isIndex: true },
+            { id: 'idx-china-india', base_symbol: 'CHINA', quote_symbol: 'INDIA', isIndex: true },
+        ];
+
         async function loadTeaPairs() {
             try {
                 const { data, error } = await supabaseClient
@@ -9528,6 +11436,13 @@
             } catch (error) {
                 console.error('Failed to load pairs:', error);
             }
+        }
+        
+        // Get index price from regional indexes
+        function getIndexPrice(indexSymbol) {
+            const indexes = calculateRegionalIndexes();
+            const idx = indexes.find(i => i.symbol === indexSymbol);
+            return idx ? { price: idx.price, previousPrice: idx.previousPrice, name: idx.name, color: idx.color } : null;
         }
 
         function setMarketView(view) {
@@ -9579,14 +11494,19 @@
 
         function updatePairsTable() {
             const tbody = document.getElementById('pairs-table-body');
-            if (!tbody || !teaPairs.length || !teas.length) return;
+            if (!tbody || !teas.length) return;
 
             // Build tea price map
             const teaMap = {};
             teas.forEach(tea => teaMap[tea.symbol] = tea);
+            
+            // Get regional indexes
+            const indexes = calculateRegionalIndexes();
+            const indexMap = {};
+            indexes.forEach(idx => indexMap[idx.symbol] = idx);
 
-            // Build data array for sorting
-            const pairsData = teaPairs.map(pair => {
+            // Build data array from regular tea pairs
+            const pairsData = (teaPairs || []).map(pair => {
                 const baseTea = teaMap[pair.base_symbol];
                 const quoteTea = teaMap[pair.quote_symbol];
 
@@ -9622,12 +11542,65 @@
                 const quoteShort = pair.quote_symbol.split('-')[1] || pair.quote_symbol;
 
                 return {
-                    pair, basePrice, quotePrice, ratio, changePct, changeStr, changeClass, flashClass, spread, baseShort, quoteShort
+                    pair, basePrice, quotePrice, ratio, changePct, changeStr, changeClass, flashClass, spread, baseShort, quoteShort, isIndex: false
                 };
             }).filter(Boolean);
+            
+            // Add index pairs
+            indexPairs.forEach(pair => {
+                const baseIdx = indexMap[pair.base_symbol];
+                const quoteIdx = indexMap[pair.quote_symbol];
+                
+                if (!baseIdx || !quoteIdx || baseIdx.price === 0 || quoteIdx.price === 0) return;
+                
+                const basePrice = baseIdx.price;
+                const quotePrice = quoteIdx.price;
+                const ratio = quotePrice > 0 ? basePrice / quotePrice : 0;
+                const pairKey = `${pair.base_symbol}/${pair.quote_symbol}`;
+                
+                let changePct = 0;
+                let changeStr = '—';
+                let changeClass = '';
+                let flashClass = '';
+
+                if (previousPairRatios[pairKey] !== undefined) {
+                    const prevRatio = previousPairRatios[pairKey];
+                    if (prevRatio !== ratio) {
+                        changePct = ((ratio - prevRatio) / prevRatio) * 100;
+                        changeStr = `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`;
+                        changeClass = changePct > 0 ? 'up' : 'down';
+                        flashClass = changePct > 0 ? 'flash-up' : 'flash-down';
+                    }
+                }
+                previousPairRatios[pairKey] = ratio;
+
+                const spread = Math.abs(basePrice - quotePrice);
+                
+                pairsData.push({
+                    pair,
+                    basePrice,
+                    quotePrice,
+                    ratio,
+                    changePct,
+                    changeStr,
+                    changeClass,
+                    flashClass,
+                    spread,
+                    baseShort: pair.base_symbol,
+                    quoteShort: pair.quote_symbol,
+                    isIndex: true,
+                    baseColor: baseIdx.color,
+                    quoteColor: quoteIdx.color
+                });
+            });
 
             // Sort the data
             pairsData.sort((a, b) => {
+                // Index pairs always at top
+                if (a.isIndex !== b.isIndex) {
+                    return a.isIndex ? -1 : 1;
+                }
+                
                 let valA, valB;
                 switch (pairsSortColumn) {
                     case 'pair':
@@ -9667,11 +11640,19 @@
 
             // Render sorted data
             tbody.innerHTML = pairsData.map(data => {
+                const baseStyle = data.isIndex ? `style="color: ${data.baseColor}; font-weight: 700;"` : '';
+                const quoteStyle = data.isIndex ? `style="color: ${data.quoteColor}; font-weight: 700;"` : '';
+                const rowClass = data.isIndex ? 'index-pair-row' : '';
+                const clickHandler = data.isIndex ? 
+                    `onclick="openIndexPairModal('${data.pair.id}', 'LONG')"` : 
+                    `onclick="openPairsModal('${data.pair.id}', 'LONG')"`;
+                
                 return `
-                    <tr onclick="openPairsModal('${data.pair.id}', 'LONG')" style="cursor: pointer;">
+                    <tr ${clickHandler} style="cursor: pointer;" class="${rowClass}">
                         <td>
                             <span class="pair-symbol">
-                                <span class="base">${data.baseShort}</span>/<span class="quote">${data.quoteShort}</span>
+                                <span class="base" ${baseStyle}>${data.baseShort}</span>/<span class="quote" ${quoteStyle}>${data.quoteShort}</span>
+                                ${data.isIndex ? '<span class="index-badge">IDX</span>' : ''}
                             </span>
                         </td>
                         <td class="pairs-price ${data.flashClass}">$${data.basePrice.toFixed(2)}</td>
@@ -9682,6 +11663,53 @@
                     </tr>
                 `;
             }).join('');
+        }
+        
+        // Open modal for index pairs
+        function openIndexPairModal(pairId, side) {
+            if (!currentUser) {
+                showToast('Login Required', 'Please sign in to trade pairs', true);
+                return;
+            }
+            
+            const pair = indexPairs.find(p => p.id === pairId);
+            if (!pair) {
+                showToast('Error', 'Index pair not found', true);
+                return;
+            }
+            
+            const baseIdx = getIndexPrice(pair.base_symbol);
+            const quoteIdx = getIndexPrice(pair.quote_symbol);
+            
+            if (!baseIdx || !quoteIdx) {
+                showToast('Error', 'Index prices not available', true);
+                return;
+            }
+            
+            const ratio = baseIdx.price / quoteIdx.price;
+            
+            currentPairTrade = {
+                pairId,
+                pair,
+                side,
+                baseTea: { current_price: baseIdx.price, symbol: pair.base_symbol },
+                quoteTea: { current_price: quoteIdx.price, symbol: pair.quote_symbol },
+                ratio,
+                baseShort: pair.base_symbol,
+                quoteShort: pair.quote_symbol,
+                isIndex: true
+            };
+
+            // Update modal display
+            document.getElementById('pairs-modal-title').textContent = `${side} ${pair.base_symbol}/${pair.quote_symbol}`;
+            document.getElementById('modal-pair-display').innerHTML = 
+                `<span class="base" style="color: ${baseIdx.color};">${pair.base_symbol}</span>/<span class="quote" style="color: ${quoteIdx.color};">${pair.quote_symbol}</span>`;
+            document.getElementById('modal-ratio-display').textContent = `Ratio: ${ratio.toFixed(4)}`;
+
+            setLeverage(1);
+            setPairsSide(side);
+            updatePairsSummary();
+            document.getElementById('pairs-modal').classList.add('active');
         }
 
         function openPairsModal(pairId, side) {
