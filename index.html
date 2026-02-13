@@ -687,6 +687,29 @@
             border-collapse: collapse;
             font-size: 12px;
         }
+
+        .order-table-wrapper {
+            max-height: 320px;
+            overflow-y: auto;
+        }
+
+        .order-table-wrapper::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .order-table-wrapper::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+        }
+
+        .order-table-wrapper::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        .order-table-wrapper::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
         
         .order-table th {
             text-align: left;
@@ -749,6 +772,11 @@
         .order-status.pending {
             background: rgba(251, 191, 36, 0.15);
             color: var(--accent-orange);
+        }
+
+        .order-status.closed {
+            background: rgba(96, 165, 250, 0.15);
+            color: var(--accent-blue);
         }
 
         .close-position-btn {
@@ -2707,6 +2735,7 @@
                     </div>
                 <button class="filter-btn active">All</button>
                 </div>
+                <div class="order-table-wrapper">
                 <table class="order-table">
                     <thead>
                         <tr>
@@ -2715,7 +2744,7 @@
                             <th>Tea</th>
                             <th>Side</th>
                             <th>Qty (kg)</th>
-                            <th>Price</th>
+                            <th>Entry</th>
                             <th>Total</th>
                             <th>P/L</th>
                             <th>Status</th>
@@ -2730,6 +2759,7 @@
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
 
@@ -4206,9 +4236,36 @@
             
             if (!tbody) return;
 
-            countEl.textContent = trades.length;
+            // Separate BUY and SELL trades
+            const buyTrades = trades.filter(t => t.side === 'BUY');
+            const sellTrades = trades.filter(t => t.side === 'SELL');
 
-            if (trades.length === 0) {
+            // Match SELL trades to BUY trades (closing trades)
+            const closedBuyIds = new Set();
+            const closingInfo = {}; // buyTradeId -> { sellPrice, sellTime }
+
+            // For each SELL, find the most recent BUY of the same tea that hasn't been closed
+            sellTrades.forEach(sell => {
+                const matchingBuy = buyTrades.find(buy => 
+                    buy.tea_id === sell.tea_id && 
+                    buy.quantity === sell.quantity &&
+                    !closedBuyIds.has(buy.id) &&
+                    buy.id < sell.id // SELL must come after BUY
+                );
+                if (matchingBuy) {
+                    closedBuyIds.add(matchingBuy.id);
+                    closingInfo[matchingBuy.id] = {
+                        sellPrice: sell.price,
+                        sellTime: sell.created_at
+                    };
+                }
+            });
+
+            // Only show BUY trades (open or closed)
+            const displayTrades = buyTrades;
+            countEl.textContent = displayTrades.length;
+
+            if (displayTrades.length === 0) {
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 20px;">
@@ -4220,42 +4277,52 @@
             }
 
             let html = '';
-            trades.forEach(trade => {
+            displayTrades.forEach(trade => {
                 const time = trade.created_at 
                     ? new Date(trade.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
                     : '--:--';
                 const orderId = '#' + String(trade.id).substring(0, 5).toUpperCase();
                 const tea = teas.find(t => t.id === trade.tea_id);
                 const teaSymbol = tea?.symbol || 'Unknown';
-                const sideClass = trade.side === 'BUY' ? 'buy-side' : 'sell-side';
                 const total = (trade.quantity * trade.price).toFixed(2);
                 
-                // Calculate P/L based on current price vs entry price
+                const isClosed = closedBuyIds.has(trade.id);
+                const closing = closingInfo[trade.id];
+                
+                // Calculate P/L
                 let pnl = 0;
                 let pnlPct = 0;
-                if (tea && trade.side === 'BUY') {
+                if (isClosed && closing) {
+                    // Locked-in P/L from the closing trade
+                    pnl = (closing.sellPrice - trade.price) * trade.quantity;
+                    pnlPct = ((closing.sellPrice - trade.price) / trade.price * 100);
+                } else if (tea) {
+                    // Live P/L based on current price
                     pnl = (tea.current_price - trade.price) * trade.quantity;
                     pnlPct = ((tea.current_price - trade.price) / trade.price * 100);
-                } else if (tea && trade.side === 'SELL') {
-                    // For sells, P/L is locked in at trade time
-                    pnl = 0;
-                    pnlPct = 0;
                 }
                 const pnlClass = pnl >= 0 ? 'up' : 'down';
                 const pnlSign = pnl >= 0 ? '+' : '';
+
+                // Status and action
+                const status = isClosed ? 'CLOSED' : 'OPEN';
+                const statusClass = isClosed ? 'closed' : 'filled';
+                const actionBtn = isClosed 
+                    ? `<span style="color: var(--text-muted);">—</span>`
+                    : `<button class="close-position-btn" onclick="closePosition(${trade.tea_id}, ${trade.quantity}, '${teaSymbol}')">Close</button>`;
 
                 html += `
                     <tr>
                         <td>${time}</td>
                         <td style="font-family: 'JetBrains Mono', monospace;">${orderId}</td>
                         <td>${teaSymbol}</td>
-                        <td><span class="order-side ${sideClass}">${trade.side}</span></td>
+                        <td><span class="order-side buy-side">BUY</span></td>
                         <td class="order-qty">${trade.quantity.toLocaleString()}</td>
                         <td class="order-price">$${trade.price.toFixed(2)}</td>
                         <td class="order-price">$${parseFloat(total).toLocaleString()}</td>
-                        <td class="${pnlClass}">${trade.side === 'BUY' ? pnlSign + '$' + pnl.toFixed(2) : '—'}</td>
-                        <td><span class="order-status filled">FILLED</span></td>
-                        <td>${trade.side === 'BUY' ? `<button class="close-position-btn" onclick="closePosition(${trade.tea_id}, ${trade.quantity}, '${teaSymbol}')">Close</button>` : '—'}</td>
+                        <td class="${pnlClass}">${pnlSign}$${pnl.toFixed(2)} (${pnlPct.toFixed(1)}%)</td>
+                        <td><span class="order-status ${statusClass}">${status}</span></td>
+                        <td>${actionBtn}</td>
                     </tr>
                 `;
             });
