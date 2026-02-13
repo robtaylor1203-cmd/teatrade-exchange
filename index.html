@@ -681,6 +681,11 @@
             padding: 2px 8px;
             border-radius: 10px;
         }
+
+        .order-filter-buttons {
+            display: flex;
+            gap: 8px;
+        }
         
         .order-table {
             width: 100%;
@@ -2776,8 +2781,10 @@
                         Your Confirmed Orders
                         <span class="order-count" id="order-count">0</span>
                     </div>
-                <button class="filter-btn active" id="filter-all" onclick="setOrdersFilter('all')">All</button>
-                <button class="filter-btn" id="filter-open" onclick="setOrdersFilter('open')">Open</button>
+                    <div class="order-filter-buttons">
+                        <button class="filter-btn" id="filter-open" onclick="setOrdersFilter('open')">Open</button>
+                        <button class="filter-btn active" id="filter-all" onclick="setOrdersFilter('all')">All</button>
+                    </div>
                 </div>
                 <div class="order-table-wrapper">
                 <table class="order-table" id="orders-table">
