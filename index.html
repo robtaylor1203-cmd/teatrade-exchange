@@ -4047,7 +4047,7 @@
             try {
                 const { data, error } = await supabaseClient
                     .from('trades')
-                    .select('*, teas(symbol)')
+                    .select('*')
                     .eq('user_id', currentUser.id)
                     .order('created_at', { ascending: false })
                     .limit(20);
@@ -4082,7 +4082,8 @@
             trades.forEach(trade => {
                 const time = new Date(trade.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
                 const orderId = '#' + trade.id.substring(0, 5).toUpperCase();
-                const teaSymbol = trade.teas?.symbol || 'Unknown';
+                const tea = teas.find(t => t.id === trade.tea_id);
+                const teaSymbol = tea?.symbol || 'Unknown';
                 const sideClass = trade.side === 'BUY' ? 'buy-side' : 'sell-side';
                 const total = (trade.quantity * trade.price).toFixed(2);
 
