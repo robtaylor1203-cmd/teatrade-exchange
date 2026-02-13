@@ -760,6 +760,9 @@
             border-top: 2px solid var(--border);
             font-weight: 600;
             background: var(--bg-tertiary);
+            position: sticky;
+            bottom: 0;
+            z-index: 1;
         }
         
         .order-table td {
@@ -2798,6 +2801,17 @@
                             </td>
                         </tr>
                     </tbody>
+                    <tfoot id="orders-tfoot" style="display: none;">
+                        <tr>
+                            <td colspan="4" style="text-align: right; color: var(--text-muted);">OPEN POSITIONS TOTAL</td>
+                            <td></td>
+                            <td></td>
+                            <td id="tfoot-total" class="order-price">$0.00</td>
+                            <td id="tfoot-pnl">$0.00</td>
+                            <td id="tfoot-count"><span style="color: var(--text-muted);">0 open</span></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
                 </table>
                 </div>
             </div>
@@ -4453,22 +4467,23 @@
                 `;
             });
 
-            // Add totals row for open positions
+            // Update totals in tfoot
+            const tfoot = document.getElementById('orders-tfoot');
+            const tfootTotal = document.getElementById('tfoot-total');
+            const tfootPnl = document.getElementById('tfoot-pnl');
+            const tfootCount = document.getElementById('tfoot-count');
+
             if (openCount > 0) {
+                tfoot.style.display = '';
                 const openPnlClass = openTotalPnl >= 0 ? 'up' : 'down';
                 const openPnlSign = openTotalPnl >= 0 ? '+' : '';
                 const openPnlPct = openTotalValue > 0 ? (openTotalPnl / openTotalValue * 100) : 0;
-                html += `
-                    <tr style="background: var(--bg-tertiary); font-weight: 600;">
-                        <td colspan="4" style="text-align: right; color: var(--text-muted);">OPEN POSITIONS TOTAL</td>
-                        <td></td>
-                        <td></td>
-                        <td class="order-price">$${openTotalValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                        <td class="${openPnlClass}">${openPnlSign}$${openTotalPnl.toFixed(2)} (${openPnlPct.toFixed(1)}%)</td>
-                        <td><span style="color: var(--text-muted);">${openCount} open</span></td>
-                        <td></td>
-                    </tr>
-                `;
+                
+                tfootTotal.textContent = '$' + openTotalValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                tfootPnl.innerHTML = `<span class="${openPnlClass}">${openPnlSign}$${openTotalPnl.toFixed(2)} (${openPnlPct.toFixed(1)}%)</span>`;
+                tfootCount.innerHTML = `<span style="color: var(--text-muted);">${openCount} open</span>`;
+            } else {
+                tfoot.style.display = 'none';
             }
 
             tbody.innerHTML = html;
