@@ -437,6 +437,38 @@
         .chat-blast:hover {
             background: #d97706;
         }
+        
+        /* Private message styling */
+        .chat-message.private {
+            background: rgba(147, 51, 234, 0.1);
+            border-left: 2px solid var(--accent-purple, #9333ea);
+            padding-left: 8px;
+            margin-left: -8px;
+        }
+        
+        .chat-message.private .chat-sender {
+            color: var(--accent-purple, #9333ea);
+        }
+        
+        .chat-message.private .chat-text::before {
+            content: '🔒 ';
+            font-size: 10px;
+        }
+        
+        .chat-message.own {
+            background: rgba(26, 115, 232, 0.1);
+            border-left: 2px solid var(--accent-blue);
+            padding-left: 8px;
+            margin-left: -8px;
+        }
+        
+        .chat-sender.dm-target {
+            color: var(--accent-purple, #9333ea);
+        }
+        
+        .chat-sender.dm-target::before {
+            content: '→ ';
+        }
 
         /* Center Content */
         .center-content {
@@ -4660,50 +4692,16 @@
                 <div class="chat-header">
                     <div class="chat-title">
                         TT Messenger
-                        <span class="chat-online">3 online</span>
+                        <span class="chat-online" id="chat-online-count">0 online</span>
                     </div>
                 </div>
-                <div class="chat-messages">
-                    <div class="chat-message">
-                        <div class="chat-message-header">
-                            <span class="chat-sender">J.HARRISON@FINLAYS</span>
-                            <span class="chat-time">14:28</span>
-                        </div>
-                        <div class="chat-text">Looking for 20MT BP1 Mombasa. Can you source?</div>
-                    </div>
-                    <div class="chat-message">
-                        <div class="chat-message-header">
-                            <span class="chat-sender">R.PATEL@TATA</span>
-                            <span class="chat-time">14:22</span>
-                        </div>
-                        <div class="chat-text">Confirmed 15MT Assam CTC at 285. Settlement T+2.</div>
-                    </div>
-                    <div class="chat-message">
-                        <div class="chat-message-header">
-                            <span class="chat-sender system">SYSTEM</span>
-                            <span class="chat-time">14:15</span>
-                        </div>
-                        <div class="chat-text">Trade alert: Your bid on Lot #24608 has been matched.</div>
-                    </div>
-                    <div class="chat-message">
-                        <div class="chat-message-header">
-                            <span class="chat-sender">M.WONG@EKATERRA</span>
-                            <span class="chat-time">14:08</span>
-                        </div>
-                        <div class="chat-text">Any visibility on Ceylon OP availability next week?</div>
-                    </div>
-                    <div class="chat-message">
-                        <div class="chat-message-header">
-                            <span class="chat-sender">K.MUTHONI@KTDA</span>
-                            <span class="chat-time">13:55</span>
-                        </div>
-                        <div class="chat-text">New lots arriving from Kericho highlands tomorrow. Premium quality expected.</div>
-                    </div>
+                <div class="chat-messages" id="chat-messages">
+                    <!-- Messages will be populated dynamically -->
                 </div>
                 <div class="chat-input-container">
-                    <input type="text" class="chat-input" placeholder="Type a message...">
-                    <button class="chat-send">Send</button>
-                    <button class="chat-blast" title="BLAST"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg></button>
+                    <input type="text" class="chat-input" id="chat-input" placeholder="Type a message... (@user for DM)">
+                    <button class="chat-send" id="chat-send-btn" onclick="sendChatMessage()">Send</button>
+                    <button class="chat-blast" title="BLAST" onclick="sendBlastMessage()"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg></button>
                 </div>
             </div>
         </div>
@@ -8579,6 +8577,273 @@
             if (window.innerWidth > 1200) {
                 closeMobileMenu();
             }
+        });
+
+        // =============================================
+        // LIVE CHAT SYSTEM
+        // =============================================
+        
+        let chatMessages = [];
+        let chatSubscription = null;
+        let onlineUsers = new Set();
+        
+        // Initialize chat system
+        async function initChat() {
+            await loadChatMessages();
+            setupChatSubscription();
+            setupChatInputListeners();
+            updateOnlineCount();
+            
+            // Simulate some users being online
+            setInterval(updateOnlineCount, 30000);
+        }
+        
+        // Load recent chat messages
+        async function loadChatMessages() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('chat_messages')
+                    .select('*')
+                    .order('created_at', { ascending: true })
+                    .limit(50);
+                
+                if (error) {
+                    // Table might not exist yet - show demo messages
+                    console.log('Chat table not found, using demo messages');
+                    loadDemoChatMessages();
+                    return;
+                }
+                
+                chatMessages = data || [];
+                renderChatMessages();
+            } catch (err) {
+                console.error('Error loading chat:', err);
+                loadDemoChatMessages();
+            }
+        }
+        
+        // Load demo messages for when the table doesn't exist
+        function loadDemoChatMessages() {
+            const now = new Date();
+            chatMessages = [
+                { id: 1, sender_email: 'k.muthoni@ktda.co.ke', sender_name: 'K.MUTHONI', message: 'New lots arriving from Kericho highlands tomorrow. Premium quality expected.', created_at: new Date(now - 35 * 60000).toISOString(), is_private: false },
+                { id: 2, sender_email: 'm.wong@ekaterra.com', sender_name: 'M.WONG', message: 'Any visibility on Ceylon OP availability next week?', created_at: new Date(now - 22 * 60000).toISOString(), is_private: false },
+                { id: 3, sender_email: 'system', sender_name: 'SYSTEM', message: 'Trade alert: Lot #24608 has been matched.', created_at: new Date(now - 15 * 60000).toISOString(), is_private: false, is_system: true },
+                { id: 4, sender_email: 'r.patel@tata.com', sender_name: 'R.PATEL', message: 'Confirmed 15MT Assam CTC at 285. Settlement T+2.', created_at: new Date(now - 8 * 60000).toISOString(), is_private: false },
+                { id: 5, sender_email: 'j.harrison@finlays.com', sender_name: 'J.HARRISON', message: 'Looking for 20MT BP1 Mombasa. Can you source?', created_at: new Date(now - 2 * 60000).toISOString(), is_private: false }
+            ];
+            renderChatMessages();
+        }
+        
+        // Set up real-time subscription
+        function setupChatSubscription() {
+            chatSubscription = supabaseClient
+                .channel('chat_messages')
+                .on('postgres_changes', 
+                    { event: 'INSERT', schema: 'public', table: 'chat_messages' },
+                    (payload) => {
+                        const newMessage = payload.new;
+                        // Check if it's a private message for someone else
+                        if (newMessage.is_private && newMessage.recipient_email !== currentUser?.email && newMessage.sender_email !== currentUser?.email) {
+                            return; // Don't show private messages not meant for us
+                        }
+                        chatMessages.push(newMessage);
+                        renderChatMessages();
+                    }
+                )
+                .subscribe();
+        }
+        
+        // Render chat messages
+        function renderChatMessages() {
+            const container = document.getElementById('chat-messages');
+            if (!container) return;
+            
+            const currentEmail = currentUser?.email || '';
+            
+            container.innerHTML = chatMessages.map(msg => {
+                const isOwn = msg.sender_email === currentEmail;
+                const isPrivate = msg.is_private;
+                const isSystem = msg.is_system || msg.sender_name === 'SYSTEM';
+                
+                let msgClass = 'chat-message';
+                if (isOwn) msgClass += ' own';
+                if (isPrivate) msgClass += ' private';
+                
+                let senderClass = 'chat-sender';
+                if (isSystem) senderClass += ' system';
+                
+                const time = formatChatTime(msg.created_at);
+                const senderDisplay = isOwn ? 'YOU' : msg.sender_name || msg.sender_email?.split('@')[0].toUpperCase();
+                
+                let recipientTag = '';
+                if (isPrivate && msg.recipient_email) {
+                    const recipientName = msg.recipient_email.split('@')[0].toUpperCase();
+                    recipientTag = `<span class="chat-sender dm-target">@${recipientName}</span>`;
+                }
+                
+                return `
+                    <div class="${msgClass}">
+                        <div class="chat-message-header">
+                            <span class="${senderClass}">${senderDisplay}${recipientTag}</span>
+                            <span class="chat-time">${time}</span>
+                        </div>
+                        <div class="chat-text">${escapeHtml(msg.message)}</div>
+                    </div>
+                `;
+            }).join('');
+            
+            // Scroll to bottom
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        // Format chat timestamp
+        function formatChatTime(timestamp) {
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            
+            if (diffMins < 1) return 'now';
+            if (diffMins < 60) return `${diffMins}m ago`;
+            
+            // Show time if today
+            if (date.toDateString() === now.toDateString()) {
+                return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            }
+            
+            // Show date if older
+            return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        }
+        
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Set up input listeners
+        function setupChatInputListeners() {
+            const input = document.getElementById('chat-input');
+            if (!input) return;
+            
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendChatMessage();
+                }
+            });
+        }
+        
+        // Send a chat message
+        async function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            if (!input) return;
+            
+            const message = input.value.trim();
+            if (!message) return;
+            
+            // Check if user is logged in
+            if (!currentUser) {
+                showToast('Login Required', 'Please log in to send messages');
+                openAuthModal();
+                return;
+            }
+            
+            // Parse for @username (private message)
+            let isPrivate = false;
+            let recipientEmail = null;
+            let actualMessage = message;
+            
+            const dmMatch = message.match(/^@(\S+)\s+(.+)/);
+            if (dmMatch) {
+                isPrivate = true;
+                const recipientHandle = dmMatch[1].toLowerCase();
+                actualMessage = dmMatch[2];
+                
+                // Try to find recipient (for demo, just use the handle as email prefix)
+                recipientEmail = recipientHandle.includes('@') ? recipientHandle : `${recipientHandle}@teatrade.exchange`;
+            }
+            
+            // Clear input immediately for responsiveness
+            input.value = '';
+            
+            // Get sender name
+            const senderName = currentUser.email.split('@')[0].toUpperCase();
+            
+            try {
+                const { error } = await supabaseClient
+                    .from('chat_messages')
+                    .insert({
+                        sender_email: currentUser.email,
+                        sender_name: senderName,
+                        message: actualMessage,
+                        is_private: isPrivate,
+                        recipient_email: recipientEmail
+                    });
+                
+                if (error) {
+                    // Table might not exist - add locally for demo
+                    console.log('Chat insert error (table may not exist), adding locally');
+                    addLocalChatMessage(senderName, actualMessage, isPrivate, recipientEmail);
+                }
+            } catch (err) {
+                console.error('Error sending message:', err);
+                addLocalChatMessage(senderName, actualMessage, isPrivate, recipientEmail);
+            }
+        }
+        
+        // Add message locally (for demo/offline mode)
+        function addLocalChatMessage(senderName, message, isPrivate, recipientEmail) {
+            const newMsg = {
+                id: Date.now(),
+                sender_email: currentUser?.email || 'demo@user.com',
+                sender_name: senderName,
+                message: message,
+                created_at: new Date().toISOString(),
+                is_private: isPrivate,
+                recipient_email: recipientEmail
+            };
+            chatMessages.push(newMsg);
+            renderChatMessages();
+        }
+        
+        // Send a blast message (highlighted)
+        function sendBlastMessage() {
+            const input = document.getElementById('chat-input');
+            if (!input) return;
+            
+            const message = input.value.trim();
+            if (!message) {
+                showToast('Empty Message', 'Type a message to blast');
+                return;
+            }
+            
+            if (!currentUser) {
+                showToast('Login Required', 'Please log in to send blasts');
+                openAuthModal();
+                return;
+            }
+            
+            // Blast is just a highlighted global message
+            input.value = `🔥 BLAST: ${message}`;
+            sendChatMessage();
+        }
+        
+        // Update online user count
+        function updateOnlineCount() {
+            const countEl = document.getElementById('chat-online-count');
+            if (!countEl) return;
+            
+            // Simulate random online count (2-8)
+            const count = 2 + Math.floor(Math.random() * 7);
+            countEl.textContent = `${count} online`;
+        }
+        
+        // Initialize chat when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(initChat, 1000); // Delay to let auth initialize first
         });
 
         // =============================================
