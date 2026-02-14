@@ -311,21 +311,23 @@
         .chat-notification-badge {
             display: none;
             position: fixed;
-            bottom: 20px;
-            left: 20px;
+            bottom: 24px;
+            left: 24px;
             background: var(--accent-blue);
             color: white;
-            padding: 6px 10px;
-            border-radius: 16px;
-            font-size: 10px;
+            padding: 10px 14px;
+            border-radius: 20px;
+            font-size: 12px;
             font-weight: 600;
             cursor: pointer;
-            z-index: 1000;
-            box-shadow: 0 4px 12px rgba(26, 115, 232, 0.4);
+            z-index: 10000;
+            box-shadow: 0 4px 16px rgba(26, 115, 232, 0.5);
             animation: chatBadgePulse 2s ease-in-out infinite;
             transition: transform 0.2s, background 0.2s;
             width: fit-content;
-            max-width: 80px;
+            max-width: 100px;
+            height: auto;
+            max-height: 44px;
         }
         
         .chat-notification-badge:hover {
@@ -340,8 +342,8 @@
         }
         
         .chat-notification-badge svg {
-            width: 12px;
-            height: 12px;
+            width: 18px;
+            height: 18px;
             flex-shrink: 0;
         }
         
@@ -352,11 +354,11 @@
         .chat-notification-count {
             background: white;
             color: var(--accent-blue);
-            padding: 1px 4px;
-            border-radius: 6px;
-            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 11px;
             font-weight: 700;
-            min-width: 14px;
+            min-width: 18px;
             text-align: center;
             flex-shrink: 0;
         }
@@ -6322,12 +6324,6 @@
                 </div>
             </div>
         </div>
-        
-        <!-- Chat Notification Badge (fixed position) -->
-        <div class="chat-notification-badge" id="chat-notification-badge" onclick="scrollToChatSection()">
-            <svg fill="currentColor" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
-            <span class="chat-notification-count" id="chat-notification-count">0</span>
-        </div>
 
         <!-- Center Content -->
         <div class="center-content">
@@ -7259,17 +7255,22 @@
                         return dbData;
                     }
                     
-                    // Fallback to generated data (seeded for consistency)
+                    // Database empty - generate FIXED historical data and SAVE to database
+                    console.log(`No data for ${cacheKey} - seeding database with historical data...`);
                     let generatedData;
                     if (symbolType === 'index') {
-                        generatedData = generateIndexHistoricalData(symbol);
+                        generatedData = generateFixedHistoricalData(symbol, symbolType);
                     } else {
                         const tea = teas?.find(t => t.symbol === symbol);
-                        generatedData = tea ? generateTeaHistory(tea) : [];
+                        generatedData = tea ? generateFixedHistoricalData(symbol, symbolType, tea.current_price) : [];
                     }
                     
                     if (generatedData && generatedData.length > 0) {
+                        // SAVE to database immediately so it persists
+                        await seedPriceHistoryToDatabase(symbol, symbolType, generatedData);
+                        
                         priceDataCache.data[cacheKey] = generatedData;
+                        priceDataCache.loaded[cacheKey] = true;
                         priceDataCache.lastUpdate[cacheKey] = Date.now();
                     }
                     
@@ -7368,6 +7369,148 @@
             console.log('Price cache initialized');
         }
         
+        // Generate historical data with FIXED timestamps (not relative to current time)
+        // This ensures the same data is generated on every page load
+        function generateFixedHistoricalData(symbol, symbolType, basePrice = null) {
+            // Use FIXED base date - Jan 1, 2025 00:00:00 UTC
+            const FIXED_EPOCH = new Date('2025-01-01T00:00:00Z').getTime();
+            
+            // Seeded random based on symbol for consistency
+            const seed = symbol.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+            let seededRandom = seed;
+            const nextRandom = () => {
+                seededRandom = (seededRandom * 9301 + 49297) % 233280;
+                return seededRandom / 233280;
+            };
+            
+            // Determine base price
+            let startPrice;
+            if (basePrice) {
+                startPrice = basePrice;
+            } else if (symbolType === 'index') {
+                // Index base prices
+                const indexPrices = {
+                    'KENYA': 3.42, 'INDIA': 4.15, 'CEYLON': 3.89, 'CHINA': 2.67, 'JAPAN': 5.23,
+                    'AFRICA': 2.95, 'ASIA': 3.45, 'MOMBASA': 2.87, 'KOLKATA': 267.45,
+                    'COLOMBO': 3.24, 'FUTURES': 3847
+                };
+                startPrice = indexPrices[symbol] || 3.50;
+            } else {
+                // Tea base prices
+                const teaPrices = {
+                    'KEN-BP1': 3.42, 'KEN-PF1': 2.98, 'KEN-DUST': 2.15,
+                    'IND-CTC': 4.12, 'IND-ORTH': 5.67, 'IND-DARJ': 12.45,
+                    'SRI-BOP': 3.89, 'SRI-BOPF': 4.23, 'CHN-KEEM': 8.90,
+                    'CHN-LONG': 15.60, 'JPN-SENC': 22.30, 'JPN-GYOK': 45.00,
+                    'TW-OOLO': 18.75
+                };
+                startPrice = teaPrices[symbol] || 3.50;
+            }
+            
+            // Generate 720 hourly candles (30 days)
+            const data = [];
+            let price = startPrice;
+            const volatility = symbolType === 'index' ? 0.002 : 0.008;
+            
+            for (let i = 0; i < 720; i++) {
+                const timestamp = FIXED_EPOCH + (i * 3600000); // Each candle = 1 hour
+                
+                // Generate OHLC with seeded random
+                const change = (nextRandom() - 0.5) * 2 * volatility * price;
+                const open = price;
+                const close = Math.max(0.01, price + change);
+                const high = Math.max(open, close) * (1 + nextRandom() * volatility * 0.5);
+                const low = Math.min(open, close) * (1 - nextRandom() * volatility * 0.5);
+                const volume = Math.round(10000 + nextRandom() * 50000);
+                
+                data.push({
+                    date: new Date(timestamp),
+                    open: open,
+                    high: high,
+                    low: Math.max(0.01, low),
+                    close: close,
+                    volume: volume
+                });
+                
+                price = close;
+            }
+            
+            return data;
+        }
+        
+        // Save generated historical data to Supabase database
+        async function seedPriceHistoryToDatabase(symbol, symbolType, data) {
+            if (!supabaseClient || !data || data.length === 0) {
+                console.warn(`Cannot seed ${symbol} - no supabase client or data`);
+                return;
+            }
+            
+            try {
+                console.log(`Seeding ${data.length} candles for ${symbol} to database...`);
+                
+                // Convert OHLC data to multiple price ticks per candle for proper reconstruction
+                // Store 4 ticks per hour: open (0min), high (15min), low (30min), close (45min)
+                const records = [];
+                data.forEach(candle => {
+                    const baseTime = candle.date.getTime();
+                    
+                    // Open at 0 minutes
+                    records.push({
+                        symbol: symbol,
+                        symbol_type: symbolType,
+                        price: candle.open,
+                        volume: Math.round((candle.volume || 0) / 4),
+                        recorded_at: new Date(baseTime).toISOString()
+                    });
+                    
+                    // High at 15 minutes
+                    records.push({
+                        symbol: symbol,
+                        symbol_type: symbolType,
+                        price: candle.high,
+                        volume: Math.round((candle.volume || 0) / 4),
+                        recorded_at: new Date(baseTime + 15 * 60 * 1000).toISOString()
+                    });
+                    
+                    // Low at 30 minutes
+                    records.push({
+                        symbol: symbol,
+                        symbol_type: symbolType,
+                        price: candle.low,
+                        volume: Math.round((candle.volume || 0) / 4),
+                        recorded_at: new Date(baseTime + 30 * 60 * 1000).toISOString()
+                    });
+                    
+                    // Close at 45 minutes
+                    records.push({
+                        symbol: symbol,
+                        symbol_type: symbolType,
+                        price: candle.close,
+                        volume: Math.round((candle.volume || 0) / 4),
+                        recorded_at: new Date(baseTime + 45 * 60 * 1000).toISOString()
+                    });
+                });
+                
+                // Insert in batches of 200 to avoid timeout
+                const batchSize = 200;
+                for (let i = 0; i < records.length; i += batchSize) {
+                    const batch = records.slice(i, i + batchSize);
+                    const { error } = await supabaseClient
+                        .from('price_history')
+                        .upsert(batch, { onConflict: 'symbol,recorded_at' });
+                    
+                    if (error) {
+                        console.error(`Error seeding batch ${i/batchSize + 1} for ${symbol}:`, error);
+                        // Continue with other batches even if one fails
+                    }
+                }
+                
+                console.log(`Successfully seeded ${records.length} records for ${symbol}`);
+            } catch (err) {
+                console.error(`Failed to seed ${symbol} to database:`, err);
+            }
+        }
+
         // Market indices data structure - tracks current data at each position
         // Prices will be updated dynamically from calculateMarketIndexes()
         let mainChartData = { name: 'Kenyan Tea Price Index', symbol: 'KENYA', basePrice: 3.42, change: 2.4, currency: '$', volume: '8.2M' };
@@ -10231,6 +10374,20 @@
                         option.dataset.price = tea.current_price;
                     }
                 });
+                
+                // ALSO update index prices (crucial for live trading)
+                const indexes = calculateRegionalIndexes();
+                if (indexes && indexes.length > 0) {
+                    indexes.forEach(idx => {
+                        const option = select.querySelector(`option[value="INDEX_${idx.symbol}"]`);
+                        if (option) {
+                            const changeSign = idx.change >= 0 ? '+' : '';
+                            option.textContent = `${idx.symbol} Index - $${idx.price.toFixed(2)} (${changeSign}${idx.change.toFixed(1)}%)`;
+                            option.dataset.price = idx.price;
+                        }
+                    });
+                }
+                
                 // Update the trade summary with new price
                 updateTradeSummary();
                 return;
@@ -10723,6 +10880,72 @@
             }
         }
 
+        async function closeIndexPosition(indexSymbol, quantity, tradeId) {
+            if (!currentUser) {
+                openAuthModal();
+                return;
+            }
+
+            // Get current index price
+            const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
+            const index = indexes.find(idx => idx.symbol === indexSymbol);
+            if (!index) {
+                showToast('Error', 'Index not found', true);
+                return;
+            }
+
+            // Find the user's index position
+            const position = indexPositions[indexSymbol];
+            if (!position || position.quantity < quantity) {
+                showToast('Error', 'Index position not found or insufficient quantity', true);
+                return;
+            }
+
+            const price = index.price;
+            const total = price * quantity;
+
+            try {
+                // Update cash balance
+                const newBalance = userProfile.cash_balance + total;
+                const { error: balanceError } = await supabaseClient
+                    .from('profiles')
+                    .update({ cash_balance: newBalance })
+                    .eq('id', currentUser.id);
+                if (balanceError) throw balanceError;
+
+                // Update or delete index position
+                await updateIndexPosition(indexSymbol, quantity, price, 'SELL');
+
+                // Record the closing trade in trades table
+                const { error: tradeError } = await supabaseClient
+                    .from('trades')
+                    .insert({
+                        user_id: currentUser.id,
+                        tea_id: null,
+                        index_symbol: indexSymbol,
+                        side: 'SELL',
+                        quantity: quantity,
+                        price: price,
+                        total_value: total
+                    });
+                if (tradeError) throw tradeError;
+
+                userProfile.cash_balance = newBalance;
+                const pnl = (price - position.avg_entry_price) * quantity;
+                const pnlText = pnl >= 0 ? `Profit: +$${pnl.toFixed(2)}` : `Loss: -$${Math.abs(pnl).toFixed(2)}`;
+                showToast('Position Closed!', `Sold ${quantity.toLocaleString()} kg of ${indexSymbol} Index. ${pnlText}`);
+
+                // Refresh data
+                await loadIndexPositions();
+                await loadUserTrades();
+                updateUIForLoggedInUser();
+
+            } catch (error) {
+                console.error('Close index position error:', error);
+                showToast('Error', error.message, true);
+            }
+        }
+
         async function closePairPosition(tradeId) {
             if (!currentUser) {
                 openAuthModal();
@@ -11189,17 +11412,19 @@
             let openTotalValue = 0;
             let openTotalPnl = 0;
 
-            processedTrades.forEach(({ trade, timeStr, orderId, tea, teaSymbol, total, isClosed, pnl, pnlPct, status, isPairTrade, leverage }) => {
+            processedTrades.forEach(({ trade, timeStr, orderId, tea, teaSymbol, total, isClosed, pnl, pnlPct, status, isPairTrade, isIndexTrade, leverage }) => {
                 const pnlClass = pnl >= 0 ? 'up' : 'down';
                 const pnlSign = pnl >= 0 ? '+' : '';
                 const statusClass = isClosed ? 'closed' : 'filled';
                 
-                // Different close action for pairs vs singles
+                // Different close action for pairs vs singles vs indexes
                 let actionBtn;
                 if (isClosed) {
                     actionBtn = `<span style="color: var(--text-muted);">\u2014</span>`;
                 } else if (isPairTrade) {
                     actionBtn = `<button class="close-position-btn" onclick="closePairPosition('${trade.id}')">Close</button>`;
+                } else if (isIndexTrade) {
+                    actionBtn = `<button class="close-position-btn" onclick="closeIndexPosition('${trade.index_symbol}', ${trade.quantity}, ${trade.id})">Close</button>`;
                 } else {
                     actionBtn = `<button class="close-position-btn" onclick="closePosition(${trade.tea_id}, ${trade.quantity}, '${teaSymbol}')">Close</button>`;
                 }
@@ -15788,5 +16013,11 @@
         }, 30000); // Every 30 seconds
 
     </script>
+    
+    <!-- Chat Notification Badge (fixed position - must be outside main-grid) -->
+    <div class="chat-notification-badge" id="chat-notification-badge" onclick="scrollToChatSection()">
+        <svg fill="currentColor" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
+        <span class="chat-notification-count" id="chat-notification-count">0</span>
+    </div>
 </body>
 </html>
