@@ -16553,6 +16553,7 @@
             const tpInput = document.getElementById('qq-tp');
             const stopLoss = slInput?.value ? parseFloat(slInput.value) : null;
             const takeProfit = tpInput?.value ? parseFloat(tpInput.value) : null;
+            const isIndexTrade = !!quickQuoteTea.isIndex;
             
             if (qty <= 0) {
                 showToast('Invalid quantity', 'Please enter a valid quantity', true);
@@ -16570,98 +16571,162 @@
             execBtn.textContent = 'Executing...';
             
             try {
-                if (quickQuoteTradeType === 'BUY') {
-                    // Deduct from balance
-                    const { error: balanceError } = await supabaseClient
-                        .from('profiles')
-                        .update({ cash_balance: (userProfile?.cash_balance || 0) - total })
-                        .eq('id', currentUser.id);
-                    
-                    if (balanceError) throw balanceError;
-                    
-                    // Update local balance
-                    if (userProfile) userProfile.cash_balance -= total;
-                }
-                
-                // Record the trade
-                const tradeData = {
-                    user_id: currentUser.id,
-                    tea_id: quickQuoteTea.id,
-                    side: quickQuoteTradeType,
-                    quantity: qty,
-                    price: price,
-                    total_value: total
-                };
-                
-                const { data: trade, error: tradeError } = await supabaseClient
-                    .from('trades')
-                    .insert(tradeData)
-                    .select()
-                    .single();
-                
-                if (tradeError) throw tradeError;
-                
-                // Update positions
-                const existingPos = positions.find(p => p.tea_id === quickQuoteTea.id);
-                
-                if (quickQuoteTradeType === 'BUY') {
-                    if (existingPos) {
-                        // Average up
-                        const newQty = existingPos.quantity + qty;
-                        const newAvgPrice = ((existingPos.avg_entry_price * existingPos.quantity) + (price * qty)) / newQty;
-                        
-                        await supabaseClient
-                            .from('positions')
-                            .update({ quantity: newQty, avg_entry_price: newAvgPrice })
-                            .eq('id', existingPos.id);
-                        
-                        existingPos.quantity = newQty;
-                        existingPos.avg_entry_price = newAvgPrice;
+                const productName = quickQuoteTea.name || quickQuoteTea.symbol;
+
+                if (isIndexTrade) {
+                    // === INDEX TRADE ===
+                    const indexSymbol = quickQuoteTea.symbol;
+                    // Resolve tea_id from first underlying tea (or null)
+                    const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
+                    const idx = indexes.find(i => i.symbol === indexSymbol);
+                    const underlyingTea = idx ? teas?.find(t => idx.teas?.includes(t.symbol)) : null;
+                    const teaId = underlyingTea?.id || null;
+
+                    if (quickQuoteTradeType === 'BUY') {
+                        // Deduct balance
+                        const newBalance = (userProfile?.cash_balance || 0) - total;
+                        const { error: balanceError } = await supabaseClient
+                            .from('profiles')
+                            .update({ cash_balance: newBalance })
+                            .eq('id', currentUser.id);
+                        if (balanceError) throw balanceError;
+                        if (userProfile) userProfile.cash_balance = newBalance;
+
+                        // Update index position
+                        if (typeof updateIndexPosition === 'function') {
+                            await updateIndexPosition(indexSymbol, qty, price, 'BUY');
+                        }
                     } else {
-                        const posData = {
-                            user_id: currentUser.id,
-                            tea_id: quickQuoteTea.id,
-                            quantity: qty,
-                            avg_entry_price: price
-                        };
-                        
-                        const { data: newPos } = await supabaseClient
-                            .from('positions')
-                            .insert(posData)
-                            .select()
-                            .single();
-                        
-                        if (newPos) positions.push(newPos);
+                        // SELL index – check holdings
+                        const indexPos = typeof getIndexPosition === 'function' ? getIndexPosition(indexSymbol) : null;
+                        if (!indexPos || indexPos.quantity < qty) {
+                            throw new Error('Insufficient index holdings');
+                        }
+
+                        // Credit balance
+                        const newBalance = (userProfile?.cash_balance || 0) + total;
+                        const { error: balanceError } = await supabaseClient
+                            .from('profiles')
+                            .update({ cash_balance: newBalance })
+                            .eq('id', currentUser.id);
+                        if (balanceError) throw balanceError;
+                        if (userProfile) userProfile.cash_balance = newBalance;
+
+                        // Update index position
+                        if (typeof updateIndexPosition === 'function') {
+                            await updateIndexPosition(indexSymbol, qty, price, 'SELL');
+                        }
                     }
+
+                    // Record trade with index_symbol
+                    const { error: tradeError } = await supabaseClient
+                        .from('trades')
+                        .insert({
+                            user_id: currentUser.id,
+                            tea_id: teaId,
+                            side: quickQuoteTradeType,
+                            quantity: qty,
+                            price: price,
+                            total_value: total,
+                            index_symbol: indexSymbol
+                        });
+                    if (tradeError) throw tradeError;
+
                 } else {
-                    // SELL - reduce position
-                    if (existingPos && existingPos.quantity >= qty) {
-                        const newQty = existingPos.quantity - qty;
+                    // === REGULAR TEA TRADE ===
+                    if (quickQuoteTradeType === 'BUY') {
+                        // Deduct from balance
+                        const { error: balanceError } = await supabaseClient
+                            .from('profiles')
+                            .update({ cash_balance: (userProfile?.cash_balance || 0) - total })
+                            .eq('id', currentUser.id);
                         
-                        if (newQty <= 0) {
-                            await supabaseClient
-                                .from('positions')
-                                .delete()
-                                .eq('id', existingPos.id);
+                        if (balanceError) throw balanceError;
+                        
+                        // Update local balance
+                        if (userProfile) userProfile.cash_balance -= total;
+                    }
+                    
+                    // Record the trade
+                    const tradeData = {
+                        user_id: currentUser.id,
+                        tea_id: quickQuoteTea.id,
+                        side: quickQuoteTradeType,
+                        quantity: qty,
+                        price: price,
+                        total_value: total
+                    };
+                    
+                    const { data: trade, error: tradeError } = await supabaseClient
+                        .from('trades')
+                        .insert(tradeData)
+                        .select()
+                        .single();
+                    
+                    if (tradeError) throw tradeError;
+                    
+                    // Update positions
+                    const existingPos = positions.find(p => p.tea_id === quickQuoteTea.id);
+                    
+                    if (quickQuoteTradeType === 'BUY') {
+                        if (existingPos) {
+                            // Average up
+                            const newQty = existingPos.quantity + qty;
+                            const newAvgPrice = ((existingPos.avg_entry_price * existingPos.quantity) + (price * qty)) / newQty;
                             
-                            positions = positions.filter(p => p.id !== existingPos.id);
-                        } else {
                             await supabaseClient
                                 .from('positions')
-                                .update({ quantity: newQty })
+                                .update({ quantity: newQty, avg_entry_price: newAvgPrice })
                                 .eq('id', existingPos.id);
                             
                             existingPos.quantity = newQty;
+                            existingPos.avg_entry_price = newAvgPrice;
+                        } else {
+                            const posData = {
+                                user_id: currentUser.id,
+                                tea_id: quickQuoteTea.id,
+                                quantity: qty,
+                                avg_entry_price: price
+                            };
+                            
+                            const { data: newPos } = await supabaseClient
+                                .from('positions')
+                                .insert(posData)
+                                .select()
+                                .single();
+                            
+                            if (newPos) positions.push(newPos);
                         }
-                        
-                        // Credit balance
-                        const { error: creditError } = await supabaseClient
-                            .from('profiles')
-                            .update({ cash_balance: (userProfile?.cash_balance || 0) + total })
-                            .eq('id', currentUser.id);
-                        
-                        if (!creditError && userProfile) {
-                            userProfile.cash_balance += total;
+                    } else {
+                        // SELL - reduce position
+                        if (existingPos && existingPos.quantity >= qty) {
+                            const newQty = existingPos.quantity - qty;
+                            
+                            if (newQty <= 0) {
+                                await supabaseClient
+                                    .from('positions')
+                                    .delete()
+                                    .eq('id', existingPos.id);
+                                
+                                positions = positions.filter(p => p.id !== existingPos.id);
+                            } else {
+                                await supabaseClient
+                                    .from('positions')
+                                    .update({ quantity: newQty })
+                                    .eq('id', existingPos.id);
+                                
+                                existingPos.quantity = newQty;
+                            }
+                            
+                            // Credit balance
+                            const { error: creditError } = await supabaseClient
+                                .from('profiles')
+                                .update({ cash_balance: (userProfile?.cash_balance || 0) + total })
+                                .eq('id', currentUser.id);
+                            
+                            if (!creditError && userProfile) {
+                                userProfile.cash_balance += total;
+                            }
                         }
                     }
                 }
@@ -16670,7 +16735,7 @@
                 await loadUserTrades();
                 updatePortfolioDisplay();
                 
-                showToast(`${quickQuoteTradeType} Order Filled`, `${qty} kg of ${quickQuoteTea.name || quickQuoteTea.symbol} @ $${price.toFixed(2)}`);
+                showToast(`${quickQuoteTradeType} Order Filled`, `${qty} kg of ${productName} @ $${price.toFixed(2)}`);
                 closeQuickQuoteModal();
                 
             } catch (error) {
