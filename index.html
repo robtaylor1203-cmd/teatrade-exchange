@@ -15718,6 +15718,21 @@
             sellBtn.classList.toggle('active', type === 'SELL');
             
             execBtn.className = `quick-trade-execute ${type.toLowerCase()}`;
+            
+            // Update mobile sticky bar button color
+            const mobileTradeBtn = document.getElementById('qq-mobile-trade-btn');
+            if (mobileTradeBtn) {
+                mobileTradeBtn.className = `qq-mobile-trade-btn ${type.toLowerCase()}`;
+            }
+            
+            // Update mobile form execute button color
+            const mobileExecBtn = document.getElementById('qq-mobile-execute-btn');
+            if (mobileExecBtn) {
+                mobileExecBtn.className = `quick-trade-execute ${type.toLowerCase()}`;
+                mobileExecBtn.style.width = '100%';
+                mobileExecBtn.style.marginTop = '14px';
+            }
+            
             updateQuickTradeSummary();
         }
         
