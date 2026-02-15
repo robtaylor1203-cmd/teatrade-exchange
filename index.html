@@ -4900,13 +4900,23 @@
                 max-width: 100vw;
             }
             
-            /* Hide ticker strip and bottom bar on mobile */
+            /* Hide ticker strip on mobile */
             .ticker-strip {
                 display: none;
             }
             
             .bottom-bar {
-                display: none;
+                flex-direction: column;
+                gap: 4px;
+                padding: 8px 12px;
+                font-size: 10px;
+                text-align: center;
+            }
+            
+            .bottom-stat {
+                justify-content: center;
+                gap: 12px;
+                flex-wrap: wrap;
             }
             
             /* Market Cards - horizontal scroll */
