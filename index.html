@@ -13487,11 +13487,41 @@
         // Load recent chat messages
         async function loadChatMessages() {
             try {
-                const { data, error } = await supabaseClient
-                    .from('chat_messages')
-                    .select('*')
-                    .order('created_at', { ascending: true })
-                    .limit(50);
+                // Load public messages + private messages where current user is sender or recipient
+                const userEmail = currentUser?.email;
+                let query;
+                if (userEmail) {
+                    // Fetch public messages and private messages involving this user
+                    const { data: publicMsgs } = await supabaseClient
+                        .from('chat_messages')
+                        .select('*')
+                        .eq('is_private', false)
+                        .order('created_at', { ascending: true })
+                        .limit(50);
+                    
+                    const { data: privateMsgs } = await supabaseClient
+                        .from('chat_messages')
+                        .select('*')
+                        .eq('is_private', true)
+                        .or(`recipient_email.eq.${userEmail},sender_email.eq.${userEmail}`)
+                        .order('created_at', { ascending: true })
+                        .limit(50);
+                    
+                    // Merge and sort
+                    const allMsgs = [...(publicMsgs || []), ...(privateMsgs || [])];
+                    allMsgs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+                    var data = allMsgs;
+                    var error = null;
+                } else {
+                    const result = await supabaseClient
+                        .from('chat_messages')
+                        .select('*')
+                        .eq('is_private', false)
+                        .order('created_at', { ascending: true })
+                        .limit(50);
+                    var data = result.data;
+                    var error = result.error;
+                }
                 
                 if (error) {
                     // Table might not exist yet - show demo messages
@@ -13661,11 +13691,30 @@
                     return;
                 }
                 
-                isPrivate = true;
-                actualMessage = dmMessage;
-                
-                // Try to find recipient (for demo, just use the handle as email prefix)
-                recipientEmail = recipientHandle.includes('@') ? recipientHandle : `${recipientHandle}@teatrade.exchange`;
+                // Look up recipient by username in profiles table
+                try {
+                    const { data: recipientProfile, error: lookupError } = await supabaseClient
+                        .from('profiles')
+                        .select('id, username, email')
+                        .ilike('username', recipientHandle)
+                        .single();
+                    
+                    if (lookupError || !recipientProfile) {
+                        showToast('User Not Found', `No user found with username "${dmMatch[1]}". Check spelling.`, true);
+                        input.value = message; // Restore message so user can fix
+                        return;
+                    }
+                    
+                    isPrivate = true;
+                    actualMessage = dmMessage;
+                    recipientEmail = recipientProfile.email;
+                    var recipientName = recipientProfile.username.toUpperCase();
+                } catch (lookupErr) {
+                    console.error('Error looking up recipient:', lookupErr);
+                    showToast('Error', 'Could not look up user. Try again.', true);
+                    input.value = message;
+                    return;
+                }
             }
             
             // Clear input immediately for responsiveness
@@ -13675,15 +13724,19 @@
             const senderUsername = (userProfile?.username || 'trader').toUpperCase();
             
             try {
+                const insertData = {
+                    sender_email: currentUser.email,
+                    sender_name: senderUsername,
+                    message: actualMessage,
+                    is_private: isPrivate,
+                    recipient_email: recipientEmail
+                };
+                if (isPrivate && typeof recipientName !== 'undefined') {
+                    insertData.recipient_name = recipientName;
+                }
                 const { error } = await supabaseClient
                     .from('chat_messages')
-                    .insert({
-                        sender_email: currentUser.email,
-                        sender_name: senderUsername,
-                        message: actualMessage,
-                        is_private: isPrivate,
-                        recipient_email: recipientEmail
-                    });
+                    .insert(insertData);
                 
                 if (error) {
                     // Table might not exist - add locally for demo

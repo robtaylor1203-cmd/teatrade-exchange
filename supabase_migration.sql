@@ -98,3 +98,9 @@ ON CONFLICT (code) DO NOTHING;
 ALTER TABLE price_history
     ADD CONSTRAINT IF NOT EXISTS price_history_symbol_recorded_at_key
     UNIQUE (symbol, recorded_at);
+
+-- =============================================
+-- 5. Add recipient_name column to chat_messages
+-- Stores the display name for private message recipients
+-- =============================================
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS recipient_name TEXT;
