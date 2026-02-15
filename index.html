@@ -11968,9 +11968,27 @@
                 }
 
                 // Find the pair (check both tea pairs and index pairs)
-                let pair = teaPairs.find(p => p.id === trade.pair_id);
-                const isIndexPair = !pair;
-                if (!pair) pair = indexPairs.find(p => p.id === trade.pair_id);
+                let pair = null;
+                let isIndexPair = false;
+                
+                if (trade.pair_id) {
+                    // Tea pair - look up by UUID
+                    pair = teaPairs.find(p => p.id === trade.pair_id);
+                }
+                
+                if (!pair && trade.index_symbol && trade.index_symbol.includes('/')) {
+                    // Index pair - reconstruct from stored "BASE/QUOTE" format
+                    const parts = trade.index_symbol.split('/');
+                    pair = { base_symbol: parts[0], quote_symbol: parts[1], isIndex: true };
+                    isIndexPair = true;
+                }
+                
+                if (!pair && trade.pair_id) {
+                    // Fallback: check indexPairs by id
+                    pair = indexPairs.find(p => p.id === trade.pair_id);
+                    if (pair) isIndexPair = true;
+                }
+                
                 if (!pair) {
                     showToast('Error', 'Pair not found', true);
                     return;
