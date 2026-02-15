@@ -17367,7 +17367,7 @@
                     quantity: amount,
                     price: currentPairTrade.ratio,
                     total_value: amount * selectedLeverage,
-                    pair_id: currentPairTrade.pairId,
+                    pair_id: currentPairTrade.isIndex ? null : currentPairTrade.pairId,
                     leverage: selectedLeverage,
                     is_pair_trade: true
                 };
