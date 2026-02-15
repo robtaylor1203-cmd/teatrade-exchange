@@ -8121,6 +8121,9 @@
         let userProfile = null;
         let teas = [];
         let positions = [];
+        let dbIndexes = [];       // Loaded from Supabase 'indexes' table
+        let indexPairs = [];      // Loaded from Supabase 'index_pairs' table
+        let originNames = {};     // Loaded from Supabase 'origins' table
         
         // Chart state
         let currentTimeframe = '1W';
@@ -8275,9 +8278,8 @@
                 });
             }
             
-            // Load all index symbols
-            const indexSymbols = ['KENYA', 'INDIA', 'CEYLON', 'CHINA', 'JAPAN', 'AFRICA', 'ASIA', 'MOMBASA', 'KOLKATA', 'COLOMBO', 'FUTURES'];
-            indexSymbols.forEach(symbol => {
+            // Load all index symbols from DB
+            getIndexSymbols().forEach(symbol => {
                 loadPromises.push(getPriceHistory(symbol, 'index'));
             });
             
@@ -8457,29 +8459,24 @@
                 return { price: avgPrice, change: change };
             };
             
-            // KENYA Index - Kenya teas
-            const kenya = calcIndex(['KEN-BP1', 'KEN-PF1', 'KEN-DUST']);
+            const result = {};
             
-            // MOMBASA - Kenya auction (same as Kenya but displayed separately)
-            const mombasa = calcIndex(['KEN-BP1', 'KEN-PF1', 'KEN-DUST']);
+            // Use all indexes from DB (both market cards and regional)
+            if (dbIndexes.length > 0) {
+                dbIndexes.forEach(idx => {
+                    const calc = calcIndex(idx.teas || [], idx.currency || '$', idx.multiplier || 1);
+                    result[idx.symbol] = calc;
+                });
+            } else {
+                // Fallback to hardcoded
+                result.KENYA = calcIndex(['KEN-BP1', 'KEN-PF1', 'KEN-DUST']);
+                result.MOMBASA = calcIndex(['KEN-BP1', 'KEN-PF1', 'KEN-DUST']);
+                result.KOLKATA = calcIndex(['IND-ASM', 'IND-DRJ'], '₹', 83);
+                result.COLOMBO = calcIndex(['SRI-BOP', 'SRI-PEK']);
+                result.FUTURES = calcIndex(['KEN-BP1', 'IND-ASM', 'SRI-BOP', 'CHN-YUN', 'IND-DRJ'], '$', 1000);
+            }
             
-            // KOLKATA - India teas (in Rupees, ~83 INR per USD)
-            const kolkata = calcIndex(['IND-ASM', 'IND-DRJ'], '₹', 83);
-            
-            // COLOMBO - Sri Lanka teas
-            const colombo = calcIndex(['SRI-BOP', 'SRI-PEK']);
-            
-            // FUTURES - Global composite (all major teas, price per metric ton = price * 1000)
-            const allSymbols = ['KEN-BP1', 'IND-ASM', 'SRI-BOP', 'CHN-YUN', 'IND-DRJ'];
-            const futures = calcIndex(allSymbols, '$', 1000);
-            
-            return {
-                KENYA: kenya,
-                MOMBASA: mombasa,
-                KOLKATA: kolkata,
-                COLOMBO: colombo,
-                FUTURES: futures
-            };
+            return result;
         }
         
         // Update all market index displays with real calculated prices
@@ -9770,7 +9767,7 @@
             
             // Update hub chart incrementally from unified cache
             const hubSymbol = document.getElementById('hub-buy-symbol')?.value || 'KENYA';
-            const isHubIndex = ['KENYA', 'KENYAN', 'INDIA', 'CEYLON', 'CHINA', 'JAPAN', 'AFRICA', 'ASIA'].includes(hubSymbol);
+            const isHubIndex = isIndexSymbol(hubSymbol === 'KENYAN' ? 'KENYA' : hubSymbol);
             const hubLookupSymbol = hubSymbol === 'KENYAN' ? 'KENYA' : hubSymbol;
             const hubCacheKey = isHubIndex ? `INDEX_${hubLookupSymbol}` : hubLookupSymbol;
             
@@ -10537,6 +10534,12 @@
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', async () => {
             await checkAuthState();
+            
+            // Load reference data from Supabase first (indexes, origins, pairs)
+            await loadIndexes();
+            await loadIndexPairs();
+            await loadOrigins();
+            
             await loadTeas();
             
             // Initialize unified price cache from database (ensures all charts use same data)
@@ -10791,6 +10794,79 @@
             } catch (error) {
                 console.error('Failed to load teas:', error);
             }
+        }
+
+        async function loadIndexes() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('indexes')
+                    .select('*')
+                    .order('display_order');
+                if (error) throw error;
+                dbIndexes = data || [];
+            } catch (error) {
+                console.error('Failed to load indexes:', error);
+                // Fallback to hardcoded defaults if table doesn't exist yet
+                dbIndexes = [
+                    { symbol: 'KENYA', name: 'Kenya Tea Index', teas: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST'], color: 'var(--accent-green)', currency: '$', multiplier: 1, is_market_card: false },
+                    { symbol: 'INDIA', name: 'India Tea Index', teas: ['IND-ASM', 'IND-DRJ'], color: 'var(--accent-orange)', currency: '$', multiplier: 1, is_market_card: false },
+                    { symbol: 'CEYLON', name: 'Ceylon Tea Index', teas: ['SRI-BOP', 'SRI-PEK'], color: 'var(--accent-purple)', currency: '$', multiplier: 1, is_market_card: false },
+                    { symbol: 'CHINA', name: 'China Tea Index', teas: ['CHN-YUN'], color: 'var(--accent-red)', currency: '$', multiplier: 1, is_market_card: false },
+                    { symbol: 'AFRICA', name: 'African Tea Index', teas: ['KEN-BP1', 'KEN-PF1', 'MLW-BP1', 'RWA-OP'], color: 'var(--accent-green)', currency: '$', multiplier: 1, is_market_card: false },
+                    { symbol: 'ASIA', name: 'Asian Tea Index', teas: ['IND-ASM', 'IND-DRJ', 'SRI-BOP', 'SRI-PEK', 'CHN-YUN'], color: 'var(--accent-blue)', currency: '$', multiplier: 1, is_market_card: false },
+                    { symbol: 'MOMBASA', name: 'Mombasa Auction Index', teas: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST'], color: 'var(--accent-green)', currency: '$', multiplier: 1, is_market_card: true },
+                    { symbol: 'KOLKATA', name: 'Kolkata Tea Index', teas: ['IND-ASM', 'IND-DRJ'], color: 'var(--accent-orange)', currency: '₹', multiplier: 83, is_market_card: true },
+                    { symbol: 'COLOMBO', name: 'Colombo Index', teas: ['SRI-BOP', 'SRI-PEK'], color: 'var(--accent-purple)', currency: '$', multiplier: 1, is_market_card: true },
+                    { symbol: 'FUTURES', name: 'Global Tea Futures', teas: ['KEN-BP1', 'IND-ASM', 'SRI-BOP', 'CHN-YUN', 'IND-DRJ'], color: 'var(--accent-blue)', currency: '$', multiplier: 1000, is_market_card: true }
+                ];
+            }
+        }
+
+        async function loadIndexPairs() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('index_pairs')
+                    .select('*');
+                if (error) throw error;
+                indexPairs = (data || []).map(p => ({ ...p, isIndex: true }));
+            } catch (error) {
+                console.error('Failed to load index pairs:', error);
+                // Fallback
+                indexPairs = [
+                    { id: 'idx-kenya-india', base_symbol: 'KENYA', quote_symbol: 'INDIA', isIndex: true },
+                    { id: 'idx-india-ceylon', base_symbol: 'INDIA', quote_symbol: 'CEYLON', isIndex: true },
+                    { id: 'idx-africa-asia', base_symbol: 'AFRICA', quote_symbol: 'ASIA', isIndex: true },
+                    { id: 'idx-kenya-ceylon', base_symbol: 'KENYA', quote_symbol: 'CEYLON', isIndex: true },
+                    { id: 'idx-china-india', base_symbol: 'CHINA', quote_symbol: 'INDIA', isIndex: true },
+                ];
+            }
+        }
+
+        async function loadOrigins() {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('origins')
+                    .select('*')
+                    .order('display_order');
+                if (error) throw error;
+                originNames = {};
+                (data || []).forEach(o => { originNames[o.code] = o.name; });
+            } catch (error) {
+                console.error('Failed to load origins:', error);
+                // Fallback
+                originNames = { KEN: 'Kenya', IND: 'India', SRI: 'Sri Lanka', CHN: 'China', JPN: 'Japan', MLW: 'Malawi', RWA: 'Rwanda' };
+            }
+        }
+
+        // Helper: get all index symbols from loaded DB data
+        function getIndexSymbols() {
+            if (dbIndexes.length > 0) return dbIndexes.map(i => i.symbol);
+            return ['KENYA', 'INDIA', 'CEYLON', 'CHINA', 'JAPAN', 'AFRICA', 'ASIA', 'MOMBASA', 'KOLKATA', 'COLOMBO', 'FUTURES'];
+        }
+
+        // Helper: check if a symbol is an index
+        function isIndexSymbol(symbol) {
+            return getIndexSymbols().includes(symbol?.toUpperCase());
         }
         
         // Update main chart to use real calculated index prices
@@ -11067,9 +11143,8 @@
             if (hubChartData && hubChartData.length > 0 && maximizedPanel?.classList.contains('panel-maximized')) {
                 const symbol = document.getElementById('hub-buy-symbol')?.value;
                 if (symbol) {
-                    const indexSymbols = ['KENYA', 'KENYAN', 'INDIA', 'CEYLON', 'CHINA', 'JAPAN', 'AFRICA', 'ASIA'];
                     const lookupSymbol = symbol === 'KENYAN' ? 'KENYA' : symbol;
-                    const isIndex = indexSymbols.includes(symbol);
+                    const isIndex = isIndexSymbol(lookupSymbol);
                     
                     let newPrice;
                     if (isIndex) {
@@ -12678,44 +12753,17 @@
             const teaMap = {};
             teas.forEach(tea => teaMap[tea.symbol] = tea);
             
-            const indexes = [
-                { 
-                    symbol: 'KENYA', 
-                    name: 'Kenya Tea Index',
-                    teas: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST'],
-                    color: 'var(--accent-green)'
-                },
-                { 
-                    symbol: 'INDIA', 
-                    name: 'India Tea Index',
-                    teas: ['IND-ASM', 'IND-DRJ'],
-                    color: 'var(--accent-orange)'
-                },
-                { 
-                    symbol: 'CEYLON', 
-                    name: 'Ceylon Tea Index',
-                    teas: ['SRI-BOP', 'SRI-PEK'],
-                    color: 'var(--accent-purple)'
-                },
-                { 
-                    symbol: 'CHINA', 
-                    name: 'China Tea Index',
-                    teas: ['CHN-YUN'],
-                    color: 'var(--accent-red)'
-                },
-                { 
-                    symbol: 'AFRICA', 
-                    name: 'African Tea Index',
-                    teas: ['KEN-BP1', 'KEN-PF1', 'MLW-BP1', 'RWA-OP'],
-                    color: 'var(--accent-green)'
-                },
-                { 
-                    symbol: 'ASIA', 
-                    name: 'Asian Tea Index',
-                    teas: ['IND-ASM', 'IND-DRJ', 'SRI-BOP', 'SRI-PEK', 'CHN-YUN'],
-                    color: 'var(--accent-blue)'
-                }
-            ];
+            // Use indexes loaded from Supabase (non-market-card indexes)
+            const indexes = dbIndexes.length > 0
+                ? dbIndexes.filter(i => !i.is_market_card)
+                : [
+                    { symbol: 'KENYA', name: 'Kenya Tea Index', teas: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST'], color: 'var(--accent-green)' },
+                    { symbol: 'INDIA', name: 'India Tea Index', teas: ['IND-ASM', 'IND-DRJ'], color: 'var(--accent-orange)' },
+                    { symbol: 'CEYLON', name: 'Ceylon Tea Index', teas: ['SRI-BOP', 'SRI-PEK'], color: 'var(--accent-purple)' },
+                    { symbol: 'CHINA', name: 'China Tea Index', teas: ['CHN-YUN'], color: 'var(--accent-red)' },
+                    { symbol: 'AFRICA', name: 'African Tea Index', teas: ['KEN-BP1', 'KEN-PF1', 'MLW-BP1', 'RWA-OP'], color: 'var(--accent-green)' },
+                    { symbol: 'ASIA', name: 'Asian Tea Index', teas: ['IND-ASM', 'IND-DRJ', 'SRI-BOP', 'SRI-PEK', 'CHN-YUN'], color: 'var(--accent-blue)' }
+                ];
             
             return indexes.map(idx => {
                 const prices = idx.teas.map(s => teaMap[s]?.current_price || 0).filter(p => p > 0);
@@ -13940,9 +13988,8 @@
         
         async function loadOrGenerateHubChartData(symbol) {
             // Hub chart uses unified price cache for consistency
-            const indexSymbols = ['KENYA', 'KENYAN', 'INDIA', 'CEYLON', 'CHINA', 'JAPAN', 'AFRICA', 'ASIA'];
             const lookupSymbol = symbol === 'KENYAN' ? 'KENYA' : symbol;
-            const isIndex = indexSymbols.includes(symbol);
+            const isIndex = isIndexSymbol(lookupSymbol);
             const symbolType = isIndex ? 'index' : 'tea';
             
             // Get from unified cache (which loads from DB first)
@@ -13952,9 +13999,8 @@
         
         function generateInitialChartData(symbol) {
             // Uses unified cache sync version
-            const indexSymbols = ['KENYA', 'KENYAN', 'INDIA', 'CEYLON', 'CHINA', 'JAPAN', 'AFRICA', 'ASIA'];
             const lookupSymbol = symbol === 'KENYAN' ? 'KENYA' : symbol;
-            const isIndex = indexSymbols.includes(symbol);
+            const isIndex = isIndexSymbol(lookupSymbol);
             const symbolType = isIndex ? 'index' : 'tea';
             
             // Get from unified cache (sync version for immediate rendering)
@@ -14022,9 +14068,8 @@
             const symbol = document.getElementById('hub-buy-symbol')?.value || 'KENYA';
             
             // Use unified cache sync version (this returns data from DB-first cache)
-            const indexSymbols = ['KENYA', 'KENYAN', 'INDIA', 'CEYLON', 'CHINA', 'JAPAN', 'AFRICA', 'ASIA'];
             const lookupSymbol = symbol === 'KENYAN' ? 'KENYA' : symbol;
-            const isIndex = indexSymbols.includes(symbol);
+            const isIndex = isIndexSymbol(lookupSymbol);
             const symbolType = isIndex ? 'index' : 'tea';
             
             let data = getPriceHistorySync(lookupSymbol, symbolType);
@@ -14072,9 +14117,8 @@
             const symbol = document.getElementById('hub-buy-symbol')?.value || '';
             
             // Check if this is an index
-            const indexSymbols = ['KENYA', 'KENYAN', 'INDIA', 'CEYLON', 'CHINA', 'JAPAN', 'AFRICA', 'ASIA'];
             const lookupSymbol = symbol === 'KENYAN' ? 'KENYA' : symbol;
-            const isIndex = indexSymbols.includes(symbol);
+            const isIndex = isIndexSymbol(lookupSymbol);
             
             let position = null;
             let currentPrice = 0;
@@ -14687,10 +14731,9 @@
             
             // Helper to get price for symbol (tea or index)
             const getPriceForSymbol = (symbol) => {
-                const indexSymbols = ['KENYA', 'KENYAN', 'INDIA', 'CEYLON', 'CHINA', 'JAPAN', 'AFRICA', 'ASIA'];
-                if (indexSymbols.includes(symbol)) {
+                const lookupSymbol = symbol === 'KENYAN' ? 'KENYA' : symbol;
+                if (isIndexSymbol(lookupSymbol)) {
                     const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
-                    const lookupSymbol = symbol === 'KENYAN' ? 'KENYA' : symbol;
                     const index = indexes.find(idx => idx.symbol === lookupSymbol);
                     return index?.price || 3.50;
                 } else {
@@ -14801,9 +14844,8 @@
             }
             
             // Check if this is an index trade
-            const indexSymbols = ['KENYA', 'KENYAN', 'INDIA', 'CEYLON', 'CHINA', 'JAPAN', 'AFRICA', 'ASIA'];
             const lookupSymbol = symbol === 'KENYAN' ? 'KENYA' : symbol;
-            const isIndex = indexSymbols.includes(symbol);
+            const isIndex = isIndexSymbol(lookupSymbol);
             
             let price, productName, teaId = null;
             
@@ -15531,7 +15573,7 @@
             teas.forEach(t => {
                 const parts = t.symbol.split('-');
                 const origin = parts[0] || 'Other';
-                const originNames = { KEN: 'Kenya', IND: 'India', SRI: 'Sri Lanka', CHN: 'China', JPN: 'Japan', MLW: 'Malawi', RWA: 'Rwanda' };
+                // Use global originNames loaded from Supabase (fallback to code if not loaded)
                 const label = originNames[origin] || origin;
                 if (!origins[label]) origins[label] = [];
                 origins[label].push(t);
@@ -16900,14 +16942,8 @@
         let selectedLeverage = 1;
         let previousPairRatios = {};
 
-        // Regional Index Pairs (calculated from tea averages)
-        const indexPairs = [
-            { id: 'idx-kenya-india', base_symbol: 'KENYA', quote_symbol: 'INDIA', isIndex: true },
-            { id: 'idx-india-ceylon', base_symbol: 'INDIA', quote_symbol: 'CEYLON', isIndex: true },
-            { id: 'idx-africa-asia', base_symbol: 'AFRICA', quote_symbol: 'ASIA', isIndex: true },
-            { id: 'idx-kenya-ceylon', base_symbol: 'KENYA', quote_symbol: 'CEYLON', isIndex: true },
-            { id: 'idx-china-india', base_symbol: 'CHINA', quote_symbol: 'INDIA', isIndex: true },
-        ];
+        // Regional Index Pairs - loaded from Supabase via loadIndexPairs()
+        // (indexPairs is declared in Global State section)
 
         async function loadTeaPairs() {
             try {
