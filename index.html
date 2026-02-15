@@ -8852,8 +8852,8 @@
                 item.classList.toggle('active', item.textContent === tf);
             });
             
-            // Close menu
-            document.getElementById('timeframe-menu').classList.remove('visible');
+            // Close all dropdowns
+            closeAllDropdowns();
             
             drawChart();
         }
@@ -9165,6 +9165,9 @@
             activeStudies[study] = !activeStudies[study];
             const toggle = document.getElementById('toggle-' + study);
             toggle.classList.toggle('active', activeStudies[study]);
+            
+            // Close studies menu on selection
+            closeAllDropdowns();
             
             // Update button appearance
             const hasActive = Object.values(activeStudies).some(v => v);
@@ -14590,7 +14593,7 @@
         function setHubTimeframe(tf) {
             hubTimeframe = tf;
             document.getElementById('hub-timeframe-label').textContent = tf;
-            document.getElementById('hub-timeframe-menu').classList.remove('show');
+            closeAllDropdowns();
             
             // Also update main chart timeframe to keep in sync
             setTimeframe(tf);
@@ -14608,6 +14611,7 @@
         function toggleHubStudy(study) {
             hubStudies[study] = !hubStudies[study];
             updateHubStudyToggles();
+            closeAllDropdowns();
             
             // Show/hide RSI section
             if (study === 'rsi') {
@@ -15278,7 +15282,25 @@
         let quickQuoteTradeType = 'BUY';
         let quickQuoteTea = null;
         
+        // Global: close all open dropdowns
+        function closeAllDropdowns() {
+            // QQ symbol dropdown
+            const qqList = document.getElementById('qq-symbol-list');
+            const qqDd = document.getElementById('qq-symbol-dropdown');
+            if (qqList) qqList.classList.remove('show');
+            if (qqDd) qqDd.classList.remove('open');
+            // Timeframe menus
+            document.getElementById('timeframe-menu')?.classList.remove('visible');
+            document.getElementById('hub-timeframe-menu')?.classList.remove('show');
+            // Studies menus
+            document.getElementById('studies-menu')?.classList.remove('visible');
+            document.getElementById('hub-studies-menu')?.classList.remove('show');
+            // Multi-chart tea selector
+            document.querySelector('.mc-tea-selector')?.remove();
+        }
+
         function openQuickQuoteModal(tea) {
+            closeAllDropdowns();
             quickQuoteTea = tea;
             const modal = document.getElementById('quick-quote-modal');
             if (!modal) return;
