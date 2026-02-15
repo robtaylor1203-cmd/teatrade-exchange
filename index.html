@@ -15514,7 +15514,7 @@
                     const change = t.price_change_24h || 0;
                     const isUp = change >= 0;
                     const isActive = quickQuoteTea && quickQuoteTea.id === t.id;
-                    html += `<div class="qq-symbol-item${isActive ? ' active' : ''}" onclick="selectQQSymbol('${t.symbol}', false)">
+                    html += `<div class="qq-symbol-item${isActive ? ' active' : ''}" onclick="event.stopPropagation(); selectQQSymbol('${t.symbol}', false)">
                         <span class="qq-symbol-item-left"><span class="qq-si-dot tea"></span>${sym} <span class="qq-si-name">— ${t.name}</span></span>
                         <span class="qq-symbol-item-price ${isUp ? 'up' : 'down'}">$${price.toFixed(2)}</span>
                     </div>`;
@@ -15528,7 +15528,7 @@
                 indexes.forEach(idx => {
                     const isUp = (idx.change || 0) >= 0;
                     const isActive = quickQuoteTea && quickQuoteTea.symbol === idx.symbol;
-                    html += `<div class="qq-symbol-item${isActive ? ' active' : ''}" onclick="selectQQSymbol('${idx.symbol}', true)">
+                    html += `<div class="qq-symbol-item${isActive ? ' active' : ''}" onclick="event.stopPropagation(); selectQQSymbol('${idx.symbol}', true)">
                         <span class="qq-symbol-item-left"><span class="qq-si-dot index"></span>${idx.symbol} <span class="qq-si-name">— ${idx.name}</span></span>
                         <span class="qq-symbol-item-price ${isUp ? 'up' : 'down'}">$${idx.price.toFixed(2)}</span>
                     </div>`;
