@@ -12347,8 +12347,31 @@
                         pnl = 0;
                         pnlPct = 0;
                     }
+                } else if (isIndexTrade && trade.is_pair_trade) {
+                    // Index PAIR trade - index_symbol is stored as "BASE/QUOTE"
+                    const parts = trade.index_symbol.split('/');
+                    const baseSymbol = parts[0];
+                    const quoteSymbol = parts[1];
+                    teaSymbol = `${baseSymbol}/${quoteSymbol} ${leverage}x`;
+                    total = trade.quantity; // Margin amount
+                    const entryRatio = trade.price;
+                    
+                    // Get current index prices for P&L
+                    const baseIdx = typeof getIndexPrice === 'function' ? getIndexPrice(baseSymbol) : null;
+                    const quoteIdx = typeof getIndexPrice === 'function' ? getIndexPrice(quoteSymbol) : null;
+                    
+                    if (baseIdx && quoteIdx && quoteIdx.price > 0) {
+                        const currentRatio = baseIdx.price / quoteIdx.price;
+                        const ratioChange = (currentRatio - entryRatio) / entryRatio;
+                        const direction = trade.side === 'BUY' ? 1 : -1;
+                        pnl = total * ratioChange * leverage * direction;
+                        pnlPct = ratioChange * 100 * leverage * direction;
+                    } else {
+                        pnl = 0;
+                        pnlPct = 0;
+                    }
                 } else if (isIndexTrade) {
-                    // Index trade - use symbol from database
+                    // Single index trade - use symbol from database
                     const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
                     const index = indexes.find(idx => idx.symbol === trade.index_symbol);
                     teaSymbol = trade.index_symbol + ' IDX';
@@ -17378,7 +17401,8 @@
                     const baseIndex = indexes.find(i => i.symbol === currentPairTrade.baseTea.symbol);
                     const underlyingTea = baseIndex ? teas?.find(t => baseIndex.teas?.includes(t.symbol)) : null;
                     tradeInsert.tea_id = underlyingTea?.id || null;
-                    tradeInsert.index_symbol = currentPairTrade.baseTea.symbol;
+                    // Store base/quote as "BASE/QUOTE" so display can reconstruct the pair
+                    tradeInsert.index_symbol = `${currentPairTrade.baseTea.symbol}/${currentPairTrade.quoteTea.symbol}`;
                 } else {
                     tradeInsert.tea_id = currentPairTrade.baseTea.id;
                 }
