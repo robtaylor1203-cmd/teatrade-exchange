@@ -15431,6 +15431,12 @@
                 const balance = userProfile?.cash_balance || 10000;
                 document.getElementById('qq-mobile-balance').textContent = `$${balance.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
                 
+                // Sync BUY/SELL state
+                const mobileBuyBtn = document.getElementById('qq-mobile-btn-buy');
+                const mobileSellBtn = document.getElementById('qq-mobile-btn-sell');
+                if (mobileBuyBtn) mobileBuyBtn.classList.toggle('active', quickQuoteTradeType === 'BUY');
+                if (mobileSellBtn) mobileSellBtn.classList.toggle('active', quickQuoteTradeType === 'SELL');
+                
                 updateMobileQQSummary();
             }
             
@@ -15458,6 +15464,9 @@
             if (execBtn) {
                 execBtn.textContent = `${quickQuoteTradeType} ${qty} kg`;
                 execBtn.className = `quick-trade-execute ${quickQuoteTradeType.toLowerCase()}`;
+                execBtn.style.width = '100%';
+                execBtn.style.marginTop = '14px';
+                execBtn.style.textAlign = 'center';
             }
         }
         
