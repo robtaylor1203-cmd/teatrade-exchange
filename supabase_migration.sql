@@ -90,3 +90,11 @@ INSERT INTO origins (code, name, display_order) VALUES
     ('MLW', 'Malawi',    6),
     ('RWA', 'Rwanda',    7)
 ON CONFLICT (code) DO NOTHING;
+
+-- =============================================
+-- 4. Fix price_history unique constraint
+-- Required for upsert (ON CONFLICT) to work
+-- =============================================
+ALTER TABLE price_history
+    ADD CONSTRAINT IF NOT EXISTS price_history_symbol_recorded_at_key
+    UNIQUE (symbol, recorded_at);
