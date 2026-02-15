@@ -5706,6 +5706,41 @@
                 -webkit-overflow-scrolling: touch;
                 max-height: 100vh;
             }
+            
+            /* Mobile Chat Fixes */
+            .sidebar.mobile-open .chat-section {
+                min-height: unset;
+                max-height: none;
+                flex: 0 0 auto;
+            }
+            
+            .sidebar.mobile-open .chat-messages {
+                max-height: 220px;
+                min-height: 120px;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                background: var(--bg-tertiary);
+                padding: 4px 6px;
+            }
+            
+            .sidebar.mobile-open .chat-message {
+                padding: 6px 0;
+            }
+            
+            .sidebar.mobile-open .chat-text {
+                font-size: 11px;
+            }
+            
+            .sidebar.mobile-open .chat-input-container {
+                padding-top: 6px;
+            }
+            
+            .sidebar.mobile-open .chat-input {
+                font-size: 13px;
+                padding: 8px 10px;
+            }
         }
 
         @media (max-width: 400px) {
@@ -13205,16 +13240,28 @@
         // Scroll to chat section and clear notifications
         function scrollToChatSection() {
             const chatSection = document.getElementById('chat-section-sidebar');
-            if (chatSection) {
-                // If on mobile, open sidebar first
-                if (window.innerWidth <= 1200) {
-                    openMobileMenu();
-                    setTimeout(() => {
-                        chatSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }, 300);
-                } else {
-                    chatSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (!chatSection) return;
+            
+            // If on mobile, open sidebar first then scroll to chat
+            if (window.innerWidth <= 1200) {
+                const sidebar = document.getElementById('mobile-sidebar');
+                const overlay = document.getElementById('mobile-overlay');
+                
+                if (sidebar && !sidebar.classList.contains('mobile-open')) {
+                    sidebar.classList.add('mobile-open');
+                    if (overlay) overlay.classList.add('active');
+                    document.body.style.overflow = 'hidden';
                 }
+                
+                // Wait for sidebar animation then scroll to chat
+                setTimeout(() => {
+                    chatSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    // Focus the input for immediate typing
+                    const input = document.getElementById('chat-input');
+                    if (input) input.focus();
+                }, 350);
+            } else {
+                chatSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
             clearChatNotifications();
         }
