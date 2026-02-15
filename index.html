@@ -2340,6 +2340,13 @@
             gap: 6px;
         }
         
+        /* Hidden on desktop, shown on mobile */
+        .qq-trade-icon-circle { display: none; }
+        .qq-market-depth { display: none; }
+        .qq-extra-stats { display: none; }
+        .qq-symbol-dropdown .dropdown-arrow { display: none; }
+        .qq-symbol-list { display: none; }
+        
         .quick-trade-type-btn {
             flex: 1;
             padding: 10px;
@@ -5140,9 +5147,12 @@
             
             .quick-quote-title {
                 flex-direction: column;
-                gap: 2px;
-                flex: 1;
+                gap: 2px;\n                flex: 1;
                 min-width: 0;
+            }
+            
+            .qq-symbol-dropdown .dropdown-arrow {
+                display: inline-block !important;
             }
             
             .quick-quote-symbol {
@@ -5190,15 +5200,16 @@
                 gap: 10px;
             }
             
-            /* Buy/Sell toggle - Trading212 wide gradient bar */
+            /* Buy/Sell toggle - Trading212 wide gradient bar with icon */
             .quick-trade-type-toggle {
                 display: grid;
-                grid-template-columns: 1fr 1fr;
+                grid-template-columns: 1fr auto 1fr;
                 gap: 0;
                 background: var(--bg-tertiary);
                 border-radius: 8px;
-                overflow: hidden;
+                overflow: visible;
                 border: 1px solid var(--border);
+                position: relative;
             }
             
             .quick-trade-type-btn {
@@ -5208,12 +5219,47 @@
                 font-weight: 700;
             }
             
+            .quick-trade-type-btn.buy {
+                border-radius: 8px 0 0 8px;
+            }
+            
+            .quick-trade-type-btn.sell {
+                border-radius: 0 8px 8px 0;
+            }
+            
             .quick-trade-type-btn.buy.active {
                 background: linear-gradient(135deg, #059669, #10b981);
             }
             
             .quick-trade-type-btn.sell.active {
                 background: linear-gradient(135deg, #dc2626, #ef4444);
+            }
+            
+            /* Center icon circle between buy/sell */
+            .qq-trade-icon-circle {
+                display: flex !important;
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                background: var(--bg-card);
+                border: 2px solid var(--border);
+                align-items: center;
+                justify-content: center;
+                z-index: 2;
+                align-self: center;
+                margin: 0 -4px;
+                flex-shrink: 0;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            }
+            
+            .qq-trade-icon-circle svg {
+                width: 18px;
+                height: 18px;
+                color: var(--accent-green);
+            }
+            
+            .qq-trade-icon-circle.index svg {
+                color: var(--accent-blue);
             }
             
             /* Price display within buy/sell bar */
@@ -5256,12 +5302,15 @@
             .qq-timeframe-selector {
                 gap: 2px;
                 flex-shrink: 0;
+                flex-wrap: nowrap;
+                white-space: nowrap;
             }
             
             .qq-tf-btn {
-                padding: 6px 10px;
-                font-size: 11px;
+                padding: 5px 10px;
+                font-size: 10px;
                 border-radius: 6px;
+                flex-shrink: 0;
             }
             
             /* Hide indicators on mobile - too cramped */
@@ -5320,6 +5369,197 @@
             
             .qq-position-pnl {
                 font-size: 12px;
+            }
+            
+            /* Market Depth section in QQ modal */
+            .qq-market-depth {
+                display: block !important;
+                margin: 4px 4px 12px;
+                padding: 14px;
+                background: var(--bg-tertiary);
+                border-radius: 8px;
+                border: 1px solid var(--border);
+            }
+            
+            .qq-depth-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 10px;
+            }
+            
+            .qq-depth-title {
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--text-primary);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            
+            .qq-depth-ratio-badge {
+                font-size: 10px;
+                font-family: 'JetBrains Mono', monospace;
+                color: var(--text-muted);
+                background: var(--bg-secondary);
+                padding: 3px 8px;
+                border-radius: 4px;
+            }
+            
+            .qq-depth-bar {
+                display: flex;
+                height: 28px;
+                border-radius: 6px;
+                overflow: hidden;
+                margin-bottom: 8px;
+            }
+            
+            .qq-depth-bids {
+                background: linear-gradient(90deg, rgba(16,185,129,0.3), rgba(16,185,129,0.6));
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: width 0.5s ease;
+            }
+            
+            .qq-depth-asks {
+                background: linear-gradient(90deg, rgba(239,68,68,0.6), rgba(239,68,68,0.3));
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: width 0.5s ease;
+            }
+            
+            .qq-depth-label {
+                font-size: 10px;
+                font-weight: 600;
+                font-family: 'JetBrains Mono', monospace;
+                color: #fff;
+                white-space: nowrap;
+            }
+            
+            .qq-depth-levels {
+                display: flex;
+                justify-content: space-between;
+                font-size: 10px;
+                font-family: 'JetBrains Mono', monospace;
+                color: var(--text-muted);
+            }
+            
+            .qq-depth-levels .bid-vol {
+                color: var(--accent-green);
+            }
+            
+            .qq-depth-levels .ask-vol {
+                color: var(--accent-red);
+            }
+            
+            /* Additional stats section */
+            .qq-extra-stats {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+                margin: 4px 4px 12px;
+            }
+            
+            .qq-extra-stat {
+                padding: 12px;
+                background: var(--bg-tertiary);
+                border-radius: 8px;
+                border: 1px solid var(--border);
+            }
+            
+            .qq-extra-stat-value {
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--text-primary);
+                margin-bottom: 2px;
+            }
+            
+            .qq-extra-stat-label {
+                font-size: 10px;
+                color: var(--text-muted);
+                text-transform: uppercase;
+                letter-spacing: 0.3px;
+            }
+            
+            /* Symbol dropdown in header */
+            .qq-symbol-dropdown {
+                display: flex !important;
+                align-items: center;
+                gap: 4px;
+                cursor: pointer;
+                position: relative;
+            }
+            
+            .qq-symbol-dropdown .dropdown-arrow {
+                font-size: 8px;
+                color: var(--text-muted);
+                transition: transform 0.2s;
+            }
+            
+            .qq-symbol-dropdown.open .dropdown-arrow {
+                transform: rotate(180deg);
+            }
+            
+            .qq-symbol-list {
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                min-width: 220px;
+                max-height: 300px;
+                overflow-y: auto;
+                background: var(--bg-card);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+                z-index: 100;
+                display: none;
+                margin-top: 4px;
+            }
+            
+            .qq-symbol-list.show {
+                display: block;
+            }
+            
+            .qq-symbol-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 10px 14px;
+                cursor: pointer;
+                transition: background 0.15s;
+                border-bottom: 1px solid var(--border);
+            }
+            
+            .qq-symbol-item:last-child {
+                border-bottom: none;
+            }
+            
+            .qq-symbol-item:hover,
+            .qq-symbol-item.active {
+                background: var(--bg-tertiary);
+            }
+            
+            .qq-symbol-item-name {
+                font-size: 12px;
+                font-weight: 500;
+                color: var(--text-primary);
+            }
+            
+            .qq-symbol-item-price {
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 11px;
+                font-weight: 500;
+            }
+            
+            .qq-symbol-item-price.up {
+                color: var(--accent-green);
+            }
+            
+            .qq-symbol-item-price.down {
+                color: var(--accent-red);
             }
             
             /* Mobile sidebar left panel fix */
@@ -6162,9 +6402,11 @@
     <div class="quick-quote-modal-overlay" id="quick-quote-modal">
         <div class="quick-quote-modal">
             <div class="quick-quote-header">
-                <div class="quick-quote-title">
+                <div class="quick-quote-title qq-symbol-dropdown" id="qq-symbol-dropdown" onclick="toggleQQSymbolDropdown(event)">
                     <span class="quick-quote-symbol" id="qq-symbol">BP1</span>
                     <span class="quick-quote-name" id="qq-name">Kenya BP1</span>
+                    <span class="dropdown-arrow">&#9660;</span>
+                    <div class="qq-symbol-list" id="qq-symbol-list"></div>
                 </div>
                 <div class="quick-quote-price-info">
                     <span class="quick-quote-current-price up" id="qq-price">$3.42</span>
@@ -6238,10 +6480,70 @@
                         </div>
                     </div>
                     <div class="qq-open-positions" id="qq-open-positions"></div>
+                    
+                    <!-- Market Depth (populated by JS) -->
+                    <div class="qq-market-depth" id="qq-market-depth">
+                        <div class="qq-depth-header">
+                            <span class="qq-depth-title">Market Depth</span>
+                            <span class="qq-depth-ratio-badge" id="qq-depth-ratio">Bid/Ask: 1.00</span>
+                        </div>
+                        <div class="qq-depth-bar">
+                            <div class="qq-depth-bids" id="qq-depth-bids" style="width:50%;">
+                                <span class="qq-depth-label">BIDS 50%</span>
+                            </div>
+                            <div class="qq-depth-asks" id="qq-depth-asks" style="width:50%;">
+                                <span class="qq-depth-label">ASKS 50%</span>
+                            </div>
+                        </div>
+                        <div class="qq-depth-levels">
+                            <span class="bid-vol" id="qq-depth-bid-vol">Vol: 0 kg</span>
+                            <span id="qq-depth-mid">Mid: $0.00</span>
+                            <span class="ask-vol" id="qq-depth-ask-vol">Vol: 0 kg</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Extra Stats (populated by JS) -->
+                    <div class="qq-extra-stats" id="qq-extra-stats">
+                        <div class="qq-extra-stat">
+                            <div class="qq-extra-stat-value" id="qq-spread">$0.00</div>
+                            <div class="qq-extra-stat-label">Spread</div>
+                        </div>
+                        <div class="qq-extra-stat">
+                            <div class="qq-extra-stat-value" id="qq-volatility">0.0%</div>
+                            <div class="qq-extra-stat-label">Volatility</div>
+                        </div>
+                        <div class="qq-extra-stat">
+                            <div class="qq-extra-stat-value" id="qq-bid-price">$0.00</div>
+                            <div class="qq-extra-stat-label">Best Bid</div>
+                        </div>
+                        <div class="qq-extra-stat">
+                            <div class="qq-extra-stat-value" id="qq-ask-price">$0.00</div>
+                            <div class="qq-extra-stat-label">Best Ask</div>
+                        </div>
+                        <div class="qq-extra-stat">
+                            <div class="qq-extra-stat-value" id="qq-open-price">$0.00</div>
+                            <div class="qq-extra-stat-label">Open</div>
+                        </div>
+                        <div class="qq-extra-stat">
+                            <div class="qq-extra-stat-value" id="qq-prev-close">$0.00</div>
+                            <div class="qq-extra-stat-label">Prev Close</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="quick-quote-trade-panel">
                     <div class="quick-trade-type-toggle">
                         <button class="quick-trade-type-btn buy active" id="qq-btn-buy" onclick="setQuickTradeType('BUY')">BUY</button>
+                        <div class="qq-trade-icon-circle" id="qq-trade-icon-circle">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="qq-icon-leaf">
+                                <path d="M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66L7 18c4-2 7-4 9-8"/>
+                                <path d="M2 2s7.5 1.5 12 5c2 2 3.5 4.5 4 8"/>
+                            </svg>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="qq-icon-globe" style="display:none;">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="2" y1="12" x2="22" y2="12"/>
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                            </svg>
+                        </div>
                         <button class="quick-trade-type-btn sell" id="qq-btn-sell" onclick="setQuickTradeType('SELL')">SELL</button>
                     </div>
                     <div class="quick-trade-input-group">
@@ -9373,6 +9675,9 @@
                 // Update mobile trade bar price
                 const mobilePriceEl = document.getElementById('qq-mobile-trade-price');
                 if (mobilePriceEl) mobilePriceEl.textContent = `$${tea.current_price.toFixed(2)}`;
+                
+                // Update market depth live
+                updateQQMarketDepth(tea);
             }
         }
         
@@ -14856,6 +15161,12 @@
             setQuickTradeType('BUY');
             updateQuickTradeSummary();
             
+            // Update trade icon (leaf for teas, globe for indexes)
+            updateQQTradeIcon(tea);
+            
+            // Update market depth & extra stats
+            updateQQMarketDepth(tea);
+            
             // Update open positions display
             updateQQOpenPositions(tea.symbol);
             
@@ -14946,6 +15257,174 @@
             updateQuickTradeSummary();
             executeQuickTrade();
             closeMobileQQTradeForm();
+        }
+        
+        // --- QQ Symbol Dropdown ---
+        function toggleQQSymbolDropdown(e) {
+            if (window.innerWidth > 768) return; // Only on mobile
+            e.stopPropagation();
+            const dropdown = document.getElementById('qq-symbol-dropdown');
+            const list = document.getElementById('qq-symbol-list');
+            if (!dropdown || !list) return;
+            
+            const isOpen = list.classList.contains('show');
+            if (isOpen) {
+                list.classList.remove('show');
+                dropdown.classList.remove('open');
+                return;
+            }
+            
+            // Build the list
+            let html = '';
+            teas.forEach(t => {
+                const sym = t.symbol.split('-')[1] || t.symbol;
+                const price = t.current_price || 0;
+                const change = t.price_change_24h || 0;
+                const isUp = change >= 0;
+                const isActive = quickQuoteTea && quickQuoteTea.id === t.id;
+                html += `<div class="qq-symbol-item${isActive ? ' active' : ''}" onclick="selectQQSymbol('${t.symbol}')">
+                    <span class="qq-symbol-item-name">${sym} — ${t.name}</span>
+                    <span class="qq-symbol-item-price ${isUp ? 'up' : 'down'}">$${price.toFixed(2)}</span>
+                </div>`;
+            });
+            list.innerHTML = html;
+            list.classList.add('show');
+            dropdown.classList.add('open');
+        }
+        
+        function selectQQSymbol(symbol) {
+            const tea = teas.find(t => t.symbol === symbol);
+            if (!tea) return;
+            
+            // Close dropdown
+            const list = document.getElementById('qq-symbol-list');
+            const dropdown = document.getElementById('qq-symbol-dropdown');
+            if (list) list.classList.remove('show');
+            if (dropdown) dropdown.classList.remove('open');
+            
+            // Re-open modal with new tea
+            openQuickQuoteModal(tea);
+        }
+        
+        // Close dropdown on outside click
+        document.addEventListener('click', function(e) {
+            const dropdown = document.getElementById('qq-symbol-dropdown');
+            const list = document.getElementById('qq-symbol-list');
+            if (dropdown && list && !dropdown.contains(e.target)) {
+                list.classList.remove('show');
+                dropdown.classList.remove('open');
+            }
+        });
+        
+        // --- QQ Trade Icon (leaf/globe) ---
+        function updateQQTradeIcon(tea) {
+            const iconCircle = document.getElementById('qq-trade-icon-circle');
+            const leafIcon = document.getElementById('qq-icon-leaf');
+            const globeIcon = document.getElementById('qq-icon-globe');
+            if (!iconCircle || !leafIcon || !globeIcon) return;
+            
+            const indexSymbols = ['KENYA', 'KENYAN', 'INDIA', 'CEYLON', 'CHINA', 'JAPAN', 'AFRICA', 'ASIA', 'MOMBASA', 'KOLKATA', 'COLOMBO', 'FUTURES'];
+            const symbol = (tea.symbol || '').split('-')[1] || tea.symbol || '';
+            const isIndex = indexSymbols.includes(symbol.toUpperCase());
+            
+            if (isIndex) {
+                leafIcon.style.display = 'none';
+                globeIcon.style.display = 'block';
+                iconCircle.classList.add('index');
+            } else {
+                leafIcon.style.display = 'block';
+                globeIcon.style.display = 'none';
+                iconCircle.classList.remove('index');
+            }
+        }
+        
+        // --- QQ Market Depth & Extra Stats ---
+        function updateQQMarketDepth(tea) {
+            const depthEl = document.getElementById('qq-market-depth');
+            const extraEl = document.getElementById('qq-extra-stats');
+            if (!depthEl || !extraEl) return;
+            
+            const price = tea.current_price || 0;
+            
+            // Use seeded random for consistent depth per symbol
+            const seed = hashCode(tea.symbol || 'TEA');
+            const seededRand = () => {
+                let s = seed;
+                return () => { s = (s * 16807 + 0) % 2147483647; return (s & 0x7fffffff) / 0x7fffffff; };
+            };
+            const rand = seededRand();
+            
+            // Calculate bid/ask spread (0.2-1.5% of price)
+            const spreadPct = 0.002 + rand() * 0.013;
+            const spread = price * spreadPct;
+            const bidPrice = price - spread / 2;
+            const askPrice = price + spread / 2;
+            
+            // Market depth percentages
+            const bidPct = 40 + rand() * 20 + (Math.random() - 0.5) * 4;
+            const askPct = 100 - bidPct;
+            
+            // Volumes
+            const bidVol = Math.round(5000 + rand() * 15000 + Math.random() * 2000);
+            const askVol = Math.round(5000 + rand() * 15000 + Math.random() * 2000);
+            
+            // Volatility (from history if available)
+            const history = generateTeaHistory(tea);
+            const last24h = history.length >= 24 ? history.slice(-24) : history;
+            let volatility = 0;
+            if (last24h.length > 1) {
+                const returns = [];
+                for (let i = 1; i < last24h.length; i++) {
+                    returns.push((last24h[i].close - last24h[i-1].close) / last24h[i-1].close);
+                }
+                const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+                const variance = returns.reduce((a, r) => a + (r - mean) ** 2, 0) / returns.length;
+                volatility = Math.sqrt(variance) * Math.sqrt(252) * 100; // Annualized
+            }
+            
+            // Open price & prev close
+            const openPrice = last24h.length > 0 ? last24h[0].open : price * 0.99;
+            const prevClose = last24h.length > 1 ? last24h[last24h.length - 2]?.close || price * 0.995 : price * 0.995;
+            
+            // Update depth bar
+            const bidsBar = document.getElementById('qq-depth-bids');
+            const asksBar = document.getElementById('qq-depth-asks');
+            if (bidsBar) {
+                bidsBar.style.width = `${bidPct.toFixed(0)}%`;
+                bidsBar.querySelector('.qq-depth-label').textContent = `BIDS ${bidPct.toFixed(0)}%`;
+            }
+            if (asksBar) {
+                asksBar.style.width = `${askPct.toFixed(0)}%`;
+                asksBar.querySelector('.qq-depth-label').textContent = `ASKS ${askPct.toFixed(0)}%`;
+            }
+            
+            const ratioEl = document.getElementById('qq-depth-ratio');
+            if (ratioEl) ratioEl.textContent = `Bid/Ask: ${(bidPct / askPct).toFixed(2)}`;
+            
+            const bidVolEl = document.getElementById('qq-depth-bid-vol');
+            const askVolEl = document.getElementById('qq-depth-ask-vol');
+            const midEl = document.getElementById('qq-depth-mid');
+            if (bidVolEl) bidVolEl.textContent = `Vol: ${bidVol.toLocaleString()} kg`;
+            if (askVolEl) askVolEl.textContent = `Vol: ${askVol.toLocaleString()} kg`;
+            if (midEl) midEl.textContent = `Mid: $${price.toFixed(2)}`;
+            
+            // Update extra stats
+            document.getElementById('qq-spread').textContent = `$${spread.toFixed(4)}`;
+            document.getElementById('qq-volatility').textContent = `${volatility.toFixed(1)}%`;
+            document.getElementById('qq-bid-price').textContent = `$${bidPrice.toFixed(2)}`;
+            document.getElementById('qq-ask-price').textContent = `$${askPrice.toFixed(2)}`;
+            document.getElementById('qq-open-price').textContent = `$${openPrice.toFixed(2)}`;
+            document.getElementById('qq-prev-close').textContent = `$${prevClose.toFixed(2)}`;
+        }
+        
+        function hashCode(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash |= 0;
+            }
+            return Math.abs(hash) || 1;
         }
         
         function setQuickTradeType(type) {
