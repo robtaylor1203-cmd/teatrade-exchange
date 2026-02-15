@@ -11892,25 +11892,43 @@
                     return;
                 }
 
-                // Find the pair
-                const pair = teaPairs.find(p => p.id === trade.pair_id);
+                // Find the pair (check both tea pairs and index pairs)
+                let pair = teaPairs.find(p => p.id === trade.pair_id);
+                const isIndexPair = !pair;
+                if (!pair) pair = indexPairs.find(p => p.id === trade.pair_id);
                 if (!pair) {
                     showToast('Error', 'Pair not found', true);
                     return;
                 }
 
                 // Calculate current ratio and P/L
-                const teaMap = {};
-                teas.forEach(t => teaMap[t.symbol] = t);
-                const baseTea = teaMap[pair.base_symbol];
-                const quoteTea = teaMap[pair.quote_symbol];
-
-                if (!baseTea || !quoteTea) {
-                    showToast('Error', 'Could not get current prices', true);
-                    return;
+                let basePrice, quotePrice;
+                
+                if (isIndexPair) {
+                    // Index pair - get prices from regional indexes
+                    const baseIdx = getIndexPrice(pair.base_symbol);
+                    const quoteIdx = getIndexPrice(pair.quote_symbol);
+                    if (!baseIdx || !quoteIdx) {
+                        showToast('Error', 'Could not get current index prices', true);
+                        return;
+                    }
+                    basePrice = baseIdx.price;
+                    quotePrice = quoteIdx.price;
+                } else {
+                    // Tea pair - get prices from teas array
+                    const teaMap = {};
+                    teas.forEach(t => teaMap[t.symbol] = t);
+                    const baseTea = teaMap[pair.base_symbol];
+                    const quoteTea = teaMap[pair.quote_symbol];
+                    if (!baseTea || !quoteTea) {
+                        showToast('Error', 'Could not get current prices', true);
+                        return;
+                    }
+                    basePrice = baseTea.current_price;
+                    quotePrice = quoteTea.current_price;
                 }
 
-                const currentRatio = baseTea.current_price / quoteTea.current_price;
+                const currentRatio = basePrice / quotePrice;
                 const entryRatio = trade.price;
                 const ratioChange = (currentRatio - entryRatio) / entryRatio;
                 const direction = trade.side === 'BUY' ? 1 : -1; // LONG = BUY, SHORT = SELL
@@ -11929,19 +11947,23 @@
                 if (balanceError) throw balanceError;
 
                 // Record the closing trade
+                const closeInsert = {
+                    user_id: currentUser.id,
+                    tea_id: trade.tea_id,
+                    side: trade.side === 'BUY' ? 'SELL' : 'BUY', // Opposite side to close
+                    quantity: margin,
+                    price: currentRatio,
+                    total_value: returnAmount,
+                    pair_id: trade.pair_id,
+                    leverage: leverage,
+                    is_pair_trade: true
+                };
+                if (isIndexPair && trade.index_symbol) {
+                    closeInsert.index_symbol = trade.index_symbol;
+                }
                 const { error: closeError } = await supabaseClient
                     .from('trades')
-                    .insert({
-                        user_id: currentUser.id,
-                        tea_id: trade.tea_id,
-                        side: trade.side === 'BUY' ? 'SELL' : 'BUY', // Opposite side to close
-                        quantity: margin,
-                        price: currentRatio,
-                        total_value: returnAmount,
-                        pair_id: trade.pair_id,
-                        leverage: leverage,
-                        is_pair_trade: true
-                    });
+                    .insert(closeInsert);
                 if (closeError) throw closeError;
 
                 userProfile.cash_balance = newBalance;
@@ -17303,19 +17325,31 @@
                 if (balanceError) throw balanceError;
 
                 // Record pair trade
+                const tradeInsert = {
+                    user_id: currentUser.id,
+                    side: currentPairTrade.side === 'LONG' ? 'BUY' : 'SELL',
+                    quantity: amount,
+                    price: currentPairTrade.ratio,
+                    total_value: amount * selectedLeverage,
+                    pair_id: currentPairTrade.pairId,
+                    leverage: selectedLeverage,
+                    is_pair_trade: true
+                };
+
+                if (currentPairTrade.isIndex) {
+                    // Index pair: resolve tea_id from underlying teas or null
+                    const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
+                    const baseIndex = indexes.find(i => i.symbol === currentPairTrade.baseTea.symbol);
+                    const underlyingTea = baseIndex ? teas?.find(t => baseIndex.teas?.includes(t.symbol)) : null;
+                    tradeInsert.tea_id = underlyingTea?.id || null;
+                    tradeInsert.index_symbol = currentPairTrade.baseTea.symbol;
+                } else {
+                    tradeInsert.tea_id = currentPairTrade.baseTea.id;
+                }
+
                 const { error: tradeError } = await supabaseClient
                     .from('trades')
-                    .insert({
-                        user_id: currentUser.id,
-                        tea_id: currentPairTrade.baseTea.id,
-                        side: currentPairTrade.side === 'LONG' ? 'BUY' : 'SELL',
-                        quantity: amount, // Using quantity as the margin amount
-                        price: currentPairTrade.ratio,
-                        total_value: amount * selectedLeverage,
-                        pair_id: currentPairTrade.pairId,
-                        leverage: selectedLeverage,
-                        is_pair_trade: true
-                    });
+                    .insert(tradeInsert);
                 if (tradeError) throw tradeError;
 
                 userProfile.cash_balance = newBalance;
