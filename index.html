@@ -12265,10 +12265,14 @@
             if (!tbody) return;
 
             // Separate BUY and SELL trades
-            const buyTrades = trades.filter(t => t.side === 'BUY');
-            const sellTrades = trades.filter(t => t.side === 'SELL');
+            // Pair trades use BUY=LONG, SELL=SHORT - both are opening positions
+            const pairTrades = trades.filter(t => t.is_pair_trade);
+            const regularTrades = trades.filter(t => !t.is_pair_trade);
+            
+            const buyTrades = regularTrades.filter(t => t.side === 'BUY');
+            const sellTrades = regularTrades.filter(t => t.side === 'SELL');
 
-            // Match SELL trades to BUY trades (closing trades)
+            // Match SELL trades to BUY trades (closing trades) - regular trades only
             const closedBuyIds = new Set();
             const closingInfo = {}; // buyTradeId -> { sellPrice, sellTime }
 
@@ -12289,11 +12293,40 @@
                 }
             });
 
+            // For pair trades, match closing trades (opposite side with same index_symbol/pair_id)
+            const closedPairIds = new Set();
+            const pairClosingInfo = {};
+            const openingPairTrades = [];
+            const closingPairTrades = [];
+            
+            // Sort pair trades by id to process in order
+            const sortedPairTrades = [...pairTrades].sort((a, b) => a.id - b.id);
+            sortedPairTrades.forEach(pt => {
+                // A closing pair trade matches an earlier opening trade with opposite side + same symbol
+                const matchingOpen = openingPairTrades.find(op => 
+                    !closedPairIds.has(op.id) &&
+                    op.index_symbol === pt.index_symbol &&
+                    op.pair_id === pt.pair_id &&
+                    op.side !== pt.side &&
+                    op.id < pt.id
+                );
+                if (matchingOpen) {
+                    closedPairIds.add(matchingOpen.id);
+                    pairClosingInfo[matchingOpen.id] = { sellPrice: pt.price, sellTime: pt.created_at };
+                    closingPairTrades.push(pt);
+                } else {
+                    openingPairTrades.push(pt);
+                }
+            });
+
             // Filter based on current filter setting
-            let displayTrades = buyTrades;
+            let displayRegular = buyTrades;
+            let displayPairs = openingPairTrades;
             if (ordersFilter === 'open') {
-                displayTrades = buyTrades.filter(t => !closedBuyIds.has(t.id));
+                displayRegular = buyTrades.filter(t => !closedBuyIds.has(t.id));
+                displayPairs = openingPairTrades.filter(t => !closedPairIds.has(t.id));
             }
+            let displayTrades = [...displayRegular, ...displayPairs].sort((a, b) => b.id - a.id);
             countEl.textContent = displayTrades.length;
 
             if (displayTrades.length === 0) {
@@ -12318,8 +12351,8 @@
                 const orderId = '#' + String(trade.id).substring(0, 5).toUpperCase();
                 const tea = teas.find(t => t.id === trade.tea_id);
                 
-                const isClosed = closedBuyIds.has(trade.id);
-                const closing = closingInfo[trade.id];
+                const isClosed = closedBuyIds.has(trade.id) || closedPairIds.has(trade.id);
+                const closing = closingInfo[trade.id] || pairClosingInfo[trade.id];
                 
                 // Handle pair trades differently
                 const isPairTrade = trade.is_pair_trade || false;
