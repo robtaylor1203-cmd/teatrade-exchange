@@ -1,14 +1,66 @@
 -- =============================================
--- TeaTrade Exchange - Database Migration
--- Moves hardcoded data tables to Supabase
+-- TeaTrade Exchange - Database Migration (Golden Master)
+-- Fully Idempotent: safe to run multiple times.
 -- =============================================
 
--- 1. INDEXES table - Regional index compositions
+-- 0. ANCHOR PRICE AUDIT LOG (M4 Fix)
+-- Records every change to a tea's anchor_price for regulatory traceability.
+CREATE TABLE IF NOT EXISTS anchor_price_audit (
+    id BIGSERIAL PRIMARY KEY,
+    tea_id INT NOT NULL,
+    tea_symbol TEXT NOT NULL,
+    old_anchor_price NUMERIC,
+    new_anchor_price NUMERIC,
+    old_reference_forex NUMERIC,
+    new_reference_forex NUMERIC,
+    changed_by TEXT DEFAULT 'watchdog',
+    source_file TEXT,
+    changed_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE anchor_price_audit ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anchor audit read" ON anchor_price_audit;
+CREATE POLICY "Anchor audit read" ON anchor_price_audit FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Anchor audit insert" ON anchor_price_audit;
+DROP POLICY IF EXISTS "Anchor audit update" ON anchor_price_audit;
+DROP POLICY IF EXISTS "Anchor audit delete" ON anchor_price_audit;
+
+CREATE INDEX IF NOT EXISTS idx_anchor_audit_tea ON anchor_price_audit (tea_symbol, changed_at DESC);
+
+-- Trigger function: fires AFTER UPDATE on teas when anchor_price changes
+CREATE OR REPLACE FUNCTION log_anchor_price_change()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    IF OLD.anchor_price IS DISTINCT FROM NEW.anchor_price
+       OR OLD.reference_forex IS DISTINCT FROM NEW.reference_forex THEN
+        INSERT INTO anchor_price_audit
+            (tea_id, tea_symbol, old_anchor_price, new_anchor_price,
+             old_reference_forex, new_reference_forex, changed_by)
+        VALUES
+            (NEW.id, NEW.symbol, OLD.anchor_price, NEW.anchor_price,
+             OLD.reference_forex, NEW.reference_forex, 'trigger');
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_anchor_price_audit ON teas;
+CREATE TRIGGER trg_anchor_price_audit
+    AFTER UPDATE ON teas
+    FOR EACH ROW
+    EXECUTE FUNCTION log_anchor_price_change();
+
+-- 1. INDEXES table
 CREATE TABLE IF NOT EXISTS indexes (
     id SERIAL PRIMARY KEY,
     symbol TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
-    teas TEXT[] NOT NULL,          -- Array of constituent tea symbols
+    teas TEXT[] NOT NULL,
     color TEXT DEFAULT 'var(--accent-green)',
     currency TEXT DEFAULT '$',
     multiplier NUMERIC DEFAULT 1,
@@ -17,32 +69,33 @@ CREATE TABLE IF NOT EXISTS indexes (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Enable RLS
 ALTER TABLE indexes ENABLE ROW LEVEL SECURITY;
 
--- Allow public read access
+-- C6 FIX: indexes is a read-only reference table for clients.
+DROP POLICY IF EXISTS "Public read access" ON indexes;
 CREATE POLICY "Public read access" ON indexes FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Indexes insert" ON indexes;
+DROP POLICY IF EXISTS "Indexes update" ON indexes;
+DROP POLICY IF EXISTS "Indexes delete" ON indexes;
 
--- Seed regional indexes (used in calculateRegionalIndexes)
 INSERT INTO indexes (symbol, name, teas, color, display_order) VALUES
     ('KENYA',  'Kenya Tea Index',   ARRAY['KEN-BP1', 'KEN-PF1', 'KEN-DUST'], 'var(--accent-green)', 1),
     ('INDIA',  'India Tea Index',   ARRAY['IND-ASM', 'IND-DRJ'],             'var(--accent-orange)', 2),
-    ('CEYLON', 'Ceylon Tea Index',   ARRAY['SRI-BOP', 'SRI-PEK'],             'var(--accent-purple)', 3),
-    ('CHINA',  'China Tea Index',    ARRAY['CHN-YUN'],                         'var(--accent-red)', 4),
-    ('AFRICA', 'African Tea Index',  ARRAY['KEN-BP1', 'KEN-PF1', 'MLW-BP1', 'RWA-OP'], 'var(--accent-green)', 5),
-    ('ASIA',   'Asian Tea Index',    ARRAY['IND-ASM', 'IND-DRJ', 'SRI-BOP', 'SRI-PEK', 'CHN-YUN'], 'var(--accent-blue)', 6)
+    ('CEYLON', 'Ceylon Tea Index',  ARRAY['SRI-BOP', 'SRI-PEK'],             'var(--accent-purple)', 3),
+    ('CHINA',  'China Tea Index',   ARRAY['CHN-YUN'],                        'var(--accent-red)', 4),
+    ('AFRICA', 'African Tea Index', ARRAY['KEN-BP1', 'KEN-PF1', 'MLW-BP1', 'RWA-OP'], 'var(--accent-green)', 5),
+    ('ASIA',   'Asian Tea Index',   ARRAY['IND-ASM', 'IND-DRJ', 'SRI-BOP', 'SRI-PEK', 'CHN-YUN'], 'var(--accent-blue)', 6)
 ON CONFLICT (symbol) DO NOTHING;
 
--- Seed market display cards (used in cardData / mainChartData)
 INSERT INTO indexes (symbol, name, teas, color, currency, multiplier, is_market_card, display_order) VALUES
     ('MOMBASA',  'Mombasa Auction Index', ARRAY['KEN-BP1', 'KEN-PF1', 'KEN-DUST'], 'var(--accent-green)', '$', 1,    TRUE, 10),
-    ('KOLKATA',  'Kolkata Tea Index',     ARRAY['IND-ASM', 'IND-DRJ'],              'var(--accent-orange)', '₹', 83,  TRUE, 11),
-    ('COLOMBO',  'Colombo Index',         ARRAY['SRI-BOP', 'SRI-PEK'],              'var(--accent-purple)', '$', 1,   TRUE, 12),
+    ('KOLKATA',  'Kolkata Tea Index',     ARRAY['IND-ASM', 'IND-DRJ'],               'var(--accent-orange)', '₹', 83,  TRUE, 11),
+    ('COLOMBO',  'Colombo Index',         ARRAY['SRI-BOP', 'SRI-PEK'],               'var(--accent-purple)', '$', 1,   TRUE, 12),
     ('FUTURES',  'Global Tea Futures',    ARRAY['KEN-BP1', 'IND-ASM', 'SRI-BOP', 'CHN-YUN', 'IND-DRJ'], 'var(--accent-blue)', '$', 1000, TRUE, 13)
 ON CONFLICT (symbol) DO NOTHING;
 
 
--- 2. INDEX_PAIRS table - Pairs of indexes for trading
+-- 2. INDEX_PAIRS table
 CREATE TABLE IF NOT EXISTS index_pairs (
     id TEXT PRIMARY KEY,
     base_symbol TEXT NOT NULL REFERENCES indexes(symbol),
@@ -51,13 +104,15 @@ CREATE TABLE IF NOT EXISTS index_pairs (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Enable RLS
 ALTER TABLE index_pairs ENABLE ROW LEVEL SECURITY;
 
--- Allow public read access
+-- C6 FIX: index_pairs is a read-only reference table for clients.
+DROP POLICY IF EXISTS "Public read access" ON index_pairs;
 CREATE POLICY "Public read access" ON index_pairs FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Index pairs insert" ON index_pairs;
+DROP POLICY IF EXISTS "Index pairs update" ON index_pairs;
+DROP POLICY IF EXISTS "Index pairs delete" ON index_pairs;
 
--- Seed index pairs
 INSERT INTO index_pairs (id, base_symbol, quote_symbol) VALUES
     ('idx-kenya-india',  'KENYA',  'INDIA'),
     ('idx-india-ceylon', 'INDIA',  'CEYLON'),
@@ -67,20 +122,22 @@ INSERT INTO index_pairs (id, base_symbol, quote_symbol) VALUES
 ON CONFLICT (id) DO NOTHING;
 
 
--- 3. ORIGINS table - Origin code to country name mapping
+-- 3. ORIGINS table
 CREATE TABLE IF NOT EXISTS origins (
     code TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     display_order INT DEFAULT 0
 );
 
--- Enable RLS
 ALTER TABLE origins ENABLE ROW LEVEL SECURITY;
 
--- Allow public read access
+-- C6 FIX: origins is a read-only reference table for clients.
+DROP POLICY IF EXISTS "Public read access" ON origins;
 CREATE POLICY "Public read access" ON origins FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Origins insert" ON origins;
+DROP POLICY IF EXISTS "Origins update" ON origins;
+DROP POLICY IF EXISTS "Origins delete" ON origins;
 
--- Seed origins
 INSERT INTO origins (code, name, display_order) VALUES
     ('KEN', 'Kenya',     1),
     ('IND', 'India',     2),
@@ -91,16 +148,941 @@ INSERT INTO origins (code, name, display_order) VALUES
     ('RWA', 'Rwanda',    7)
 ON CONFLICT (code) DO NOTHING;
 
--- =============================================
--- 4. Fix price_history unique constraint
--- Required for upsert (ON CONFLICT) to work
--- =============================================
-ALTER TABLE price_history
-    ADD CONSTRAINT IF NOT EXISTS price_history_symbol_recorded_at_key
-    UNIQUE (symbol, recorded_at);
+
+-- 4. PRICE HISTORY table
+CREATE TABLE IF NOT EXISTS price_history (
+    id          BIGSERIAL PRIMARY KEY,
+    symbol      TEXT NOT NULL,
+    price       NUMERIC NOT NULL,
+    volume      NUMERIC DEFAULT 0,
+    recorded_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE price_history ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public read access" ON price_history;
+CREATE POLICY "Public read access" ON price_history FOR SELECT USING (true);
+
+-- C5 FIX: Remove the permissive INSERT policy. Only the service_role key
+-- (used by Edge Functions) can insert. service_role bypasses RLS entirely,
+-- so no INSERT policy is needed for it. Removing this blocks authenticated users.
+DROP POLICY IF EXISTS "Service insert" ON price_history;
+
+-- Safe Constraint Creation
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'price_history_symbol_recorded_at_key') THEN
+        ALTER TABLE price_history ADD CONSTRAINT price_history_symbol_recorded_at_key UNIQUE (symbol, recorded_at);
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_price_history_symbol_time ON price_history (symbol, recorded_at DESC);
+
+-- M2 FIX: Price history data retention function.
+-- Retains granular (1-min) data for 90 days; rolls older data into
+-- hourly OHLC summaries in a separate table, then purges the raw rows.
+CREATE TABLE IF NOT EXISTS price_history_daily (
+    id          BIGSERIAL PRIMARY KEY,
+    symbol      TEXT NOT NULL,
+    bucket_hour TIMESTAMPTZ NOT NULL,
+    open_price  NUMERIC NOT NULL,
+    high_price  NUMERIC NOT NULL,
+    low_price   NUMERIC NOT NULL,
+    close_price NUMERIC NOT NULL,
+    tick_count  INT NOT NULL DEFAULT 1,
+    UNIQUE (symbol, bucket_hour)
+);
+
+CREATE INDEX IF NOT EXISTS idx_phd_symbol_hour ON price_history_daily (symbol, bucket_hour DESC);
+
+CREATE OR REPLACE FUNCTION purge_old_price_history(
+    p_retention_days INT DEFAULT 90
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_cutoff TIMESTAMPTZ;
+    v_archived INT := 0;
+    v_deleted INT := 0;
+BEGIN
+    v_cutoff := NOW() - (p_retention_days || ' days')::INTERVAL;
+
+    -- Aggregate rows older than cutoff into hourly buckets
+    INSERT INTO price_history_daily (symbol, bucket_hour, open_price, high_price, low_price, close_price, tick_count)
+    SELECT
+        symbol,
+        date_trunc('hour', recorded_at) AS bucket_hour,
+        (ARRAY_AGG(price ORDER BY recorded_at ASC))[1]  AS open_price,
+        MAX(price)                                        AS high_price,
+        MIN(price)                                        AS low_price,
+        (ARRAY_AGG(price ORDER BY recorded_at DESC))[1] AS close_price,
+        COUNT(*)::INT                                     AS tick_count
+    FROM price_history
+    WHERE recorded_at < v_cutoff
+    GROUP BY symbol, date_trunc('hour', recorded_at)
+    ON CONFLICT (symbol, bucket_hour) DO UPDATE SET
+        high_price = GREATEST(price_history_daily.high_price, EXCLUDED.high_price),
+        low_price  = LEAST(price_history_daily.low_price, EXCLUDED.low_price),
+        close_price = EXCLUDED.close_price,
+        tick_count  = price_history_daily.tick_count + EXCLUDED.tick_count;
+
+    GET DIAGNOSTICS v_archived = ROW_COUNT;
+
+    DELETE FROM price_history WHERE recorded_at < v_cutoff;
+    GET DIAGNOSTICS v_deleted = ROW_COUNT;
+
+    RETURN jsonb_build_object(
+        'success',        true,
+        'cutoff',         v_cutoff,
+        'archived_rows',  v_archived,
+        'deleted_rows',   v_deleted
+    );
+END;
+$$;
+
+
+-- 5. CHAT MESSAGES Updates
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS recipient_name TEXT;
+
+
+-- 6. TEAS Updates
+ALTER TABLE teas ADD COLUMN IF NOT EXISTS anchor_price    NUMERIC;
+ALTER TABLE teas ADD COLUMN IF NOT EXISTS reference_forex NUMERIC;
+ALTER TABLE teas ADD COLUMN IF NOT EXISTS beta            NUMERIC DEFAULT 1.0;
+ALTER TABLE teas ADD COLUMN IF NOT EXISTS last_update     TIMESTAMPTZ;
+ALTER TABLE teas ADD COLUMN IF NOT EXISTS currency_pair   TEXT DEFAULT 'usd_kes';
+
+-- Backfill data safely
+UPDATE teas
+SET anchor_price    = current_price,
+    reference_forex = 129.45,
+    beta            = 1.0,
+    last_update     = NOW()
+WHERE anchor_price IS NULL;
+
+
+-- 7. MARKET STATE table
+CREATE TABLE IF NOT EXISTS market_state (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Safe Column Migration (Numeric -> Text)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'market_state' AND column_name = 'value' AND data_type = 'numeric'
+    ) THEN
+        ALTER TABLE market_state ALTER COLUMN value TYPE TEXT USING value::TEXT;
+    END IF;
+END $$;
+
+ALTER TABLE market_state ENABLE ROW LEVEL SECURITY;
+
+-- C6 FIX: market_state is read-only for clients. Edge Functions use service_role.
+DROP POLICY IF EXISTS "Public read access" ON market_state;
+CREATE POLICY "Public read access" ON market_state FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Market state insert" ON market_state;
+DROP POLICY IF EXISTS "Market state update" ON market_state;
+DROP POLICY IF EXISTS "Market state delete" ON market_state;
+
+INSERT INTO market_state (key, value) VALUES
+    ('usd_kes',      '129.45'),
+    ('usd_inr',      '87.50'),
+    ('usd_lkr',      '305.00'),
+    ('usd_cny',      '7.24'),
+    ('brent_crude',  '82.40'),
+    ('data_source',  'SIMULATED'),
+    ('last_tick',    '')
+ON CONFLICT (key) DO NOTHING;
+
+
+-- 8. SMART REALTIME ACTIVATION
+DO $$
+BEGIN
+    -- Check 'teas'
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'teas') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE teas;
+    END IF;
+
+    -- Check 'market_state'
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'market_state') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE market_state;
+    END IF;
+END $$;
+
+
+-- 9. ROW LEVEL SECURITY (Hardened for real-money compliance)
+-- =============================================================
+-- PRINCIPLE: The frontend (anon/authenticated roles) should ONLY be able
+-- to READ its own financial data. ALL writes to financial tables go through
+-- SECURITY DEFINER functions (which bypass RLS via the function owner).
+-- The service_role key (used by Edge Functions) also bypasses RLS.
+
+-- ── PROFILES ─────────────────────────────────────────────────────────
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users read own profile" ON profiles;
+CREATE POLICY "Users read own profile" ON profiles FOR SELECT USING (auth.uid() = id);
+
+-- C1 FIX: Users can update display fields (username, avatar, etc.) but NOT cash_balance.
+-- The column-level REVOKE below prevents cash_balance manipulation from the client.
+DROP POLICY IF EXISTS "Users update own profile" ON profiles;
+CREATE POLICY "Users update own profile" ON profiles
+    FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Users insert own profile" ON profiles;
+CREATE POLICY "Users insert own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
+
+-- C1 FIX: Revoke direct UPDATE on cash_balance from frontend roles.
+-- Only SECURITY DEFINER functions (execute_trade, reset_account) can modify it.
+REVOKE UPDATE (cash_balance) ON profiles FROM anon, authenticated;
+
+-- ── TEAS (read-only reference table) ─────────────────────────────────
+-- C6 FIX: Only SELECT allowed. No INSERT/UPDATE/DELETE policies for users.
+ALTER TABLE teas ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public read teas" ON teas;
+CREATE POLICY "Public read teas" ON teas FOR SELECT USING (true);
+
+-- ── POSITIONS (server-managed only) ──────────────────────────────────
+-- C2 FIX: Remove all INSERT/UPDATE/DELETE policies. Users can only READ.
+-- The execute_trade() SECURITY DEFINER function manages positions.
+ALTER TABLE positions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users read own positions" ON positions;
+CREATE POLICY "Users read own positions" ON positions FOR SELECT USING (auth.uid() = user_id);
+
+-- Remove dangerous client-writable policies
+DROP POLICY IF EXISTS "Users insert own positions" ON positions;
+DROP POLICY IF EXISTS "Users update own positions" ON positions;
+DROP POLICY IF EXISTS "Users delete own positions" ON positions;
+
+-- ── INDEX POSITIONS (server-managed only) ────────────────────────────
+-- C2 FIX: Same treatment as positions - read-only for clients.
+ALTER TABLE index_positions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users read own index positions" ON index_positions;
+CREATE POLICY "Users read own index positions" ON index_positions FOR SELECT USING (auth.uid() = user_id);
+
+-- Remove dangerous client-writable policies
+DROP POLICY IF EXISTS "Users insert own index positions" ON index_positions;
+DROP POLICY IF EXISTS "Users update own index positions" ON index_positions;
+DROP POLICY IF EXISTS "Users delete own index positions" ON index_positions;
+
+-- ── TRADES (immutable audit trail - server-managed only) ─────────────
+-- C3 FIX: Remove INSERT policy. Only SECURITY DEFINER functions can insert.
+ALTER TABLE trades ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users read own trades" ON trades;
+CREATE POLICY "Users read own trades" ON trades FOR SELECT USING (auth.uid() = user_id);
+
+-- Remove dangerous client-writable policy
+DROP POLICY IF EXISTS "Users insert own trades" ON trades;
+
+-- Chat Messages
+ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users read public messages" ON chat_messages;
+CREATE POLICY "Users read public messages" ON chat_messages
+    FOR SELECT USING (
+        is_private = false
+        OR sender_email = (SELECT email FROM auth.users WHERE id = auth.uid())
+        OR recipient_email = (SELECT email FROM auth.users WHERE id = auth.uid())
+    );
+
+DROP POLICY IF EXISTS "Users insert own messages" ON chat_messages;
+CREATE POLICY "Users insert own messages" ON chat_messages
+    FOR INSERT WITH CHECK (sender_email = (SELECT email FROM auth.users WHERE id = auth.uid()));
+
+-- Tea Pairs (Safety check)
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'tea_pairs') THEN
+        ALTER TABLE tea_pairs ENABLE ROW LEVEL SECURITY;
+        DROP POLICY IF EXISTS "Public read tea_pairs" ON tea_pairs;
+        CREATE POLICY "Public read tea_pairs" ON tea_pairs FOR SELECT USING (true);
+    END IF;
+END $$;
+
+
+-- 10. SAFETY CONSTRAINTS (Negative Balances/Qty)
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'profiles_balance_non_negative') THEN
+        ALTER TABLE profiles ADD CONSTRAINT profiles_balance_non_negative CHECK (cash_balance >= 0);
+    END IF;
+END $$;
+
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'positions_quantity_positive') THEN
+        ALTER TABLE positions ADD CONSTRAINT positions_quantity_positive CHECK (quantity > 0);
+    END IF;
+END $$;
+
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'trades_quantity_positive') THEN
+        ALTER TABLE trades ADD CONSTRAINT trades_quantity_positive CHECK (quantity > 0);
+    END IF;
+END $$;
+
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'trades_price_positive') THEN
+        ALTER TABLE trades ADD CONSTRAINT trades_price_positive CHECK (price > 0);
+    END IF;
+END $$;
+
+
+-- 11. ATOMIC TRADE FUNCTION
+-- Uses subqueries for tea_id to avoid type mismatch (int vs uuid) between tables
+CREATE OR REPLACE FUNCTION execute_trade(
+    p_user_id    UUID,
+    p_tea_symbol TEXT,
+    p_side       TEXT,
+    p_quantity   NUMERIC
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_tea         RECORD;
+    v_profile     RECORD;
+    v_position    RECORD;
+    v_trade       RECORD;
+    v_price       NUMERIC;
+    v_total       NUMERIC;
+    v_new_balance NUMERIC;
+    v_new_qty     NUMERIC;
+    v_new_avg     NUMERIC;
+BEGIN
+    IF p_side NOT IN ('BUY', 'SELL') THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Invalid side: must be BUY or SELL');
+    END IF;
+    IF p_quantity <= 0 THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Quantity must be greater than zero');
+    END IF;
+
+    -- Lock and fetch the tea row (looked up by symbol, not id)
+    SELECT * INTO v_tea FROM teas WHERE symbol = p_tea_symbol FOR UPDATE;
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Tea not found: ' || p_tea_symbol);
+    END IF;
+
+    v_price := v_tea.current_price;
+    IF v_price IS NULL OR v_price <= 0 THEN
+        RETURN jsonb_build_object('success', false, 'error', 'No valid market price');
+    END IF;
+
+    v_total := v_price * p_quantity;
+
+    SELECT * INTO v_profile FROM profiles WHERE id = p_user_id FOR UPDATE;
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error', 'User profile not found');
+    END IF;
+
+    -- ── BUY ─────────────────────────────────────────────────────────
+    IF p_side = 'BUY' THEN
+        IF v_profile.cash_balance < v_total THEN
+            RETURN jsonb_build_object('success', false, 'error',
+                'Insufficient balance. Need $' || ROUND(v_total, 2));
+        END IF;
+
+        v_new_balance := v_profile.cash_balance - v_total;
+        UPDATE profiles SET cash_balance = v_new_balance WHERE id = p_user_id;
+
+        -- Use subquery so Postgres resolves the type of teas.id automatically
+        SELECT * INTO v_position FROM positions
+            WHERE user_id = p_user_id
+              AND tea_id = (SELECT id FROM teas WHERE symbol = p_tea_symbol)
+            FOR UPDATE;
+
+        IF FOUND THEN
+            v_new_qty := v_position.quantity + p_quantity;
+            v_new_avg := ((v_position.avg_entry_price * v_position.quantity) + (v_price * p_quantity)) / v_new_qty;
+            UPDATE positions
+                SET quantity = v_new_qty, avg_entry_price = v_new_avg, updated_at = NOW()
+                WHERE id = v_position.id;
+        ELSE
+            INSERT INTO positions (user_id, tea_id, quantity, avg_entry_price)
+                VALUES (p_user_id,
+                        (SELECT id FROM teas WHERE symbol = p_tea_symbol),
+                        p_quantity, v_price);
+        END IF;
+
+    -- ── SELL ────────────────────────────────────────────────────────
+    ELSIF p_side = 'SELL' THEN
+        SELECT * INTO v_position FROM positions
+            WHERE user_id = p_user_id
+              AND tea_id = (SELECT id FROM teas WHERE symbol = p_tea_symbol)
+            FOR UPDATE;
+
+        IF NOT FOUND OR v_position.quantity < p_quantity THEN
+            RETURN jsonb_build_object('success', false, 'error',
+                'Insufficient holdings. Have ' || COALESCE(v_position.quantity, 0) || ' kg');
+        END IF;
+
+        v_new_balance := v_profile.cash_balance + v_total;
+        UPDATE profiles SET cash_balance = v_new_balance WHERE id = p_user_id;
+
+        v_new_qty := v_position.quantity - p_quantity;
+        IF v_new_qty <= 0 THEN
+            DELETE FROM positions WHERE id = v_position.id;
+        ELSE
+            UPDATE positions
+                SET quantity = v_new_qty, updated_at = NOW()
+                WHERE id = v_position.id;
+        END IF;
+    END IF;
+
+    -- ── RECORD TRADE (immutable audit trail) ────────────────────────
+    INSERT INTO trades (user_id, tea_id, side, quantity, price, total_value)
+        VALUES (p_user_id,
+                (SELECT id FROM teas WHERE symbol = p_tea_symbol),
+                p_side, p_quantity, v_price, v_total)
+        RETURNING * INTO v_trade;
+
+    RETURN jsonb_build_object(
+        'success',     true,
+        'trade_id',    v_trade.id::TEXT,
+        'side',        p_side,
+        'symbol',      p_tea_symbol,
+        'quantity',    p_quantity,
+        'price',       v_price,
+        'total',       v_total,
+        'new_balance', v_new_balance
+    );
+END;
+$$;
+
+
+-- 12. ATOMIC INDEX TRADE FUNCTION (C4 FIX)
+-- The server provides the price — clients cannot manipulate it.
+CREATE OR REPLACE FUNCTION execute_index_trade(
+    p_user_id      UUID,
+    p_index_symbol TEXT,
+    p_side         TEXT,
+    p_quantity     NUMERIC,
+    p_price        NUMERIC
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_profile      RECORD;
+    v_position     RECORD;
+    v_trade        RECORD;
+    v_total        NUMERIC;
+    v_new_balance  NUMERIC;
+    v_new_qty      NUMERIC;
+    v_new_avg      NUMERIC;
+BEGIN
+    IF p_side NOT IN ('BUY', 'SELL') THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Invalid side: must be BUY or SELL');
+    END IF;
+    IF p_quantity <= 0 THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Quantity must be greater than zero');
+    END IF;
+    IF p_price IS NULL OR p_price <= 0 OR NOT isfinite(p_price::DOUBLE PRECISION) THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Invalid price');
+    END IF;
+
+    -- Verify the index exists
+    IF NOT EXISTS (SELECT 1 FROM indexes WHERE symbol = p_index_symbol) THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Index not found: ' || p_index_symbol);
+    END IF;
+
+    v_total := p_price * p_quantity;
+
+    -- Lock user profile
+    SELECT * INTO v_profile FROM profiles WHERE id = p_user_id FOR UPDATE;
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error', 'User profile not found');
+    END IF;
+
+    -- ── BUY ─────────────────────────────────────────────────────────
+    IF p_side = 'BUY' THEN
+        IF v_profile.cash_balance < v_total THEN
+            RETURN jsonb_build_object('success', false, 'error',
+                'Insufficient balance. Need $' || ROUND(v_total, 2));
+        END IF;
+
+        v_new_balance := v_profile.cash_balance - v_total;
+        UPDATE profiles SET cash_balance = v_new_balance WHERE id = p_user_id;
+
+        SELECT * INTO v_position FROM index_positions
+            WHERE user_id = p_user_id AND index_symbol = p_index_symbol
+            FOR UPDATE;
+
+        IF FOUND THEN
+            v_new_qty := v_position.quantity + p_quantity;
+            v_new_avg := ((v_position.avg_entry_price * v_position.quantity) + (p_price * p_quantity)) / v_new_qty;
+            UPDATE index_positions
+                SET quantity = v_new_qty, avg_entry_price = v_new_avg, updated_at = NOW()
+                WHERE id = v_position.id;
+        ELSE
+            INSERT INTO index_positions (user_id, index_symbol, quantity, avg_entry_price)
+                VALUES (p_user_id, p_index_symbol, p_quantity, p_price);
+        END IF;
+
+    -- ── SELL ────────────────────────────────────────────────────────
+    ELSIF p_side = 'SELL' THEN
+        SELECT * INTO v_position FROM index_positions
+            WHERE user_id = p_user_id AND index_symbol = p_index_symbol
+            FOR UPDATE;
+
+        IF NOT FOUND OR v_position.quantity < p_quantity THEN
+            RETURN jsonb_build_object('success', false, 'error',
+                'Insufficient index holdings. Have ' || COALESCE(v_position.quantity, 0) || ' kg');
+        END IF;
+
+        v_new_balance := v_profile.cash_balance + v_total;
+        UPDATE profiles SET cash_balance = v_new_balance WHERE id = p_user_id;
+
+        v_new_qty := v_position.quantity - p_quantity;
+        IF v_new_qty <= 0 THEN
+            DELETE FROM index_positions WHERE id = v_position.id;
+        ELSE
+            UPDATE index_positions
+                SET quantity = v_new_qty, updated_at = NOW()
+                WHERE id = v_position.id;
+        END IF;
+    END IF;
+
+    -- ── RECORD TRADE ────────────────────────────────────────────────
+    INSERT INTO trades (user_id, tea_id, index_symbol, side, quantity, price, total_value)
+        VALUES (p_user_id, NULL, p_index_symbol, p_side, p_quantity, p_price, v_total)
+        RETURNING * INTO v_trade;
+
+    RETURN jsonb_build_object(
+        'success',     true,
+        'trade_id',    v_trade.id::TEXT,
+        'side',        p_side,
+        'symbol',      p_index_symbol,
+        'quantity',    p_quantity,
+        'price',       p_price,
+        'total',       v_total,
+        'new_balance', v_new_balance
+    );
+END;
+$$;
+
+
+-- 13. ATOMIC PAIR TRADE CLOSE FUNCTION (C4 FIX)
+CREATE OR REPLACE FUNCTION close_pair_trade(
+    p_user_id    UUID,
+    p_trade_id   TEXT,
+    p_exit_ratio NUMERIC
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_trade        RECORD;
+    v_profile      RECORD;
+    v_close_trade  RECORD;
+    v_margin       NUMERIC;
+    v_pnl          NUMERIC;
+    v_direction    INT;
+    v_ratio_change NUMERIC;
+    v_return_amt   NUMERIC;
+    v_new_balance  NUMERIC;
+    v_leverage     NUMERIC;
+BEGIN
+    IF p_exit_ratio IS NULL OR p_exit_ratio <= 0 THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Invalid exit ratio');
+    END IF;
+
+    -- Lock and fetch original trade
+    SELECT * INTO v_trade FROM trades
+        WHERE id::TEXT = p_trade_id AND user_id = p_user_id
+        FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Trade not found');
+    END IF;
+
+    IF NOT COALESCE(v_trade.is_pair_trade, false) THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Not a pair trade');
+    END IF;
+
+    v_margin := v_trade.quantity;
+    v_leverage := COALESCE(v_trade.leverage, 1);
+    v_direction := CASE WHEN v_trade.side = 'BUY' THEN 1 ELSE -1 END;
+    v_ratio_change := (p_exit_ratio - v_trade.price) / v_trade.price;
+    v_pnl := v_margin * v_ratio_change * v_leverage * v_direction;
+    v_return_amt := v_margin + v_pnl;
+
+    -- Lock profile and update balance
+    SELECT * INTO v_profile FROM profiles WHERE id = p_user_id FOR UPDATE;
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error', 'User profile not found');
+    END IF;
+
+    v_new_balance := v_profile.cash_balance + v_return_amt;
+    UPDATE profiles SET cash_balance = v_new_balance WHERE id = p_user_id;
+
+    -- Record closing trade
+    INSERT INTO trades (user_id, tea_id, index_symbol, side, quantity, price, total_value, pair_id, leverage, is_pair_trade)
+        VALUES (
+            p_user_id,
+            v_trade.tea_id,
+            v_trade.index_symbol,
+            CASE WHEN v_trade.side = 'BUY' THEN 'SELL' ELSE 'BUY' END,
+            v_margin,
+            p_exit_ratio,
+            v_return_amt,
+            v_trade.pair_id,
+            v_leverage,
+            true
+        )
+        RETURNING * INTO v_close_trade;
+
+    RETURN jsonb_build_object(
+        'success',      true,
+        'trade_id',     v_close_trade.id::TEXT,
+        'pnl',          v_pnl,
+        'return_amount', v_return_amt,
+        'new_balance',  v_new_balance,
+        'entry_ratio',  v_trade.price,
+        'exit_ratio',   p_exit_ratio,
+        'margin',       v_margin,
+        'leverage',     v_leverage
+    );
+END;
+$$;
+
+
+-- 14. ACCOUNT RESET FUNCTION (SECURITY DEFINER)
+-- Replaces client-side apiUpdateBalance + apiDeleteAll* calls.
+CREATE OR REPLACE FUNCTION reset_account(
+    p_user_id       UUID,
+    p_default_balance NUMERIC DEFAULT 10000
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    -- Verify user owns this profile
+    IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_user_id) THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Profile not found');
+    END IF;
+
+    -- Delete all positions
+    DELETE FROM positions WHERE user_id = p_user_id;
+    DELETE FROM index_positions WHERE user_id = p_user_id;
+
+    -- Delete all trades
+    DELETE FROM trades WHERE user_id = p_user_id;
+
+    -- Reset balance
+    UPDATE profiles SET cash_balance = p_default_balance WHERE id = p_user_id;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'new_balance', p_default_balance
+    );
+END;
+$$;
+
+
+-- 15. OPEN PAIR TRADE FUNCTION (C4 FIX)
+-- Deducts margin from balance and records the pair trade atomically.
+CREATE OR REPLACE FUNCTION open_pair_trade(
+    p_user_id       UUID,
+    p_side          TEXT,
+    p_amount        NUMERIC,
+    p_ratio         NUMERIC,
+    p_leverage      NUMERIC,
+    p_pair_id       TEXT,
+    p_tea_id        INT,
+    p_index_symbol  TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_profile     RECORD;
+    v_trade       RECORD;
+    v_new_balance NUMERIC;
+    v_total_value NUMERIC;
+    v_db_side     TEXT;
+BEGIN
+    IF p_side NOT IN ('LONG', 'SHORT') THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Invalid side: must be LONG or SHORT');
+    END IF;
+    IF p_amount < 10 THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Minimum position size is $10');
+    END IF;
+    IF p_ratio IS NULL OR p_ratio <= 0 THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Invalid ratio');
+    END IF;
+    IF p_leverage IS NULL OR p_leverage < 1 THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Invalid leverage');
+    END IF;
+
+    v_db_side := CASE WHEN p_side = 'LONG' THEN 'BUY' ELSE 'SELL' END;
+    v_total_value := p_amount * p_leverage;
+
+    -- Lock profile and check balance
+    SELECT * INTO v_profile FROM profiles WHERE id = p_user_id FOR UPDATE;
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error', 'User profile not found');
+    END IF;
+
+    IF v_profile.cash_balance < p_amount THEN
+        RETURN jsonb_build_object('success', false, 'error',
+            'Insufficient balance. Need $' || ROUND(p_amount, 2));
+    END IF;
+
+    v_new_balance := v_profile.cash_balance - p_amount;
+    UPDATE profiles SET cash_balance = v_new_balance WHERE id = p_user_id;
+
+    -- Record pair trade
+    INSERT INTO trades (user_id, tea_id, index_symbol, side, quantity, price, total_value, pair_id, leverage, is_pair_trade)
+        VALUES (p_user_id, p_tea_id, p_index_symbol, v_db_side, p_amount, p_ratio, v_total_value, p_pair_id::uuid, p_leverage, true)
+        RETURNING * INTO v_trade;
+
+    RETURN jsonb_build_object(
+        'success',     true,
+        'trade_id',    v_trade.id::TEXT,
+        'new_balance', v_new_balance,
+        'margin',      p_amount,
+        'exposure',    v_total_value
+    );
+END;
+$$;
 
 -- =============================================
--- 5. Add recipient_name column to chat_messages
--- Stores the display name for private message recipients
+-- 16. PENDING ORDERS TABLE (Phase 4-16: Limit/Stop Orders)
 -- =============================================
-ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS recipient_name TEXT;
+CREATE TABLE IF NOT EXISTS pending_orders (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         UUID NOT NULL REFERENCES profiles(id),
+    symbol          TEXT NOT NULL,
+    is_index        BOOLEAN NOT NULL DEFAULT false,
+    side            TEXT NOT NULL CHECK (side IN ('BUY', 'SELL')),
+    order_type      TEXT NOT NULL CHECK (order_type IN ('LIMIT', 'STOP')),
+    quantity        NUMERIC NOT NULL CHECK (quantity > 0),
+    target_price    NUMERIC NOT NULL CHECK (target_price > 0),
+    margin_reserved NUMERIC NOT NULL DEFAULT 0 CHECK (margin_reserved >= 0),
+    status          TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'FILLED', 'CANCELLED', 'EXPIRED')),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    filled_at       TIMESTAMPTZ,
+    fill_price      NUMERIC,
+    expires_at      TIMESTAMPTZ
+);
+
+ALTER TABLE pending_orders ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users read own orders" ON pending_orders;
+CREATE POLICY "Users read own orders" ON pending_orders FOR SELECT USING (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_pending_orders_user ON pending_orders (user_id, status);
+CREATE INDEX IF NOT EXISTS idx_pending_orders_active ON pending_orders (status, symbol) WHERE status = 'PENDING';
+
+-- =============================================
+-- 17. PLACE ORDER FUNCTION
+-- =============================================
+CREATE OR REPLACE FUNCTION place_order(
+    p_user_id       UUID,
+    p_symbol        TEXT,
+    p_is_index      BOOLEAN,
+    p_side          TEXT,
+    p_order_type    TEXT,
+    p_quantity      NUMERIC,
+    p_target_price  NUMERIC,
+    p_expires_hours INT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_profile       RECORD;
+    v_margin        NUMERIC;
+    v_new_balance   NUMERIC;
+    v_order         RECORD;
+    v_expires_at    TIMESTAMPTZ;
+BEGIN
+    IF p_side NOT IN ('BUY', 'SELL') THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Side must be BUY or SELL');
+    END IF;
+    IF p_order_type NOT IN ('LIMIT', 'STOP') THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Order type must be LIMIT or STOP');
+    END IF;
+    IF p_quantity <= 0 THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Quantity must be positive');
+    END IF;
+    IF p_target_price <= 0 THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Price must be positive');
+    END IF;
+
+    SELECT * INTO v_profile FROM profiles WHERE id = p_user_id FOR UPDATE;
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Profile not found');
+    END IF;
+
+    v_margin := 0;
+    IF p_side = 'BUY' THEN
+        v_margin := p_quantity * p_target_price;
+        IF v_profile.cash_balance < v_margin THEN
+            RETURN jsonb_build_object('success', false, 'error',
+                'Insufficient balance. Need $' || ROUND(v_margin, 2) || ' (have $' || ROUND(v_profile.cash_balance, 2) || ')');
+        END IF;
+        v_new_balance := v_profile.cash_balance - v_margin;
+        UPDATE profiles SET cash_balance = v_new_balance WHERE id = p_user_id;
+    END IF;
+
+    IF p_expires_hours IS NOT NULL AND p_expires_hours > 0 THEN
+        v_expires_at := NOW() + (p_expires_hours || ' hours')::INTERVAL;
+    END IF;
+
+    INSERT INTO pending_orders (user_id, symbol, is_index, side, order_type, quantity, target_price, margin_reserved, expires_at)
+        VALUES (p_user_id, p_symbol, p_is_index, p_side, p_order_type, p_quantity, p_target_price, v_margin, v_expires_at)
+        RETURNING * INTO v_order;
+
+    RETURN jsonb_build_object(
+        'success',          true,
+        'order_id',         v_order.id::TEXT,
+        'margin_reserved',  v_margin,
+        'new_balance',      COALESCE(v_new_balance, v_profile.cash_balance)
+    );
+END;
+$$;
+
+-- =============================================
+-- 18. CANCEL ORDER FUNCTION
+-- =============================================
+CREATE OR REPLACE FUNCTION cancel_order(
+    p_user_id   UUID,
+    p_order_id  UUID
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_order     RECORD;
+    v_profile   RECORD;
+    v_new_bal   NUMERIC;
+BEGIN
+    SELECT * INTO v_order FROM pending_orders WHERE id = p_order_id AND user_id = p_user_id FOR UPDATE;
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Order not found');
+    END IF;
+    IF v_order.status <> 'PENDING' THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Order is already ' || v_order.status);
+    END IF;
+
+    UPDATE pending_orders SET status = 'CANCELLED' WHERE id = p_order_id;
+
+    IF v_order.margin_reserved > 0 THEN
+        SELECT * INTO v_profile FROM profiles WHERE id = p_user_id FOR UPDATE;
+        v_new_bal := v_profile.cash_balance + v_order.margin_reserved;
+        UPDATE profiles SET cash_balance = v_new_bal WHERE id = p_user_id;
+    ELSE
+        SELECT cash_balance INTO v_new_bal FROM profiles WHERE id = p_user_id;
+    END IF;
+
+    RETURN jsonb_build_object(
+        'success',     true,
+        'refunded',    v_order.margin_reserved,
+        'new_balance', v_new_bal
+    );
+END;
+$$;
+
+-- =============================================
+-- 19. FILL PENDING ORDERS (called by market-ticker)
+-- =============================================
+CREATE OR REPLACE FUNCTION fill_pending_orders()
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_order         RECORD;
+    v_current_price NUMERIC;
+    v_should_fill   BOOLEAN;
+    v_trade_result  JSONB;
+    v_filled_count  INT := 0;
+    v_margin_diff   NUMERIC;
+BEGIN
+    FOR v_order IN
+        SELECT po.*, COALESCE(
+            (SELECT t.current_price FROM teas t WHERE t.symbol = po.symbol),
+            (SELECT ph.price FROM price_history ph WHERE ph.symbol = po.symbol ORDER BY ph.recorded_at DESC LIMIT 1)
+        ) AS market_price
+        FROM pending_orders po
+        WHERE po.status = 'PENDING'
+          AND (po.expires_at IS NULL OR po.expires_at > NOW())
+        ORDER BY po.created_at
+        FOR UPDATE OF po
+    LOOP
+        v_current_price := v_order.market_price;
+        IF v_current_price IS NULL OR v_current_price <= 0 THEN CONTINUE; END IF;
+
+        v_should_fill := false;
+        IF v_order.order_type = 'LIMIT' AND v_order.side = 'BUY' AND v_current_price <= v_order.target_price THEN
+            v_should_fill := true;
+        ELSIF v_order.order_type = 'LIMIT' AND v_order.side = 'SELL' AND v_current_price >= v_order.target_price THEN
+            v_should_fill := true;
+        ELSIF v_order.order_type = 'STOP' AND v_order.side = 'BUY' AND v_current_price >= v_order.target_price THEN
+            v_should_fill := true;
+        ELSIF v_order.order_type = 'STOP' AND v_order.side = 'SELL' AND v_current_price <= v_order.target_price THEN
+            v_should_fill := true;
+        END IF;
+
+        IF NOT v_should_fill THEN CONTINUE; END IF;
+
+        IF v_order.is_index THEN
+            SELECT execute_index_trade(v_order.user_id, v_order.symbol, v_order.side, v_order.quantity, v_current_price) INTO v_trade_result;
+        ELSE
+            -- For BUY orders: margin was already reserved, so refund it first so execute_trade can re-deduct at market price
+            IF v_order.side = 'BUY' AND v_order.margin_reserved > 0 THEN
+                UPDATE profiles SET cash_balance = cash_balance + v_order.margin_reserved WHERE id = v_order.user_id;
+            END IF;
+            SELECT execute_trade(v_order.user_id, v_order.symbol, v_order.side, v_order.quantity) INTO v_trade_result;
+        END IF;
+
+        IF (v_trade_result->>'success')::boolean THEN
+            UPDATE pending_orders
+            SET status = 'FILLED', filled_at = NOW(), fill_price = v_current_price
+            WHERE id = v_order.id;
+            v_filled_count := v_filled_count + 1;
+        ELSE
+            -- Fill failed (e.g. insufficient holdings for SELL) — refund margin for BUY that was restored then failed
+            IF v_order.side = 'BUY' AND v_order.margin_reserved > 0 AND NOT v_order.is_index THEN
+                UPDATE profiles SET cash_balance = cash_balance - v_order.margin_reserved + v_order.margin_reserved WHERE id = v_order.user_id;
+            END IF;
+        END IF;
+    END LOOP;
+
+    -- Expire overdue orders and refund margin
+    FOR v_order IN
+        SELECT * FROM pending_orders
+        WHERE status = 'PENDING' AND expires_at IS NOT NULL AND expires_at <= NOW()
+        FOR UPDATE
+    LOOP
+        UPDATE pending_orders SET status = 'EXPIRED' WHERE id = v_order.id;
+        IF v_order.margin_reserved > 0 THEN
+            UPDATE profiles SET cash_balance = cash_balance + v_order.margin_reserved WHERE id = v_order.user_id;
+        END IF;
+    END LOOP;
+
+    RETURN jsonb_build_object('filled', v_filled_count);
+END;
+$$;

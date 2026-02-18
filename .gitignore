@@ -1,0 +1,25 @@
+# Environment secrets (NEVER commit these)
+.env
+tools/.env
+
+# Node
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Supabase local
+.supabase/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Auction data (uploaded separately)
+auction_drops/
+
+# Backup
+backup.html
