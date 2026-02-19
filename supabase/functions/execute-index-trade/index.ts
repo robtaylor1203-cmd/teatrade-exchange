@@ -111,22 +111,68 @@ serve(async (req) => {
         })
       }
 
-      // Server-side price validation: fetch the latest index price from price_history
-      const { data: latestPrice } = await supabaseAdmin
-        .from('price_history')
-        .select('price')
-        .eq('symbol', symbol)
-        .order('recorded_at', { ascending: false })
-        .limit(1)
-        .single()
+      // ── Server-side reference price ──────────────────────────────────────────
+      // Compute the index price from constituent teas in the `teas` table.
+      // This is always current (updated by the cron every minute) and avoids
+      // the CEYLON vs COLOMBO naming mismatch that caused false rejections when
+      // comparing against stale or differently-named price_history entries.
+      const INDEX_COMPOSITIONS: Record<string, string[]> = {
+        KENYA:   ['KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS'],
+        INDIA:   ['IND-ASM', 'IND-DRJ'],
+        CEYLON:  ['SRI-BOP', 'SRI-PEK'],
+        COLOMBO: ['SRI-BOP', 'SRI-PEK'],
+        CHINA:   ['CHN-YUN'],
+        AFRICA:  ['KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS', 'MLW-BP1', 'RWA-OP'],
+        ASIA:    ['IND-ASM', 'IND-DRJ', 'SRI-BOP', 'SRI-PEK', 'CHN-YUN'],
+        MOMBASA: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS'],
+        KOLKATA: ['IND-ASM', 'IND-DRJ'],
+        FUTURES: ['KEN-BP1', 'IND-ASM', 'SRI-BOP', 'CHN-YUN', 'IND-DRJ'],
+      }
 
-      // If we have a server-side reference price, reject if client price deviates >5%
-      if (latestPrice && latestPrice.price > 0) {
-        const deviation = Math.abs(px - latestPrice.price) / latestPrice.price
-        if (deviation > 0.05) {
+      let serverRefPrice: number | null = null
+
+      const teasInIndex = INDEX_COMPOSITIONS[symbol]
+      if (teasInIndex && teasInIndex.length > 0) {
+        const { data: teaPrices } = await supabaseAdmin
+          .from('teas')
+          .select('current_price')
+          .in('symbol', teasInIndex)
+
+        if (teaPrices && teaPrices.length > 0) {
+          const valid = teaPrices
+            .map((t: { current_price: number }) => Number(t.current_price))
+            .filter((p: number) => p > 0)
+          if (valid.length > 0) {
+            serverRefPrice = valid.reduce((a: number, b: number) => a + b, 0) / valid.length
+          }
+        }
+      }
+
+      // Fallback: only use price_history if it's fresh (< 10 min old)
+      if (serverRefPrice === null) {
+        const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+        const { data: latestPrice } = await supabaseAdmin
+          .from('price_history')
+          .select('price')
+          .eq('symbol', symbol)
+          .gte('recorded_at', tenMinAgo)
+          .order('recorded_at', { ascending: false })
+          .limit(1)
+          .single()
+
+        if (latestPrice && Number(latestPrice.price) > 0) {
+          serverRefPrice = Number(latestPrice.price)
+        }
+      }
+
+      // Reject if client price deviates >10% from the server-computed reference.
+      // 10% (up from 5%) gives room for the ~60s cron lag without false rejections.
+      if (serverRefPrice !== null && serverRefPrice > 0) {
+        const deviation = Math.abs(px - serverRefPrice) / serverRefPrice
+        if (deviation > 0.10) {
           return new Response(JSON.stringify({
             success: false,
-            error: `Price rejected: $${px.toFixed(2)} deviates >5% from server price $${latestPrice.price.toFixed(2)}`
+            error: `Price rejected: $${px.toFixed(2)} deviates >10% from server price $${serverRefPrice.toFixed(2)}`
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400,
