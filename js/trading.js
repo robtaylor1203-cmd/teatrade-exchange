@@ -49,6 +49,8 @@ function adjustSlTp(inputId, delta) {
 
 /**
  * Recalculate the estimated total shown below the trade form.
+ * FIX: Fetches the price directly from state.teas / calculateRegionalIndexes
+ * instead of the potentially-stale dataset.price on the <option> element.
  */
 function updateTradeSummary() {
     const select = document.getElementById('trade-tea-select');
@@ -56,8 +58,31 @@ function updateTradeSummary() {
     const priceInput = document.getElementById('trade-price');
     const valueEl = document.getElementById('trade-value');
 
-    const selectedOption = select.options[select.selectedIndex];
-    const price = selectedOption?.dataset?.price ? parseFloat(selectedOption.dataset.price) : 0;
+    const selectValue = select.value;
+    let price = 0;
+
+    if (selectValue) {
+        if (selectValue.startsWith('INDEX_')) {
+            // Index trade — use the live calculated index price
+            const indexSymbol = selectValue.replace('INDEX_', '');
+            const indexes = typeof calculateRegionalIndexes === 'function'
+                ? calculateRegionalIndexes() : [];
+            const idx = indexes.find(i => i.symbol === indexSymbol);
+            price = idx?.price || 0;
+        } else {
+            // Tea trade — look up the live current_price from state.teas
+            const teaId = parseInt(selectValue);
+            const tea = state.teas?.find(t => t.id === teaId);
+            price = tea?.current_price || 0;
+        }
+    }
+
+    // Fallback to dataset.price if state isn't loaded yet
+    if (!price) {
+        const selectedOption = select.options[select.selectedIndex];
+        price = selectedOption?.dataset?.price ? parseFloat(selectedOption.dataset.price) : 0;
+    }
+
     const qty = parseFloat(qtyInput.value) || 0;
 
     priceInput.value = price > 0 ? price.toFixed(3) : '';
@@ -169,6 +194,11 @@ async function executeTrade() {
     let indexSymbol = null;
     let productName = '';
 
+    // FIX: For index trades, capture the live index object now so we can
+    // use its price at execution time — avoiding the >10% deviation error
+    // that occurred when the form price was stale vs the server's reality.
+    let _liveIndex = null;
+
     if (isIndexTrade) {
         indexSymbol = selectValue.replace('INDEX_', '');
         const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
@@ -177,6 +207,7 @@ async function executeTrade() {
             showToast('Index not found', 'error', true);
             return;
         }
+        _liveIndex = index;
         productName = index.name || indexSymbol + ' Index';
         tea = state.teas?.find(t => index.teas?.includes(t.symbol));
         teaId = tea?.id || null;
@@ -193,7 +224,13 @@ async function executeTrade() {
     try {
         if (isIndexTrade) {
             // ── INDEX TRADE (C4 FIX: server-side atomic execution) ──
-            const result = await apiExecuteIndexTrade(indexSymbol, state.tradeType, qty, price);
+            // Use the live price from calculateRegionalIndexes (not the form
+            // field) to ensure it matches the server's current reality.
+            const executionPrice = (_liveIndex?.price && _liveIndex.price > 0)
+                ? _liveIndex.price
+                : price;
+
+            const result = await apiExecuteIndexTrade(indexSymbol, state.tradeType, qty, executionPrice);
 
             if (!result.success) {
                 throw new Error(result.error || 'Index trade failed');
@@ -202,11 +239,11 @@ async function executeTrade() {
             state.userProfile.cash_balance = result.new_balance;
 
             if (state.tradeType === 'BUY') {
-                showToast('Trade Executed!', `Bought ${qty.toLocaleString()} kg of ${productName} at $${price.toFixed(2)}/kg`);
+                showToast('Trade Executed!', `Bought ${qty.toLocaleString()} kg of ${productName} at $${executionPrice.toFixed(2)}/kg`);
             } else {
                 const indexPos = state.indexPositions?.[indexSymbol];
-                const entryPrice = indexPos?.avg_entry_price || price;
-                const pnl = (price - entryPrice) * qty;
+                const entryPrice = indexPos?.avg_entry_price || executionPrice;
+                const pnl = (executionPrice - entryPrice) * qty;
                 const pnlText = pnl >= 0 ? `Profit: +$${pnl.toFixed(2)}` : `Loss: -$${Math.abs(pnl).toFixed(2)}`;
                 showToast('Trade Executed!', `Sold ${qty.toLocaleString()} kg of ${productName}. ${pnlText}`);
             }

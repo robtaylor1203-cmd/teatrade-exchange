@@ -107,20 +107,43 @@ SIM_TAG = '@teatrade.sim'
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 
+_RETRY_EXC = (requests.exceptions.SSLError, requests.exceptions.ConnectionError)
+
+def _request(method: str, url: str, headers: dict, retries: int = 3, **kwargs):
+    """All HTTP calls go through here — retries on SSL/connection drops."""
+    delay = 2.0
+    for attempt in range(retries):
+        try:
+            r = requests.request(method, url, headers=headers,
+                                 timeout=15, **kwargs)
+            return r
+        except _RETRY_EXC as exc:
+            if attempt < retries - 1:
+                log.debug(f"    Network hiccup ({exc.__class__.__name__}), "
+                          f"retrying in {delay:.0f}s…")
+                time.sleep(delay)
+                delay *= 2
+            else:
+                raise
+
 def _get(path: str, params: dict = None):
-    r = requests.get(f"{REST}/{path}", headers=HEADERS, params=params, timeout=10)
+    r = _request('GET', f"{REST}/{path}", HEADERS, params=params)
     return r.json() if r.ok else None
 
 def _post(path: str, payload: dict):
-    r = requests.post(f"{REST}/{path}", headers=HEADERS, json=payload, timeout=10)
+    r = _request('POST', f"{REST}/{path}", HEADERS, json=payload)
     return r.json() if r.ok else None
 
 def _post_raw(url: str, payload: dict):
-    r = requests.post(url, headers=HEADERS, json=payload, timeout=10)
+    r = _request('POST', url, HEADERS, json=payload)
+    return r.status_code, r.json() if r.text else {}
+
+def _post_raw_with_headers(url: str, headers: dict, payload: dict):
+    r = _request('POST', url, headers, json=payload)
     return r.status_code, r.json() if r.text else {}
 
 def _delete(path: str, params: dict):
-    r = requests.delete(f"{REST}/{path}", headers=HEADERS, params=params, timeout=10)
+    r = _request('DELETE', f"{REST}/{path}", HEADERS, params=params)
     return r.ok
 
 # ── FETCH LIVE PRICES ─────────────────────────────────────────────────────────
@@ -152,12 +175,24 @@ def create_bot(n: int, session_id: str) -> Optional[dict]:
     email    = f"simbot_{n:03d}_{session_id[:8]}{SIM_TAG}"
     password = f"SimPass_{uuid.uuid4().hex[:12]}!"
 
-    # Create auth user via admin API
+    # Include the first 8 chars of session_id so every run gets unique usernames
+    # even if a previous run wasn't cleaned up yet.
+    short_sid = session_id[:8]
+    username  = f"SimBot_{n:03d}_{short_sid}"
+
+    # Create auth user via admin API.
+    # user_metadata is read by the handle_new_user DB trigger to populate
+    # the profiles row — username MUST be included here to satisfy the NOT NULL
+    # constraint on profiles.username.
     status, resp = _post_raw(AUTH, {
-        'email':            email,
-        'password':         password,
-        'email_confirm':    True,   # skip email verification
-        'user_metadata':    {'is_sim_bot': True, 'session_id': session_id},
+        'email':         email,
+        'password':      password,
+        'email_confirm': True,   # skip email verification
+        'user_metadata': {
+            'username':   username,
+            'is_sim_bot': True,
+            'session_id': session_id,
+        },
     })
 
     if status not in (200, 201):
@@ -168,26 +203,50 @@ def create_bot(n: int, session_id: str) -> Optional[dict]:
     if not user_id:
         return None
 
-    # Upsert profile with a generous starting balance
-    _post_raw(
+    # Upsert profile — trigger may have already created it, so merge on conflict.
+    cash = round(random.uniform(50_000, 200_000), 2)
+    upsert_headers = {
+        **HEADERS,
+        'Prefer': 'return=representation,resolution=merge-duplicates',
+    }
+    prof_status, prof_resp = _post_raw_with_headers(
         f"{SUPABASE_URL}/rest/v1/profiles",
+        upsert_headers,
         {
-            'id':             user_id,
-            'username':       f"SimBot_{n:03d}",
-            'cash_balance':   random.uniform(50_000, 200_000),
-            'display_name':   f"Simulation Bot {n:03d}",
-        }
+            'id':           user_id,
+            'username':     username,
+            'cash_balance': cash,
+        },
     )
+
+    if prof_status not in (200, 201):
+        log.warning(f"  Profile upsert failed for bot {n}: {prof_resp}")
+        # Retry with a plain INSERT as fallback
+        insert_headers = {**HEADERS, 'Prefer': 'return=representation'}
+        prof_status2, prof_resp2 = _post_raw_with_headers(
+            f"{SUPABASE_URL}/rest/v1/profiles",
+            insert_headers,
+            {
+                'id':           user_id,
+                'username':     username,
+                'cash_balance': cash,
+            },
+        )
+        if prof_status2 not in (200, 201):
+            log.warning(f"  Profile INSERT also failed for bot {n}: {prof_resp2}")
+
+    # Verify profile exists before returning
+    verify = _request('GET', f"{SUPABASE_URL}/rest/v1/profiles",
+                       HEADERS, params={'id': f'eq.{user_id}', 'select': 'id'})
+    if not verify.ok or not verify.json():
+        log.warning(f"  Bot {n}: profile not found after creation, skipping")
+        return None
 
     log.info(f"  ✓ Bot {n:03d} created → {email}")
     return {'id': user_id, 'email': email}
 
 def delete_bot_user(user_id: str):
-    requests.delete(
-        f"{AUTH}/{user_id}",
-        headers=HEADERS,
-        timeout=10,
-    )
+    _request('DELETE', f"{AUTH}/{user_id}", HEADERS)
 
 # ── TRADE EXECUTION ───────────────────────────────────────────────────────────
 
@@ -222,15 +281,15 @@ def place_trade(bot_id: str, bot_n: int, prices: dict, session_id: str,
     exec_price = round(price + slippage, 4)
 
     payload = {
-        'user_id':     bot_id,
-        'tea_id':      tea_id,
+        'user_id':      bot_id,
+        'tea_id':       tea_id,
         'index_symbol': idx_sym,
-        'side':        side,
-        'quantity':    qty,
-        'price':       exec_price,
-        'total_value': total,
-        'status':      'FILLED',
-        'notes':       f'sim_session:{session_id}',   # tag for cleanup
+        'side':         side,
+        'quantity':     qty,
+        'price':        exec_price,
+        'total_value':  total,
+        'status':       'FILLED',
+        'notes':        f'sim_session:{session_id}',
     }
 
     status, resp = _post_raw(f"{SUPABASE_URL}/rest/v1/trades", payload)
@@ -238,7 +297,7 @@ def place_trade(bot_id: str, bot_n: int, prices: dict, session_id: str,
     if status in (200, 201):
         log.info(f"  Bot {bot_n:03d} {side:4s} {qty:>6.0f} kg {sym_display:<12s} @ ${exec_price:.4f}")
     else:
-        log.debug(f"  Bot {bot_n:03d} trade failed ({status}): {resp}")
+        log.warning(f"  Bot {bot_n:03d} trade FAILED (HTTP {status}): {resp}")
 
 # ── MAIN SIMULATION LOOP ──────────────────────────────────────────────────────
 
@@ -256,7 +315,9 @@ def run_simulation(n_bots: int, duration_s: int, intensity: str):
     log.info(f"         OR : SELECT cleanup_simulation_bots(); in SQL Editor")
     log.info("=" * 60)
 
-    # 1. Create bots
+    # 1. Create bots — paced to stay within Supabase Auth API rate limits.
+    # Every 10 bots we pause 15s to let the throttle window reset; without
+    # this, Supabase starts adding multi-second delays per request around bot 20.
     log.info(f"\n[1/3] Creating {n_bots} simulation bots…")
     bots = []
     for i in range(1, n_bots + 1):
@@ -266,7 +327,10 @@ def run_simulation(n_bots: int, duration_s: int, intensity: str):
             bots.append({**bot, 'n': i, 'archetype': archetype,
                           'cfg': ARCHETYPES[archetype],
                           'next_trade_at': time.time() + random.uniform(0, 5)})
-        time.sleep(0.15)   # gentle rate limiting on auth API
+        time.sleep(0.5)    # base inter-bot delay
+        if i % 10 == 0 and i < n_bots:
+            log.info(f"  ⏸  Cooldown after bot {i} (letting Auth API recover 15s)…")
+            time.sleep(15)
 
     if not bots:
         log.error("No bots created — check your SUPABASE_KEY and URL")
@@ -278,10 +342,14 @@ def run_simulation(n_bots: int, duration_s: int, intensity: str):
 
     end_time = time.time() + duration_s
     trade_count = 0
+    empty_price_warnings = 0
 
     while time.time() < end_time:
         prices = fetch_tea_prices()
         if not prices:
+            empty_price_warnings += 1
+            if empty_price_warnings <= 3 or empty_price_warnings % 10 == 0:
+                log.warning(f"  fetch_tea_prices() returned empty (attempt {empty_price_warnings}) — check REST API access")
             time.sleep(2)
             continue
 
@@ -317,12 +385,8 @@ def run_cleanup():
     # Find all sim bot auth users
     page, all_users = 0, []
     while True:
-        r = requests.get(
-            AUTH,
-            headers=HEADERS,
-            params={'page': page, 'per_page': 1000},
-            timeout=15,
-        )
+        r = _request('GET', AUTH, HEADERS,
+                     params={'page': page, 'per_page': 1000})
         if not r.ok:
             break
         data = r.json()
@@ -346,37 +410,25 @@ def run_cleanup():
     # Delete trades
     for chunk in [ids[i:i+50] for i in range(0, len(ids), 50)]:
         id_list = ','.join(f'"{i}"' for i in chunk)
-        requests.delete(
-            f"{REST}/trades",
-            headers=HEADERS,
-            params={'user_id': f'in.({id_list})'},
-            timeout=15,
-        )
+        _request('DELETE', f"{REST}/trades", HEADERS,
+                 params={'user_id': f'in.({id_list})'})
 
     # Delete positions
     for chunk in [ids[i:i+50] for i in range(0, len(ids), 50)]:
         id_list = ','.join(f'"{i}"' for i in chunk)
-        requests.delete(
-            f"{REST}/positions",
-            headers=HEADERS,
-            params={'user_id': f'in.({id_list})'},
-            timeout=15,
-        )
+        _request('DELETE', f"{REST}/positions", HEADERS,
+                 params={'user_id': f'in.({id_list})'})
 
     # Delete profiles
     for chunk in [ids[i:i+50] for i in range(0, len(ids), 50)]:
         id_list = ','.join(f'"{i}"' for i in chunk)
-        requests.delete(
-            f"{REST}/profiles",
-            headers=HEADERS,
-            params={'id': f'in.({id_list})'},
-            timeout=15,
-        )
+        _request('DELETE', f"{REST}/profiles", HEADERS,
+                 params={'id': f'in.({id_list})'})
 
     # Delete auth users
     deleted = 0
     for user in all_users:
-        r = requests.delete(f"{AUTH}/{user['id']}", headers=HEADERS, timeout=10)
+        r = _request('DELETE', f"{AUTH}/{user['id']}", HEADERS)
         if r.ok or r.status_code == 404:
             deleted += 1
 

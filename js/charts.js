@@ -16,6 +16,29 @@
 let lastLivePrice = null;
 let livePriceDirection = 0; // 1 = up, -1 = down, 0 = neutral
 
+/**
+ * Resolve the currency symbol and forex multiplier for the currently
+ * displayed chart. Returns { symbol: '$', multiplier: 1 } for USD,
+ * or e.g. { symbol: 'Rs', multiplier: 305 } for LKR-converted charts.
+ * The multiplier converts raw USD price_history values to local currency.
+ */
+function _getChartCurrencyInfo() {
+    const mcd = state.mainChartData;
+    if (!mcd) return { symbol: '$', multiplier: 1 };
+
+    const curr = mcd.currency || '$';
+    if (curr === '$') return { symbol: '$', multiplier: 1 };
+
+    if (mcd.forexKey && state.macroIndicators?.[mcd.forexKey]) {
+        return { symbol: curr, multiplier: Number(state.macroIndicators[mcd.forexKey]) || 1 };
+    }
+    const idx = state.dbIndexes?.find(i => i.symbol === mcd.symbol);
+    if (idx?.forexKey && state.macroIndicators?.[idx.forexKey]) {
+        return { symbol: curr, multiplier: Number(state.macroIndicators[idx.forexKey]) || idx.multiplier || 1 };
+    }
+    return { symbol: curr, multiplier: 1 };
+}
+
 // Shared window state set during drawChart so hover handlers can use it
 let _chartWStart    = null;
 let _chartWDuration = 0;
@@ -153,23 +176,28 @@ function generateChartData(timeframe) {
     let fullHistory;
     let symbol, symbolType;
 
+    // Market card display symbols → tradable index symbols for data lookup
+    const _cardToIndex = { 'MOMBASA': 'KENYA', 'KOLKATA': 'INDIA', 'COLOMBO': 'CEYLON', 'FUTURES': 'ASIA', 'KENYAN': 'KENYA' };
+
     if (state.mainChartData?.isTea) {
-        // Tea selected via search or quote card
         symbol = state.mainChartData.symbol;
         symbolType = 'tea';
     } else if (state.mainChartData?.isIndex) {
-        // Index selected via market card click
-        symbol = state.mainChartData.symbol;
+        symbol = _cardToIndex[state.mainChartData.symbol] || state.mainChartData.symbol;
         symbolType = 'index';
     } else {
-        // Fallback: check hub trade dropdown (default initial state)
+        // Fallback: check hub trade dropdown (default initial state).
+        // Dropdown values are numeric tea IDs (e.g. "3") or "INDEX_KENYA".
         const select = document.getElementById('trade-tea-select');
-        const selectedSymbol = select?.value;
-        const selectedTea = state.teas && state.teas.find(t => t.symbol === selectedSymbol);
-        if (selectedTea) {
-            symbol = selectedTea.symbol;
-            symbolType = 'tea';
-        } else {
+        const selectedVal = select?.value;
+        if (selectedVal && !selectedVal.startsWith('INDEX_')) {
+            const tea = state.teas?.find(t => t.id === parseInt(selectedVal));
+            if (tea) {
+                symbol = tea.symbol;
+                symbolType = 'tea';
+            }
+        }
+        if (!symbol) {
             symbol = state.mainChartData?.symbol || 'KENYA';
             symbolType = 'index';
         }
@@ -191,7 +219,20 @@ function generateChartData(timeframe) {
         }).catch(() => {});
     }
 
-    return sampleHistoricalData(fullHistory, timeframe, config);
+    const sampled = sampleHistoricalData(fullHistory, timeframe, config);
+
+    const ci = _getChartCurrencyInfo();
+    if (ci.multiplier !== 1 && sampled.length > 0) {
+        const m = ci.multiplier;
+        for (const c of sampled) {
+            c.open  *= m;
+            c.high  *= m;
+            c.low   *= m;
+            c.close *= m;
+        }
+    }
+
+    return sampled;
 }
 
 function sampleHistoricalData(fullHistory, timeframe, config) {
@@ -442,8 +483,7 @@ function drawChart() {
         maxPrice = midPrice + minSpan / 2;
     }
 
-    // Gentle EMA smoothing to avoid axis jumping between refreshes.
-    // Cache key uses the actual charted symbol so each instrument has its own bounds.
+    // Light EMA smoothing to avoid axis jumping between refreshes.
     const chartedSymbol = state.mainChartData?.symbol || 'MAIN';
     const cacheKey = `main_${chartedSymbol}_${state.currentTimeframe}`;
     if (!window.mainYAxisCache) window.mainYAxisCache = {};
@@ -451,14 +491,11 @@ function drawChart() {
     if (prev) {
         const prevRange  = prev.max - prev.min;
         const newRange   = maxPrice - minPrice;
-        // If the cached range is wildly different (>3× or <0.33×), snap immediately
-        // rather than blending — prevents the "invisible flat line" trap when switching
-        // between instruments with very different price scales (e.g. $5 vs $500).
         const ratio = prevRange / newRange;
-        if (ratio > 3 || ratio < 0.33) {
-            // Snap: use new bounds directly, no blend
+        if (ratio > 2 || ratio < 0.5) {
+            // Snap immediately for large scale changes (symbol switch, currency change)
         } else {
-            const α = 0.30;
+            const α = 0.55;
             minPrice = prev.min * (1 - α) + minPrice * α;
             maxPrice = prev.max * (1 - α) + maxPrice * α;
         }
@@ -515,16 +552,23 @@ function drawChart() {
     ctx.fillStyle = '#6b7280';
     ctx.textAlign = 'right';
 
+    const _ccurr = (state.mainChartData?.currency || '$');
+    const _cfmt = (v) => {
+        if (v >= 1000) return _ccurr + v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        if (v >= 100) return _ccurr + v.toFixed(1);
+        return _ccurr + v.toFixed(2);
+    };
+
     for (let i = 0; i <= 5; i++) {
         const y = h * 0.1 + chartHeight * (i / 5);
-        const priceLabel = (maxPrice - (priceRange * (i / 5))).toFixed(2);
+        const priceVal = maxPrice - (priceRange * (i / 5));
 
         ctx.beginPath();
         ctx.moveTo(leftMargin, y);
         ctx.lineTo(w - rightMargin, y);
         ctx.stroke();
 
-        ctx.fillText('$' + priceLabel, leftMargin - 8, y + 3);
+        ctx.fillText(_cfmt(priceVal), leftMargin - 8, y + 3);
     }
 
     // Draw X-axis labels — evenly spaced dates within the fixed timeframe window
@@ -1194,23 +1238,25 @@ function setupChartHover() {
         const changeClass = dpChange >= 0 ? 'up' : 'down';
         const changeSign = dpChange >= 0 ? '+' : '';
 
+        const _tc = state.mainChartData?.currency || '$';
+        const _tf = (v) => v >= 100 ? _tc + v.toFixed(1) : _tc + v.toFixed(3);
         tooltip.innerHTML = `
             <div class="tooltip-date">${formatChartDate(dataPoint.date, state.currentTimeframe)}</div>
             <div class="tooltip-row">
                 <span class="tooltip-label">Open</span>
-                <span class="tooltip-value">$${dpOpen.toFixed(3)}</span>
+                <span class="tooltip-value">${_tf(dpOpen)}</span>
             </div>
             <div class="tooltip-row">
                 <span class="tooltip-label">High</span>
-                <span class="tooltip-value up">$${dpHigh.toFixed(3)}</span>
+                <span class="tooltip-value up">${_tf(dpHigh)}</span>
             </div>
             <div class="tooltip-row">
                 <span class="tooltip-label">Low</span>
-                <span class="tooltip-value down">$${dpLow.toFixed(3)}</span>
+                <span class="tooltip-value down">${_tf(dpLow)}</span>
             </div>
             <div class="tooltip-row">
                 <span class="tooltip-label">Close</span>
-                <span class="tooltip-value">$${dpClose.toFixed(3)}</span>
+                <span class="tooltip-value">${_tf(dpClose)}</span>
             </div>
             <div class="tooltip-row">
                 <span class="tooltip-label">Change</span>
@@ -1259,6 +1305,67 @@ document.addEventListener('click', (e) => {
     const dropdown = document.querySelector('.studies-dropdown');
     if (dropdown && !dropdown.contains(e.target)) {
         document.getElementById('studies-menu')?.classList.remove('visible');
+    }
+});
+
+// =============================================
+// UNIVERSAL EVENT DELEGATION
+// Handles .timeframe-item and indicator buttons in any dynamic context
+// (main chart, trading hub fullscreen, quick-quote modal, any popup).
+// Buttons with an existing inline onclick are already handled — skip them
+// to avoid double-firing. Buttons without onclick (dynamically injected)
+// are caught here and routed to the correct chart instance.
+// =============================================
+document.addEventListener('click', (e) => {
+    // ── Timeframe option items ─────────────────────────────────────────────
+    const tfItem = e.target.closest('.timeframe-item');
+    if (tfItem && !tfItem.getAttribute('onclick')) {
+        const tf = tfItem.dataset.tf || tfItem.textContent.trim();
+        if (!tf) return;
+
+        if (e.target.closest('#hub-timeframe-menu')) {
+            // Hub fullscreen chart
+            if (typeof setHubTimeframe === 'function') setHubTimeframe(tf);
+        } else if (e.target.closest('#quick-quote-modal')) {
+            // Quick-quote modal (uses .qq-tf-btn, but catch .timeframe-item too)
+            if (typeof setQQTimeframe === 'function') setQQTimeframe(tf);
+        } else {
+            // Main chart
+            setTimeframe(tf);
+        }
+        return;
+    }
+
+    // ── Quick-quote timeframe buttons (.qq-tf-btn) ─────────────────────────
+    const qqTfBtn = e.target.closest('.qq-tf-btn');
+    if (qqTfBtn && !qqTfBtn.getAttribute('onclick')) {
+        const tf = qqTfBtn.dataset.tf;
+        if (tf && typeof setQQTimeframe === 'function') setQQTimeframe(tf);
+        return;
+    }
+
+    // ── Quick-quote indicator buttons (.qq-indicator-btn) ──────────────────
+    const qqIndBtn = e.target.closest('.qq-indicator-btn');
+    if (qqIndBtn && !qqIndBtn.getAttribute('onclick')) {
+        const ind = qqIndBtn.dataset.ind;
+        if (ind && typeof toggleQQIndicator === 'function') toggleQQIndicator(ind);
+        return;
+    }
+
+    // ── Generic indicator buttons (.indicator-btn) — routed by context ─────
+    const indBtn = e.target.closest('.indicator-btn');
+    if (indBtn && !indBtn.getAttribute('onclick')) {
+        const study = indBtn.dataset.study || indBtn.dataset.ind;
+        if (!study) return;
+
+        if (e.target.closest('#quick-quote-modal')) {
+            if (typeof toggleQQIndicator === 'function') toggleQQIndicator(study);
+        } else if (e.target.closest('#chart-section.panel-maximized')) {
+            // Hub fullscreen
+            if (typeof toggleHubStudy === 'function') toggleHubStudy(study);
+        } else {
+            toggleStudy(study);
+        }
     }
 });
 

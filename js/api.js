@@ -189,23 +189,27 @@ async function apiFetchTradeById(tradeId) {
  * @returns {Promise<{data: Array|null, error: object|null}>}
  */
 async function apiFetchPriceHistory(symbol, limit, since) {
-    // For short timeframes (1D / 1W) a single DESC query is fine — live ticks
-    // are exactly what we want.
+    // Always use a split strategy when a time window (since) is given.
     //
-    // For longer timeframes (1M / 3M / 1Y / ALL) the edge-function live ticks
-    // from this week would saturate the LIMIT and push the simulated historical
-    // daily records completely out of the result set.  We therefore run TWO
-    // parallel queries and merge:
-    //   A) All simulated rows in the window (at most ~365 per year — trivial)
-    //   B) The most-recent 500 live-tick rows (covers the last few days)
+    // The price_history table contains two distinct populations:
+    //   • is_simulated = TRUE  – one row per day per symbol (2023 → now)
+    //   • is_simulated = FALSE – one row every 5 min per symbol (live cron)
+    //
+    // A naive single DESC LIMIT query always returns the N most-recent live
+    // rows, which for a 1D window is only the last few hours, leaving most of
+    // the chart X-axis blank.  Splitting lets us bring in the full simulated
+    // history regardless of how many live rows exist.
+    //
+    //   A) ALL simulated rows in the time window  (cheap — ≤365 rows/year)
+    //   B) Most-recent 5 000 live rows in the window (covers up to ~17 days at
+    //      5-min density, or ~41 h at legacy 30-s density)
+    //
+    // After merging we sort ascending so convertToOHLC sees a clean timeline.
 
-    const recentCutoff = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString(); // 2 weeks
-    const useSplit = since && (new Date(Date.now()) - new Date(since)) > 14 * 24 * 3600 * 1000;
-
-    if (useSplit && supabaseClient.from) {
+    if (since && supabaseClient.from) {
         try {
             const [histResult, liveResult] = await Promise.all([
-                // A: simulated historical rows for the full window
+                // A: every simulated row in the window
                 supabaseClient
                     .from('price_history')
                     .select('price, recorded_at, volume')
@@ -213,35 +217,34 @@ async function apiFetchPriceHistory(symbol, limit, since) {
                     .eq('is_simulated', true)
                     .gte('recorded_at', since)
                     .order('recorded_at', { ascending: true })
-                    .limit(2000),
-                // B: recent live rows (last 2 weeks, not simulated)
+                    .limit(5000),
+                // B: most-recent live rows in the window (DESC so limit is from newest)
                 supabaseClient
                     .from('price_history')
                     .select('price, recorded_at, volume')
                     .eq('symbol', symbol)
                     .eq('is_simulated', false)
-                    .gte('recorded_at', recentCutoff)
-                    .order('recorded_at', { ascending: true })
-                    .limit(500),
+                    .gte('recorded_at', since)
+                    .order('recorded_at', { ascending: false })
+                    .limit(5000),
             ]);
 
-            if (histResult.error && liveResult.error) {
-                // Both failed — fall through to single query below
-            } else {
+            if (!histResult.error || !liveResult.error) {
                 const hist = histResult.data || [];
-                const live = liveResult.data || [];
-                // Merge and sort by time
+                // Reverse live rows back to ascending order before merge
+                const live = (liveResult.data || []).reverse();
                 const merged = [...hist, ...live].sort(
-                    (a, b) => new Date(a.recorded_at) - new Date(b.recorded_at)
+                    (a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
                 );
                 return { data: merged, error: null };
             }
+            // Both failed — fall through
         } catch (_) {
             // Fall through to single query
         }
     }
 
-    // Default single-query path (short timeframes or split unavailable)
+    // Fallback: no time window (ALL timeframe) — single DESC LIMIT query
     let query = supabaseClient
         .from('price_history')
         .select('price, recorded_at, volume')
@@ -314,7 +317,7 @@ async function apiInsertChatMessage(data) {
 async function apiLookupUserByUsername(username) {
     return supabaseClient
         .from('profiles')
-        .select('id, username, email')
+        .select('id, username, email, cash_balance, follower_count, following_count')
         .ilike('username', username)
         .single();
 }
@@ -642,7 +645,12 @@ function reconnectAllChannels() {
     _realtimeState.macroRetries = 0;
     _realtimeState.chatRetries = 0;
     if (typeof startTickerSubscription === 'function') startTickerSubscription();
-    if (state.currentUser) startUserSubscriptions(state.currentUser.id);
+    if (state.currentUser) {
+        startUserSubscriptions(state.currentUser.id);
+        if (typeof reconnectTradeNotifications === 'function') {
+            reconnectTradeNotifications();
+        }
+    }
 }
 
 /**
@@ -661,7 +669,23 @@ async function apiFetchMarketState() {
 
 async function _invokeEdgeFunction(fnName, body) {
     try {
-        const { data, error } = await supabaseClient.functions.invoke(fnName, { body });
+        // Always refresh the session before calling an Edge Function.
+        // supabaseClient.functions.invoke() does NOT auto-refresh the access
+        // token, so a slightly-expired JWT gets sent to the gateway and comes
+        // back as "Invalid JWT". getSession() triggers a silent token refresh
+        // when the access token is within the expiry window.
+        let accessToken = null;
+        try {
+            const { data: sessionData } = await supabaseClient.auth.getSession();
+            accessToken = sessionData?.session?.access_token || null;
+        } catch (_) {}
+
+        const invokeOpts = { body };
+        if (accessToken) {
+            invokeOpts.headers = { Authorization: `Bearer ${accessToken}` };
+        }
+
+        const { data, error } = await supabaseClient.functions.invoke(fnName, invokeOpts);
 
         if (!error) {
             return data || { success: false, error: 'Empty response' };
@@ -787,5 +811,98 @@ async function apiFetchLeaderboard(limit) {
         .select('*')
         .order('total_value', { ascending: false })
         .limit(limit || 10);
+}
+
+// =============================================
+// FOLLOWS
+// =============================================
+
+async function apiFollowUser(targetUserId) {
+    const me = state.currentUser?.id;
+    if (!me || me === targetUserId) return { data: null, error: { message: 'Cannot follow' } };
+    return supabaseClient.from('follows').insert({ follower_id: me, following_id: targetUserId });
+}
+
+async function apiUnfollowUser(targetUserId) {
+    const me = state.currentUser?.id;
+    if (!me) return { data: null, error: { message: 'Not logged in' } };
+    return supabaseClient.from('follows').delete().eq('follower_id', me).eq('following_id', targetUserId);
+}
+
+async function apiIsFollowing(targetUserId) {
+    const me = state.currentUser?.id;
+    if (!me) return false;
+    const { data } = await supabaseClient
+        .from('follows')
+        .select('id')
+        .eq('follower_id', me)
+        .eq('following_id', targetUserId)
+        .maybeSingle();
+    return !!data;
+}
+
+async function apiFetchFollowCounts(userId) {
+    const { data } = await supabaseClient
+        .from('profiles')
+        .select('follower_count, following_count')
+        .eq('id', userId)
+        .single();
+    return data || { follower_count: 0, following_count: 0 };
+}
+
+async function apiToggleFollowNotify(targetUserId, notify) {
+    const me = state.currentUser?.id;
+    if (!me) return { error: { message: 'Not logged in' } };
+    return supabaseClient
+        .from('follows')
+        .update({ notify })
+        .eq('follower_id', me)
+        .eq('following_id', targetUserId);
+}
+
+async function apiFetchMyFollows() {
+    const me = state.currentUser?.id;
+    if (!me) return [];
+    const { data } = await supabaseClient
+        .from('follows')
+        .select('following_id, notify, created_at')
+        .eq('follower_id', me);
+    return data || [];
+}
+
+async function apiFetchTraderProfile(username) {
+    const { data } = await supabaseClient
+        .from('leaderboard')
+        .select('*')
+        .ilike('username', username)
+        .maybeSingle();
+    return data;
+}
+
+// =============================================
+// TODAY'S OPENING PRICES (for accurate % change)
+// =============================================
+
+async function apiFetchTodayOpenPrices() {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayISO = todayStart.toISOString();
+
+    const { data } = await supabaseClient
+        .from('price_history')
+        .select('symbol, price')
+        .gte('recorded_at', todayISO)
+        .order('recorded_at', { ascending: true })
+        .limit(500);
+
+    if (!data) return {};
+
+    const openPrices = {};
+    data.forEach(row => {
+        if (!openPrices[row.symbol]) {
+            openPrices[row.symbol] = row.price;
+        }
+    });
+    return openPrices;
 }
 

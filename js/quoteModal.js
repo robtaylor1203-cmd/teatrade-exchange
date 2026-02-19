@@ -102,19 +102,21 @@ function openQuickQuoteModal(tea) {
     changeEl.textContent = `${isUp ? '+' : ''}${change.toFixed(1)}%`;
     changeEl.className = `quick-quote-change ${isUp ? 'up' : 'down'}`;
 
-    // Invalidate cache and force a fresh fetch for this tea's data
+    // Invalidate cache and force a fresh fetch for this tea's / index's data
+    const openSymbolType = (tea.isIndex || isIndexSymbol(tea.symbol)) ? 'index' : 'tea';
     if (state.priceDataCache) {
         delete state.priceDataCache.lastUpdate[tea.symbol];
+        delete state.priceDataCache.lastUpdate[`INDEX_${tea.symbol}`];
     }
     // Trigger async re-fetch; redraw QQ chart when data arrives
-    getPriceHistory(tea.symbol, 'tea').then(data => {
+    getPriceHistory(tea.symbol, openSymbolType).then(data => {
         if (data && data.length > 0 && state.qqCurrentTea?.symbol === tea.symbol) {
             drawQuickQuoteChart(state.qqCurrentTea);
         }
     }).catch(() => {});
 
     // Get whatever is currently cached (may be stale — async fetch above will update)
-    const history = getPriceHistorySync(tea.symbol, 'tea');
+    const history = getPriceHistorySync(tea.symbol, openSymbolType);
     const last24h = history.length >= 24 ? history.slice(-24) : history;
 
     let high24h = price * 1.04;
@@ -424,28 +426,39 @@ function updateQQMarketDepth(tea) {
     if (!depthEl || !extraEl) return;
 
     const price = tea.current_price || 0;
+    const sym   = tea.symbol || '';
 
-    // Use seeded random for consistent depth per symbol
-    const seed = hashCode(tea.symbol || 'TEA');
-    const seededRand = () => {
-        let s = seed;
-        return () => { s = (s * 16807 + 0) % 2147483647; return (s & 0x7fffffff) / 0x7fffffff; };
-    };
-    const rand = seededRand();
+    // ── Real order-flow from market_pressure ────────────────────────────
+    const mp = state.marketPressure || {};
+    const pressure = mp[sym] || null;
+    let bidVol = 0, askVol = 0, usingLiveFlow = false;
 
-    // Calculate bid/ask spread (0.2–1.5% of price)
-    const spreadPct = 0.002 + rand() * 0.013;
+    if (pressure && (pressure.buy5m > 0 || pressure.sell5m > 0)) {
+        bidVol = pressure.buy5m;
+        askVol = pressure.sell5m;
+        usingLiveFlow = true;
+    } else if (pressure && (pressure.buy30m > 0 || pressure.sell30m > 0)) {
+        bidVol = pressure.buy30m;
+        askVol = pressure.sell30m;
+        usingLiveFlow = true;
+    }
+
+    let bidPct, askPct;
+    if (usingLiveFlow && (bidVol + askVol) > 0) {
+        bidPct = (bidVol / (bidVol + askVol)) * 100;
+        askPct = 100 - bidPct;
+    } else {
+        bidPct = 50; askPct = 50;
+        bidVol = 0;  askVol = 0;
+    }
+    bidPct = Math.max(5, Math.min(95, bidPct));
+    askPct = 100 - bidPct;
+
+    // Calculate bid/ask spread from real volume imbalance
+    const spreadPct = usingLiveFlow ? 0.002 + (1 - Math.min(bidVol + askVol, 10000) / 10000) * 0.013 : 0.005;
     const spread    = price * spreadPct;
     const bidPrice  = price - spread / 2;
     const askPrice  = price + spread / 2;
-
-    // Market depth percentages (seeded, no Math.random)
-    const bidPct = 40 + rand() * 20;
-    const askPct = 100 - bidPct;
-
-    // Volumes (seeded, no Math.random)
-    const bidVol = Math.round(5000 + rand() * 15000);
-    const askVol = Math.round(5000 + rand() * 15000);
 
     // Volatility (from history if available)
     const history = getPriceHistorySync(tea.symbol, 'tea');
@@ -553,32 +566,47 @@ function setQQTimeframe(tf) {
         btn.classList.toggle('active', btn.dataset.tf === tf);
     });
     if (state.qqCurrentTea) {
-        const tea = state.qqCurrentTea;
+        const tea        = state.qqCurrentTea;
+        const isIndex    = tea.isIndex || isIndexSymbol(tea.symbol);
+        const symbolType = isIndex ? 'index' : 'tea';
 
-        // Invalidate the cache so data is re-fetched at the correct resolution
-        if (state.priceDataCache) {
-            delete state.priceDataCache.data[tea.symbol];
-            delete state.priceDataCache.lastUpdate[tea.symbol];
-            delete state.priceDataCache.loaded[tea.symbol];
-        }
-
-        // Temporarily set the global timeframe for the fetch, then restore it.
-        // This ensures loadChartDataFromHistory uses the right TIMEFRAME_CONFIG.
+        // QQ timeframe → TIMEFRAME_CONFIG key used by loadChartDataFromHistory.
+        // 1H and 1D both use the '1D' config (5-min candles); drawQuickQuoteChart
+        // then slices to 60 pts (1H) or 96 pts (1D) from the same dataset.
         const qqToMainTf = { '1H': '1D', '1D': '1D', '1W': '1W', '1M': '1M' };
-        const savedTimeframe = state.currentTimeframe;
-        state.currentTimeframe = qqToMainTf[tf] || '1D';
+        const fetchTf    = qqToMainTf[tf] || '1D';
 
-        getPriceHistory(tea.symbol, 'tea').then(data => {
-            state.currentTimeframe = savedTimeframe;
-            if (data && data.length > 0 && state.qqCurrentTea?.symbol === tea.symbol) {
-                drawQuickQuoteChart(state.qqCurrentTea);
-            }
-        }).catch(() => {
-            state.currentTimeframe = savedTimeframe;
-        });
+        // Snapshot for closure guards — avoids applying a stale fetch if the
+        // user rapidly clicks through timeframes or closes the modal.
+        const snapshotSymbol = tea.symbol;
+        const snapshotTf     = tf;
 
-        // Draw immediately with whatever is cached (async fetch will redraw)
+        // Draw immediately with whatever is cached so the modal doesn't blank out
         drawQuickQuoteChart(tea);
+
+        // Fetch directly from DB using the correct timeframe config. This bypasses
+        // getPriceHistory's shared loading-promise cache so rapid clicks each get
+        // their own independent DB query rather than sharing a stale in-flight one.
+        loadChartDataFromHistory(tea.symbol, symbolType, fetchTf)
+            .then(data => {
+                if (!data || data.length === 0) return;
+                // Discard if the user changed timeframe or closed the modal
+                if (state.qqTimeframe !== snapshotTf) return;
+                if (state.qqCurrentTea?.symbol !== snapshotSymbol) return;
+
+                // Populate the shared cache so live-tick updates append to it
+                const cacheKey = symbolType === 'index'
+                    ? `INDEX_${tea.symbol}` : tea.symbol;
+                if (state.priceDataCache) {
+                    state.priceDataCache.data[cacheKey]       = data;
+                    state.priceDataCache.lastUpdate[cacheKey] = Date.now();
+                    state.priceDataCache.loaded[cacheKey]     = true;
+                    delete state.priceDataCache.loading[cacheKey];
+                }
+
+                drawQuickQuoteChart(state.qqCurrentTea);
+            })
+            .catch(() => {});
     }
 }
 
@@ -752,8 +780,17 @@ function drawQuickQuoteChart(tea) {
     const isUp   = change >= 0;
 
     // Get historical data from unified cache (database-backed)
-    let fullHistory = getPriceHistorySync(tea.symbol, 'tea');
-    if (!fullHistory || fullHistory.length === 0) return;
+    const qqSymbolType = (tea.isIndex || isIndexSymbol(tea.symbol)) ? 'index' : 'tea';
+    let fullHistory = getPriceHistorySync(tea.symbol, qqSymbolType);
+    if (!fullHistory || fullHistory.length === 0) {
+        // Trigger an async fetch and redraw when it arrives
+        getPriceHistory(tea.symbol, qqSymbolType).then(data => {
+            if (data && data.length > 0 && state.qqCurrentTea?.symbol === tea.symbol) {
+                drawQuickQuoteChart(state.qqCurrentTea);
+            }
+        }).catch(() => {});
+        return;
+    }
 
     // Data from the cache is already at the correct candle interval for
     // the active timeframe (set by TIMEFRAME_CONFIG in market.js).
@@ -797,7 +834,8 @@ function drawQuickQuoteChart(tea) {
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
         ctx.font      = '10px JetBrains Mono';
         ctx.textAlign  = 'right';
-        ctx.fillText(`$${priceLabel.toFixed(2)}`, padding.left - 8, y + 3);
+        const _qqCurr = state.qqCurrentTea?.currency || '$';
+        ctx.fillText(`${_qqCurr}${priceLabel >= 100 ? priceLabel.toFixed(1) : priceLabel.toFixed(2)}`, padding.left - 8, y + 3);
     }
 
     // Draw time labels
@@ -990,7 +1028,8 @@ function drawQuickQuoteChart(tea) {
     ctx.fillStyle = '#fff';
     ctx.font      = 'bold 10px JetBrains Mono';
     ctx.textAlign  = 'left';
-    ctx.fillText(`$${price.toFixed(2)}`, w - padding.right + 6, currentY + 3);
+    const _qqCurr2 = state.qqCurrentTea?.currency || '$';
+    ctx.fillText(`${_qqCurr2}${price >= 100 ? price.toFixed(1) : price.toFixed(2)}`, w - padding.right + 6, currentY + 3);
 
     // Update trade annotations after chart is drawn
     updateQQTradeAnnotations();
@@ -1112,14 +1151,24 @@ async function executeQuickTrade() {
 
     if (!state.qqCurrentTea) return;
 
-    const qty        = parseFloat(document.getElementById('qq-qty').value) || 0;
-    const price      = state.qqCurrentTea.current_price;
+    const qty          = parseFloat(document.getElementById('qq-qty').value) || 0;
+    const isIndexTrade = !!state.qqCurrentTea.isIndex;
+
+    // For index trades, recalculate the price live from calculateRegionalIndexes()
+    // so it always matches the server's reference price. For tea trades the server
+    // determines execution price independently, so we pass current_price as reference.
+    let price = state.qqCurrentTea.current_price;
+    if (isIndexTrade && typeof calculateRegionalIndexes === 'function') {
+        const indexes  = calculateRegionalIndexes();
+        const liveIdx  = indexes.find(i => i.symbol === state.qqCurrentTea.symbol);
+        if (liveIdx?.price > 0) price = liveIdx.price;
+    }
+
     const total      = qty * price;
     const slInput    = document.getElementById('qq-sl');
     const tpInput    = document.getElementById('qq-tp');
     const stopLoss   = slInput?.value ? parseFloat(slInput.value) : null;
     const takeProfit = tpInput?.value ? parseFloat(tpInput.value) : null;
-    const isIndexTrade = !!state.qqCurrentTea.isIndex;
 
     if (qty <= 0) {
         showToast('Invalid quantity', 'Please enter a valid quantity', true);

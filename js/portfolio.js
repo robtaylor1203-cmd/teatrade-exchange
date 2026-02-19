@@ -485,7 +485,7 @@ function displayUserTrades(trades) {
 // =============================================
 
 function switchPortfolioTab(tab) {
-    document.querySelectorAll('.portfolio-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('#portfolio-section .portfolio-tab').forEach(t => t.classList.remove('active'));
     if (event && event.target) event.target.classList.add('active');
 
     ['portfolio-positions', 'portfolio-orders', 'portfolio-history'].forEach(id => {
@@ -891,10 +891,12 @@ function isTraderFollowed(username) {
     return getTraderWatchlist().some(t => t.username === username);
 }
 
-function toggleFollowTrader(username, returnPct, totalValue) {
+async function toggleFollowTrader(username, returnPct, totalValue) {
     let list = getTraderWatchlist();
     const idx = list.findIndex(t => t.username === username);
-    if (idx === -1) {
+    const isFollow = idx === -1;
+
+    if (isFollow) {
         list.push({ username, returnPct, totalValue, followedAt: new Date().toISOString() });
         showToast('Following', `You are now following ${username}`);
     } else {
@@ -902,9 +904,22 @@ function toggleFollowTrader(username, returnPct, totalValue) {
         showToast('Unfollowed', `Removed ${username} from your watchlist`);
     }
     saveTraderWatchlist(list);
-    // Refresh leaderboard stars & modal button
     if (typeof loadLeaderboard === 'function') loadLeaderboard();
     _refreshTraderProfileFollowBtn(username);
+
+    const { data: profile } = await apiLookupUserByUsername(username);
+    if (profile?.id) {
+        if (isFollow) {
+            await apiFollowUser(profile.id);
+        } else {
+            await apiUnfollowUser(profile.id);
+        }
+        _refreshFollowCounts(profile.id);
+    }
+
+    _refreshOwnFollowCounts();
+
+    if (isFollow) _ensureTradeNotificationChannel();
 }
 
 function _refreshTraderProfileFollowBtn(username) {
@@ -915,65 +930,330 @@ function _refreshTraderProfileFollowBtn(username) {
     btn.className = 'trader-profile-follow-btn' + (followed ? ' following' : '');
 }
 
+async function _refreshFollowCounts(userId) {
+    const counts = await apiFetchFollowCounts(userId);
+    const el = document.getElementById('trader-profile-follow-counts');
+    if (!el) return;
+    el.innerHTML = `
+        <span class="follow-count-item"><strong>${counts.follower_count}</strong> Followers</span>
+        <span class="follow-count-divider">·</span>
+        <span class="follow-count-item"><strong>${counts.following_count}</strong> Following</span>`;
+}
+
+async function _refreshOwnFollowCounts() {
+    if (!state.currentUser?.id) return;
+    const counts = await apiFetchFollowCounts(state.currentUser.id);
+    const el = document.getElementById('portfolio-header-follow-counts');
+    if (el) {
+        el.innerHTML = `
+            <span class="follow-count-item"><strong>${counts.follower_count}</strong> Followers</span>
+            <span class="follow-count-divider">·</span>
+            <span class="follow-count-item"><strong>${counts.following_count}</strong> Following</span>`;
+    }
+    const countEl = document.getElementById('portfolio-wl-count');
+    if (countEl) countEl.textContent = getTraderWatchlist().length;
+}
+
+// =============================================
+// TRADE NOTIFICATIONS FOR FOLLOWED TRADERS
+// =============================================
+
+let _tradeNotifyChannel = null;
+let _notifyFollowedIds = new Set();
+let _notifyPollTimer = null;
+let _lastSeenTradeId = 0;
+
+function reconnectTradeNotifications() {
+    if (_tradeNotifyChannel) {
+        try { supabaseClient.removeChannel(_tradeNotifyChannel); } catch (_) {}
+        _tradeNotifyChannel = null;
+    }
+    _ensureTradeNotificationChannel();
+}
+
+async function _ensureTradeNotificationChannel() {
+    if (!state.currentUser?.id) return;
+
+    const follows = await apiFetchMyFollows();
+    _notifyFollowedIds = new Set(
+        follows.filter(f => f.notify).map(f => f.following_id)
+    );
+
+    if (_notifyFollowedIds.size === 0) {
+        _stopNotifyPolling();
+        if (_tradeNotifyChannel) {
+            supabaseClient.removeChannel(_tradeNotifyChannel);
+            _tradeNotifyChannel = null;
+        }
+        return;
+    }
+
+    // Realtime channel (primary — may be blocked by RLS context)
+    if (!_tradeNotifyChannel) {
+        _tradeNotifyChannel = supabaseClient
+            .channel('follow-trade-notifications')
+            .on('postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'trades' },
+                (payload) => {
+                    const trade = payload.new;
+                    if (!trade || !_notifyFollowedIds.has(trade.user_id)) return;
+                    if (trade.id && trade.id <= _lastSeenTradeId) return;
+                    _lastSeenTradeId = Math.max(_lastSeenTradeId, trade.id || 0);
+                    _showTradeNotification(trade);
+                }
+            )
+            .subscribe();
+    }
+
+    // Polling fallback — guaranteed to work via service-level REST query
+    _startNotifyPolling();
+}
+
+function _startNotifyPolling() {
+    if (_notifyPollTimer) return;
+    _initLastSeenTradeId();
+    _notifyPollTimer = setInterval(_pollFollowedTrades, 30000);
+}
+
+function _stopNotifyPolling() {
+    if (_notifyPollTimer) {
+        clearInterval(_notifyPollTimer);
+        _notifyPollTimer = null;
+    }
+}
+
+async function _initLastSeenTradeId() {
+    if (_lastSeenTradeId > 0) return;
+    try {
+        const ids = [..._notifyFollowedIds];
+        if (ids.length === 0) return;
+        const { data } = await supabaseClient
+            .from('trades')
+            .select('id')
+            .in('user_id', ids)
+            .order('id', { ascending: false })
+            .limit(1);
+        if (data?.[0]?.id) _lastSeenTradeId = data[0].id;
+    } catch (_) {}
+}
+
+async function _pollFollowedTrades() {
+    if (!state.currentUser?.id || _notifyFollowedIds.size === 0) return;
+
+    try {
+        const ids = [..._notifyFollowedIds];
+        const { data: trades } = await supabaseClient
+            .from('trades')
+            .select('id, user_id, side, quantity, price, tea_id, index_symbol, created_at')
+            .in('user_id', ids)
+            .gt('id', _lastSeenTradeId)
+            .order('id', { ascending: true })
+            .limit(5);
+
+        if (!trades || trades.length === 0) return;
+
+        for (const trade of trades) {
+            if (trade.id <= _lastSeenTradeId) continue;
+            _lastSeenTradeId = trade.id;
+            _showTradeNotification(trade);
+        }
+    } catch (e) {
+        console.warn('[FollowNotify] poll error:', e.message);
+    }
+}
+
+function _showTradeNotification(trade) {
+    const stack = document.getElementById('follow-notify-stack');
+    if (!stack) return;
+
+    const teaMap = {};
+    (state.teas || []).forEach(t => { teaMap[t.id] = t.symbol; });
+    const sym = trade.index_symbol || teaMap[trade.tea_id] || '???';
+    const side = (trade.side || 'BUY').toUpperCase();
+    const isBuy = side === 'BUY';
+    const qty = Number(trade.quantity).toLocaleString();
+    const price = Number(trade.price).toFixed(2);
+    const total = (trade.quantity * trade.price).toFixed(2);
+    const username = _tradeNotifyProfileCache[trade.user_id] || 'A trader you follow';
+    const initials = username.slice(0, 2).toUpperCase();
+
+    const isIndex = !!trade.index_symbol;
+    const selectVal = isIndex ? `INDEX_${sym}` : (trade.tea_id || '');
+
+    const cardId = `fn-card-${Date.now()}`;
+    const card = document.createElement('div');
+    card.className = `follow-notify-card ${isBuy ? 'fn-border-buy' : 'fn-border-sell'}`;
+    card.id = cardId;
+    card.innerHTML = `
+        <div class="fn-header">
+            <div class="fn-avatar">${escapeHtml(initials)}</div>
+            <div class="fn-trader-name">${escapeHtml(username)}</div>
+            <button class="fn-close" onclick="_dismissFollowNotify('${cardId}')" title="Dismiss">✕</button>
+        </div>
+        <div class="fn-body">
+            <span class="fn-side ${isBuy ? 'buy' : 'sell'}">${side}</span>
+            <div class="fn-details">
+                <span class="fn-sym">${escapeHtml(sym)}</span> · ${qty} kg<br>
+                @ $${price} · Total $${Number(total).toLocaleString()}
+            </div>
+        </div>
+        <div class="fn-footer">
+            <button class="fn-copy-btn" onclick="_copyFollowTrade('${selectVal}', '${side}', ${trade.quantity}, '${cardId}')">Copy Trade</button>
+            <button class="fn-dismiss-btn" onclick="_dismissFollowNotify('${cardId}')">Dismiss</button>
+        </div>`;
+
+    stack.appendChild(card);
+
+    const MAX_CARDS = 4;
+    while (stack.children.length > MAX_CARDS) {
+        stack.removeChild(stack.firstChild);
+    }
+
+    setTimeout(() => _dismissFollowNotify(cardId), 15000);
+}
+
+function _dismissFollowNotify(cardId) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    card.classList.add('removing');
+    setTimeout(() => card.remove(), 300);
+}
+
+function _copyFollowTrade(selectVal, side, quantity, cardId) {
+    const select = document.getElementById('trade-tea-select');
+    if (select) {
+        select.value = selectVal;
+        select.dispatchEvent(new Event('change'));
+    }
+
+    if (typeof setTradeType === 'function') setTradeType(side);
+
+    const qtyEl = document.getElementById('trade-qty');
+    if (qtyEl) {
+        qtyEl.value = quantity;
+        qtyEl.dispatchEvent(new Event('input'));
+    }
+
+    if (typeof updateTradeSummary === 'function') updateTradeSummary();
+
+    _dismissFollowNotify(cardId);
+    showToast('Trade Copied', `${side} ${Number(quantity).toLocaleString()} kg ready — review and execute`);
+}
+
+const _tradeNotifyProfileCache = {};
+
+async function _buildNotifyProfileCache() {
+    const follows = await apiFetchMyFollows();
+    for (const f of follows) {
+        if (_tradeNotifyProfileCache[f.following_id]) continue;
+        const { data } = await supabaseClient
+            .from('profiles')
+            .select('username')
+            .eq('id', f.following_id)
+            .single();
+        if (data?.username) _tradeNotifyProfileCache[f.following_id] = data.username;
+    }
+}
+
+async function toggleFollowNotify(targetUserId, currentState) {
+    const newState = !currentState;
+    await apiToggleFollowNotify(targetUserId, newState);
+
+    if (newState) {
+        _notifyFollowedIds.add(targetUserId);
+    } else {
+        _notifyFollowedIds.delete(targetUserId);
+    }
+
+    _ensureTradeNotificationChannel();
+    return newState;
+}
+
 // =============================================
 // TRADER PROFILE MODAL
 // =============================================
 
-function openTraderProfile(username, returnPct, totalValue, rank) {
+async function openTraderProfile(username, returnPct, totalValue, rank) {
     const modal = document.getElementById('trader-profile-modal');
     if (!modal) return;
 
     const followed  = isTraderFollowed(username);
-    const retClass  = returnPct >= 0 ? 'up' : 'down';
-    const retSign   = returnPct >= 0 ? '+' : '';
     const rankEmoji = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
     const initials  = username.slice(0, 2).toUpperCase();
-    const startVal  = totalValue / (1 + returnPct / 100);
-    const gainLoss  = totalValue - startVal;
-    const gainSign  = gainLoss >= 0 ? '+' : '';
 
-    modal.innerHTML = `
-        <div class="trader-profile-overlay" onclick="closeTraderProfile()"></div>
-        <div class="trader-profile-card">
-            <button class="trader-profile-close" onclick="closeTraderProfile()">✕</button>
-            <div class="trader-profile-header">
-                <div class="trader-profile-avatar">${initials}</div>
-                <div class="trader-profile-info">
-                    <div class="trader-profile-name">${escapeHtml(username)}</div>
-                    <div class="trader-profile-rank">${rankEmoji} Rank ${rank} · Feb 2026</div>
+    const _buildCard = (rp, tv) => {
+        const retClass = rp >= 0 ? 'up' : 'down';
+        const retSign  = rp >= 0 ? '+' : '';
+        const startVal = tv / (1 + rp / 100) || 0;
+        const gainLoss = tv - startVal;
+        const gainSign = gainLoss >= 0 ? '+' : '';
+
+        return `
+            <div class="trader-profile-overlay" onclick="closeTraderProfile()"></div>
+            <div class="trader-profile-card">
+                <button class="trader-profile-close" onclick="closeTraderProfile()">✕</button>
+                <div class="trader-profile-header">
+                    <div class="trader-profile-avatar">${initials}</div>
+                    <div class="trader-profile-info">
+                        <div class="trader-profile-name">${escapeHtml(username)}</div>
+                        <div class="trader-profile-rank">${rankEmoji} Rank ${rank} · Feb 2026</div>
+                        <div id="trader-profile-follow-counts" class="trader-profile-follow-counts">
+                            <span class="follow-count-item"><strong>—</strong> Followers</span>
+                            <span class="follow-count-divider">·</span>
+                            <span class="follow-count-item"><strong>—</strong> Following</span>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="trader-profile-stats">
-                <div class="trader-stat-box">
-                    <div class="trader-stat-label">Return</div>
-                    <div class="trader-stat-value ${retClass}">${retSign}${returnPct.toFixed(1)}%</div>
+                <div class="trader-profile-stats" id="trader-profile-stats-grid">
+                    <div class="trader-stat-box">
+                        <div class="trader-stat-label">Return</div>
+                        <div class="trader-stat-value ${retClass}">${retSign}${rp.toFixed(1)}%</div>
+                    </div>
+                    <div class="trader-stat-box">
+                        <div class="trader-stat-label">Portfolio Value</div>
+                        <div class="trader-stat-value">$${tv.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
+                    </div>
+                    <div class="trader-stat-box">
+                        <div class="trader-stat-label">P&amp;L</div>
+                        <div class="trader-stat-value ${gainLoss >= 0 ? 'up' : 'down'}">${gainSign}$${Math.abs(gainLoss).toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
+                    </div>
+                    <div class="trader-stat-box">
+                        <div class="trader-stat-label">Starting Capital</div>
+                        <div class="trader-stat-value">$${startVal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
+                    </div>
                 </div>
-                <div class="trader-stat-box">
-                    <div class="trader-stat-label">Portfolio Value</div>
-                    <div class="trader-stat-value">$${totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
+                <div class="trader-profile-activity">
+                    <div class="trader-activity-label">Recent Activity</div>
+                    <div id="trader-profile-trade-feed" class="portfolio-trade-feed">
+                        <div class="portfolio-notification-placeholder">Loading trades...</div>
+                    </div>
                 </div>
-                <div class="trader-stat-box">
-                    <div class="trader-stat-label">P&amp;L</div>
-                    <div class="trader-stat-value ${gainLoss >= 0 ? 'up' : 'down'}">${gainSign}$${Math.abs(gainLoss).toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
-                </div>
-                <div class="trader-stat-box">
-                    <div class="trader-stat-label">Starting Capital</div>
-                    <div class="trader-stat-value">$${startVal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
-                </div>
-            </div>
-            <div class="trader-profile-activity">
-                <div class="trader-activity-label">Recent Activity</div>
-                <div class="trader-activity-placeholder">Trade history coming soon</div>
-            </div>
-            <button id="trader-profile-follow-btn"
-                class="trader-profile-follow-btn${followed ? ' following' : ''}"
-                onclick="toggleFollowTrader('${username}', ${returnPct}, ${totalValue})">
-                ${followed ? '★ Following' : '☆ Follow Trader'}
-            </button>
-        </div>
-    `;
+                <button id="trader-profile-follow-btn"
+                    class="trader-profile-follow-btn${followed ? ' following' : ''}"
+                    onclick="toggleFollowTrader('${escapeHtml(username)}', ${rp}, ${tv})">
+                    ${followed ? '★ Following' : '☆ Follow Trader'}
+                </button>
+            </div>`;
+    };
+
+    modal.innerHTML = _buildCard(returnPct, totalValue);
+    _loadTraderProfileTrades(username);
     modal.classList.add('active');
     document.body.style.overflow = 'hidden';
+
+    const [liveProfile, profileData] = await Promise.all([
+        apiFetchTraderProfile(username),
+        apiLookupUserByUsername(username)
+    ]);
+
+    if (liveProfile) {
+        returnPct = liveProfile.return_pct || returnPct;
+        totalValue = liveProfile.total_value || totalValue;
+        modal.innerHTML = _buildCard(returnPct, totalValue);
+        _loadTraderProfileTrades(username);
+    }
+
+    if (profileData?.data?.id) _refreshFollowCounts(profileData.data.id);
 }
 
 function closeTraderProfile() {
@@ -988,23 +1268,38 @@ function closeTraderProfile() {
 // MY PORTFOLIO MODAL
 // =============================================
 
-function openPortfolioModal() {
+async function openPortfolioModal() {
     const modal = document.getElementById('portfolio-modal');
     if (!modal) return;
 
-    // Populate header balance from state
-    const balEl = document.getElementById('portfolio-header-balance');
-    if (balEl && state.userProfile?.cash_balance != null) {
-        balEl.textContent = `$${Number(state.userProfile.cash_balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-    }
-
-    // Watchlist count badge
     const countEl = document.getElementById('portfolio-wl-count');
     if (countEl) countEl.textContent = getTraderWatchlist().length;
 
+    switchPortfolioModalTab('financial');
     renderPortfolioModal();
     modal.classList.add('active');
     document.body.style.overflow = 'hidden';
+
+    if (state.currentUser?.id) {
+        _syncMissingFollowsToDb().then(() => _refreshOwnFollowCounts());
+        _refreshOwnFollowCounts();
+    }
+}
+
+async function _syncMissingFollowsToDb() {
+    if (!state.currentUser) return;
+    const localList = getTraderWatchlist();
+    if (localList.length === 0) return;
+
+    const dbFollows = await apiFetchMyFollows();
+    const dbFollowedIds = new Set(dbFollows.map(f => f.following_id));
+
+    for (const entry of localList) {
+        const { data: profile } = await apiLookupUserByUsername(entry.username);
+        if (profile?.id && profile.id !== state.currentUser.id && !dbFollowedIds.has(profile.id)) {
+            await apiFollowUser(profile.id);
+        }
+    }
 }
 
 function closePortfolioModal() {
@@ -1015,7 +1310,160 @@ function closePortfolioModal() {
     }
 }
 
-function renderPortfolioModal() {
+function switchPortfolioModalTab(tab) {
+    document.querySelectorAll('.portfolio-modal .portfolio-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    document.getElementById('portfolio-tab-financial').style.display = tab === 'financial' ? 'block' : 'none';
+    document.getElementById('portfolio-tab-social').style.display    = tab === 'social'    ? 'flex'  : 'none';
+    if (tab === 'financial') renderFinancialTab();
+    if (tab === 'social') renderPortfolioModal();
+}
+
+function renderFinancialTab() {
+    const panel = document.getElementById('portfolio-financial-panel');
+    if (!panel) return;
+
+    const balance = parseFloat(state.userProfile?.cash_balance ?? 0);
+    const positions = state.positions || [];
+    const indexPositionsData = state.indexPositions || {};
+    const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
+
+    let holdingsValue = 0;
+    let totalPnl = 0;
+    let positionsHtml = '';
+
+    positions.forEach(pos => {
+        const tea = pos.teas || state.teas.find(t => t.id === pos.tea_id);
+        if (!tea) return;
+        const curVal = pos.quantity * tea.current_price;
+        const cost = pos.quantity * pos.avg_entry_price;
+        const pnl = curVal - cost;
+        const pnlPct = cost > 0 ? (pnl / cost * 100).toFixed(1) : '0.0';
+        holdingsValue += curVal;
+        totalPnl += pnl;
+        positionsHtml += `
+            <div class="pf-pos-row">
+                <div class="pf-pos-symbol">${escapeHtml(tea.symbol)}</div>
+                <div class="pf-pos-qty">${pos.quantity.toLocaleString()} kg</div>
+                <div class="pf-pos-avg">$${pos.avg_entry_price.toFixed(2)}</div>
+                <div class="pf-pos-cur">$${tea.current_price.toFixed(2)}</div>
+                <div class="pf-pos-val">$${curVal.toFixed(2)}</div>
+                <div class="pf-pos-pnl ${pnl >= 0 ? 'up' : 'down'}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} (${pnlPct}%)</div>
+            </div>`;
+    });
+
+    Object.entries(indexPositionsData).forEach(([symbol, pos]) => {
+        const idx = indexes.find(i => i.symbol === symbol);
+        if (!idx || !pos || pos.quantity <= 0) return;
+        const curVal = pos.quantity * idx.price;
+        const cost = pos.quantity * pos.avg_entry_price;
+        const pnl = curVal - cost;
+        const pnlPct = cost > 0 ? (pnl / cost * 100).toFixed(1) : '0.0';
+        holdingsValue += curVal;
+        totalPnl += pnl;
+        positionsHtml += `
+            <div class="pf-pos-row">
+                <div class="pf-pos-symbol">${escapeHtml(symbol)} <span class="pf-idx-badge">IDX</span></div>
+                <div class="pf-pos-qty">${pos.quantity.toLocaleString()} kg</div>
+                <div class="pf-pos-avg">$${pos.avg_entry_price.toFixed(2)}</div>
+                <div class="pf-pos-cur">$${idx.price.toFixed(2)}</div>
+                <div class="pf-pos-val">$${curVal.toFixed(2)}</div>
+                <div class="pf-pos-pnl ${pnl >= 0 ? 'up' : 'down'}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} (${pnlPct}%)</div>
+            </div>`;
+    });
+
+    const totalValue = balance + holdingsValue;
+    const overallReturn = totalValue - 10000;
+    const overallPct = (overallReturn / 10000 * 100).toFixed(2);
+    const posCount = positions.length + Object.values(indexPositionsData).filter(p => p && p.quantity > 0).length;
+
+    panel.innerHTML = `
+        <div class="pf-summary-grid">
+            <div class="pf-summary-card pf-summary-main">
+                <div class="pf-summary-label">Total Portfolio Value</div>
+                <div class="pf-summary-value-big">$${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                <div class="pf-summary-return ${overallReturn >= 0 ? 'up' : 'down'}">${overallReturn >= 0 ? '+' : ''}$${overallReturn.toFixed(2)} (${overallPct}%)</div>
+            </div>
+            <div class="pf-summary-card">
+                <div class="pf-summary-label">Cash Balance</div>
+                <div class="pf-summary-value">$${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+            <div class="pf-summary-card">
+                <div class="pf-summary-label">Holdings Value</div>
+                <div class="pf-summary-value">$${holdingsValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+            <div class="pf-summary-card">
+                <div class="pf-summary-label">Unrealised P&amp;L</div>
+                <div class="pf-summary-value ${totalPnl >= 0 ? 'up' : 'down'}">${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)}</div>
+            </div>
+            <div class="pf-summary-card">
+                <div class="pf-summary-label">Open Positions</div>
+                <div class="pf-summary-value">${posCount}</div>
+            </div>
+        </div>
+        <div class="pf-section">
+            <div class="pf-section-title">Open Positions</div>
+            ${posCount === 0
+                ? '<div class="pf-empty">No open positions. Start trading to build your portfolio.</div>'
+                : `<div class="pf-positions-table">
+                    <div class="pf-pos-header">
+                        <div>Symbol</div><div>Qty</div><div>Avg Entry</div><div>Current</div><div>Value</div><div>P&amp;L</div>
+                    </div>
+                    ${positionsHtml}
+                   </div>`}
+        </div>
+        <div class="pf-section">
+            <div class="pf-section-title">Recent Trades</div>
+            <div id="portfolio-own-trade-feed" class="portfolio-trade-feed">
+                <div class="portfolio-notification-placeholder">Loading...</div>
+            </div>
+        </div>
+    `;
+
+    _loadOwnTrades();
+}
+
+async function _loadOwnTrades() {
+    const feedEl = document.getElementById('portfolio-own-trade-feed');
+    if (!feedEl || !state.currentUser) return;
+
+    try {
+        const { data: trades, error } = await supabaseClient
+            .from('trades')
+            .select('side, quantity, price, tea_id, index_symbol, created_at')
+            .eq('user_id', state.currentUser.id)
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+        if (error || !trades?.length) {
+            feedEl.innerHTML = '<div class="portfolio-notification-placeholder">No trades yet</div>';
+            return;
+        }
+
+        const teaMap = {};
+        (state.teas || []).forEach(t => { teaMap[t.id] = t.symbol; });
+
+        feedEl.innerHTML = trades.map(t => {
+            const sym = t.index_symbol || teaMap[t.tea_id] || '???';
+            const isBuy = t.side === 'BUY';
+            const ago = _timeAgo(new Date(t.created_at));
+            const total = (t.quantity * t.price).toFixed(2);
+            return `<div class="portfolio-trade-item">
+                <span class="portfolio-trade-side ${isBuy ? 'buy' : 'sell'}">${t.side}</span>
+                <span class="portfolio-trade-sym">${sym}</span>
+                <span class="portfolio-trade-qty">${Number(t.quantity).toLocaleString()} kg</span>
+                <span class="portfolio-trade-price">@ $${Number(t.price).toFixed(2)}</span>
+                <span class="portfolio-trade-total">$${Number(total).toLocaleString()}</span>
+                <span class="portfolio-trade-time">${ago}</span>
+            </div>`;
+        }).join('');
+    } catch (e) {
+        feedEl.innerHTML = '<div class="portfolio-notification-placeholder">Error loading trades</div>';
+    }
+}
+
+async function renderPortfolioModal() {
     const watchlist = getTraderWatchlist();
     const wlPanel   = document.getElementById('portfolio-watchlist-panel');
     const statsPanel = document.getElementById('portfolio-stats-panel');
@@ -1036,76 +1484,215 @@ function renderPortfolioModal() {
         const retClass = t.returnPct >= 0 ? 'up' : 'down';
         const retSign  = t.returnPct >= 0 ? '+' : '';
         return `
-            <div class="portfolio-wl-item" onclick="selectPortfolioTrader('${t.username}', ${t.returnPct}, ${t.totalValue})">
+            <div class="portfolio-wl-item" onclick="selectPortfolioTrader('${escapeHtml(t.username)}')" data-username="${escapeHtml(t.username)}">
                 <div class="portfolio-wl-avatar">${t.username.slice(0, 2).toUpperCase()}</div>
                 <div class="portfolio-wl-info">
                     <div class="portfolio-wl-name">${escapeHtml(t.username)}</div>
-                    <div class="portfolio-wl-return ${retClass}">${retSign}${t.returnPct.toFixed(1)}%</div>
+                    <div class="portfolio-wl-return ${retClass}" id="wl-return-${escapeHtml(t.username)}">${retSign}${t.returnPct.toFixed(1)}%</div>
                 </div>
-                <button class="portfolio-wl-unfollow" onclick="event.stopPropagation(); toggleFollowTrader('${t.username}', ${t.returnPct}, ${t.totalValue}); renderPortfolioModal();" title="Unfollow">✕</button>
+                <button class="portfolio-wl-unfollow" onclick="event.stopPropagation(); toggleFollowTrader('${escapeHtml(t.username)}', ${t.returnPct}, ${t.totalValue}); renderPortfolioModal();" title="Unfollow">✕</button>
             </div>`;
     }).join('');
 
-    // Auto-select first trader
-    const first = watchlist[0];
-    selectPortfolioTrader(first.username, first.returnPct, first.totalValue);
+    selectPortfolioTrader(watchlist[0].username);
+
+    _refreshWatchlistLiveStats(watchlist);
 }
 
-function selectPortfolioTrader(username, returnPct, totalValue) {
+async function _refreshWatchlistLiveStats(watchlist) {
+    for (const t of watchlist) {
+        const live = await apiFetchTraderProfile(t.username);
+        if (!live) continue;
+        t.returnPct = live.return_pct || 0;
+        t.totalValue = live.total_value || 0;
+        saveTraderWatchlist(getTraderWatchlist().map(w =>
+            w.username === t.username ? { ...w, returnPct: t.returnPct, totalValue: t.totalValue } : w
+        ));
+        const retEl = document.getElementById(`wl-return-${t.username}`);
+        if (retEl) {
+            const retClass = t.returnPct >= 0 ? 'up' : 'down';
+            const retSign  = t.returnPct >= 0 ? '+' : '';
+            retEl.textContent = `${retSign}${t.returnPct.toFixed(1)}%`;
+            retEl.className = `portfolio-wl-return ${retClass}`;
+        }
+    }
+}
+
+async function selectPortfolioTrader(username) {
     const statsPanel = document.getElementById('portfolio-stats-panel');
     if (!statsPanel) return;
 
-    // Highlight selected
     document.querySelectorAll('.portfolio-wl-item').forEach(el => el.classList.remove('selected'));
-    const items = document.querySelectorAll('.portfolio-wl-item');
-    items.forEach(el => {
+    document.querySelectorAll('.portfolio-wl-item').forEach(el => {
         if (el.querySelector('.portfolio-wl-name')?.textContent === username) {
             el.classList.add('selected');
         }
     });
 
-    const retClass  = returnPct >= 0 ? 'up' : 'down';
-    const retSign   = returnPct >= 0 ? '+' : '';
-    const initials  = username.slice(0, 2).toUpperCase();
-    const startVal  = totalValue / (1 + returnPct / 100);
-    const gainLoss  = totalValue - startVal;
-    const gainSign  = gainLoss >= 0 ? '+' : '';
+    const wlEntry = getTraderWatchlist().find(t => t.username === username);
+    let returnPct = wlEntry?.returnPct || 0;
+    let totalValue = wlEntry?.totalValue || 0;
+    const initials = username.slice(0, 2).toUpperCase();
+    const followedAt = wlEntry?.followedAt || new Date().toISOString();
 
-    statsPanel.innerHTML = `
-        <div class="portfolio-trader-detail">
-            <div class="portfolio-trader-header">
-                <div class="portfolio-trader-avatar">${initials}</div>
-                <div>
-                    <div class="portfolio-trader-name">${escapeHtml(username)}</div>
-                    <div class="portfolio-trader-since">Following since ${new Date(getTraderWatchlist().find(t=>t.username===username)?.followedAt||Date.now()).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>
+    const _renderStats = (rp, tv, notifyOn, targetUserId) => {
+        const retClass = rp >= 0 ? 'up' : 'down';
+        const retSign  = rp >= 0 ? '+' : '';
+        const startVal = tv / (1 + rp / 100) || 0;
+        const gainLoss = tv - startVal;
+        const gainSign = gainLoss >= 0 ? '+' : '';
+
+        const bellSvg = notifyOn
+            ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>'
+            : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+
+        statsPanel.innerHTML = `
+            <div class="portfolio-trader-detail">
+                <div class="portfolio-trader-header">
+                    <div class="portfolio-trader-avatar">${initials}</div>
+                    <div style="flex:1;min-width:0;">
+                        <div class="portfolio-trader-name">${escapeHtml(username)}</div>
+                        <div class="portfolio-trader-since">Following since ${new Date(followedAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>
+                    </div>
+                    <button class="notify-toggle-btn ${notifyOn ? 'active' : ''}"
+                        id="notify-toggle-btn"
+                        title="${notifyOn ? 'Notifications on — click to mute' : 'Notifications off — click to enable'}"
+                        onclick="_handleNotifyToggle('${targetUserId || ''}', ${notifyOn})">
+                        ${bellSvg}
+                    </button>
                 </div>
+                <div class="portfolio-trader-stats-grid" id="portfolio-trader-live-stats">
+                    <div class="portfolio-stat">
+                        <div class="portfolio-stat-label">Return</div>
+                        <div class="portfolio-stat-value ${retClass}">${retSign}${rp.toFixed(1)}%</div>
+                    </div>
+                    <div class="portfolio-stat">
+                        <div class="portfolio-stat-label">Portfolio Value</div>
+                        <div class="portfolio-stat-value">$${tv.toLocaleString('en-US',{maximumFractionDigits:0})}</div>
+                    </div>
+                    <div class="portfolio-stat">
+                        <div class="portfolio-stat-label">P&amp;L</div>
+                        <div class="portfolio-stat-value ${gainLoss>=0?'up':'down'}">${gainSign}$${Math.abs(gainLoss).toLocaleString('en-US',{maximumFractionDigits:0})}</div>
+                    </div>
+                    <div class="portfolio-stat">
+                        <div class="portfolio-stat-label">Starting Capital</div>
+                        <div class="portfolio-stat-value">$${startVal.toLocaleString('en-US',{maximumFractionDigits:0})}</div>
+                    </div>
+                </div>
+                <div class="portfolio-activity-section">
+                    <div class="portfolio-activity-title">Recent Trades</div>
+                    <div id="portfolio-trade-feed" class="portfolio-trade-feed">
+                        <div class="portfolio-notification-placeholder">Loading trades...</div>
+                    </div>
+                </div>
+                <button class="trader-profile-follow-btn following" onclick="toggleFollowTrader('${escapeHtml(username)}', ${rp}, ${tv}); renderPortfolioModal();">
+                    ★ Unfollow Trader
+                </button>
             </div>
-            <div class="portfolio-trader-stats-grid">
-                <div class="portfolio-stat">
-                    <div class="portfolio-stat-label">Return</div>
-                    <div class="portfolio-stat-value ${retClass}">${retSign}${returnPct.toFixed(1)}%</div>
-                </div>
-                <div class="portfolio-stat">
-                    <div class="portfolio-stat-label">Portfolio Value</div>
-                    <div class="portfolio-stat-value">$${totalValue.toLocaleString('en-US',{maximumFractionDigits:0})}</div>
-                </div>
-                <div class="portfolio-stat">
-                    <div class="portfolio-stat-label">P&amp;L</div>
-                    <div class="portfolio-stat-value ${gainLoss>=0?'up':'down'}">${gainSign}$${Math.abs(gainLoss).toLocaleString('en-US',{maximumFractionDigits:0})}</div>
-                </div>
-                <div class="portfolio-stat">
-                    <div class="portfolio-stat-label">Starting Capital</div>
-                    <div class="portfolio-stat-value">$${startVal.toLocaleString('en-US',{maximumFractionDigits:0})}</div>
-                </div>
-            </div>
-            <div class="portfolio-activity-section">
-                <div class="portfolio-activity-title">Trade Notifications</div>
-                <div class="portfolio-activity-info">You'll be notified here when ${escapeHtml(username)} opens or closes a position.</div>
-                <div class="portfolio-notification-placeholder">No recent activity</div>
-            </div>
-            <button class="trader-profile-follow-btn following" onclick="toggleFollowTrader('${username}', ${returnPct}, ${totalValue}); renderPortfolioModal();">
-                ★ Unfollow Trader
-            </button>
-        </div>
-    `;
+        `;
+        _loadFollowedTraderTrades(username);
+    };
+
+    _renderStats(returnPct, totalValue, false, '');
+
+    const [liveProfile, profileData] = await Promise.all([
+        apiFetchTraderProfile(username),
+        apiLookupUserByUsername(username)
+    ]);
+
+    if (liveProfile) {
+        returnPct = liveProfile.return_pct || 0;
+        totalValue = liveProfile.total_value || 0;
+    }
+
+    let notifyOn = true;
+    const targetUserId = profileData?.data?.id || '';
+    if (targetUserId && state.currentUser?.id) {
+        const follows = await apiFetchMyFollows();
+        const followEntry = follows.find(f => f.following_id === targetUserId);
+        if (followEntry) notifyOn = followEntry.notify !== false;
+    }
+
+    _renderStats(returnPct, totalValue, notifyOn, targetUserId);
+}
+
+async function _handleNotifyToggle(targetUserId, currentState) {
+    if (!targetUserId) return;
+    const newState = await toggleFollowNotify(targetUserId, currentState);
+    const btn = document.getElementById('notify-toggle-btn');
+    if (btn) {
+        btn.className = `notify-toggle-btn ${newState ? 'active' : ''}`;
+        btn.title = newState ? 'Notifications on — click to mute' : 'Notifications off — click to enable';
+        btn.setAttribute('onclick', `_handleNotifyToggle('${targetUserId}', ${newState})`);
+        const bellOn  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+        const bellOff = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+        btn.innerHTML = newState ? bellOn : bellOff;
+    }
+    showToast(
+        newState ? 'Notifications On' : 'Notifications Off',
+        newState ? 'You will be notified of their trades' : 'Trade notifications muted'
+    );
+}
+
+async function _renderTradesIntoFeed(feedElId, username, maxRows = 10) {
+    const feedEl = document.getElementById(feedElId);
+    if (!feedEl) return;
+
+    try {
+        const { data: profile } = await apiLookupUserByUsername(username);
+        if (!profile?.id) {
+            feedEl.innerHTML = '<div class="portfolio-notification-placeholder">Could not find trader profile</div>';
+            return;
+        }
+
+        const { data: trades, error } = await supabaseClient
+            .from('trades')
+            .select('side, quantity, price, tea_id, index_symbol, created_at')
+            .eq('user_id', profile.id)
+            .order('created_at', { ascending: false })
+            .limit(maxRows);
+
+        if (error || !trades?.length) {
+            feedEl.innerHTML = '<div class="portfolio-notification-placeholder">No recent activity</div>';
+            return;
+        }
+
+        const teaMap = {};
+        (state.teas || []).forEach(t => { teaMap[t.id] = t.symbol; });
+
+        feedEl.innerHTML = trades.map(t => {
+            const sym = t.index_symbol || teaMap[t.tea_id] || '???';
+            const isBuy = t.side === 'BUY';
+            const ago = _timeAgo(new Date(t.created_at));
+            const total = (t.quantity * t.price).toFixed(2);
+            return `<div class="portfolio-trade-item">
+                <span class="portfolio-trade-side ${isBuy ? 'buy' : 'sell'}">${t.side}</span>
+                <span class="portfolio-trade-sym">${sym}</span>
+                <span class="portfolio-trade-qty">${Number(t.quantity).toLocaleString()} kg</span>
+                <span class="portfolio-trade-price">@ $${Number(t.price).toFixed(2)}</span>
+                <span class="portfolio-trade-total">$${Number(total).toLocaleString()}</span>
+                <span class="portfolio-trade-time">${ago}</span>
+            </div>`;
+        }).join('');
+    } catch (e) {
+        feedEl.innerHTML = '<div class="portfolio-notification-placeholder">Error loading trades</div>';
+    }
+}
+
+function _loadFollowedTraderTrades(username) {
+    _renderTradesIntoFeed('portfolio-trade-feed', username, 5);
+}
+
+function _loadTraderProfileTrades(username) {
+    _renderTradesIntoFeed('trader-profile-trade-feed', username, 10);
+}
+
+function _timeAgo(date) {
+    const s = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (s < 60) return `${s}s ago`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
 }

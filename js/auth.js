@@ -218,8 +218,26 @@ async function loadUserProfile() {
         console.log('Profile loaded, balance:', state.userProfile?.cash_balance);
         await loadPositions();
         await loadIndexPositions();
+        _syncLocalFollowsToDb();
     } catch (error) {
         console.error('Profile load error:', error);
+    }
+}
+
+async function _syncLocalFollowsToDb() {
+    const SYNC_KEY = 'tt_follows_synced';
+    if (localStorage.getItem(SYNC_KEY) || !state.currentUser) return;
+    try {
+        const list = getTraderWatchlist();
+        for (const entry of list) {
+            const { data: profile } = await apiLookupUserByUsername(entry.username);
+            if (profile?.id && profile.id !== state.currentUser.id) {
+                await apiFollowUser(profile.id);
+            }
+        }
+        localStorage.setItem(SYNC_KEY, '1');
+    } catch (e) {
+        console.warn('Follow sync:', e);
     }
 }
 

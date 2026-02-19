@@ -132,22 +132,22 @@ const state = {
 // Card data for market index cards
 const cardData = [
     { name: 'Mombasa Auction Index', symbol: 'MOMBASA', basePrice: 2.87, change: 1.8, currency: '$', volume: '6.8M' },
-    { name: 'Kolkata Tea Index', symbol: 'KOLKATA', basePrice: 267.45, change: 3.2, currency: '\u20B9', volume: '4.2M' },
-    { name: 'Colombo Index', symbol: 'COLOMBO', basePrice: 3.24, change: -1.8, currency: '$', volume: '5.1M' },
+    { name: 'Kolkata Tea Index', symbol: 'KOLKATA', basePrice: 267.45, change: 3.2, currency: '\u20B9', volume: '4.2M', forexKey: 'usd_inr' },
+    { name: 'Colombo Index', symbol: 'COLOMBO', basePrice: 988.00, change: -1.8, currency: '\u20A8', volume: '5.1M', forexKey: 'usd_lkr' },
     { name: 'Global Tea Futures', symbol: 'FUTURES', basePrice: 3847, change: 0.7, currency: '$', volume: '12.4M' }
 ];
 
 // Default index definitions (fallback if DB table empty)
 const defaultDbIndexes = [
     { symbol: 'KENYA', name: 'Kenya Tea Index', teas: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS'], color: 'var(--accent-green)', currency: '$', multiplier: 1, is_market_card: false },
-    { symbol: 'INDIA', name: 'India Tea Index', teas: ['IND-ASM', 'IND-DRJ'], color: 'var(--accent-orange)', currency: '$', multiplier: 1, is_market_card: false },
-    { symbol: 'CEYLON', name: 'Ceylon Tea Index', teas: ['SRI-BOP', 'SRI-PEK'], color: 'var(--accent-purple)', currency: '$', multiplier: 1, is_market_card: false },
+    { symbol: 'INDIA', name: 'India Tea Index', teas: ['IND-ASM', 'IND-DRJ'], color: 'var(--accent-orange)', currency: '$', multiplier: 1, forexKey: null, is_market_card: false },
+    { symbol: 'CEYLON', name: 'Ceylon Tea Index', teas: ['SRI-BOP', 'SRI-PEK'], color: 'var(--accent-purple)', currency: '$', multiplier: 1, forexKey: null, is_market_card: false },
     { symbol: 'CHINA', name: 'China Tea Index', teas: ['CHN-YUN'], color: 'var(--accent-red)', currency: '$', multiplier: 1, is_market_card: false },
     { symbol: 'AFRICA', name: 'African Tea Index', teas: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS', 'MLW-BP1', 'RWA-OP'], color: 'var(--accent-green)', currency: '$', multiplier: 1, is_market_card: false },
     { symbol: 'ASIA', name: 'Asian Tea Index', teas: ['IND-ASM', 'IND-DRJ', 'SRI-BOP', 'SRI-PEK', 'CHN-YUN'], color: 'var(--accent-blue)', currency: '$', multiplier: 1, is_market_card: false },
     { symbol: 'MOMBASA', name: 'Mombasa Auction Index', teas: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS'], color: 'var(--accent-green)', currency: '$', multiplier: 1, is_market_card: true },
-    { symbol: 'KOLKATA', name: 'Kolkata Tea Index', teas: ['IND-ASM', 'IND-DRJ'], color: 'var(--accent-orange)', currency: '\u20B9', multiplier: 83, is_market_card: true },
-    { symbol: 'COLOMBO', name: 'Colombo Index', teas: ['SRI-BOP', 'SRI-PEK'], color: 'var(--accent-purple)', currency: '$', multiplier: 1, is_market_card: true },
+    { symbol: 'KOLKATA', name: 'Kolkata Tea Index', teas: ['IND-ASM', 'IND-DRJ'], color: 'var(--accent-orange)', currency: '\u20B9', multiplier: 87.5, forexKey: 'usd_inr', is_market_card: true },
+    { symbol: 'COLOMBO', name: 'Colombo Index', teas: ['SRI-BOP', 'SRI-PEK'], color: 'var(--accent-purple)', currency: '\u20A8', multiplier: 305, forexKey: 'usd_lkr', is_market_card: true },
     { symbol: 'FUTURES', name: 'Global Tea Futures', teas: ['KEN-BP1', 'IND-ASM', 'SRI-BOP', 'CHN-YUN', 'IND-DRJ'], color: 'var(--accent-blue)', currency: '$', multiplier: 1000, is_market_card: true }
 ];
 
@@ -186,7 +186,7 @@ const studyColors = {
 };
 
 // Chart layout constants
-const leftMargin = 50;
+const leftMargin = 60;
 const rightMargin = 20;
 const bottomMargin = 25;
 
@@ -201,7 +201,7 @@ const timeframeConfig = {
 };
 
 // Debounce delay for batching Realtime ticker updates into a single UI refresh (ms)
-const TICKER_DEBOUNCE_MS = 500;
+const TICKER_DEBOUNCE_MS = 200;
 
 // Helper: get all index symbols from dbIndexes
 function getIndexSymbols() {
@@ -210,4 +210,28 @@ function getIndexSymbols() {
 
 function isIndexSymbol(sym) {
     return getIndexSymbols().includes(sym);
+}
+
+/**
+ * Resolve the display currency symbol for any trading symbol.
+ * Checks market card mappings and dbIndexes for forex-converted indexes.
+ * Returns '$' for USD, '₹' for INR, '₨' for LKR, etc.
+ */
+const _TRADE_TO_CARD = { 'KENYA': 'MOMBASA', 'INDIA': 'KOLKATA', 'CEYLON': 'COLOMBO', 'ASIA': 'FUTURES' };
+function getCurrencyForSymbol(sym) {
+    const cardSym = _TRADE_TO_CARD[sym] || sym;
+    const idx = (state.dbIndexes || []).find(i => i.symbol === cardSym) ||
+                (state.dbIndexes || []).find(i => i.symbol === sym);
+    return idx?.currency || '$';
+}
+
+/**
+ * Format a price with the correct currency for a given symbol.
+ */
+function formatSymbolPrice(price, sym) {
+    const c = getCurrencyForSymbol(sym);
+    if (!price || isNaN(price)) return c + '0.00';
+    if (price >= 10000) return c + price.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    if (price >= 100) return c + price.toFixed(1);
+    return c + price.toFixed(2);
 }

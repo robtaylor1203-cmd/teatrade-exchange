@@ -195,6 +195,10 @@ CREATE TABLE IF NOT EXISTS price_history_daily (
 
 CREATE INDEX IF NOT EXISTS idx_phd_symbol_hour ON price_history_daily (symbol, bucket_hour DESC);
 
+-- purge_old_price_history is intentionally a no-op.
+-- Price history is the permanent, immutable audit trail of every price tick
+-- and must never be deleted. This stub replaces the old function that deleted
+-- rows older than p_retention_days to prevent accidental data loss.
 CREATE OR REPLACE FUNCTION purge_old_price_history(
     p_retention_days INT DEFAULT 90
 )
@@ -202,42 +206,11 @@ RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
-DECLARE
-    v_cutoff TIMESTAMPTZ;
-    v_archived INT := 0;
-    v_deleted INT := 0;
 BEGIN
-    v_cutoff := NOW() - (p_retention_days || ' days')::INTERVAL;
-
-    -- Aggregate rows older than cutoff into hourly buckets
-    INSERT INTO price_history_daily (symbol, bucket_hour, open_price, high_price, low_price, close_price, tick_count)
-    SELECT
-        symbol,
-        date_trunc('hour', recorded_at) AS bucket_hour,
-        (ARRAY_AGG(price ORDER BY recorded_at ASC))[1]  AS open_price,
-        MAX(price)                                        AS high_price,
-        MIN(price)                                        AS low_price,
-        (ARRAY_AGG(price ORDER BY recorded_at DESC))[1] AS close_price,
-        COUNT(*)::INT                                     AS tick_count
-    FROM price_history
-    WHERE recorded_at < v_cutoff
-    GROUP BY symbol, date_trunc('hour', recorded_at)
-    ON CONFLICT (symbol, bucket_hour) DO UPDATE SET
-        high_price = GREATEST(price_history_daily.high_price, EXCLUDED.high_price),
-        low_price  = LEAST(price_history_daily.low_price, EXCLUDED.low_price),
-        close_price = EXCLUDED.close_price,
-        tick_count  = price_history_daily.tick_count + EXCLUDED.tick_count;
-
-    GET DIAGNOSTICS v_archived = ROW_COUNT;
-
-    DELETE FROM price_history WHERE recorded_at < v_cutoff;
-    GET DIAGNOSTICS v_deleted = ROW_COUNT;
-
     RETURN jsonb_build_object(
-        'success',        true,
-        'cutoff',         v_cutoff,
-        'archived_rows',  v_archived,
-        'deleted_rows',   v_deleted
+        'success', true,
+        'message', 'Price history is permanent and is never purged.',
+        'deleted_rows', 0
     );
 END;
 $$;
@@ -1628,14 +1601,12 @@ BEGIN
            last_update   = NOW()
     WHERE  id = NEW.tea_id;
 
-    -- Append tick to immutable price history
-    -- ON CONFLICT handles the rare case of two trades in the same millisecond
+    -- Append tick to immutable price history.
+    -- DO NOTHING on conflict: price_history rows are write-once; two trades in
+    -- the same millisecond simply result in one recorded point (acceptable).
     INSERT INTO price_history (symbol, price, volume, recorded_at, is_simulated)
     VALUES (v_symbol, v_new_price, NEW.quantity, NOW(), false)
-    ON CONFLICT (symbol, recorded_at) DO UPDATE
-        SET price        = EXCLUDED.price,
-            volume       = price_history.volume + EXCLUDED.volume,
-            is_simulated = false;
+    ON CONFLICT (symbol, recorded_at) DO NOTHING;
 
     RETURN NEW;
 END;

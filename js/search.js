@@ -330,11 +330,14 @@ function openIndexChart(indexSymbol) {
     chartSection.style.transform = 'scale(0.98)';
 
     setTimeout(() => {
+        const _idxCurr = typeof getCurrencyForSymbol === 'function' ? getCurrencyForSymbol(idx.symbol) : '$';
+        const _idxFk = idx.forexKey || null;
         state.mainChartData = {
             name: idx.name,
             symbol: idx.symbol,
             basePrice: idx.price,
-            currency: '$',
+            currency: _idxCurr,
+            forexKey: _idxFk,
             change: idx.change,
             volume: '\u2014',
             isIndex: true
@@ -342,7 +345,7 @@ function openIndexChart(indexSymbol) {
 
         document.getElementById('main-chart-title').textContent = state.mainChartData.name;
         const priceEl = document.getElementById('main-chart-price');
-        priceEl.textContent = `$${idx.price.toFixed(2)}`;
+        priceEl.textContent = formatIndexPrice(idx.price, _idxCurr);
         priceEl.className = 'chart-stat-value ' + (idx.change >= 0 ? 'up' : 'down');
 
         const idxChangeEl = document.getElementById('main-chart-change');

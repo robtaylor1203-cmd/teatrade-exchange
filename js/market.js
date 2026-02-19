@@ -57,12 +57,13 @@ async function getPriceHistory(symbol, symbolType = 'tea') {
                 return dbData;
             }
 
-            // Database empty or too sparse — return empty array. The Edge
-            // Function will populate price_history over time.
-            console.log(`Insufficient price history for ${cacheKey} (${dbData ? dbData.length : 0} candles) — waiting for server data`);
+            // Database empty or too sparse — store [] but with lastUpdate=0
+            // so the very next call triggers a fresh DB fetch instead of
+            // serving cached emptiness for 60 seconds.
+            console.log(`Insufficient price history for ${cacheKey} (${dbData ? dbData.length : 0} candles) — will retry on next request`);
             state.priceDataCache.data[cacheKey] = [];
-            state.priceDataCache.loaded[cacheKey] = true;
-            state.priceDataCache.lastUpdate[cacheKey] = Date.now();
+            state.priceDataCache.loaded[cacheKey] = false;
+            state.priceDataCache.lastUpdate[cacheKey] = 0;
             return [];
         } finally {
             delete state.priceDataCache.loading[cacheKey];
@@ -184,18 +185,23 @@ async function initializePriceCache() {
 // =============================================
 
 // Timeframe → candle interval (minutes) and lookback window
+// Limits are sized for the split-query strategy in apiFetchPriceHistory:
+//   • Simulated rows : 1 row/day  → trivial for any window
+//   • Live rows      : 1 row/5 min (market-ticker now writes every 5 min)
+// The limit passed to apiFetchPriceHistory caps the live-rows query (5 000).
+// These per-timeframe limits are kept for the convertToOHLC call only.
 const TIMEFRAME_CONFIG = {
-    '1D':  { interval: 5,     hoursBack: 24,        limit: 500 },
-    '1W':  { interval: 60,    hoursBack: 168,       limit: 1000 },
-    '1M':  { interval: 240,   hoursBack: 720,       limit: 2000 },
-    '3M':  { interval: 1440,  hoursBack: 2160,      limit: 3000 },
-    '1Y':  { interval: 1440,  hoursBack: 8760,      limit: 5000 },
-    'ALL': { interval: 10080, hoursBack: null,       limit: 10000 }
+    '1D':  { interval: 5,     hoursBack: 24,   limit: 5000  },
+    '1W':  { interval: 60,    hoursBack: 168,  limit: 5000  },
+    '1M':  { interval: 240,   hoursBack: 720,  limit: 5000  },
+    '3M':  { interval: 1440,  hoursBack: 2160, limit: 5000  },
+    '1Y':  { interval: 1440,  hoursBack: 8760, limit: 5000  },
+    'ALL': { interval: 10080, hoursBack: null,  limit: 10000 }
 };
 
 // Load chart data from database with timeframe-aware filtering
-async function loadChartDataFromHistory(symbol, symbolType = 'tea') {
-    const tf = state.currentTimeframe || '1D';
+async function loadChartDataFromHistory(symbol, symbolType = 'tea', timeframeOverride = null) {
+    const tf = timeframeOverride || state.currentTimeframe || '1D';
     const cfg = TIMEFRAME_CONFIG[tf] || TIMEFRAME_CONFIG['1D'];
 
     // Calculate the "since" timestamp for this timeframe
@@ -325,7 +331,14 @@ function calculateMarketIndexes() {
     const teaMap = {};
     state.teas.forEach(t => teaMap[t.symbol] = t);
 
-    const calcIndex = (symbols, currency = '$', multiplier = 1) => {
+    const _getLiveMultiplier = (idx) => {
+        if (idx.forexKey && state.macroIndicators[idx.forexKey]) {
+            return Number(state.macroIndicators[idx.forexKey]) || idx.multiplier || 1;
+        }
+        return idx.multiplier || 1;
+    };
+
+    const calcIndex = (symbols, multiplier = 1) => {
         const validTeas = symbols.map(s => teaMap[s]).filter(t => t && t.current_price > 0);
         if (validTeas.length === 0) return { price: 0, change: 0 };
 
@@ -340,15 +353,18 @@ function calculateMarketIndexes() {
 
     if (state.dbIndexes.length > 0) {
         state.dbIndexes.forEach(idx => {
-            const calc = calcIndex(idx.teas || [], idx.currency || '$', idx.multiplier || 1);
+            const mult = _getLiveMultiplier(idx);
+            const calc = calcIndex(idx.teas || [], mult);
             result[idx.symbol] = calc;
         });
     } else {
+        const lkr = Number(state.macroIndicators.usd_lkr) || 305;
+        const inr = Number(state.macroIndicators.usd_inr) || 87.5;
         result.KENYA = calcIndex(['KEN-BP1', 'KEN-PF1', 'KEN-DUST']);
         result.MOMBASA = calcIndex(['KEN-BP1', 'KEN-PF1', 'KEN-DUST']);
-        result.KOLKATA = calcIndex(['IND-ASM', 'IND-DRJ'], '\u20B9', 83);
-        result.COLOMBO = calcIndex(['SRI-BOP', 'SRI-PEK']);
-        result.FUTURES = calcIndex(['KEN-BP1', 'IND-ASM', 'SRI-BOP', 'CHN-YUN', 'IND-DRJ'], '$', 1000);
+        result.KOLKATA = calcIndex(['IND-ASM', 'IND-DRJ'], inr);
+        result.COLOMBO = calcIndex(['SRI-BOP', 'SRI-PEK'], lkr);
+        result.FUTURES = calcIndex(['KEN-BP1', 'IND-ASM', 'SRI-BOP', 'CHN-YUN', 'IND-DRJ'], 1000);
     }
 
     return result;
@@ -359,10 +375,11 @@ function updateAllMarketIndexes() {
     const indexes = calculateMarketIndexes();
     if (!indexes) return;
 
-    // Update main chart if it's showing KENYA
-    if (state.mainChartData.symbol === 'KENYA' && indexes.KENYA) {
-        state.mainChartData.basePrice = indexes.KENYA.price;
-        state.mainChartData.change = indexes.KENYA.change;
+    // Update main chart if it's showing a KENYA-equivalent symbol
+    const mainIdxSym = _CARD_TO_INDEX[state.mainChartData.symbol] || state.mainChartData.symbol;
+    if (indexes[mainIdxSym]) {
+        state.mainChartData.basePrice = indexes[mainIdxSym].price;
+        state.mainChartData.change = indexes[mainIdxSym].change;
     }
 
     // Update card data
@@ -510,13 +527,14 @@ function updateMainChartWithRealData() {
     const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
     const kenyaIndex = indexes.find(idx => idx.symbol === 'KENYA');
 
-    if (kenyaIndex && state.mainChartData.symbol === 'KENYA') {
+    const resolvedMainSym = _CARD_TO_INDEX[state.mainChartData.symbol] || state.mainChartData.symbol;
+    if (kenyaIndex && resolvedMainSym === 'KENYA') {
         state.mainChartData.basePrice = kenyaIndex.price;
         state.mainChartData.change = kenyaIndex.change;
 
         const priceEl = document.getElementById('main-chart-price');
         if (priceEl) {
-            priceEl.textContent = `$${kenyaIndex.price.toFixed(2)}`;
+            priceEl.textContent = formatIndexPrice(kenyaIndex.price, state.mainChartData.currency || '$');
             priceEl.className = 'chart-stat-value ' + (kenyaIndex.change >= 0 ? 'up' : 'down');
         }
 
@@ -570,21 +588,159 @@ function handleTickerUpdate(payload) {
 
     const idx = state.teas.findIndex(t => t.id === updated.id);
     if (idx >= 0) {
-        // Preserve previous price for change calculation
-        state.teas[idx].previous_price = state.teas[idx].current_price;
+        // Keep today's open as previous_price (set by loadTeas); don't overwrite with last tick
+        if (!state.teas[idx].previous_price || state.teas[idx].previous_price <= 0) {
+            state.teas[idx].previous_price = state.teas[idx].current_price;
+        }
         state.teas[idx].current_price = updated.current_price;
         if (updated.price_change_24h != null) state.teas[idx].price_change_24h = updated.price_change_24h;
         if (updated.last_update) state.teas[idx].last_update = updated.last_update;
         if (updated.anchor_price) state.teas[idx].anchor_price = updated.anchor_price;
         if (updated.reference_forex) state.teas[idx].reference_forex = updated.reference_forex;
 
-        // Update unified price cache
-        updatePriceCache(state.teas[idx].symbol, updated.current_price, 'tea');
+        const symbol = state.teas[idx].symbol;
+        const newPrice = updated.current_price;
+
+        // FIX: Push new price into the unified price cache (candle history)
+        updatePriceCache(symbol, newPrice, 'tea');
+
+        // FIX: If this symbol is currently displayed on any chart, push the
+        // price directly into the active chart data array and redraw immediately
+        // — without waiting for the debounce batch.
+        _pushPriceToActiveCharts(symbol, newPrice);
     }
 
     // Debounce: the Edge Function updates N teas at once; batch them
     clearTimeout(_tickerDebounceTimer);
     _tickerDebounceTimer = setTimeout(onTickerBatchComplete, TICKER_DEBOUNCE_MS);
+}
+
+/**
+ * Resolve the symbol currently shown on the main chart.
+ * Returns the symbol string (e.g. 'KENYA', 'KEN-BP1') or null.
+ */
+const _CARD_TO_INDEX = { 'MOMBASA': 'KENYA', 'KOLKATA': 'INDIA', 'COLOMBO': 'CEYLON', 'FUTURES': 'ASIA', 'KENYAN': 'KENYA' };
+
+function _getMainChartSymbol() {
+    const sym = state.mainChartData?.symbol;
+    if (!sym) return null;
+    return _CARD_TO_INDEX[sym] || sym;
+}
+
+/**
+ * Resolve whether the main chart is showing a 'tea' or 'index'.
+ */
+function _getMainChartSymbolType() {
+    if (state.mainChartData?.isTea) return 'tea';
+    if (state.mainChartData?.isIndex) return 'index';
+    const sym = state.mainChartData?.symbol;
+    if (sym && typeof isIndexSymbol === 'function') return isIndexSymbol(sym) ? 'index' : 'tea';
+    return 'index';
+}
+
+/**
+ * Compute a live index price from current state.teas values.
+ * Returns null if the index can't be resolved or has no valid teas.
+ */
+function _liveIndexPrice(indexSymbol) {
+    const idxDef = state.dbIndexes?.find(i => i.symbol === indexSymbol);
+    if (!idxDef?.teas?.length) return null;
+    const teaMap = {};
+    state.teas.forEach(t => { teaMap[t.symbol] = t; });
+    const prices = idxDef.teas.map(s => teaMap[s]?.current_price || 0).filter(p => p > 0);
+    if (prices.length === 0) return null;
+    return prices.reduce((a, b) => a + b, 0) / prices.length;
+}
+
+/**
+ * When a real-time tick arrives for `symbol` (a tea), push the new price
+ * into every live chart rendering that symbol OR an index containing it,
+ * then redraw. This is the SOLE path for chart data mutation from live
+ * ticks — updateChartsWithNewPrices only updates DOM price displays.
+ */
+function _pushPriceToActiveCharts(symbol, newPrice) {
+    // Helper: get the forex multiplier for a chart's display currency
+    const _chartForexMult = (mcd) => {
+        if (!mcd?.forexKey) return 1;
+        return Number(state.macroIndicators?.[mcd.forexKey]) || 1;
+    };
+
+    // ── Main chart ────────────────────────────────────────────────────────
+    const mainSymbol = _getMainChartSymbol();
+    const mainType   = _getMainChartSymbolType();
+    const mainMult   = _chartForexMult(state.mainChartData);
+
+    if (mainType === 'tea' && mainSymbol === symbol && state.chartData?.length > 0) {
+        appendPriceToChart(state.chartData, newPrice * mainMult);
+        if (typeof drawChart === 'function') drawChart();
+    } else if (mainType === 'index' && state.chartData?.length > 0) {
+        const idxDef = state.dbIndexes?.find(i => i.symbol === mainSymbol);
+        if (idxDef?.teas?.includes(symbol)) {
+            const idxPrice = _liveIndexPrice(mainSymbol);
+            if (idxPrice > 0) {
+                appendPriceToChart(state.chartData, idxPrice * mainMult);
+                if (typeof drawChart === 'function') drawChart();
+            }
+        }
+    }
+
+    // ── Hub fullscreen chart ──────────────────────────────────────────────
+    const hubSection = document.getElementById('chart-section');
+    if (hubSection?.classList.contains('panel-maximized') && state.hubChartData?.length > 0) {
+        const hubRaw    = document.getElementById('hub-buy-symbol')?.value || '';
+        const _cardMap  = { 'MOMBASA': 'KENYA', 'KOLKATA': 'INDIA', 'COLOMBO': 'CEYLON', 'FUTURES': 'ASIA', 'KENYAN': 'KENYA' };
+        const hubSymbol = _cardMap[hubRaw] || hubRaw;
+        const hubIsIdx  = typeof isIndexSymbol === 'function' && isIndexSymbol(hubSymbol);
+        const _revCard  = { 'KENYA': 'MOMBASA', 'INDIA': 'KOLKATA', 'CEYLON': 'COLOMBO', 'ASIA': 'FUTURES' };
+        const hubCard   = _revCard[hubSymbol] || hubSymbol;
+        const hubIdx    = state.dbIndexes?.find(i => i.symbol === hubCard)
+                       || state.dbIndexes?.find(i => i.symbol === hubRaw || i.symbol === hubSymbol);
+        const hubMult   = (hubIdx?.forexKey && state.macroIndicators?.[hubIdx.forexKey])
+                            ? Number(state.macroIndicators[hubIdx.forexKey]) || 1
+                            : 1;
+
+        if (!hubIsIdx && hubSymbol === symbol) {
+            appendPriceToChart(state.hubChartData, newPrice * hubMult);
+            if (typeof drawHubChart === 'function') drawHubChart();
+        } else if (hubIsIdx) {
+            const idxDef = state.dbIndexes?.find(i => i.symbol === hubSymbol);
+            if (idxDef?.teas?.includes(symbol)) {
+                const idxPrice = _liveIndexPrice(hubSymbol);
+                if (idxPrice > 0) {
+                    appendPriceToChart(state.hubChartData, idxPrice * hubMult);
+                    if (typeof drawHubChart === 'function') drawHubChart();
+                }
+            }
+        }
+    }
+
+    // ── Quick-quote modal ─────────────────────────────────────────────────
+    const qqModal = document.getElementById('quick-quote-modal');
+    if (state.qqCurrentTea && qqModal?.classList.contains('active')) {
+        const qqSym   = state.qqCurrentTea.symbol;
+        const qqIsIdx = state.qqCurrentTea.isIndex;
+        let qqPrice   = null;
+
+        if (!qqIsIdx && qqSym === symbol) {
+            qqPrice = newPrice;
+        } else if (qqIsIdx) {
+            const idxDef = state.dbIndexes?.find(i => i.symbol === qqSym);
+            if (idxDef?.teas?.includes(symbol)) {
+                qqPrice = _liveIndexPrice(qqSym);
+            }
+        }
+
+        if (qqPrice && qqPrice > 0) {
+            const cacheKey = qqIsIdx ? `INDEX_${qqSym}` : qqSym;
+            if (state.priceDataCache?.data?.[cacheKey]?.length > 0) {
+                appendPriceToChart(state.priceDataCache.data[cacheKey], qqPrice);
+            }
+            if (typeof drawQuickQuoteChart === 'function') {
+                state.qqCurrentTea = { ...state.qqCurrentTea, current_price: qqPrice };
+                drawQuickQuoteChart(state.qqCurrentTea);
+            }
+        }
+    }
 }
 
 /**
@@ -977,58 +1133,57 @@ function updateMarketStatus() {
 
 setInterval(updateMarketStatus, 15000);
 
+// Safety-net refresh: if the Realtime subscription ever lags or drops a batch,
+// a full teas reload every 5 minutes ensures state.teas never drifts more than
+// 5 minutes behind the DB. This prevents the ">10% deviation" trade errors that
+// occur when state.teas prices are stale vs actual DB prices.
+setInterval(async () => {
+    if (typeof loadTeas === 'function') {
+        try {
+            await loadTeas();
+            updateAllMarketIndexes();
+        } catch (e) {
+            console.warn('Periodic teas refresh failed:', e.message);
+        }
+    }
+}, 300_000); // every 5 minutes
+
 // =============================================
 // CHART UPDATES (driven by Realtime events)
 // =============================================
 
+/**
+ * Called after the debounced ticker batch completes.
+ * Only updates DOM price/change displays. All chart data mutation
+ * happens in _pushPriceToActiveCharts which fires per-tick.
+ */
 function updateChartsWithNewPrices() {
-    // Update main chart
-    if (state.chartData && state.chartData.length > 0) {
-        let newPrice = null;
+    // ── Main chart price display ──────────────────────────────────────────
+    const mainSymbol = _getMainChartSymbol();
+    const mainType   = _getMainChartSymbolType();
+    let mainPrice    = null;
 
-        if (state.mainChartData.isTea) {
-            const tea = state.teas?.find(t => t.symbol === state.mainChartData.symbol);
-            newPrice = tea?.current_price;
-        } else if (state.mainChartData.isIndex || state.mainChartData.symbol) {
-            const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
-            const idx = indexes.find(i => i.symbol === state.mainChartData.symbol);
-            newPrice = idx?.price || state.mainChartData.basePrice;
-        }
-
-        if (newPrice && newPrice > 0) {
-            appendPriceToChart(state.chartData, newPrice);
-            state.mainChartData.basePrice = newPrice;
-
-            const priceEl = document.getElementById('main-chart-price');
-            if (priceEl) {
-                priceEl.textContent = formatIndexPrice(newPrice, state.mainChartData.currency || '$');
-            }
-
-            drawChart();
+    if (mainType === 'tea' && mainSymbol) {
+        const tea = state.teas?.find(t => t.symbol === mainSymbol);
+        mainPrice = tea?.current_price;
+    } else if (mainType === 'index' && mainSymbol) {
+        const rawUsd = _liveIndexPrice(mainSymbol);
+        if (rawUsd && rawUsd > 0) {
+            const fk = state.mainChartData?.forexKey;
+            const mult = (fk && state.macroIndicators?.[fk]) ? Number(state.macroIndicators[fk]) : 1;
+            mainPrice = rawUsd * mult;
         }
     }
 
-    // Update hub chart if panel is open
-    if (state.hubChartData && state.hubChartData.length > 0 && state.maximizedPanel?.classList.contains('panel-maximized')) {
-        const symbol = document.getElementById('hub-buy-symbol')?.value;
-        if (symbol) {
-            const lookupSymbol = symbol === 'KENYAN' ? 'KENYA' : symbol;
-            const isIndex = isIndexSymbol(lookupSymbol);
-
-            let newPrice;
-            if (isIndex) {
-                const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
-                const index = indexes.find(idx => idx.symbol === lookupSymbol);
-                newPrice = index?.price;
-            } else {
-                const tea = state.teas?.find(t => t.symbol === symbol);
-                newPrice = tea?.current_price;
-            }
-
-            if (newPrice && newPrice > 0) {
-                appendPriceToChart(state.hubChartData, newPrice);
-                drawHubChart();
-            }
+    if (mainPrice && mainPrice > 0) {
+        state.mainChartData.basePrice = mainPrice;
+        const priceEl = document.getElementById('main-chart-price');
+        if (priceEl) {
+            priceEl.textContent = formatIndexPrice(mainPrice, state.mainChartData.currency || '$');
+        }
+        if (!state.chartData?.length) {
+            state.cachedTimeframe = null;
+            drawChart();
         }
     }
 }

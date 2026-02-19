@@ -381,12 +381,21 @@ serve(async (req) => {
         console.error(`❌ Rejected invalid price for ${tea.symbol}: ${newPrice}`);
         continue;
       }
-      // Sanity: must stay within ±15% of anchor regardless of flow activity.
-      // Prevents coordinated manipulation driving prices to extreme levels.
-      if (newPrice < tea.anchor_price * 0.85 || newPrice > tea.anchor_price * 1.15) {
-        console.warn(`⚠️  ${tea.symbol} price $${newPrice.toFixed(4)} outside ±15% of anchor $${tea.anchor_price} — skipping`);
-        continue;
+      // Sanity: CLAMP to ±15% of anchor rather than skipping.
+      // Skipping caused charts to go permanently flat when stress tests or
+      // large trades pushed prices outside the band — the cron would then
+      // never update those symbols again. Clamping ensures prices always
+      // drift back toward anchor over subsequent ticks.
+      let clampedPrice = newPrice;
+      if (newPrice < tea.anchor_price * 0.85) {
+        clampedPrice = tea.anchor_price * 0.85;
+      } else if (newPrice > tea.anchor_price * 1.15) {
+        clampedPrice = tea.anchor_price * 1.15;
       }
+      if (clampedPrice !== newPrice) {
+        console.warn(`⚠️  ${tea.symbol} clamped $${newPrice.toFixed(4)} → $${clampedPrice.toFixed(4)} (±15% anchor)`);
+      }
+      const finalPrice = clampedPrice;
 
       if (flowEffect !== 0) {
         console.log(`   ${tea.symbol}: flow ${netFlowKg >= 0 ? '+' : ''}${netFlowKg.toFixed(0)}kg → impact ${(flowEffect * 100).toFixed(3)}%`);
@@ -394,7 +403,7 @@ serve(async (req) => {
 
       updates.push({
         symbol: tea.symbol,
-        current_price: newPrice,
+        current_price: finalPrice,
         last_update: timestamp
       });
     }
@@ -406,8 +415,20 @@ serve(async (req) => {
         .eq('symbol', update.symbol);
     }
 
-    // 7. Record price history (immutable time-series)
-    if (updates.length > 0) {
+    // 7. Record price history (immutable time-series) — only every 5 minutes.
+    //
+    // The cron runs every 60 s.  Writing price_history on every tick produces
+    // ~2,880 rows/day per symbol.  The 1D chart uses 5-minute candles and only
+    // needs 288 rows/day — fetching thousands of sub-minute rows saturates the
+    // query LIMIT and leaves most of the chart X-axis blank.
+    //
+    // By gating the write to minutes that are divisible by 5 we write exactly
+    // 288 rows/day, which is the perfect density for a 5-minute candle chart and
+    // still well within the capacity of the longer timeframes.
+    const tickMinute = new Date(timestamp).getMinutes();
+    const writeHistory = (tickMinute % 5) === 0;
+
+    if (writeHistory && updates.length > 0) {
       const historyRows = updates.map(u => ({
         symbol: u.symbol,
         price:  u.current_price,
@@ -424,39 +445,41 @@ serve(async (req) => {
       else console.log(`📈 Recorded ${historyRows.length} price points`);
     }
 
-    // 8. Record composite index price history
-    if (updates.length > 0) {
+    // 8. Record composite index price history for ALL indexes in the DB.
+    // We load compositions from the `indexes` table (single source of truth)
+    // so every index that clients can trade also gets a price_history row each
+    // tick — including INDIA, CEYLON, CHINA, AFRICA, ASIA which were previously
+    // missing and left those charts with no historical data.
+    // Same 5-minute gate as the tea price history above.
+    if (writeHistory && updates.length > 0) {
       const priceMap: Record<string, number> = {};
       for (const u of updates) priceMap[u.symbol] = u.current_price;
 
       const avgOf = (symbols: string[]): number | null => {
-        const prices = symbols.map(s => priceMap[s]).filter(p => p && p > 0);
+        const prices = symbols.map(s => priceMap[s]).filter(p => p != null && p > 0);
         if (!prices.length) return null;
-        return prices.reduce((a, b) => a + b, 0) / prices.length;
+        return prices.reduce((a: number, b: number) => a + b, 0) / prices.length;
       };
 
-      const indexDefs = [
-        { symbol: 'KENYA',   teas: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST'], multiplier: 1 },
-        { symbol: 'MOMBASA', teas: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST'], multiplier: 1 },
-        { symbol: 'KOLKATA', teas: ['IND-ASM', 'IND-DRJ'],             multiplier: 83 },
-        { symbol: 'COLOMBO', teas: ['SRI-BOP', 'SRI-PEK'],             multiplier: 1 },
-        { symbol: 'FUTURES', teas: ['KEN-BP1', 'IND-ASM', 'SRI-BOP', 'CHN-YUN', 'IND-DRJ'], multiplier: 1000 },
-      ];
+      // Fetch all index definitions from DB — same source the client uses
+      const { data: allIndexes } = await supabase
+        .from('indexes')
+        .select('symbol, teas, multiplier');
 
-      const indexRows = [];
-      for (const def of indexDefs) {
-        const avg = avgOf(def.teas);
+      const indexRows: Array<{symbol:string;price:number;volume:number;recorded_at:string;is_simulated:boolean}> = [];
+      for (const idx of (allIndexes || [])) {
+        const avg = avgOf(idx.teas || []);
         if (avg !== null) {
-          const ip = avg * def.multiplier;
+          const ip = avg * (idx.multiplier || 1);
           if (isFinite(ip) && ip > 0)
-            indexRows.push({ symbol: def.symbol, price: ip, volume: 0, recorded_at: timestamp, is_simulated: false });
+            indexRows.push({ symbol: idx.symbol, price: ip, volume: 0, recorded_at: timestamp, is_simulated: false });
         }
       }
 
       if (indexRows.length > 0) {
         const { error: idxErr } = await supabase.from('price_history').insert(indexRows);
         if (idxErr) console.error('index history error:', idxErr.message);
-        else console.log(`📊 Recorded ${indexRows.length} index points`);
+        else console.log(`📊 Recorded ${indexRows.length} index price points (${indexRows.map(r=>r.symbol).join(', ')})`);
       }
     }
 

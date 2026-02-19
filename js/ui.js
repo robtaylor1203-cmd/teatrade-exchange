@@ -248,12 +248,12 @@ function populateHubTeaSelects() {
         state.teas.forEach(tea => {
             const buyOption = document.createElement('option');
             buyOption.value = tea.symbol;
-            buyOption.textContent = `${tea.symbol} ($${tea.current_price?.toFixed(2) || '0.00'})`;
+            buyOption.textContent = `${tea.symbol} ($${(tea.current_price || 0).toFixed(2)})`;
             teaOptgroup.appendChild(buyOption);
 
             const sellOption = document.createElement('option');
             sellOption.value = tea.symbol;
-            sellOption.textContent = `${tea.symbol} ($${tea.current_price?.toFixed(2) || '0.00'})`;
+            sellOption.textContent = `${tea.symbol} ($${(tea.current_price || 0).toFixed(2)})`;
             sellTeaOptgroup.appendChild(sellOption);
         });
 
@@ -270,14 +270,20 @@ function populateHubTeaSelects() {
         sellIndexOptgroup.label = 'Indexes';
 
         indexes.forEach(idx => {
+            const c = typeof getCurrencyForSymbol === 'function' ? getCurrencyForSymbol(idx.symbol) : '$';
+            const fk = idx.forexKey;
+            const mult = (fk && state.macroIndicators?.[fk]) ? Number(state.macroIndicators[fk]) : 1;
+            const displayPrice = (idx.price || 0) * mult;
+            const pStr = displayPrice >= 100 ? displayPrice.toFixed(1) : displayPrice.toFixed(2);
+
             const buyOption = document.createElement('option');
             buyOption.value = idx.symbol;
-            buyOption.textContent = `${idx.symbol} Index ($${idx.price?.toFixed(2) || '0.00'})`;
+            buyOption.textContent = `${idx.symbol} Index (${c}${pStr})`;
             indexOptgroup.appendChild(buyOption);
 
             const sellOption = document.createElement('option');
             sellOption.value = idx.symbol;
-            sellOption.textContent = `${idx.symbol} Index ($${idx.price?.toFixed(2) || '0.00'})`;
+            sellOption.textContent = `${idx.symbol} Index (${c}${pStr})`;
             sellIndexOptgroup.appendChild(sellOption);
         });
 
@@ -360,34 +366,51 @@ function updateMarketDepth() {
     const ratioEl = document.getElementById('depth-ratio');
     if (!bidsEl || !asksEl) return;
 
-    // Determine which symbol the user has focused (trade form or selected quote)
+    // Resolve the focused symbol — dropdown values may be numeric tea IDs
+    // (e.g. "3") or prefixed indexes (e.g. "INDEX_KENYA").  Normalise to
+    // the plain symbol that market_pressure uses as its key.
     const select = document.getElementById('trade-tea-select');
-    const focusedSymbol = state.selectedQuoteSymbol || select?.value || null;
+    let focusedSymbol = state.selectedQuoteSymbol || select?.value || null;
+    if (focusedSymbol) {
+        if (focusedSymbol.startsWith('INDEX_')) {
+            focusedSymbol = focusedSymbol.replace('INDEX_', '');
+        } else if (/^\d+$/.test(focusedSymbol)) {
+            const tea = state.teas?.find(t => t.id === parseInt(focusedSymbol));
+            if (tea) focusedSymbol = tea.symbol;
+        }
+    }
 
-    // ── Prefer live order-flow data for the focused symbol ──────────────
-    // Falls back to broader market pressure if nothing for focusedSymbol,
-    // then falls back to the old price-movement heuristic as a last resort.
-    const pressure = (focusedSymbol && state.marketPressure?.[focusedSymbol])
-        || null;
+    // ── Aggregate real order-flow from market_pressure ───────────────────
+    // Try the focused symbol first; if no data, aggregate ALL symbols so
+    // the bar always reflects actual trading activity when bots/users trade.
+    let bidVol = 0, askVol = 0, usingLiveFlow = false;
+    const mp = state.marketPressure || {};
 
-    let bidPct, bidVol, askVol, usingLiveFlow = false;
+    const tryPressure = (sym) => {
+        const p = mp[sym];
+        if (!p) return false;
+        if (p.buy5m > 0 || p.sell5m > 0) {
+            bidVol += p.buy5m;  askVol += p.sell5m;  return true;
+        }
+        if (p.buy30m > 0 || p.sell30m > 0) {
+            bidVol += p.buy30m; askVol += p.sell30m;  return true;
+        }
+        return false;
+    };
 
-    if (pressure && (pressure.buy5m > 0 || pressure.sell5m > 0)) {
-        // Real data: 5-minute window (most recent activity)
-        const total = pressure.buy5m + pressure.sell5m;
-        bidPct   = (pressure.buy5m / total) * 100;
-        bidVol   = Math.round(pressure.buy5m);
-        askVol   = Math.round(pressure.sell5m);
-        usingLiveFlow = true;
-    } else if (pressure && (pressure.buy30m > 0 || pressure.sell30m > 0)) {
-        // Real data: 30-minute window (slightly older)
-        const total = pressure.buy30m + pressure.sell30m;
-        bidPct   = (pressure.buy30m / total) * 100;
-        bidVol   = Math.round(pressure.buy30m);
-        askVol   = Math.round(pressure.sell30m);
+    if (focusedSymbol && tryPressure(focusedSymbol)) {
         usingLiveFlow = true;
     } else {
-        // No trade data for this symbol yet — estimate from price movement counts
+        // Aggregate across every symbol with live pressure data
+        for (const sym of Object.keys(mp)) {
+            if (tryPressure(sym)) usingLiveFlow = true;
+        }
+    }
+
+    let bidPct;
+    if (usingLiveFlow && (bidVol + askVol) > 0) {
+        bidPct = (bidVol / (bidVol + askVol)) * 100;
+    } else {
         let ups = 0, downs = 0;
         state.teas.forEach(tea => {
             if (tea.previous_price && tea.current_price > tea.previous_price) ups++;
@@ -423,7 +446,7 @@ function updateMarketDepth() {
     asksEl.style.background = askPct > 55 ? 'var(--accent-red)'   : askPct < 45 ? 'rgba(239,68,68,0.4)'  : 'var(--accent-red)';
 
     // Format volumes
-    const fmt = v => v >= 1000 ? `${(v / 1000).toFixed(1)}K kg` : `${v} kg`;
+    const fmt = v => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M kg` : v >= 1000 ? `${(v / 1000).toFixed(1)}K kg` : `${v} kg`;
     document.getElementById('depth-bid-volume').textContent = `Vol: ${fmt(bidVol)}`;
     document.getElementById('depth-ask-volume').textContent = `Vol: ${fmt(askVol)}`;
 

@@ -39,6 +39,17 @@ async function loadTeas() {
         const { data, error } = await apiFetchTeas();
         if (error) throw error;
 
+        // Fetch today's opening prices for accurate % change
+        const openPrices = await apiFetchTodayOpenPrices();
+
+        data.forEach(tea => {
+            if (openPrices[tea.symbol]) {
+                tea.previous_price = openPrices[tea.symbol];
+            } else if (!tea.previous_price || tea.previous_price <= 0) {
+                tea.previous_price = tea.current_price;
+            }
+        });
+
         state.teas = data;
 
         populateTeaSelect();
@@ -63,7 +74,10 @@ async function loadIndexes() {
     try {
         const { data, error } = await apiFetchIndexes();
         if (error) throw error;
-        state.dbIndexes = data || [];
+        state.dbIndexes = (data || []).map(row => ({
+            ...row,
+            forexKey: row.forex_key || row.forexKey || null,
+        }));
     } catch (error) {
         console.error('Failed to load indexes:', error);
         state.dbIndexes = defaultDbIndexes;
@@ -155,6 +169,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // User data
     await loadUserTrades();
+
+    if (state.currentUser && typeof _ensureTradeNotificationChannel === 'function') {
+        _ensureTradeNotificationChannel();
+        _buildNotifyProfileCache();
+    }
 
     // Canvas sizing + initial draw
     resizeCanvas();

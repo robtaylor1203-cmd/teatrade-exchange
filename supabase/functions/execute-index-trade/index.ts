@@ -82,7 +82,7 @@ serve(async (req) => {
 
     // ── ACTION: INDEX TRADE ────────────────────────────────────────
     if (action === 'trade') {
-      const { symbol, side, quantity, price } = body
+      const { symbol, side, quantity } = body
 
       if (!symbol || typeof symbol !== 'string') {
         return new Response(JSON.stringify({ success: false, error: 'Missing or invalid symbol' }), {
@@ -103,36 +103,21 @@ serve(async (req) => {
           status: 400,
         })
       }
-      const px = Number(price)
-      if (!px || px <= 0 || !isFinite(px)) {
-        return new Response(JSON.stringify({ success: false, error: 'Price must be a positive number' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
-        })
-      }
 
-      // ── Server-side reference price ──────────────────────────────────────────
-      // Compute the index price from constituent teas in the `teas` table.
-      // This is always current (updated by the cron every minute) and avoids
-      // the CEYLON vs COLOMBO naming mismatch that caused false rejections when
-      // comparing against stale or differently-named price_history entries.
-      const INDEX_COMPOSITIONS: Record<string, string[]> = {
-        KENYA:   ['KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS'],
-        INDIA:   ['IND-ASM', 'IND-DRJ'],
-        CEYLON:  ['SRI-BOP', 'SRI-PEK'],
-        COLOMBO: ['SRI-BOP', 'SRI-PEK'],
-        CHINA:   ['CHN-YUN'],
-        AFRICA:  ['KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS', 'MLW-BP1', 'RWA-OP'],
-        ASIA:    ['IND-ASM', 'IND-DRJ', 'SRI-BOP', 'SRI-PEK', 'CHN-YUN'],
-        MOMBASA: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS'],
-        KOLKATA: ['IND-ASM', 'IND-DRJ'],
-        FUTURES: ['KEN-BP1', 'IND-ASM', 'SRI-BOP', 'CHN-YUN', 'IND-DRJ'],
-      }
+      // ── Server-authoritative price ─────────────────────────────────────────
+      // The server ALWAYS computes the index price from the DB. Client-sent
+      // price is ignored entirely — this eliminates all deviation errors.
+      let executionPrice: number | null = null
 
-      let serverRefPrice: number | null = null
+      const { data: indexRow } = await supabaseAdmin
+        .from('indexes')
+        .select('teas')
+        .eq('symbol', symbol)
+        .single()
 
-      const teasInIndex = INDEX_COMPOSITIONS[symbol]
-      if (teasInIndex && teasInIndex.length > 0) {
+      const teasInIndex: string[] = indexRow?.teas || []
+
+      if (teasInIndex.length > 0) {
         const { data: teaPrices } = await supabaseAdmin
           .from('teas')
           .select('current_price')
@@ -143,13 +128,13 @@ serve(async (req) => {
             .map((t: { current_price: number }) => Number(t.current_price))
             .filter((p: number) => p > 0)
           if (valid.length > 0) {
-            serverRefPrice = valid.reduce((a: number, b: number) => a + b, 0) / valid.length
+            executionPrice = valid.reduce((a: number, b: number) => a + b, 0) / valid.length
           }
         }
       }
 
-      // Fallback: only use price_history if it's fresh (< 10 min old)
-      if (serverRefPrice === null) {
+      // Fallback: recent price_history for the index symbol itself
+      if (executionPrice === null) {
         const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
         const { data: latestPrice } = await supabaseAdmin
           .from('price_history')
@@ -161,23 +146,15 @@ serve(async (req) => {
           .single()
 
         if (latestPrice && Number(latestPrice.price) > 0) {
-          serverRefPrice = Number(latestPrice.price)
+          executionPrice = Number(latestPrice.price)
         }
       }
 
-      // Reject if client price deviates >10% from the server-computed reference.
-      // 10% (up from 5%) gives room for the ~60s cron lag without false rejections.
-      if (serverRefPrice !== null && serverRefPrice > 0) {
-        const deviation = Math.abs(px - serverRefPrice) / serverRefPrice
-        if (deviation > 0.10) {
-          return new Response(JSON.stringify({
-            success: false,
-            error: `Price rejected: $${px.toFixed(2)} deviates >10% from server price $${serverRefPrice.toFixed(2)}`
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400,
-          })
-        }
+      if (executionPrice === null || executionPrice <= 0) {
+        return new Response(JSON.stringify({ success: false, error: 'Could not determine server price for ' + symbol }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        })
       }
 
       const { data, error } = await supabaseAdmin.rpc('execute_index_trade', {
@@ -185,7 +162,7 @@ serve(async (req) => {
         p_index_symbol: symbol,
         p_side: side,
         p_quantity: qty,
-        p_price: px,
+        p_price: executionPrice,
       })
 
       if (error) {
@@ -197,7 +174,10 @@ serve(async (req) => {
       }
 
       const result = data as Record<string, unknown>
-      return new Response(JSON.stringify(result), {
+      return new Response(JSON.stringify({
+        ...result,
+        execution_price: executionPrice,
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: result.success ? 200 : 400,
       })

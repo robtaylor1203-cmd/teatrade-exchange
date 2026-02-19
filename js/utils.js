@@ -49,8 +49,8 @@ function formatDuration(ms) {
 
 function formatIndexPrice(price, currency, symbol) {
     if (!price || isNaN(price)) return currency + '0.00';
-    if (symbol === 'KOLKATA') return currency + price.toFixed(2);
     if (symbol === 'FUTURES') return currency + price.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    if (price >= 100) return currency + price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return currency + price.toFixed(2);
 }
 
