@@ -759,8 +759,10 @@ function drawQuickQuoteChart(tea) {
     // the active timeframe (set by TIMEFRAME_CONFIG in market.js).
     // Just slice the most recent N candles plus warm-up for indicators.
     const warmupPeriod = 25;
-    const qqPointsMap = { '1H': 12, '1D': 48, '1W': 56, '1M': 60 };
-    const maxPoints = (qqPointsMap[state.qqTimeframe] || 48) + warmupPeriod;
+    // 1H: 60 ticks = up to 5h of 5-min candles so the chart always has enough
+    // data to display even if the edge function hasn't been very active today.
+    const qqPointsMap = { '1H': 60, '1D': 96, '1W': 168, '1M': 120 };
+    const maxPoints = (qqPointsMap[state.qqTimeframe] || 96) + warmupPeriod;
     let historySlice = fullHistory.slice(-maxPoints);
     if (historySlice.length === 0) historySlice = fullHistory.slice(-50);
 

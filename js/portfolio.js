@@ -470,8 +470,9 @@ function displayUserTrades(trades) {
         const openPnlPct = openTotalValue > 0 ? (openTotalPnl / openTotalValue * 100) : 0;
 
         tfootTotal.textContent = '$' + openTotalValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-        tfootPnl.innerHTML = `<span class="${openPnlClass}">${openPnlSign}$${openTotalPnl.toFixed(2)} (${openPnlPct.toFixed(1)}%)</span>`;
-        tfootCount.innerHTML = `<span style="color: var(--text-muted);">${openCount} open</span>`;
+        tfootPnl.className = `orders-summary-stat-value ${openPnlClass}`;
+        tfootPnl.textContent = `${openPnlSign}$${openTotalPnl.toFixed(2)} (${openPnlPct.toFixed(1)}%)`;
+        tfootCount.textContent = `${openCount} open`;
     } else {
         tfoot.style.display = 'none';
     }
@@ -748,12 +749,16 @@ function updateLeaderboardDisplay(leaders) {
         const returnPct = user.return_pct || 0;
         const returnClass = returnPct >= 0 ? 'up' : 'down';
         const returnSign = returnPct >= 0 ? '+' : '';
+        const totalValue = user.total_value || 0;
+        const isFollowed = isTraderFollowed(user.username);
+        const followIcon = isFollowed ? '★' : '☆';
 
         html += `
-            <div class="leaderboard-item">
+            <div class="leaderboard-item leaderboard-item-clickable" onclick="openTraderProfile('${user.username}', ${returnPct}, ${totalValue}, ${rank})">
                 <div class="leaderboard-rank ${rankClass}">${rank}</div>
                 <div class="leaderboard-name">${escapeHtml(user.username)}</div>
                 <div class="leaderboard-return ${returnClass}">${returnSign}${returnPct.toFixed(1)}%</div>
+                <div class="leaderboard-follow-star ${isFollowed ? 'followed' : ''}" title="${isFollowed ? 'Following' : 'Follow'}">${followIcon}</div>
             </div>
         `;
     });
@@ -865,4 +870,242 @@ async function updateIndexPosition(indexSymbol, quantity, price, side) {
     if (typeof loadIndexPositions === 'function') {
         await loadIndexPositions();
     }
+}
+
+// =============================================
+// TRADER WATCHLIST
+// =============================================
+
+const WATCHLIST_KEY = 'tt_trader_watchlist';
+
+function getTraderWatchlist() {
+    try { return JSON.parse(localStorage.getItem(WATCHLIST_KEY) || '[]'); }
+    catch { return []; }
+}
+
+function saveTraderWatchlist(list) {
+    localStorage.setItem(WATCHLIST_KEY, JSON.stringify(list));
+}
+
+function isTraderFollowed(username) {
+    return getTraderWatchlist().some(t => t.username === username);
+}
+
+function toggleFollowTrader(username, returnPct, totalValue) {
+    let list = getTraderWatchlist();
+    const idx = list.findIndex(t => t.username === username);
+    if (idx === -1) {
+        list.push({ username, returnPct, totalValue, followedAt: new Date().toISOString() });
+        showToast('Following', `You are now following ${username}`);
+    } else {
+        list.splice(idx, 1);
+        showToast('Unfollowed', `Removed ${username} from your watchlist`);
+    }
+    saveTraderWatchlist(list);
+    // Refresh leaderboard stars & modal button
+    if (typeof loadLeaderboard === 'function') loadLeaderboard();
+    _refreshTraderProfileFollowBtn(username);
+}
+
+function _refreshTraderProfileFollowBtn(username) {
+    const btn = document.getElementById('trader-profile-follow-btn');
+    if (!btn) return;
+    const followed = isTraderFollowed(username);
+    btn.textContent = followed ? '★ Following' : '☆ Follow Trader';
+    btn.className = 'trader-profile-follow-btn' + (followed ? ' following' : '');
+}
+
+// =============================================
+// TRADER PROFILE MODAL
+// =============================================
+
+function openTraderProfile(username, returnPct, totalValue, rank) {
+    const modal = document.getElementById('trader-profile-modal');
+    if (!modal) return;
+
+    const followed  = isTraderFollowed(username);
+    const retClass  = returnPct >= 0 ? 'up' : 'down';
+    const retSign   = returnPct >= 0 ? '+' : '';
+    const rankEmoji = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
+    const initials  = username.slice(0, 2).toUpperCase();
+    const startVal  = totalValue / (1 + returnPct / 100);
+    const gainLoss  = totalValue - startVal;
+    const gainSign  = gainLoss >= 0 ? '+' : '';
+
+    modal.innerHTML = `
+        <div class="trader-profile-overlay" onclick="closeTraderProfile()"></div>
+        <div class="trader-profile-card">
+            <button class="trader-profile-close" onclick="closeTraderProfile()">✕</button>
+            <div class="trader-profile-header">
+                <div class="trader-profile-avatar">${initials}</div>
+                <div class="trader-profile-info">
+                    <div class="trader-profile-name">${escapeHtml(username)}</div>
+                    <div class="trader-profile-rank">${rankEmoji} Rank ${rank} · Feb 2026</div>
+                </div>
+            </div>
+            <div class="trader-profile-stats">
+                <div class="trader-stat-box">
+                    <div class="trader-stat-label">Return</div>
+                    <div class="trader-stat-value ${retClass}">${retSign}${returnPct.toFixed(1)}%</div>
+                </div>
+                <div class="trader-stat-box">
+                    <div class="trader-stat-label">Portfolio Value</div>
+                    <div class="trader-stat-value">$${totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
+                </div>
+                <div class="trader-stat-box">
+                    <div class="trader-stat-label">P&amp;L</div>
+                    <div class="trader-stat-value ${gainLoss >= 0 ? 'up' : 'down'}">${gainSign}$${Math.abs(gainLoss).toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
+                </div>
+                <div class="trader-stat-box">
+                    <div class="trader-stat-label">Starting Capital</div>
+                    <div class="trader-stat-value">$${startVal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
+                </div>
+            </div>
+            <div class="trader-profile-activity">
+                <div class="trader-activity-label">Recent Activity</div>
+                <div class="trader-activity-placeholder">Trade history coming soon</div>
+            </div>
+            <button id="trader-profile-follow-btn"
+                class="trader-profile-follow-btn${followed ? ' following' : ''}"
+                onclick="toggleFollowTrader('${username}', ${returnPct}, ${totalValue})">
+                ${followed ? '★ Following' : '☆ Follow Trader'}
+            </button>
+        </div>
+    `;
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeTraderProfile() {
+    const modal = document.getElementById('trader-profile-modal');
+    if (modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+}
+
+// =============================================
+// MY PORTFOLIO MODAL
+// =============================================
+
+function openPortfolioModal() {
+    const modal = document.getElementById('portfolio-modal');
+    if (!modal) return;
+
+    // Populate header balance from state
+    const balEl = document.getElementById('portfolio-header-balance');
+    if (balEl && state.userProfile?.cash_balance != null) {
+        balEl.textContent = `$${Number(state.userProfile.cash_balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    }
+
+    // Watchlist count badge
+    const countEl = document.getElementById('portfolio-wl-count');
+    if (countEl) countEl.textContent = getTraderWatchlist().length;
+
+    renderPortfolioModal();
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closePortfolioModal() {
+    const modal = document.getElementById('portfolio-modal');
+    if (modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+}
+
+function renderPortfolioModal() {
+    const watchlist = getTraderWatchlist();
+    const wlPanel   = document.getElementById('portfolio-watchlist-panel');
+    const statsPanel = document.getElementById('portfolio-stats-panel');
+    if (!wlPanel || !statsPanel) return;
+
+    if (watchlist.length === 0) {
+        wlPanel.innerHTML = `
+            <div class="portfolio-watchlist-empty">
+                <div class="portfolio-wl-icon">☆</div>
+                <div>No traders followed yet.</div>
+                <div class="portfolio-wl-hint">Click ☆ on any leaderboard entry to follow a trader.</div>
+            </div>`;
+        statsPanel.innerHTML = `<div class="portfolio-stats-placeholder">Select a trader to see their stats.</div>`;
+        return;
+    }
+
+    wlPanel.innerHTML = watchlist.map(t => {
+        const retClass = t.returnPct >= 0 ? 'up' : 'down';
+        const retSign  = t.returnPct >= 0 ? '+' : '';
+        return `
+            <div class="portfolio-wl-item" onclick="selectPortfolioTrader('${t.username}', ${t.returnPct}, ${t.totalValue})">
+                <div class="portfolio-wl-avatar">${t.username.slice(0, 2).toUpperCase()}</div>
+                <div class="portfolio-wl-info">
+                    <div class="portfolio-wl-name">${escapeHtml(t.username)}</div>
+                    <div class="portfolio-wl-return ${retClass}">${retSign}${t.returnPct.toFixed(1)}%</div>
+                </div>
+                <button class="portfolio-wl-unfollow" onclick="event.stopPropagation(); toggleFollowTrader('${t.username}', ${t.returnPct}, ${t.totalValue}); renderPortfolioModal();" title="Unfollow">✕</button>
+            </div>`;
+    }).join('');
+
+    // Auto-select first trader
+    const first = watchlist[0];
+    selectPortfolioTrader(first.username, first.returnPct, first.totalValue);
+}
+
+function selectPortfolioTrader(username, returnPct, totalValue) {
+    const statsPanel = document.getElementById('portfolio-stats-panel');
+    if (!statsPanel) return;
+
+    // Highlight selected
+    document.querySelectorAll('.portfolio-wl-item').forEach(el => el.classList.remove('selected'));
+    const items = document.querySelectorAll('.portfolio-wl-item');
+    items.forEach(el => {
+        if (el.querySelector('.portfolio-wl-name')?.textContent === username) {
+            el.classList.add('selected');
+        }
+    });
+
+    const retClass  = returnPct >= 0 ? 'up' : 'down';
+    const retSign   = returnPct >= 0 ? '+' : '';
+    const initials  = username.slice(0, 2).toUpperCase();
+    const startVal  = totalValue / (1 + returnPct / 100);
+    const gainLoss  = totalValue - startVal;
+    const gainSign  = gainLoss >= 0 ? '+' : '';
+
+    statsPanel.innerHTML = `
+        <div class="portfolio-trader-detail">
+            <div class="portfolio-trader-header">
+                <div class="portfolio-trader-avatar">${initials}</div>
+                <div>
+                    <div class="portfolio-trader-name">${escapeHtml(username)}</div>
+                    <div class="portfolio-trader-since">Following since ${new Date(getTraderWatchlist().find(t=>t.username===username)?.followedAt||Date.now()).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>
+                </div>
+            </div>
+            <div class="portfolio-trader-stats-grid">
+                <div class="portfolio-stat">
+                    <div class="portfolio-stat-label">Return</div>
+                    <div class="portfolio-stat-value ${retClass}">${retSign}${returnPct.toFixed(1)}%</div>
+                </div>
+                <div class="portfolio-stat">
+                    <div class="portfolio-stat-label">Portfolio Value</div>
+                    <div class="portfolio-stat-value">$${totalValue.toLocaleString('en-US',{maximumFractionDigits:0})}</div>
+                </div>
+                <div class="portfolio-stat">
+                    <div class="portfolio-stat-label">P&amp;L</div>
+                    <div class="portfolio-stat-value ${gainLoss>=0?'up':'down'}">${gainSign}$${Math.abs(gainLoss).toLocaleString('en-US',{maximumFractionDigits:0})}</div>
+                </div>
+                <div class="portfolio-stat">
+                    <div class="portfolio-stat-label">Starting Capital</div>
+                    <div class="portfolio-stat-value">$${startVal.toLocaleString('en-US',{maximumFractionDigits:0})}</div>
+                </div>
+            </div>
+            <div class="portfolio-activity-section">
+                <div class="portfolio-activity-title">Trade Notifications</div>
+                <div class="portfolio-activity-info">You'll be notified here when ${escapeHtml(username)} opens or closes a position.</div>
+                <div class="portfolio-notification-placeholder">No recent activity</div>
+            </div>
+            <button class="trader-profile-follow-btn following" onclick="toggleFollowTrader('${username}', ${returnPct}, ${totalValue}); renderPortfolioModal();">
+                ★ Unfollow Trader
+            </button>
+        </div>
+    `;
 }

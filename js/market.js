@@ -96,7 +96,11 @@ function updatePriceCache(symbol, newPrice, symbolType = 'tea') {
     }
     const data = state.priceDataCache.data[cacheKey];
 
-    // If cache is empty, seed it with the first candle
+    // If cache is empty, seed it with the first live-tick candle.
+    // Do NOT set lastUpdate here — that field is reserved for DB loads.
+    // Leaving it unset forces getPriceHistory to still do its DB query
+    // even though we have a single seeded candle, so historical data
+    // is loaded correctly (fixing blank charts on first card click).
     if (data.length === 0) {
         const now = new Date();
         data.push({
@@ -107,7 +111,6 @@ function updatePriceCache(symbol, newPrice, symbolType = 'tea') {
             close: newPrice,
             volume: 0
         });
-        state.priceDataCache.lastUpdate[cacheKey] = Date.now();
         if (symbolType === 'index') {
             state.indexHistoricalData[symbol] = data;
         } else {
@@ -384,6 +387,7 @@ function updateAllMarketIndexes() {
         const chg = Number(state.mainChartData.change) || 0;
         const changeVal = chg >= 0 ? '+' : '';
         changeEl.textContent = `${changeVal}${chg.toFixed(1)}%`;
+        changeEl.style.color = chg >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
     }
 
     // Update market cards
@@ -421,7 +425,7 @@ function swapChartIndex(cardIndex) {
     chartSection.style.transform = 'scale(0.98)';
 
     setTimeout(() => {
-        state.mainChartData = { ...clickedCardData };
+        state.mainChartData = { ...clickedCardData, isIndex: true, isTea: false };
         const titleEl = document.getElementById('main-chart-title');
         if (titleEl) titleEl.textContent = state.mainChartData.name;
         const priceEl = document.getElementById('main-chart-price');
@@ -433,7 +437,10 @@ function swapChartIndex(cardIndex) {
 
         const chg = Number(state.mainChartData.change) || 0;
         const mainChangeEl = document.getElementById('main-chart-change');
-        if (mainChangeEl) mainChangeEl.textContent = `${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%`;
+        if (mainChangeEl) {
+            mainChangeEl.textContent = `${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%`;
+            mainChangeEl.style.color = chg >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+        }
         const volEl = document.getElementById('main-chart-volume');
         if (volEl) volEl.textContent = state.mainChartData.volume || '';
 
@@ -451,6 +458,8 @@ function swapChartIndex(cardIndex) {
 
         state.cachedTimeframe = null;
         state.chartData = [];
+        // Clear Y-axis cache so the new instrument rescales from its own data
+        if (window.mainYAxisCache) window.mainYAxisCache = {};
         drawChart();
 
         chartSection.style.opacity = '1';
@@ -513,8 +522,9 @@ function updateMainChartWithRealData() {
 
         const changeEl = document.getElementById('main-chart-change');
         if (changeEl) {
-            const changeVal = kenyaIndex.change >= 0 ? '+' : '';
-            changeEl.textContent = `${changeVal}${kenyaIndex.change.toFixed(2)}%`;
+            const chg = kenyaIndex.change;
+            changeEl.textContent = `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`;
+            changeEl.style.color = chg >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
         }
 
         // Force chart redraw with latest data
@@ -657,7 +667,67 @@ function startTickerSubscription() {
     // Subscribe to macro indicator updates
     state.macroSubscription = subscribeToMacro(handleMacroUpdate);
 
-    console.log('Realtime ticker subscriptions started');
+    // Subscribe to live order-flow / market depth updates
+    state.pressureSubscription = subscribeToMarketPressure(handleMarketPressureUpdate);
+
+    // Seed depth bars immediately from DB snapshot (don't wait for first trade)
+    loadMarketPressure();
+
+    console.log('Realtime ticker subscriptions started (prices + macro + order flow)');
+}
+
+/**
+ * Called whenever the market_pressure table row for any symbol changes.
+ * Fires within ~100ms of a trade insert — much faster than the 5-min cron.
+ *
+ * Updates state.marketPressure and immediately redraws the market depth bars.
+ */
+function handleMarketPressureUpdate(payload) {
+    const row = payload.new;
+    if (!row || !row.symbol) return;
+
+    state.marketPressure[row.symbol] = {
+        buy5m:        Number(row.buy_volume_5m)   || 0,
+        sell5m:       Number(row.sell_volume_5m)  || 0,
+        buy30m:       Number(row.buy_volume_30m)  || 0,
+        sell30m:      Number(row.sell_volume_30m) || 0,
+        tradeCount5m: Number(row.trade_count_5m)  || 0,
+        tradeCount30m:Number(row.trade_count_30m) || 0,
+        lastSide:     row.last_side,
+        lastQty:      Number(row.last_qty)         || 0,
+        updatedAt:    row.updated_at,
+    };
+
+    // Immediately redraw market depth — this fires on every trade
+    if (typeof updateMarketDepth === 'function') updateMarketDepth();
+}
+
+/**
+ * Seed state.marketPressure from the DB on page load so depth bars
+ * show real data before the first Realtime event arrives.
+ */
+async function loadMarketPressure() {
+    try {
+        const { data, error } = await apiFetchMarketPressure();
+        if (error || !data) return;
+        data.forEach(row => {
+            state.marketPressure[row.symbol] = {
+                buy5m:         Number(row.buy_volume_5m)   || 0,
+                sell5m:        Number(row.sell_volume_5m)  || 0,
+                buy30m:        Number(row.buy_volume_30m)  || 0,
+                sell30m:       Number(row.sell_volume_30m) || 0,
+                tradeCount5m:  Number(row.trade_count_5m)  || 0,
+                tradeCount30m: Number(row.trade_count_30m) || 0,
+                lastSide:      row.last_side,
+                lastQty:       Number(row.last_qty)         || 0,
+                updatedAt:     row.updated_at,
+            };
+        });
+        console.log(`📊 Market pressure seeded for ${data.length} symbol(s)`);
+        if (typeof updateMarketDepth === 'function') updateMarketDepth();
+    } catch (e) {
+        console.warn('Could not load initial market pressure:', e.message);
+    }
 }
 
 /**
@@ -677,6 +747,20 @@ async function loadMarketState() {
                     state.macroIndicators[row.key] = row.value;
                 }
             });
+
+            // Snapshot the DB values as the session baseline.
+            // The live forex feed will overwrite macroIndicators with fresh rates;
+            // the % change shown in the macro panel will reflect drift vs the
+            // last server tick rather than always showing 0%.
+            const forexKeys = ['usd_kes', 'usd_inr', 'usd_lkr', 'usd_cny', 'brent_crude'];
+            const baseline = {};
+            forexKeys.forEach(k => {
+                const v = Number(state.macroIndicators[k]);
+                if (!isNaN(v) && v > 0) baseline[k] = v;
+            });
+            if (Object.keys(baseline).length > 0) {
+                state.macroBaseline = baseline;
+            }
         }
         // Render initial values
         if (typeof updateMacroIndicators === 'function') updateMacroIndicators();
@@ -685,6 +769,98 @@ async function loadMarketState() {
     } catch (e) {
         console.error('Failed to load market state:', e);
     }
+}
+
+// =============================================
+// LIVE FOREX FEED (browser-direct, no cron dependency)
+// =============================================
+
+/**
+ * Fetch the latest forex rates directly from the open exchange rate API.
+ * Runs on page load and every FOREX_REFRESH_MS milliseconds.
+ * This keeps macro indicators live independently of the server cron.
+ * On the first successful call the values are snapshotted as
+ * state.macroBaseline so the macro panel can show a meaningful
+ * "change since session start" percentage.
+ */
+const FOREX_REFRESH_MS = 60_000; // 1 minute — free tier limit
+let _forexRefreshTimer = null;
+
+async function fetchLiveForex() {
+    try {
+        const resp = await fetch('https://open.er-api.com/v6/latest/USD');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (data.result !== 'success' || !data.rates) throw new Error('bad shape');
+
+        const r = data.rates;
+        const incoming = {
+            usd_kes: r.KES,
+            usd_inr: r.INR,
+            usd_lkr: r.LKR,
+            usd_cny: r.CNY,
+        };
+
+        Object.entries(incoming).forEach(([key, val]) => {
+            if (val != null && !isNaN(val)) state.macroIndicators[key] = val;
+        });
+
+        if (typeof updateMacroIndicators === 'function') updateMacroIndicators();
+        if (typeof updateGlobalTicker    === 'function') updateGlobalTicker();
+        console.log(`💱 Live forex: KES ${r.KES?.toFixed(2)} | INR ${r.INR?.toFixed(2)} | LKR ${r.LKR?.toFixed(2)} | CNY ${r.CNY?.toFixed(4)}`);
+    } catch (e) {
+        console.warn('Live forex fetch failed (will retry):', e.message);
+    }
+}
+
+/**
+ * Fetch a live Brent crude price from Yahoo Finance chart API.
+ * Falls back to the last DB value if unavailable.
+ */
+async function fetchLiveBrent() {
+    try {
+        const url = 'https://query1.finance.yahoo.com/v8/finance/chart/BZ=F?interval=1d&range=5d';
+        const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+        if (!price || isNaN(price)) throw new Error('no price');
+
+        state.macroIndicators['brent_crude'] = price;
+
+        if (typeof updateMacroIndicators === 'function') updateMacroIndicators();
+        if (typeof updateGlobalTicker    === 'function') updateGlobalTicker();
+        console.log(`🛢️  Live Brent crude: $${price.toFixed(2)}/bbl`);
+
+        // Cache 5-day close history for the popout sparkline
+        const result = data?.chart?.result?.[0];
+        const timestamps = result?.timestamp ?? [];
+        const closes     = result?.indicators?.quote?.[0]?.close ?? [];
+        if (timestamps.length > 0 && closes.length > 0) {
+            const history = timestamps.map((ts, i) => ({
+                date: new Date(ts * 1000).toISOString().split('T')[0],
+                rate: closes[i] ?? null
+            })).filter(d => d.rate != null);
+            // Store in macro-popout cache so the sparkline picks it up
+            if (typeof _macroHistoryCache !== 'undefined') {
+                _macroHistoryCache['brent_crude'] = { fetchedAt: Date.now(), history };
+            }
+        }
+    } catch (e) {
+        console.warn('Live Brent fetch failed (will use DB value):', e.message);
+    }
+}
+
+function startLiveForexFeed() {
+    // Fetch forex and Brent concurrently on start
+    fetchLiveForex();
+    fetchLiveBrent();
+    clearInterval(_forexRefreshTimer);
+    _forexRefreshTimer = setInterval(() => {
+        fetchLiveForex();
+        fetchLiveBrent();
+    }, FOREX_REFRESH_MS);
+    console.log(`💱 Live forex + Brent feed started (refreshes every ${FOREX_REFRESH_MS / 1000}s)`);
 }
 
 // =============================================

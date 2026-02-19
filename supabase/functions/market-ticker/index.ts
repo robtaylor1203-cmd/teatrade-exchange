@@ -11,60 +11,230 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-// H2 FIX: Shared secret for ticker invocations (set via: supabase secrets set TICKER_SECRET=your_secret)
+// H2 FIX: Shared secret for ticker invocations
 const TICKER_SECRET = Deno.env.get('TICKER_SECRET') ?? ''
 
 // ── CONFIGURATION ─────────────────────────────────────────────────────────────
 
-// API key loaded from Supabase secrets (set via: supabase secrets set ALPHA_KEY=your_key)
-const ALPHA_KEY = Deno.env.get('ALPHA_KEY') ?? '';
+const FOREX_BASELINES: Record<string, number> = {
+  USD_KES: 129.45,
+  USD_INR: 87.50,
+  USD_LKR: 305.00,
+  USD_CNY: 7.20,
+};
+const BRENT_BASELINE = 82.50;
 
-// ── HELPER FUNCTIONS ──────────────────────────────────────────────────────────
+// ── ORDER FLOW MARKET IMPACT MODEL ───────────────────────────────────────────
+//
+// Model: Kyle's Lambda with tanh bounding
+//
+// Background:
+//   In a real exchange, buy/sell imbalance moves prices. If more traders are
+//   buying than selling, dealers must raise their ask to attract more sellers;
+//   if more are selling, bids are lowered to attract buyers. This is called
+//   "market impact" or "price discovery from order flow".
+//
+// Our implementation:
+//   1. Look back FLOW_WINDOW_MS (30 min) at all trades on the platform.
+//   2. For each symbol: net_flow_kg = Σ buy_qty − Σ sell_qty
+//   3. Normalise by FLOW_REFERENCE_VOL (5,000 kg = "a typical active 30 min").
+//      raw_impact = net_flow_kg / FLOW_REFERENCE_VOL
+//   4. Smooth & bound with tanh():
+//      tanh(1.0) ≈ 0.76  → moderate pressure
+//      tanh(3.0) ≈ 0.995 → near-maximum pressure
+//      This prevents coordinated large orders from creating extreme spikes.
+//   5. Scale to MAX_FLOW_IMPACT (±2% per tick at full pressure).
+//   6. Multiply into the existing price as a final adjustment layer.
+//
+// Self-correcting property (no extra code needed):
+//   Because we only look at the last 30 minutes, flow pressure fades
+//   automatically. If buying stops, the effect decays to zero within
+//   the window — built-in mean reversion without any explicit reversion code.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
+// "Normal" trade volume per symbol within the look-back window.
+// If net 5,000 kg of buy orders arrive in 30 minutes, that represents
+// full buying pressure (~tanh input of 1.0 → ~76% of max impact).
+const FLOW_REFERENCE_VOL = 5_000;   // kg
+
+// How far back to look at trades
+const FLOW_WINDOW_MS = 30 * 60_000; // 30 minutes
+
+// Maximum price move per tick attributable to order flow (on top of
+// forex/seasonal/noise effects). ±2% is aggressive for tea; keeps the
+// market responsive to large user activity without being gameable.
+const MAX_FLOW_IMPACT = 0.02;
+
+// Weight blended between order flow and the external-factor price.
+// 1.0 = full order flow influence; 0.0 = order flow disabled.
+const FLOW_WEIGHT = 1.0;
 
 /**
- * Fetches real-time forex data from AlphaVantage.
- * Returns null if API limit is reached or error occurs.
+ * Hyperbolic tangent — smooth S-curve mapping any real number to (-1, +1).
+ * Used to bound raw order flow impact regardless of trade volume magnitude.
+ * Native Math.tanh exists in modern JS; this is a safe polyfill.
  */
-async function fetchRealForex(fromCurrency: string, toCurrency: string) {
+function tanh(x: number): number {
+  if (x > 20) return 1;
+  if (x < -20) return -1;
+  const e2x = Math.exp(2 * x);
+  return (e2x - 1) / (e2x + 1);
+}
+
+/**
+ * Fetch net order flow (buy_kg − sell_kg) per symbol for the last
+ * FLOW_WINDOW_MS. Returns a map: { symbol → net_volume_kg }.
+ * Positive values = net buying pressure; negative = net selling pressure.
+ *
+ * Covers both tea trades (looked up via tea_id → symbol) and direct
+ * index trades (stored as index_symbol text).
+ */
+async function fetchOrderFlow(
+  supabase: ReturnType<typeof createClient>,
+  teas: Array<{ id: string; symbol: string }>
+): Promise<Record<string, number>> {
+  const since = new Date(Date.now() - FLOW_WINDOW_MS).toISOString();
+
+  // Build reverse map: tea UUID → symbol string
+  const teaIdToSymbol: Record<string, string> = {};
+  for (const tea of teas) {
+    teaIdToSymbol[tea.id] = tea.symbol;
+  }
+
+  const { data: recentTrades, error } = await supabase
+    .from('trades')
+    .select('tea_id, index_symbol, side, quantity')
+    .gte('created_at', since)
+    .not('side', 'is', null);
+
+  if (error || !recentTrades) {
+    console.warn('⚠️  Order flow fetch failed:', error?.message);
+    return {};
+  }
+
+  const flowMap: Record<string, number> = {};
+
+  for (const trade of recentTrades) {
+    const symbol = trade.tea_id
+      ? teaIdToSymbol[trade.tea_id]
+      : trade.index_symbol;
+    if (!symbol) continue;
+
+    const qty = Number(trade.quantity) || 0;
+    if (qty <= 0) continue;
+
+    flowMap[symbol] = (flowMap[symbol] ?? 0) + (trade.side === 'BUY' ? qty : -qty);
+  }
+
+  const active = Object.entries(flowMap).filter(([, v]) => v !== 0);
+  if (active.length > 0) {
+    const summary = active
+      .map(([s, v]) => `${s}:${v >= 0 ? '+' : ''}${v.toFixed(0)}kg`)
+      .join('  ');
+    console.log(`🔄 Order flow (30m): ${summary}`);
+  } else {
+    console.log('🔄 Order flow (30m): no user activity — external model only');
+  }
+
+  return flowMap;
+}
+
+// ── VOLATILITY & SEASONALITY MODEL ───────────────────────────────────────────
+
+function gaussianRandom(): number {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+}
+
+/**
+ * Per-tick volatility (σ_tick) — intentionally small.
+ * Tea is not an equity; realistic weekly move target is ±1–3%.
+ */
+const TICK_VOL: Record<string, number> = {
+  USD_KES: 0.0008,
+  USD_INR: 0.0007,
+  USD_LKR: 0.0010,
+  USD_CNY: 0.0005,
+};
+const DEFAULT_TICK_VOL = 0.0008;
+
+function getSeasonalFactor(currencyPair: string, symbol: string): number {
+  const month = new Date().getUTCMonth() + 1;
+
+  if (symbol === 'IND-DRJ') {
+    if (month >= 3 && month <= 5) return 1.18;
+    if (month >= 6 && month <= 8) return 1.07;
+    if (month >= 9 && month <= 11) return 1.03;
+    return 0.95;
+  }
+  if (symbol === 'IND-ASM') {
+    if (month >= 4 && month <= 5) return 1.04;
+    if (month >= 6 && month <= 9) return 0.96;
+    return 1.0;
+  }
+  if (currencyPair === 'USD_KES') {
+    if (month >= 1 && month <= 4) return 1.04;
+    if (month >= 7 && month <= 11) return 0.96;
+    return 1.01;
+  }
+  if (currencyPair === 'USD_LKR') {
+    if (month >= 1 && month <= 3) return 1.06;
+    if (month >= 7 && month <= 9) return 0.97;
+    return 1.01;
+  }
+  if (currencyPair === 'USD_CNY') {
+    if (month === 12 || month === 1) return 1.07;
+    if (month >= 4 && month <= 6)   return 1.03;
+    return 1.0;
+  }
+  return 1.0;
+}
+
+function getBrentImpact(brentPrice: number): number {
+  const deviation = (brentPrice - BRENT_BASELINE) / BRENT_BASELINE;
+  return -(deviation * 0.12);
+}
+
+// ── LIVE DATA HELPERS ─────────────────────────────────────────────────────────
+
+async function fetchAllForexRates(): Promise<Record<string, number> | null> {
   try {
-    console.log(`🌐 Connecting to AlphaVantage: ${fromCurrency}/${toCurrency}...`);
-    const url = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${fromCurrency}&to_currency=${toCurrency}&apikey=${ALPHA_KEY}`;
-    
-    const resp = await fetch(url);
+    const resp = await fetch('https://open.er-api.com/v6/latest/USD');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
-    
-    // Check if we got a valid rate
-    if (data["Realtime Currency Exchange Rate"]) {
-      const rate = parseFloat(data["Realtime Currency Exchange Rate"]["5. Exchange Rate"]);
-      console.log(`✅ LIVE DATA: ${fromCurrency}/${toCurrency} = ${rate}`);
-      return rate;
-    } 
-    // Check if we hit the limit (Standard AlphaVantage message)
-    else if (data["Note"] && data["Note"].includes("call frequency")) {
-      console.log("⚠️ API LIMIT REACHED: Switching to Simulation Mode.");
-      return null;
-    }
-    else {
-      console.log(`⚠️ API UNAVAILABLE: ${JSON.stringify(data)}`);
-      return null;
-    }
+    if (data.result !== 'success' || !data.rates) throw new Error('Bad response shape');
+    console.log(`✅ LIVE FOREX: fetched ${Object.keys(data.rates).length} pairs`);
+    return data.rates;
   } catch (err) {
-    console.error(`❌ NETWORK ERROR: ${err.message}`);
+    console.warn(`⚠️  Forex API unavailable: ${err.message} — using simulation`);
     return null;
   }
 }
 
-/**
- * Math Simulation Fallback
- * Used when API limit is hit to keep the exchange moving.
- */
-function simulateTick(baseline: number, volatility: number) {
-  // Random drift between -0.5 and +0.5 * volatility factor
-  const drift = (Math.random() - 0.5) * volatility;
-  return baseline + drift;
+async function fetchBrentCrude(): Promise<number | null> {
+  try {
+    const url = 'https://query1.finance.yahoo.com/v8/finance/chart/BZ=F?interval=1d&range=1d';
+    const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+    if (!price || isNaN(price)) throw new Error('No price in response');
+    console.log(`✅ LIVE BRENT: $${price}/bbl`);
+    return price;
+  } catch (err) {
+    console.warn(`⚠️  Brent API unavailable: ${err.message} — using simulation`);
+    return null;
+  }
 }
 
-// M6 FIX: Idempotency guard — minimum interval between ticks (ms).
+function simulateTick(baseline: number, volatility: number) {
+  return parseFloat((baseline + (Math.random() - 0.5) * volatility).toFixed(4));
+}
+
+// M6 FIX: Idempotency guard
 const MIN_TICK_INTERVAL_MS = 10_000;
 let lastTickTimestamp = 0;
 
@@ -74,230 +244,243 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    // H2 FIX: Require shared secret or Supabase service-role auth
+    // H2 FIX: Auth check
     if (TICKER_SECRET) {
       const reqSecret = req.headers.get('x-ticker-secret') ?? ''
       const authHeader = req.headers.get('Authorization') ?? ''
       const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-
-      const isSecretValid = reqSecret === TICKER_SECRET
-      const isServiceRole = authHeader === `Bearer ${serviceKey}`
-
-      if (!isSecretValid && !isServiceRole) {
-        return new Response(JSON.stringify({ error: 'Unauthorized: invalid ticker secret' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401,
+      if (reqSecret !== TICKER_SECRET && authHeader !== `Bearer ${serviceKey}`) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401,
         })
       }
     }
 
-    // M6 FIX: Reject duplicate invocations within the cooldown window.
+    // Duplicate-tick guard
     const now = Date.now();
     if (now - lastTickTimestamp < MIN_TICK_INTERVAL_MS) {
       return new Response(JSON.stringify({
-        success: false,
-        error: 'duplicate_tick',
-        message: `Tick already processed ${Math.round((now - lastTickTimestamp) / 1000)}s ago. Min interval: ${MIN_TICK_INTERVAL_MS / 1000}s.`,
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 429,
-      })
+        success: false, error: 'duplicate_tick',
+        message: `Too soon. Min interval: ${MIN_TICK_INTERVAL_MS / 1000}s.`,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 429 })
     }
     lastTickTimestamp = now;
 
-    // 1. Initialize Supabase Admin (Auto-detects Service Key)
+    // 1. Supabase admin client
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 2. DETERMINE MARKET RATES (Hybrid Strategy)
-    let sourceStatus = "SIMULATED";
-    
-    // Default Anchors (Used if API fails)
-    let rates = {
-      'USD_KES': 129.45,
-      'USD_INR': 87.50,
-      'USD_LKR': 305.00,
-      'USD_CNY': 7.20
-    };
-
-    // Attempt to fetch KES (The Driver)
-    // We only fetch ONE pair to save your 25 daily credits.
-    const realKes = await fetchRealForex("USD", "KES");
-    
-    if (realKes) {
-      rates['USD_KES'] = realKes;
-      sourceStatus = "LIVE_API";
-      
-      // Since we are saving API credits, we simulate the others relative to their baselines
-      rates['USD_INR'] = simulateTick(87.50, 0.25); 
-      rates['USD_LKR'] = simulateTick(305.00, 1.50);
-      rates['USD_CNY'] = simulateTick(7.20, 0.02);
-      
-    } else {
-      // FULL SIMULATION MODE (Fallback when limit hit)
-      rates['USD_KES'] = simulateTick(129.45, 0.45);
-      rates['USD_INR'] = simulateTick(87.50, 0.25);
-      rates['USD_LKR'] = simulateTick(305.00, 2.00); 
-      rates['USD_CNY'] = simulateTick(7.20, 0.03);
-    }
-
-    // 3. UPDATE MARKET STATE (For the Frontend Ticker)
-    await supabase.from('market_state').upsert([
-      { key: 'usd_kes', value: rates['USD_KES'] },
-      { key: 'usd_inr', value: rates['USD_INR'] },
-      { key: 'usd_lkr', value: rates['USD_LKR'] },
-      { key: 'usd_cny', value: rates['USD_CNY'] },
-      { key: 'data_source', value: sourceStatus }, 
-      { key: 'last_tick', value: new Date().toISOString() }
+    // 2. Fetch market data + order flow in parallel to minimise latency
+    const [liveRates, liveBrent, teasResult] = await Promise.all([
+      fetchAllForexRates(),
+      fetchBrentCrude(),
+      supabase.from('teas').select('*'),
     ]);
 
-    // 4. UPDATE TEA PRICES
-    const { data: teas } = await supabase.from('teas').select('*');
+    const teas = teasResult.data ?? [];
+
+    // 3. Fetch order flow (needs teas for id→symbol map, so slightly after)
+    const orderFlow = await fetchOrderFlow(supabase, teas);
+
+    let sourceStatus = 'SIMULATED';
+
+    const pick = (liveKey: string, fallback: number, vol: number): number =>
+      liveRates?.[liveKey] != null ? liveRates[liveKey] : simulateTick(fallback, vol);
+
+    const rates = {
+      USD_KES: pick('KES', FOREX_BASELINES.USD_KES, 0.45),
+      USD_INR: pick('INR', FOREX_BASELINES.USD_INR, 0.25),
+      USD_LKR: pick('LKR', FOREX_BASELINES.USD_LKR, 2.00),
+      USD_CNY: pick('CNY', FOREX_BASELINES.USD_CNY, 0.03),
+    };
+
+    const brentPrice = liveBrent ?? simulateTick(BRENT_BASELINE, 0.35);
+
+    if (liveRates) sourceStatus = liveBrent ? 'LIVE_FULL' : 'LIVE_FOREX';
+
+    console.log(`📊 Rates — KES:${rates.USD_KES.toFixed(2)} INR:${rates.USD_INR.toFixed(2)} BRENT:${brentPrice.toFixed(2)}`);
+
+    // 4. Update market_state for the frontend ticker
+    await supabase.from('market_state').upsert([
+      { key: 'usd_kes',     value: rates.USD_KES   },
+      { key: 'usd_inr',     value: rates.USD_INR   },
+      { key: 'usd_lkr',     value: rates.USD_LKR   },
+      { key: 'usd_cny',     value: rates.USD_CNY   },
+      { key: 'brent_crude', value: brentPrice       },
+      { key: 'data_source', value: sourceStatus     },
+      { key: 'last_tick',   value: new Date().toISOString() },
+    ]);
+
+    // 5. Compute new prices for all teas
     const updates = [];
     const timestamp = new Date().toISOString();
 
-    if (teas) {
-      for (const tea of teas) {
-        // Guard: skip teas with missing or invalid anchor/forex data
-        if (!tea.anchor_price || tea.anchor_price <= 0) continue;
-        if (!tea.reference_forex || tea.reference_forex <= 0) {
-          console.warn(`⚠️ Skipping ${tea.symbol}: invalid reference_forex (${tea.reference_forex})`);
-          continue;
-        }
-
-        // Identify Driver
-        const pair = tea.currency_pair || 'USD_KES';
-        const liveRate = rates[pair] || rates['USD_KES'];
-
-        const forexDriftPct = (liveRate - tea.reference_forex) / tea.reference_forex;
-        const beta = tea.beta || 1.0;
-        const newPrice = tea.anchor_price * (1 + (forexDriftPct * beta));
-
-        // Guard: reject NaN, Infinity, negative, or extreme prices
-        if (!isFinite(newPrice) || newPrice <= 0) {
-          console.error(`❌ Rejected invalid price for ${tea.symbol}: ${newPrice} (anchor=${tea.anchor_price}, drift=${forexDriftPct}, beta=${beta})`);
-          continue;
-        }
-        // Guard: cap at reasonable tea price range ($0.01 – $500/kg)
-        if (newPrice < 0.01 || newPrice > 500) {
-          console.warn(`⚠️ Price out of bounds for ${tea.symbol}: $${newPrice.toFixed(4)} — clamping`);
-          continue;
-        }
-
-        updates.push({
-          symbol: tea.symbol,
-          current_price: newPrice,
-          last_update: timestamp
-        });
+    for (const tea of teas) {
+      if (!tea.anchor_price || tea.anchor_price <= 0) continue;
+      if (!tea.reference_forex || tea.reference_forex <= 0) {
+        console.warn(`⚠️  Skipping ${tea.symbol}: invalid reference_forex`);
+        continue;
       }
 
-      // 5. COMMIT UPDATES (update live prices on teas table)
-      for (const update of updates) {
-        await supabase.from('teas')
-          .update({ current_price: update.current_price, last_update: update.last_update })
-          .eq('symbol', update.symbol);
+      const rawPair = (tea.currency_pair || 'usd_kes').toUpperCase();
+      const liveRate = rates[rawPair] ?? rates['USD_KES'];
+
+      // ── Layer 1: Macro / external factors ──────────────────────────────
+      // Forex drift: how much has the currency moved from reference?
+      // Capped at ±3% total forex contribution regardless of drift magnitude.
+      const rawForexDrift = (liveRate - tea.reference_forex) / tea.reference_forex;
+      const beta = Math.min(tea.beta || 1.0, 2.0);
+      const forexEffect = Math.max(-0.03, Math.min(0.03, rawForexDrift * beta));
+      const forexAdjusted = tea.anchor_price * (1 + forexEffect);
+
+      // Seasonal harvest calendar
+      const seasonal = getSeasonalFactor(rawPair, tea.symbol);
+
+      // Brent crude shipping-cost pass-through (inverse, dampened)
+      const brentEffect = getBrentImpact(brentPrice);
+
+      // Gaussian noise — realistic commodity tick-level movement
+      const σ = TICK_VOL[rawPair] ?? DEFAULT_TICK_VOL;
+      const noise = gaussianRandom() * σ;
+
+      // Combined external-factor price (same formula as before adding flow)
+      const externalPrice = forexAdjusted * seasonal * (1 + noise) * (1 + brentEffect);
+
+      // ── Layer 2: Order Flow Market Impact ──────────────────────────────
+      //
+      // This is the new ecosystem layer.
+      //
+      // net_flow_kg: positive = more buying than selling in the last 30 min.
+      //              negative = more selling than buying.
+      //
+      // raw_impact: raw_impact = net_flow_kg / FLOW_REFERENCE_VOL
+      //   FLOW_REFERENCE_VOL = 5,000 kg.
+      //   Buying 5,000 kg net → raw_impact = 1.0
+      //   Buying 500 kg net  → raw_impact = 0.1 (small nudge)
+      //
+      // tanh(raw_impact): S-curve bounding to (-1, +1).
+      //   Ensures that a sudden surge of e.g. 100,000 kg buy orders
+      //   creates the same maximum impact as 15,000 kg — not a 20×
+      //   spike. This mirrors how real liquidity providers defend prices.
+      //
+      // flowEffect: the final price adjustment factor (bounded to ±2%).
+      //   Positive = price nudged up.   Negative = price nudged down.
+      //
+      const netFlowKg = (orderFlow[tea.symbol] ?? 0) * FLOW_WEIGHT;
+      const rawImpact = netFlowKg / FLOW_REFERENCE_VOL;
+      const boundedImpact = tanh(rawImpact);
+      const flowEffect = boundedImpact * MAX_FLOW_IMPACT;
+
+      // Final price: external model × (1 + order flow adjustment)
+      const newPrice = externalPrice * (1 + flowEffect);
+
+      // ── Validity guards ─────────────────────────────────────────────────
+      if (!isFinite(newPrice) || newPrice <= 0) {
+        console.error(`❌ Rejected invalid price for ${tea.symbol}: ${newPrice}`);
+        continue;
+      }
+      // Sanity: must stay within ±15% of anchor regardless of flow activity.
+      // Prevents coordinated manipulation driving prices to extreme levels.
+      if (newPrice < tea.anchor_price * 0.85 || newPrice > tea.anchor_price * 1.15) {
+        console.warn(`⚠️  ${tea.symbol} price $${newPrice.toFixed(4)} outside ±15% of anchor $${tea.anchor_price} — skipping`);
+        continue;
       }
 
-      // 6. RECORD PRICE HISTORY (immutable time-series for charts)
-      // Each tick creates one row per tea — this is the permanent record.
-      if (updates.length > 0) {
-        const historyRows = updates.map(u => ({
-          symbol: u.symbol,
-          price: u.current_price,
-          volume: 0,
-          recorded_at: timestamp
-        }));
+      if (flowEffect !== 0) {
+        console.log(`   ${tea.symbol}: flow ${netFlowKg >= 0 ? '+' : ''}${netFlowKg.toFixed(0)}kg → impact ${(flowEffect * 100).toFixed(3)}%`);
+      }
 
-        const { error: histError } = await supabase
-          .from('price_history')
-          .insert(historyRows);
+      updates.push({
+        symbol: tea.symbol,
+        current_price: newPrice,
+        last_update: timestamp
+      });
+    }
 
-        if (histError) {
-          console.error("price_history insert error:", histError.message);
-        } else {
-          console.log(`📈 Recorded ${historyRows.length} price points to history`);
+    // 6. Commit price updates
+    for (const update of updates) {
+      await supabase.from('teas')
+        .update({ current_price: update.current_price, last_update: update.last_update })
+        .eq('symbol', update.symbol);
+    }
+
+    // 7. Record price history (immutable time-series)
+    if (updates.length > 0) {
+      const historyRows = updates.map(u => ({
+        symbol: u.symbol,
+        price:  u.current_price,
+        volume: 0,
+        recorded_at: timestamp,
+        is_simulated: false,
+      }));
+
+      const { error: histError } = await supabase
+        .from('price_history')
+        .insert(historyRows);
+
+      if (histError) console.error('price_history insert error:', histError.message);
+      else console.log(`📈 Recorded ${historyRows.length} price points`);
+    }
+
+    // 8. Record composite index price history
+    if (updates.length > 0) {
+      const priceMap: Record<string, number> = {};
+      for (const u of updates) priceMap[u.symbol] = u.current_price;
+
+      const avgOf = (symbols: string[]): number | null => {
+        const prices = symbols.map(s => priceMap[s]).filter(p => p && p > 0);
+        if (!prices.length) return null;
+        return prices.reduce((a, b) => a + b, 0) / prices.length;
+      };
+
+      const indexDefs = [
+        { symbol: 'KENYA',   teas: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST'], multiplier: 1 },
+        { symbol: 'MOMBASA', teas: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST'], multiplier: 1 },
+        { symbol: 'KOLKATA', teas: ['IND-ASM', 'IND-DRJ'],             multiplier: 83 },
+        { symbol: 'COLOMBO', teas: ['SRI-BOP', 'SRI-PEK'],             multiplier: 1 },
+        { symbol: 'FUTURES', teas: ['KEN-BP1', 'IND-ASM', 'SRI-BOP', 'CHN-YUN', 'IND-DRJ'], multiplier: 1000 },
+      ];
+
+      const indexRows = [];
+      for (const def of indexDefs) {
+        const avg = avgOf(def.teas);
+        if (avg !== null) {
+          const ip = avg * def.multiplier;
+          if (isFinite(ip) && ip > 0)
+            indexRows.push({ symbol: def.symbol, price: ip, volume: 0, recorded_at: timestamp, is_simulated: false });
         }
       }
 
-      // 7. RECORD INDEX PRICE HISTORY
-      // Calculate composite index values from the freshly computed tea prices
-      // and write them to price_history so charts have persistent index data.
-      if (updates.length > 0) {
-        const priceMap: Record<string, number> = {};
-        for (const u of updates) {
-          priceMap[u.symbol] = u.current_price;
-        }
-
-        const avgOf = (symbols: string[]): number | null => {
-          const prices = symbols.map(s => priceMap[s]).filter(p => p && p > 0);
-          if (prices.length === 0) return null;
-          return prices.reduce((a, b) => a + b, 0) / prices.length;
-        };
-
-        const indexDefs: Array<{ symbol: string; teas: string[]; multiplier: number }> = [
-          { symbol: 'KENYA',   teas: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST'],                       multiplier: 1 },
-          { symbol: 'MOMBASA', teas: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST'],                       multiplier: 1 },
-          { symbol: 'KOLKATA', teas: ['IND-ASM', 'IND-DRJ'],                                    multiplier: 83 },
-          { symbol: 'COLOMBO', teas: ['SRI-BOP', 'SRI-PEK'],                                    multiplier: 1 },
-          { symbol: 'FUTURES', teas: ['KEN-BP1', 'IND-ASM', 'SRI-BOP', 'CHN-YUN', 'IND-DRJ'],  multiplier: 1000 },
-        ];
-
-        const indexRows = [];
-        for (const def of indexDefs) {
-          const avg = avgOf(def.teas);
-          if (avg !== null) {
-            const indexPrice = avg * def.multiplier;
-            if (isFinite(indexPrice) && indexPrice > 0) {
-              indexRows.push({
-                symbol: def.symbol,
-                price: indexPrice,
-                volume: 0,
-                recorded_at: timestamp,
-              });
-            }
-          }
-        }
-
-        if (indexRows.length > 0) {
-          const { error: idxHistErr } = await supabase
-            .from('price_history')
-            .insert(indexRows);
-
-          if (idxHistErr) {
-            console.error("index price_history insert error:", idxHistErr.message);
-          } else {
-            console.log(`📊 Recorded ${indexRows.length} index price points to history`);
-          }
-        }
+      if (indexRows.length > 0) {
+        const { error: idxErr } = await supabase.from('price_history').insert(indexRows);
+        if (idxErr) console.error('index history error:', idxErr.message);
+        else console.log(`📊 Recorded ${indexRows.length} index points`);
       }
     }
 
-    // 8. FILL PENDING LIMIT/STOP ORDERS
+    // 9. Fill any triggered pending limit / stop orders
     const { data: fillResult, error: fillErr } = await supabase.rpc('fill_pending_orders');
-    if (fillErr) {
-      console.error('fill_pending_orders error:', fillErr.message);
-    } else if (fillResult?.filled > 0) {
-      console.log(`🎯 Filled ${fillResult.filled} pending order(s)`);
-    }
+    if (fillErr) console.error('fill_pending_orders error:', fillErr.message);
+    else if (fillResult?.filled > 0) console.log(`🎯 Filled ${fillResult.filled} pending order(s)`);
 
-    return new Response(JSON.stringify({ 
-      success: true, 
+    return new Response(JSON.stringify({
+      success: true,
       source: sourceStatus,
-      rates: rates,
+      rates: { ...rates, brent_crude: brentPrice },
       updated_count: updates.length,
-      orders_filled: fillResult?.filled || 0
+      orders_filled: fillResult?.filled || 0,
+      flow_active_symbols: Object.keys(orderFlow).filter(k => orderFlow[k] !== 0).length,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
 
   } catch (error) {
-    console.error("CRITICAL ERROR:", error.message);
+    console.error('CRITICAL ERROR:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500,
     })
   }
 })

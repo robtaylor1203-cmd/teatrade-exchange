@@ -296,10 +296,12 @@ function switchToTea(symbol) {
         priceEl.textContent = `$${tea.current_price.toFixed(2)}`;
         priceEl.className = 'chart-stat-value ' + (change >= 0 ? 'up' : 'down');
 
-        const changeVal = change >= 0 ? '+' : '';
-        document.getElementById('main-chart-change').textContent = `${changeVal}${change.toFixed(2)}%`;
+        const changeEl = document.getElementById('main-chart-change');
+        changeEl.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+        changeEl.style.color = change >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
 
         state.cachedTimeframe = null;
+        if (window.mainYAxisCache) window.mainYAxisCache = {};
         state.chartData = getPriceHistorySync(tea.symbol, 'tea');
         drawChart();
 
@@ -343,10 +345,12 @@ function openIndexChart(indexSymbol) {
         priceEl.textContent = `$${idx.price.toFixed(2)}`;
         priceEl.className = 'chart-stat-value ' + (idx.change >= 0 ? 'up' : 'down');
 
-        const changeVal = idx.change >= 0 ? '+' : '';
-        document.getElementById('main-chart-change').textContent = `${changeVal}${idx.change.toFixed(2)}%`;
+        const idxChangeEl = document.getElementById('main-chart-change');
+        idxChangeEl.textContent = `${idx.change >= 0 ? '+' : ''}${idx.change.toFixed(2)}%`;
+        idxChangeEl.style.color = idx.change >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
 
         state.cachedTimeframe = null;
+        if (window.mainYAxisCache) window.mainYAxisCache = {};
         state.chartData = getPriceHistorySync(idx.symbol, 'index');
         drawChart();
 

@@ -362,6 +362,8 @@ async function closePosition(teaId, quantity, teaSymbol) {
         }, result.price);
 
         await loadPositions();
+        // Brief delay to allow DB write to propagate before re-fetching
+        await new Promise(r => setTimeout(r, 400));
         await loadUserTrades();
         updateUIForLoggedInUser();
 
@@ -413,8 +415,9 @@ async function closeIndexPosition(indexSymbol, quantity, tradeId) {
         const pnlText = pnl >= 0 ? `Profit: +$${pnl.toFixed(2)}` : `Loss: -$${Math.abs(pnl).toFixed(2)}`;
         showToast('Position Closed!', `Sold ${quantity.toLocaleString()} kg of ${indexSymbol} Index. ${pnlText}`);
 
-        // Refresh data
+        await loadPositions();
         await loadIndexPositions();
+        await new Promise(r => setTimeout(r, 400));
         await loadUserTrades();
         updateUIForLoggedInUser();
 
@@ -523,6 +526,9 @@ async function closePairPosition(tradeId) {
             created_at: trade.created_at
         }, currentRatio);
 
+        await loadPositions();
+        await loadIndexPositions();
+        await new Promise(r => setTimeout(r, 400));
         await loadUserTrades();
         updateUIForLoggedInUser();
 

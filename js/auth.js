@@ -26,6 +26,7 @@ async function checkAuthState() {
 
             await loadUserProfile();
             updateUIForLoggedInUser();
+            if (typeof startUserSubscriptions === 'function') startUserSubscriptions(user.id);
         } else {
             updateUIForLoggedOutUser();
         }
@@ -50,10 +51,16 @@ function closeAuthModal() {
 }
 
 function switchAuthTab(tab) {
-    document.getElementById('tab-signup').classList.toggle('active', tab === 'signup');
-    document.getElementById('tab-login').classList.toggle('active', tab === 'login');
-    document.getElementById('signup-form-container').style.display = tab === 'signup' ? 'block' : 'none';
-    document.getElementById('login-form-container').style.display = tab === 'login' ? 'block' : 'none';
+    const isSignup = tab === 'signup';
+    document.getElementById('tab-signup').classList.toggle('active', isSignup);
+    document.getElementById('tab-login').classList.toggle('active', !isSignup);
+    document.getElementById('tab-signup').setAttribute('aria-selected', isSignup);
+    document.getElementById('tab-login').setAttribute('aria-selected', !isSignup);
+    document.getElementById('signup-form-container').style.display = isSignup ? 'block' : 'none';
+    document.getElementById('login-form-container').style.display = isSignup ? 'none' : 'block';
+    // Move focus to first input in the active tab
+    const activeForm = isSignup ? 'signup-form-container' : 'login-form-container';
+    setTimeout(() => document.querySelector(`#${activeForm} input`)?.focus(), 50);
 }
 
 // =============================================
@@ -119,6 +126,7 @@ async function handleSignup(e) {
         state.currentUser = data.user;
         await loadUserProfile();
         updateUIForLoggedInUser();
+        if (typeof startUserSubscriptions === 'function') startUserSubscriptions(data.user.id);
         closeAuthModal();
 
         // C7 FIX: Prompt email verification
@@ -167,6 +175,7 @@ async function handleLogin(e) {
         } else {
             await loadUserProfile();
             updateUIForLoggedInUser();
+            if (typeof startUserSubscriptions === 'function') startUserSubscriptions(data.user.id);
             showToast('Welcome back!', `Good to see you, ${state.userProfile?.username || 'trader'}!`);
         }
 
@@ -184,6 +193,7 @@ async function handleLogout() {
     if (!confirm('Are you sure you want to log out?')) return;
 
     try {
+        if (typeof stopUserSubscriptions === 'function') stopUserSubscriptions();
         await supabaseClient.auth.signOut();
         state.currentUser = null;
         state.userProfile = null;
@@ -513,6 +523,7 @@ async function submitMfaChallenge() {
 
         await loadUserProfile();
         updateUIForLoggedInUser();
+        if (typeof startUserSubscriptions === 'function') startUserSubscriptions(state.currentUser.id);
         showToast('Welcome back!', `Good to see you, ${state.userProfile?.username || 'trader'}!`);
     } catch (err) {
         console.error('MFA challenge error:', err);
@@ -522,6 +533,59 @@ async function submitMfaChallenge() {
         btn.textContent = 'Verify';
     }
 }
+
+// =============================================
+// ACCESSIBILITY: FOCUS TRAP & KEYBOARD NAV
+// =============================================
+
+/**
+ * Trap focus within `containerEl` while modal is open.
+ * Returns a cleanup function to remove the listener.
+ */
+function trapFocus(containerEl) {
+    const focusable = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+    function handler(e) {
+        const els = Array.from(containerEl.querySelectorAll(focusable)).filter(el => !el.closest('[style*="display: none"]') && !el.closest('[style*="display:none"]'));
+        if (!els.length) return;
+        const first = els[0];
+        const last = els[els.length - 1];
+        if (e.key === 'Tab') {
+            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+    }
+    containerEl.addEventListener('keydown', handler);
+    return () => containerEl.removeEventListener('keydown', handler);
+}
+
+// Escape key closes open modals
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const authModal = document.getElementById('auth-modal');
+    if (authModal?.classList.contains('visible')) { closeAuthModal(); return; }
+    const mfaChallenge = document.getElementById('mfa-challenge-modal');
+    if (mfaChallenge?.classList.contains('visible')) { cancelMfaChallenge(); return; }
+    const mfaSetup = document.getElementById('mfa-setup-modal');
+    if (mfaSetup?.classList.contains('visible')) { closeMfaSetupModal(); return; }
+});
+
+// Wire focus traps when modals open
+const _openAuthModal = openAuthModal;
+openAuthModal = function() {
+    _openAuthModal();
+    const content = document.querySelector('#auth-modal .auth-content');
+    if (content) {
+        const cleanup = trapFocus(content);
+        const observer = new MutationObserver(() => {
+            if (!document.getElementById('auth-modal').classList.contains('visible')) {
+                cleanup(); observer.disconnect();
+            }
+        });
+        observer.observe(document.getElementById('auth-modal'), { attributes: true, attributeFilter: ['class'] });
+        // Move focus to first input
+        setTimeout(() => content.querySelector('input')?.focus(), 50);
+    }
+};
 
 // MFA code input: auto-submit on 6 digits + Enter key support
 document.addEventListener('DOMContentLoaded', () => {

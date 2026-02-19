@@ -189,6 +189,59 @@ async function apiFetchTradeById(tradeId) {
  * @returns {Promise<{data: Array|null, error: object|null}>}
  */
 async function apiFetchPriceHistory(symbol, limit, since) {
+    // For short timeframes (1D / 1W) a single DESC query is fine — live ticks
+    // are exactly what we want.
+    //
+    // For longer timeframes (1M / 3M / 1Y / ALL) the edge-function live ticks
+    // from this week would saturate the LIMIT and push the simulated historical
+    // daily records completely out of the result set.  We therefore run TWO
+    // parallel queries and merge:
+    //   A) All simulated rows in the window (at most ~365 per year — trivial)
+    //   B) The most-recent 500 live-tick rows (covers the last few days)
+
+    const recentCutoff = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString(); // 2 weeks
+    const useSplit = since && (new Date(Date.now()) - new Date(since)) > 14 * 24 * 3600 * 1000;
+
+    if (useSplit && supabaseClient.from) {
+        try {
+            const [histResult, liveResult] = await Promise.all([
+                // A: simulated historical rows for the full window
+                supabaseClient
+                    .from('price_history')
+                    .select('price, recorded_at, volume')
+                    .eq('symbol', symbol)
+                    .eq('is_simulated', true)
+                    .gte('recorded_at', since)
+                    .order('recorded_at', { ascending: true })
+                    .limit(2000),
+                // B: recent live rows (last 2 weeks, not simulated)
+                supabaseClient
+                    .from('price_history')
+                    .select('price, recorded_at, volume')
+                    .eq('symbol', symbol)
+                    .eq('is_simulated', false)
+                    .gte('recorded_at', recentCutoff)
+                    .order('recorded_at', { ascending: true })
+                    .limit(500),
+            ]);
+
+            if (histResult.error && liveResult.error) {
+                // Both failed — fall through to single query below
+            } else {
+                const hist = histResult.data || [];
+                const live = liveResult.data || [];
+                // Merge and sort by time
+                const merged = [...hist, ...live].sort(
+                    (a, b) => new Date(a.recorded_at) - new Date(b.recorded_at)
+                );
+                return { data: merged, error: null };
+            }
+        } catch (_) {
+            // Fall through to single query
+        }
+    }
+
+    // Default single-query path (short timeframes or split unavailable)
     let query = supabaseClient
         .from('price_history')
         .select('price, recorded_at, volume')
@@ -357,6 +410,43 @@ function subscribeToMacro(callback) {
 }
 
 /**
+ * Subscribe to real-time market_pressure updates.
+ * Fires within ~50-100 ms of every trade INSERT on the server.
+ * Each payload.new contains buy_volume_5m, sell_volume_5m,
+ * buy_volume_30m, sell_volume_30m, last_side, last_qty for one symbol.
+ */
+function subscribeToMarketPressure(callback) {
+    function create() {
+        if (state.pressureSubscription) {
+            try { supabaseClient.removeChannel(state.pressureSubscription); } catch (_) {}
+        }
+        state.pressureSubscription = supabaseClient
+            .channel('market:pressure')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'market_pressure'
+            }, (payload) => { callback(payload); })
+            .subscribe((status) => {
+                _handleChannelStatus(status, 'market:pressure', 'pressureRetries', create);
+            });
+        return state.pressureSubscription;
+    }
+    return create();
+}
+
+/**
+ * Fetch the current market_pressure snapshot for all symbols.
+ * Called once on startup so the depth bars are populated immediately
+ * rather than waiting for the first trade event.
+ */
+async function apiFetchMarketPressure() {
+    return supabaseClient
+        .from('market_pressure')
+        .select('*');
+}
+
+/**
  * Subscribe to chat messages with automatic reconnection.
  */
 function subscribeToChatMessages(callback) {
@@ -377,6 +467,171 @@ function subscribeToChatMessages(callback) {
     return create();
 }
 
+// =============================================
+// MULTI-TAB SYNC (Phase 4-18)
+// Realtime subscriptions for user-specific data
+// so that trades/positions update across all tabs.
+// =============================================
+
+/**
+ * Subscribe to position changes for the current user.
+ * Any INSERT/UPDATE/DELETE on positions triggers a full reload.
+ */
+function subscribeToPositions(userId) {
+    const key = 'positionsRetries';
+    if (!_realtimeState[key]) _realtimeState[key] = 0;
+
+    function create() {
+        if (state.positionsSubscription) {
+            try { supabaseClient.removeChannel(state.positionsSubscription); } catch (_) {}
+        }
+        state.positionsSubscription = supabaseClient
+            .channel(`user:positions:${userId}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'positions',
+                filter: `user_id=eq.${userId}`
+            }, async () => {
+                if (typeof loadPositions === 'function') await loadPositions();
+                if (typeof updatePortfolioDisplay === 'function') updatePortfolioDisplay();
+            })
+            .subscribe((status) => {
+                _handleChannelStatus(status, `positions:${userId.slice(0, 8)}`, key, create);
+            });
+        return state.positionsSubscription;
+    }
+    return create();
+}
+
+/**
+ * Subscribe to trade inserts for the current user.
+ * Any new trade triggers a reload of the orders table.
+ */
+function subscribeToTrades(userId) {
+    const key = 'tradesRetries';
+    if (!_realtimeState[key]) _realtimeState[key] = 0;
+
+    function create() {
+        if (state.tradesSubscription) {
+            try { supabaseClient.removeChannel(state.tradesSubscription); } catch (_) {}
+        }
+        state.tradesSubscription = supabaseClient
+            .channel(`user:trades:${userId}`)
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'trades',
+                filter: `user_id=eq.${userId}`
+            }, async () => {
+                if (typeof loadUserTrades === 'function') {
+                    await new Promise(r => setTimeout(r, 200));
+                    await loadUserTrades();
+                }
+            })
+            .subscribe((status) => {
+                _handleChannelStatus(status, `trades:${userId.slice(0, 8)}`, key, create);
+            });
+        return state.tradesSubscription;
+    }
+    return create();
+}
+
+/**
+ * Subscribe to balance/profile changes for the current user.
+ * Any UPDATE on profiles triggers a balance display refresh.
+ */
+function subscribeToProfile(userId) {
+    const key = 'profileRetries';
+    if (!_realtimeState[key]) _realtimeState[key] = 0;
+
+    function create() {
+        if (state.profileSubscription) {
+            try { supabaseClient.removeChannel(state.profileSubscription); } catch (_) {}
+        }
+        state.profileSubscription = supabaseClient
+            .channel(`user:profile:${userId}`)
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'profiles',
+                filter: `id=eq.${userId}`
+            }, async (payload) => {
+                if (payload.new && state.userProfile) {
+                    state.userProfile.cash_balance = payload.new.cash_balance;
+                    if (typeof updateUIForLoggedInUser === 'function') updateUIForLoggedInUser();
+                }
+            })
+            .subscribe((status) => {
+                _handleChannelStatus(status, `profile:${userId.slice(0, 8)}`, key, create);
+            });
+        return state.profileSubscription;
+    }
+    return create();
+}
+
+/**
+ * Subscribe to pending order fills for the current user.
+ */
+function subscribeToPendingOrders(userId) {
+    const key = 'ordersRetries';
+    if (!_realtimeState[key]) _realtimeState[key] = 0;
+
+    function create() {
+        if (state.pendingOrdersSubscription) {
+            try { supabaseClient.removeChannel(state.pendingOrdersSubscription); } catch (_) {}
+        }
+        state.pendingOrdersSubscription = supabaseClient
+            .channel(`user:orders:${userId}`)
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'pending_orders',
+                filter: `user_id=eq.${userId}`
+            }, async (payload) => {
+                if (payload.new?.status === 'FILLED') {
+                    const sym = payload.new.symbol;
+                    const side = payload.new.side;
+                    showToast('Order Filled!', `${side} ${sym} @ $${Number(payload.new.fill_price).toFixed(2)}`);
+                    if (typeof loadPositions === 'function') await loadPositions();
+                    if (typeof loadUserTrades === 'function') {
+                        await new Promise(r => setTimeout(r, 300));
+                        await loadUserTrades();
+                    }
+                }
+                if (typeof loadPendingOrders === 'function') loadPendingOrders();
+            })
+            .subscribe((status) => {
+                _handleChannelStatus(status, `orders:${userId.slice(0, 8)}`, key, create);
+            });
+        return state.pendingOrdersSubscription;
+    }
+    return create();
+}
+
+/**
+ * Start all user-specific Realtime subscriptions.
+ * Call this after login.
+ */
+function startUserSubscriptions(userId) {
+    subscribeToPositions(userId);
+    subscribeToTrades(userId);
+    subscribeToProfile(userId);
+    subscribeToPendingOrders(userId);
+}
+
+/**
+ * Tear down user-specific subscriptions on logout.
+ */
+function stopUserSubscriptions() {
+    ['positionsSubscription', 'tradesSubscription', 'profileSubscription', 'pendingOrdersSubscription'].forEach(key => {
+        if (state[key]) {
+            try { supabaseClient.removeChannel(state[key]); } catch (_) {}
+            state[key] = null;
+        }
+    });
+}
+
 /**
  * Re-establish all Realtime subscriptions after network recovery.
  * Called by the visibility/online event handlers.
@@ -387,6 +642,7 @@ function reconnectAllChannels() {
     _realtimeState.macroRetries = 0;
     _realtimeState.chatRetries = 0;
     if (typeof startTickerSubscription === 'function') startTickerSubscription();
+    if (state.currentUser) startUserSubscriptions(state.currentUser.id);
 }
 
 /**
@@ -532,3 +788,4 @@ async function apiFetchLeaderboard(limit) {
         .order('total_value', { ascending: false })
         .limit(limit || 10);
 }
+

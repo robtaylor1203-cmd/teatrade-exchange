@@ -14,6 +14,20 @@
  *   openPriceAlertModal
  */
 
+// Country prefix → flag emoji + display label
+const COUNTRY_MAP = {
+    KEN: { flag: '🇰🇪', label: 'Kenya'     },
+    CHN: { flag: '🇨🇳', label: 'China'     },
+    IND: { flag: '🇮🇳', label: 'India'     },
+    SRI: { flag: '🇱🇰', label: 'Sri Lanka' },
+    MLW: { flag: '🇲🇼', label: 'Malawi'    },
+    RWA: { flag: '🇷🇼', label: 'Rwanda'    },
+    UGA: { flag: '🇺🇬', label: 'Uganda'    },
+    TZA: { flag: '🇹🇿', label: 'Tanzania'  },
+    VIE: { flag: '🇻🇳', label: 'Vietnam'   },
+    JPN: { flag: '🇯🇵', label: 'Japan'     },
+};
+
 // =============================================
 // AUCTION TABLE
 // =============================================
@@ -341,67 +355,127 @@ function switchWatchlistTab(tab) {
 // =============================================
 
 function updateMarketDepth() {
-    // Derive bid/ask ratio from real tea price movements
-    // Count how many teas moved up vs down since last check
-    let ups = 0;
-    let downs = 0;
-    state.teas.forEach(tea => {
-        if (tea.previous_price && tea.current_price > tea.previous_price) ups++;
-        else if (tea.previous_price && tea.current_price < tea.previous_price) downs++;
-    });
-    const total = ups + downs;
-    if (total > 0) {
-        // Smooth towards new ratio
-        const targetBids = (ups / total) * 100;
-        state.marketDepthBids = state.marketDepthBids * 0.8 + targetBids * 0.2;
-    }
-    state.marketDepthBids = Math.max(25, Math.min(75, state.marketDepthBids));
-    const asks = 100 - state.marketDepthBids;
-
-    const bidsEl = document.getElementById('depth-bids');
-    const asksEl = document.getElementById('depth-asks');
+    const bidsEl  = document.getElementById('depth-bids');
+    const asksEl  = document.getElementById('depth-asks');
     const ratioEl = document.getElementById('depth-ratio');
+    if (!bidsEl || !asksEl) return;
 
-    if (bidsEl && asksEl) {
-        bidsEl.style.width = `${state.marketDepthBids}%`;
-        bidsEl.querySelector('.depth-label').textContent = `BIDS ${Math.round(state.marketDepthBids)}%`;
-        asksEl.style.width = `${asks}%`;
-        asksEl.querySelector('.depth-label').textContent = `ASKS ${Math.round(asks)}%`;
+    // Determine which symbol the user has focused (trade form or selected quote)
+    const select = document.getElementById('trade-tea-select');
+    const focusedSymbol = state.selectedQuoteSymbol || select?.value || null;
 
-        const ratio = (state.marketDepthBids / asks).toFixed(2);
-        ratioEl.textContent = `Bid/Ask: ${ratio}`;
+    // ── Prefer live order-flow data for the focused symbol ──────────────
+    // Falls back to broader market pressure if nothing for focusedSymbol,
+    // then falls back to the old price-movement heuristic as a last resort.
+    const pressure = (focusedSymbol && state.marketPressure?.[focusedSymbol])
+        || null;
 
-        // Volume derived from total tea volumes
+    let bidPct, bidVol, askVol, usingLiveFlow = false;
+
+    if (pressure && (pressure.buy5m > 0 || pressure.sell5m > 0)) {
+        // Real data: 5-minute window (most recent activity)
+        const total = pressure.buy5m + pressure.sell5m;
+        bidPct   = (pressure.buy5m / total) * 100;
+        bidVol   = Math.round(pressure.buy5m);
+        askVol   = Math.round(pressure.sell5m);
+        usingLiveFlow = true;
+    } else if (pressure && (pressure.buy30m > 0 || pressure.sell30m > 0)) {
+        // Real data: 30-minute window (slightly older)
+        const total = pressure.buy30m + pressure.sell30m;
+        bidPct   = (pressure.buy30m / total) * 100;
+        bidVol   = Math.round(pressure.buy30m);
+        askVol   = Math.round(pressure.sell30m);
+        usingLiveFlow = true;
+    } else {
+        // No trade data for this symbol yet — estimate from price movement counts
+        let ups = 0, downs = 0;
+        state.teas.forEach(tea => {
+            if (tea.previous_price && tea.current_price > tea.previous_price) ups++;
+            else if (tea.previous_price && tea.current_price < tea.previous_price) downs++;
+        });
+        const total = ups + downs;
+        if (total > 0) {
+            const targetBids = (ups / total) * 100;
+            state.marketDepthBids = state.marketDepthBids * 0.8 + targetBids * 0.2;
+        }
+        state.marketDepthBids = Math.max(25, Math.min(75, state.marketDepthBids));
+        bidPct = state.marketDepthBids;
         const totalVol = state.teas.reduce((sum, t) => sum + (t.volume_24h || 0), 0);
-        const bidVol = Math.round(totalVol * (state.marketDepthBids / 100));
-        const askVol = Math.round(totalVol * (asks / 100));
-        document.getElementById('depth-bid-volume').textContent = `Vol: ${bidVol.toLocaleString()} kg`;
-        document.getElementById('depth-ask-volume').textContent = `Vol: ${askVol.toLocaleString()} kg`;
-
-        // Mid price from selected tea
-        const select = document.getElementById('trade-tea-select');
-        const selectedTea = state.teas.find(t => t.symbol === select?.value);
-        const midPrice = (selectedTea?.current_price || 0).toFixed(2);
-        document.getElementById('depth-mid-price').textContent = `Mid: $${midPrice}`;
+        bidVol = Math.round(totalVol * (bidPct / 100));
+        askVol = Math.round(totalVol * ((100 - bidPct) / 100));
     }
+
+    // Clamp to visible range
+    bidPct = Math.max(5, Math.min(95, bidPct));
+    const askPct = 100 - bidPct;
+
+    // ── Update DOM ───────────────────────────────────────────────────────
+    bidsEl.style.width = `${bidPct}%`;
+    bidsEl.querySelector('.depth-label').textContent = `BIDS ${Math.round(bidPct)}%`;
+    asksEl.style.width = `${askPct}%`;
+    asksEl.querySelector('.depth-label').textContent = `ASKS ${Math.round(askPct)}%`;
+
+    const ratio = askPct > 0 ? (bidPct / askPct).toFixed(2) : '—';
+    ratioEl.textContent = `Bid/Ask: ${ratio}`;
+
+    // Colour the bars to visually signal dominance
+    bidsEl.style.background = bidPct > 55 ? 'var(--accent-green)' : bidPct < 45 ? 'rgba(16,185,129,0.4)' : 'var(--accent-green)';
+    asksEl.style.background = askPct > 55 ? 'var(--accent-red)'   : askPct < 45 ? 'rgba(239,68,68,0.4)'  : 'var(--accent-red)';
+
+    // Format volumes
+    const fmt = v => v >= 1000 ? `${(v / 1000).toFixed(1)}K kg` : `${v} kg`;
+    document.getElementById('depth-bid-volume').textContent = `Vol: ${fmt(bidVol)}`;
+    document.getElementById('depth-ask-volume').textContent = `Vol: ${fmt(askVol)}`;
+
+    // Show LIVE badge on depth title when driven by real order flow
+    const titleEl = document.getElementById('depth-title') || document.querySelector('.market-depth-title');
+    if (titleEl) {
+        const existingBadge = titleEl.querySelector('.depth-live-badge');
+        if (usingLiveFlow && !existingBadge) {
+            const badge = document.createElement('span');
+            badge.className = 'depth-live-badge live-badge';
+            badge.textContent = 'LIVE';
+            titleEl.appendChild(badge);
+        } else if (!usingLiveFlow && existingBadge) {
+            existingBadge.remove();
+        }
+    }
+
+    // Mid price from selected tea
+    const selectedTea = state.teas.find(t => t.symbol === (focusedSymbol || select?.value));
+    const midPrice = (selectedTea?.current_price || 0).toFixed(2);
+    document.getElementById('depth-mid-price').textContent = `Mid: $${midPrice}`;
+}
+
+function _flashMacroPrice(el, direction) {
+    el.classList.remove('macro-flash-up', 'macro-flash-down');
+    void el.offsetWidth; // force reflow to restart animation
+    el.classList.add(direction > 0 ? 'macro-flash-up' : 'macro-flash-down');
+    setTimeout(() => el.classList.remove('macro-flash-up', 'macro-flash-down'), 700);
 }
 
 function updateMacroIndicators() {
-    // Configuration for every macro row displayed in the panel
     const indicators = [
-        { key: 'usd_kes',      elId: 'macro-usdkes',  changeId: 'macro-usdkes-change',  prefix: '',  decimals: 2 },
-        { key: 'usd_inr',      elId: 'macro-usdinr',  changeId: 'macro-usdinr-change',  prefix: '',  decimals: 2 },
-        { key: 'usd_lkr',      elId: 'macro-usdlkr',  changeId: 'macro-usdlkr-change',  prefix: '',  decimals: 2 },
-        { key: 'usd_cny',      elId: 'macro-usdcny',  changeId: 'macro-usdcny-change',  prefix: '',  decimals: 4 },
-        { key: 'brent_crude',  elId: 'macro-oil',     changeId: 'macro-oil-change',     prefix: '$', decimals: 2 }
+        { key: 'usd_kes',      elId: 'macro-usdkes',  changeId: 'macro-usdkes-change',  rowId: 'macro-row-usdkes',  prefix: '',  decimals: 2 },
+        { key: 'usd_inr',      elId: 'macro-usdinr',  changeId: 'macro-usdinr-change',  rowId: 'macro-row-usdinr',  prefix: '',  decimals: 2 },
+        { key: 'usd_lkr',      elId: 'macro-usdlkr',  changeId: 'macro-usdlkr-change',  rowId: 'macro-row-usdlkr',  prefix: '',  decimals: 2 },
+        { key: 'usd_cny',      elId: 'macro-usdcny',  changeId: 'macro-usdcny-change',  rowId: 'macro-row-usdcny',  prefix: '',  decimals: 4 },
+        { key: 'brent_crude',  elId: 'macro-oil',     changeId: 'macro-oil-change',     rowId: 'macro-row-oil',     prefix: '$', decimals: 2 },
     ];
 
     const DASH = '\u2014';
 
     indicators.forEach(ind => {
-        const raw = state.macroIndicators?.[ind.key];
+        const raw   = state.macroIndicators?.[ind.key];
         const value = Number(raw);
-        const priceEl = document.getElementById(ind.elId);
+        // Use the session-start baseline (set by startLiveForexFeed on first fetch)
+        // for a meaningful "daily-style" change rather than tick-to-tick noise.
+        const baselineVal = state.macroBaseline?.[ind.key];
+        const prev = (baselineVal != null && !isNaN(Number(baselineVal)))
+            ? Number(baselineVal)
+            : Number(state.previousMacro?.[ind.key]);
+
+        const priceEl  = document.getElementById(ind.elId);
         const changeEl = document.getElementById(ind.changeId);
         if (!priceEl) return;
 
@@ -411,20 +485,28 @@ function updateMacroIndicators() {
             return;
         }
 
-        priceEl.textContent = `${ind.prefix}${value.toFixed(ind.decimals)}`;
+        const newText = `${ind.prefix}${value.toFixed(ind.decimals)}`;
 
-        // Compute change vs previous snapshot
-        const prev = Number(state.previousMacro?.[ind.key]);
+        // Flash price element if value changed since last tick
+        if (!isNaN(prev) && prev !== 0 && value !== prev) {
+            const direction = value > prev ? 1 : -1;
+            priceEl.textContent = newText;
+            _flashMacroPrice(priceEl, direction);
+        } else {
+            priceEl.textContent = newText;
+        }
+
+        // Compute and display percentage change vs previous snapshot
         if (changeEl) {
             if (!isNaN(prev) && prev !== 0) {
                 const pctChange = ((value - prev) / prev) * 100;
                 const arrow = pctChange > 0 ? '\u25B2' : pctChange < 0 ? '\u25BC' : '';
                 const sign  = pctChange > 0 ? '+' : '';
                 changeEl.textContent = `${arrow} ${sign}${pctChange.toFixed(2)}%`;
-                changeEl.className = 'macro-change ' + (pctChange > 0 ? 'up' : pctChange < 0 ? 'down' : '');
+                changeEl.className   = 'macro-change ' + (pctChange > 0 ? 'up' : pctChange < 0 ? 'down' : '');
             } else {
-                changeEl.textContent = '\u2014';
-                changeEl.className = 'macro-change';
+                changeEl.textContent = DASH;
+                changeEl.className   = 'macro-change';
             }
         }
     });
@@ -461,9 +543,12 @@ function updateDataSourceIndicator() {
     if (isStale) {
         dot.className = 'status-dot closed';
         text.textContent = 'Feed Offline';
-    } else if (source === 'LIVE_API') {
+    } else if (source === 'LIVE_FULL') {
         dot.className = 'status-dot live';
-        text.textContent = 'Real-Time (AlphaVantage)';
+        text.textContent = 'Live · Forex + Brent';
+    } else if (source === 'LIVE_FOREX' || source === 'LIVE_API') {
+        dot.className = 'status-dot live';
+        text.textContent = 'Live · Forex (open.er-api.com)';
     } else if (source === 'SIMULATED') {
         dot.className = 'status-dot simulated';
         text.textContent = 'Simulated (Safe Mode)';
@@ -573,7 +658,9 @@ function updateQuoteBoard() {
     const topTeas = state.teas.slice(0, 10);
 
     board.innerHTML = topTeas.map(tea => {
-        const symbol = tea.symbol.split('-')[1] || tea.symbol;
+        const parts  = tea.symbol.split('-');
+        const prefix = parts[0];
+        const symbol = parts[1] || tea.symbol;
         const price = Number(tea.current_price) || 0;
         const change = Number(tea.price_change_24h) || 0;
         const volume = Number(tea.volume_24h) || 0;
@@ -588,10 +675,15 @@ function updateQuoteBoard() {
         state.previousQuotePrices[tea.symbol] = price;
 
         const volDisplay = volume >= 1000 ? `${Math.round(volume / 1000)}K` : volume.toString();
+        const country = COUNTRY_MAP[prefix];
+        const countryHtml = country
+            ? `<div class="quote-country" title="${country.label}"><span class="quote-country-flag">${country.flag}</span><span class="quote-country-code">${prefix}</span></div>`
+            : '';
 
         return `
             <div class="quote-card ${flashClass} ${selectedClass}" onclick="selectTeaForTrading('${escapeHtml(tea.symbol)}')">
                 <div class="quote-symbol">${escapeHtml(symbol)}</div>
+                ${countryHtml}
                 <div class="quote-price ${isUp ? 'up' : 'down'}">$${price.toFixed(2)}</div>
                 <div class="quote-change ${isUp ? 'up' : 'down'}">${isUp ? '\u25B2' : '\u25BC'} ${change >= 0 ? '+' : ''}${change.toFixed(1)}%</div>
                 <div class="quote-volume">Vol: ${volDisplay}</div>

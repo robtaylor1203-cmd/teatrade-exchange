@@ -127,10 +127,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Unified price cache from database
     await initializePriceCache();
 
-    // Load initial macro indicator values (USD/KES, Brent, BDI)
+    // Load initial macro indicator values from DB (Brent crude, last cron tick)
     await loadMarketState();
 
-    // Start Realtime subscriptions (replaces all simulation / polling)
+    // Start the browser-direct live forex feed (fetches open.er-api.com every 60s,
+    // completely independent of the server cron — macros are always live).
+    startLiveForexFeed();
+
+    // Seed order-flow depth from DB before Realtime events arrive
+    await loadMarketPressure();
+
+    // Start Realtime subscriptions (prices + macro + order flow)
     startTickerSubscription();
 
     // Command line / universal search

@@ -16,6 +16,16 @@
 let lastLivePrice = null;
 let livePriceDirection = 0; // 1 = up, -1 = down, 0 = neutral
 
+// Shared window state set during drawChart so hover handlers can use it
+let _chartWStart    = null;
+let _chartWDuration = 0;
+
+// Timeframe → milliseconds (module-level so drawRSIChart and hover handlers can use it)
+const WINDOW_MS = {
+    '1D': 86400000, '1W': 604800000, '1M': 2592000000,
+    '3M': 7776000000, '1Y': 31536000000, 'ALL': null
+};
+
 // =============================================
 // CHART-SPECIFIC DATE FORMATTER
 // =============================================
@@ -41,6 +51,8 @@ function toggleTimeframeMenu() {
 function setTimeframe(tf) {
     const oldTimeframe = state.currentTimeframe;
     state.currentTimeframe = tf;
+    // Clear Y-axis cache so the new timeframe rescales from scratch
+    if (window.mainYAxisCache) window.mainYAxisCache = {};
 
     // Update dropdown label
     document.getElementById('timeframe-label').textContent = tf;
@@ -134,30 +146,46 @@ function generateChartData(timeframe) {
     const config = timeframeConfig[timeframe];
     if (!config) return [];
 
-    // Check if displaying the default Kenyan index (no tea selected)
-    const select = document.getElementById('trade-tea-select');
-    const selectedSymbol = select?.value;
-    const selectedTea = state.teas && state.teas.find(t => t.symbol === selectedSymbol);
-
-    // Source all data from the unified price cache (database-backed)
+    // Determine what to chart.
+    // Priority: explicit isTea/isIndex flags on mainChartData (set by index card clicks
+    // and search selections) take precedence over the hub trade dropdown.
+    // The hub dropdown only drives the chart when mainChartData hasn't been explicitly set.
     let fullHistory;
     let symbol, symbolType;
-    if (selectedTea) {
-        symbol = selectedTea.symbol;
+
+    if (state.mainChartData?.isTea) {
+        // Tea selected via search or quote card
+        symbol = state.mainChartData.symbol;
         symbolType = 'tea';
-    } else {
-        symbol = state.mainChartData?.symbol || 'KENYA';
+    } else if (state.mainChartData?.isIndex) {
+        // Index selected via market card click
+        symbol = state.mainChartData.symbol;
         symbolType = 'index';
+    } else {
+        // Fallback: check hub trade dropdown (default initial state)
+        const select = document.getElementById('trade-tea-select');
+        const selectedSymbol = select?.value;
+        const selectedTea = state.teas && state.teas.find(t => t.symbol === selectedSymbol);
+        if (selectedTea) {
+            symbol = selectedTea.symbol;
+            symbolType = 'tea';
+        } else {
+            symbol = state.mainChartData?.symbol || 'KENYA';
+            symbolType = 'index';
+        }
     }
 
     fullHistory = getPriceHistorySync(symbol, symbolType);
 
-    // If cache was empty, an async load was triggered.
-    // Schedule a redraw once data arrives.
+    // Trigger an async DB load only when cache is completely empty.
+    // Do NOT use a threshold like < 5 — longer timeframes legitimately
+    // return few candles from live ticks alone, and re-triggering on every
+    // draw creates an infinite drawChart → getPriceHistory → drawChart loop
+    // that crashes the tab on 3M / 1Y / ALL.
     if (!fullHistory || fullHistory.length === 0) {
         getPriceHistory(symbol, symbolType).then(data => {
             if (data && data.length > 0) {
-                state.cachedTimeframe = null; // force regeneration
+                state.cachedTimeframe = null;
                 drawChart();
             }
         }).catch(() => {});
@@ -392,46 +420,50 @@ function drawChart() {
     const prices = state.chartData.map(d => Number(d.close) || 0).filter(p => p > 0);
     if (prices.length === 0) return;
 
-    // Y-AXIS STABILIZATION: Calculate stable range to prevent flickering
-    const lows = state.chartData.map(d => Number(d.low) || 0).filter(p => p > 0);
+    // SMART Y-AXIS: tight range derived from visible data only
+    const lows  = state.chartData.map(d => Number(d.low)  || 0).filter(p => p > 0);
     const highs = state.chartData.map(d => Number(d.high) || 0).filter(p => p > 0);
     if (lows.length === 0 || highs.length === 0) return;
 
     const dataMinPrice = Math.min(...lows);
     const dataMaxPrice = Math.max(...highs);
-    const dataRange = dataMaxPrice - dataMinPrice;
-    const midPrice = (dataMaxPrice + dataMinPrice) / 2;
+    const dataRange    = dataMaxPrice - dataMinPrice;
+    const midPrice     = (dataMaxPrice + dataMinPrice) / 2;
 
-    // Minimum range is 8% of mid price
-    const minRange = midPrice * 0.08;
-    const stableRange = Math.max(dataRange, minRange);
+    // Padding: 12% of data range on each side, at least 2% of mid price
+    const pad      = Math.max(dataRange * 0.12, midPrice * 0.02);
+    // Minimum total axis span: 6% of mid price (prevents microscopic zoom on flat data)
+    const minSpan  = midPrice * 0.06;
 
-    // Use cached Y-axis bounds if data is within range
-    const chartSymbol = document.getElementById('trade-tea-select')?.value || 'MAIN';
-    const cacheKey = `main_${chartSymbol}_${state.currentTimeframe}`;
-    if (!window.mainYAxisCache) window.mainYAxisCache = {};
-
-    let minPrice, maxPrice;
-    if (window.mainYAxisCache[cacheKey]) {
-        const cached = window.mainYAxisCache[cacheKey];
-        const cachedRange = cached.max - cached.min;
-        // Only update if prices exceed 80% of cached range
-        if (dataMinPrice >= cached.min + cachedRange * 0.1 &&
-            dataMaxPrice <= cached.max - cachedRange * 0.1) {
-            minPrice = cached.min;
-            maxPrice = cached.max;
-        } else {
-            // Update cache with new stable range
-            minPrice = midPrice - (stableRange * 0.65);
-            maxPrice = midPrice + (stableRange * 0.65);
-            window.mainYAxisCache[cacheKey] = { min: minPrice, max: maxPrice };
-        }
-    } else {
-        // First render - cache the bounds
-        minPrice = midPrice - (stableRange * 0.65);
-        maxPrice = midPrice + (stableRange * 0.65);
-        window.mainYAxisCache[cacheKey] = { min: minPrice, max: maxPrice };
+    let minPrice = dataMinPrice - pad;
+    let maxPrice = dataMaxPrice + pad;
+    if ((maxPrice - minPrice) < minSpan) {
+        minPrice = midPrice - minSpan / 2;
+        maxPrice = midPrice + minSpan / 2;
     }
+
+    // Gentle EMA smoothing to avoid axis jumping between refreshes.
+    // Cache key uses the actual charted symbol so each instrument has its own bounds.
+    const chartedSymbol = state.mainChartData?.symbol || 'MAIN';
+    const cacheKey = `main_${chartedSymbol}_${state.currentTimeframe}`;
+    if (!window.mainYAxisCache) window.mainYAxisCache = {};
+    const prev = window.mainYAxisCache[cacheKey];
+    if (prev) {
+        const prevRange  = prev.max - prev.min;
+        const newRange   = maxPrice - minPrice;
+        // If the cached range is wildly different (>3× or <0.33×), snap immediately
+        // rather than blending — prevents the "invisible flat line" trap when switching
+        // between instruments with very different price scales (e.g. $5 vs $500).
+        const ratio = prevRange / newRange;
+        if (ratio > 3 || ratio < 0.33) {
+            // Snap: use new bounds directly, no blend
+        } else {
+            const α = 0.30;
+            minPrice = prev.min * (1 - α) + minPrice * α;
+            maxPrice = prev.max * (1 - α) + maxPrice * α;
+        }
+    }
+    window.mainYAxisCache[cacheKey] = { min: minPrice, max: maxPrice };
 
     const priceRange = maxPrice - minPrice;
     const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
@@ -445,6 +477,36 @@ function drawChart() {
 
     const chartWidth = w - leftMargin - rightMargin;
     const chartHeight = h - bottomMargin - (h * 0.1);
+
+    // ── Fixed time window based on selected timeframe ─────────────────────
+    // The window is always [now - timeframeDuration, now] so the axis is
+    // stable regardless of how much data is loaded. Data points are plotted
+    // at their correct proportional position within this window.
+    const _toDate = d => (d instanceof Date) ? d : new Date(d);
+    const wEnd = new Date();
+    let wStart;
+    const windowSpan = WINDOW_MS[state.currentTimeframe];
+    if (windowSpan) {
+        wStart = new Date(wEnd.getTime() - windowSpan);
+    } else {
+        // ALL: span from earliest candle to now
+        const ts = state.chartData.map(d => d.date ? _toDate(d.date).getTime() : null).filter(t => t && !isNaN(t));
+        wStart = ts.length > 0 ? new Date(Math.min(...ts)) : new Date(wEnd.getTime() - 31536000000);
+    }
+    const wDuration = wEnd.getTime() - wStart.getTime();
+    // Share with hover handlers
+    _chartWStart    = wStart;
+    _chartWDuration = wDuration;
+
+    // Converts candle index → X canvas position based on its actual date.
+    // Returns null if the date is missing or outside the window.
+    function candleX(i) {
+        const d = state.chartData[i]?.date;
+        if (!d) return null;
+        const t = _toDate(d).getTime();
+        if (isNaN(t)) return null;
+        return leftMargin + ((t - wStart.getTime()) / wDuration) * chartWidth;
+    }
 
     // Draw grid lines and Y-axis labels
     ctx.strokeStyle = '#1a2332';
@@ -465,14 +527,16 @@ function drawChart() {
         ctx.fillText('$' + priceLabel, leftMargin - 8, y + 3);
     }
 
-    // Draw X-axis labels
+    // Draw X-axis labels — evenly spaced dates within the fixed timeframe window
     ctx.textAlign = 'center';
     ctx.fillStyle = '#6b7280';
-    const labels = config.labels;
-    labels.forEach((label, i) => {
-        const x = leftMargin + (i / (labels.length - 1)) * chartWidth;
-        ctx.fillText(label, x, h - 8);
-    });
+    const labelCount = config.labels.length;
+    for (let i = 0; i < labelCount; i++) {
+        const frac = labelCount > 1 ? i / (labelCount - 1) : 0;
+        const x = leftMargin + frac * chartWidth;
+        const labelDate = new Date(wStart.getTime() + frac * wDuration);
+        ctx.fillText(formatChartDate(labelDate, state.currentTimeframe), x, h - 8);
+    }
 
     // Draw average line (dashed)
     const avgY = h * 0.1 + (1 - (avgPrice - minPrice) / priceRange) * chartHeight;
@@ -485,24 +549,30 @@ function drawChart() {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    const lastX = leftMargin + chartWidth;
+    // lastX / lastY: position of the most-recent valid candle in the window
+    let lastX = leftMargin + chartWidth;
     const lastY = h * 0.1 + (1 - (currentPrice - minPrice) / priceRange) * chartHeight;
+    for (let i = state.chartData.length - 1; i >= 0; i--) {
+        const x = candleX(i);
+        if (x !== null) { lastX = x; break; }
+    }
 
     if (state.chartType === 'candle') {
-        // Draw candlesticks
-        const candleWidth = Math.max(4, Math.min(20, (chartWidth / state.chartData.length) * 0.7));
+        // Draw candlesticks — each placed at its real date within the window
+        const candleWidth = Math.max(4, Math.min(20, (chartWidth / Math.max(state.chartData.length, 1)) * 0.7));
 
         state.chartData.forEach((d, i) => {
-            const x = leftMargin + (i / (state.chartData.length - 1)) * chartWidth;
-            const openY = h * 0.1 + (1 - (d.open - minPrice) / priceRange) * chartHeight;
-            const closeY = h * 0.1 + (1 - (d.close - minPrice) / priceRange) * chartHeight;
-            const highY = h * 0.1 + (1 - (d.high - minPrice) / priceRange) * chartHeight;
-            const lowY = h * 0.1 + (1 - (d.low - minPrice) / priceRange) * chartHeight;
+            const x = candleX(i);
+            if (x === null) return; // outside window or invalid date
 
-            const isUp = d.close >= d.open;
+            const openY  = h * 0.1 + (1 - (Number(d.open)  - minPrice) / priceRange) * chartHeight;
+            const closeY = h * 0.1 + (1 - (Number(d.close) - minPrice) / priceRange) * chartHeight;
+            const highY  = h * 0.1 + (1 - (Number(d.high)  - minPrice) / priceRange) * chartHeight;
+            const lowY   = h * 0.1 + (1 - (Number(d.low)   - minPrice) / priceRange) * chartHeight;
+
+            const isUp  = d.close >= d.open;
             const color = isUp ? '#10b981' : '#ef4444';
 
-            // Draw wick (high-low line)
             ctx.strokeStyle = color;
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -510,38 +580,41 @@ function drawChart() {
             ctx.lineTo(x, lowY);
             ctx.stroke();
 
-            // Draw candle body
-            const bodyTop = Math.min(openY, closeY);
+            const bodyTop    = Math.min(openY, closeY);
             const bodyHeight = Math.max(1, Math.abs(closeY - openY));
-
-            ctx.fillStyle = color;
+            ctx.fillStyle  = color;
             ctx.fillRect(x - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
-
-            // Body border for definition
             ctx.strokeStyle = color;
-            ctx.lineWidth = 1;
             ctx.strokeRect(x - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
         });
     } else {
-        // Draw line chart
+        // Draw line chart — each point at its real date within the window
         ctx.beginPath();
         ctx.strokeStyle = '#1a73e8';
         ctx.lineWidth = 2;
 
-        prices.forEach((p, i) => {
-            const x = leftMargin + (i / (prices.length - 1)) * chartWidth;
+        let lineStarted = false;
+        let lineLastX = lastX;
+        state.chartData.forEach((d, i) => {
+            const p = Number(d.close) || 0;
+            if (!p) return;
+            const x = candleX(i);
+            if (x === null) return;
             const y = h * 0.1 + (1 - (p - minPrice) / priceRange) * chartHeight;
-            if (i === 0) ctx.moveTo(x, y);
+            if (!lineStarted) { ctx.moveTo(x, y); lineStarted = true; }
             else ctx.lineTo(x, y);
+            lineLastX = x;
         });
         ctx.stroke();
 
-        // Draw area fill
-        ctx.lineTo(lastX, h * 0.1 + chartHeight);
-        ctx.lineTo(leftMargin, h * 0.1 + chartHeight);
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(26, 115, 232, 0.15)';
-        ctx.fill();
+        // Area fill back to bottom-left
+        if (lineStarted) {
+            ctx.lineTo(lineLastX, h * 0.1 + chartHeight);
+            ctx.lineTo(leftMargin, h * 0.1 + chartHeight);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(26, 115, 232, 0.15)';
+            ctx.fill();
+        }
     }
 
     // =============================================
@@ -554,16 +627,14 @@ function drawChart() {
         ctx.lineWidth = lineWidth;
         let started = false;
 
+        // values[i] aligns with state.chartData[i], so use candleX for position
         values.forEach((val, i) => {
             if (val === null) return;
-            const x = leftMargin + (i / (values.length - 1)) * chartWidth;
+            const x = candleX(i);
+            if (x === null) return;
             const y = h * 0.1 + (1 - (val - minPrice) / priceRange) * chartHeight;
-            if (!started) {
-                ctx.moveTo(x, y);
-                started = true;
-            } else {
-                ctx.lineTo(x, y);
-            }
+            if (!started) { ctx.moveTo(x, y); started = true; }
+            else ctx.lineTo(x, y);
         });
         ctx.stroke();
     }
@@ -615,21 +686,19 @@ function drawChart() {
 
         // Fill between bands
         ctx.beginPath();
-        let started = false;
+        let bbStarted = false;
         bb.upper.forEach((val, i) => {
             if (val === null) return;
-            const x = leftMargin + (i / (bb.upper.length - 1)) * chartWidth;
+            const x = candleX(i);
+            if (x === null) return;
             const y = h * 0.1 + (1 - (val - minPrice) / priceRange) * chartHeight;
-            if (!started) {
-                ctx.moveTo(x, y);
-                started = true;
-            } else {
-                ctx.lineTo(x, y);
-            }
+            if (!bbStarted) { ctx.moveTo(x, y); bbStarted = true; }
+            else ctx.lineTo(x, y);
         });
         for (let i = bb.lower.length - 1; i >= 0; i--) {
             if (bb.lower[i] === null) continue;
-            const x = leftMargin + (i / (bb.lower.length - 1)) * chartWidth;
+            const x = candleX(i);
+            if (x === null) continue;
             const y = h * 0.1 + (1 - (bb.lower[i] - minPrice) / priceRange) * chartHeight;
             ctx.lineTo(x, y);
         }
@@ -640,29 +709,45 @@ function drawChart() {
 
     // High/Low markers (line chart only)
     if (state.chartType === 'line') {
-        const highIndex = prices.indexOf(highPrice);
-        const highX = leftMargin + (highIndex / (prices.length - 1)) * chartWidth;
-        const highY = h * 0.1 + (1 - (highPrice - minPrice) / priceRange) * chartHeight;
-        ctx.fillStyle = '#10b981';
-        ctx.beginPath();
-        ctx.arc(highX, highY, 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.font = '9px JetBrains Mono, monospace';
-        ctx.fillStyle = '#10b981';
-        ctx.textAlign = 'center';
-        ctx.fillText('H $' + highPrice.toFixed(2), highX, highY - 10);
+        // Find high/low candle index from state.chartData (not filtered prices array)
+        let highIdx = -1, lowIdx = -1;
+        state.chartData.forEach((d, i) => {
+            const c = Number(d.close) || 0;
+            if (!c) return;
+            if (highIdx < 0 || c >= Number(state.chartData[highIdx].close)) highIdx = i;
+            if (lowIdx  < 0 || c <= Number(state.chartData[lowIdx].close))  lowIdx  = i;
+        });
 
-        const lowIndex = prices.indexOf(lowPrice);
-        const lowX = leftMargin + (lowIndex / (prices.length - 1)) * chartWidth;
-        const lowY = h * 0.1 + (1 - (lowPrice - minPrice) / priceRange) * chartHeight;
-        ctx.fillStyle = '#ef4444';
-        ctx.beginPath();
-        ctx.arc(lowX, lowY, 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#ef4444';
-        ctx.fillText('L $' + lowPrice.toFixed(2), lowX, lowY + 16);
+        if (highIdx >= 0) {
+            const hx = candleX(highIdx);
+            if (hx !== null) {
+                const hy = h * 0.1 + (1 - (highPrice - minPrice) / priceRange) * chartHeight;
+                ctx.fillStyle = '#10b981';
+                ctx.beginPath();
+                ctx.arc(hx, hy, 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.font = '9px JetBrains Mono, monospace';
+                ctx.fillStyle = '#10b981';
+                ctx.textAlign = 'center';
+                ctx.fillText('H $' + highPrice.toFixed(2), hx, hy - 10);
+            }
+        }
 
-        // Current price marker
+        if (lowIdx >= 0) {
+            const lx = candleX(lowIdx);
+            if (lx !== null) {
+                const ly = h * 0.1 + (1 - (lowPrice - minPrice) / priceRange) * chartHeight;
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.arc(lx, ly, 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#ef4444';
+                ctx.textAlign = 'center';
+                ctx.fillText('L $' + lowPrice.toFixed(2), lx, ly + 16);
+            }
+        }
+
+        // Current price marker at last candle position
         ctx.fillStyle = '#1a73e8';
         ctx.beginPath();
         ctx.arc(lastX, lastY, 5, 0, Math.PI * 2);
@@ -923,25 +1008,31 @@ function drawRSIChart() {
     rsiCtx.strokeStyle = studyColors.rsi;
     rsiCtx.lineWidth = 1.5;
 
+    // RSI uses the same time window as the main chart (stored in module-level vars)
+    function rsiCandleX(i) {
+        if (!_chartWStart || !_chartWDuration) return null;
+        const d = state.chartData[i]?.date;
+        if (!d) return null;
+        const t = (d instanceof Date ? d : new Date(d)).getTime();
+        if (isNaN(t)) return null;
+        return leftMargin + ((t - _chartWStart.getTime()) / _chartWDuration) * chartWidth;
+    }
+
     let started = false;
     rsiData.forEach((val, i) => {
         if (val === null) return;
-
-        const x = leftMargin + (i / (rsiData.length - 1)) * chartWidth;
+        const x = rsiCandleX(i);
+        if (x === null) return;
         const y = topPadding + (1 - val / 100) * chartHeight;
-
-        if (!started) {
-            rsiCtx.moveTo(x, y);
-            started = true;
-        } else {
-            rsiCtx.lineTo(x, y);
-        }
+        if (!started) { rsiCtx.moveTo(x, y); started = true; }
+        else rsiCtx.lineTo(x, y);
     });
     rsiCtx.stroke();
 
     // Draw fill under line
     if (started) {
-        rsiCtx.lineTo(w - rightMargin, topPadding + chartHeight);
+        const lastRsiX = rsiCandleX(rsiData.length - 1) ?? (w - rightMargin);
+        rsiCtx.lineTo(lastRsiX, topPadding + chartHeight);
         rsiCtx.lineTo(leftMargin, topPadding + chartHeight);
         rsiCtx.closePath();
         rsiCtx.fillStyle = 'rgba(236, 72, 153, 0.1)';
@@ -1066,9 +1157,25 @@ function setupChartHover() {
             return;
         }
 
-        // Find data point
+        // Find nearest candle by time-proportional X position
         const relX = x - leftMargin;
-        const index = Math.round((relX / chartWidth) * (state.chartData.length - 1));
+        const hoverFrac = relX / chartWidth;
+        const hoverTime = _chartWStart && _chartWDuration
+            ? _chartWStart.getTime() + hoverFrac * _chartWDuration
+            : null;
+
+        let index = 0;
+        if (hoverTime !== null && state.chartData.length > 0) {
+            let bestDist = Infinity;
+            state.chartData.forEach((d, i) => {
+                if (!d.date) return;
+                const t = (d.date instanceof Date ? d.date : new Date(d.date)).getTime();
+                const dist = Math.abs(t - hoverTime);
+                if (dist < bestDist) { bestDist = dist; index = i; }
+            });
+        } else {
+            index = Math.round(hoverFrac * (state.chartData.length - 1));
+        }
         const dataPoint = state.chartData[Math.max(0, Math.min(index, state.chartData.length - 1))];
 
         if (!dataPoint || !dataPoint.date) return;

@@ -586,7 +586,7 @@ BEGIN
     IF p_quantity <= 0 THEN
         RETURN jsonb_build_object('success', false, 'error', 'Quantity must be greater than zero');
     END IF;
-    IF p_price IS NULL OR p_price <= 0 OR NOT isfinite(p_price::DOUBLE PRECISION) THEN
+    IF p_price IS NULL OR p_price <= 0 OR p_price != p_price OR p_price > 1e15 THEN
         RETURN jsonb_build_object('success', false, 'error', 'Invalid price');
     END IF;
 
@@ -1086,3 +1086,769 @@ BEGIN
     RETURN jsonb_build_object('filled', v_filled_count);
 END;
 $$;
+
+-- =============================================
+-- 20. SETTLEMENT (Phase 4-17)
+-- Adds settlement tracking to trades table and
+-- a function to process T+0 instant settlement.
+-- =============================================
+
+-- Add settlement columns to trades (idempotent)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trades' AND column_name='settlement_status') THEN
+        ALTER TABLE trades ADD COLUMN settlement_status TEXT NOT NULL DEFAULT 'PENDING'
+            CHECK (settlement_status IN ('PENDING', 'SETTLED', 'FAILED'));
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='trades' AND column_name='settled_at') THEN
+        ALTER TABLE trades ADD COLUMN settled_at TIMESTAMPTZ;
+    END IF;
+END
+$$;
+
+-- Backfill existing trades as SETTLED (they were already processed)
+UPDATE trades SET settlement_status = 'SETTLED', settled_at = created_at
+WHERE settlement_status = 'PENDING';
+
+-- Auto-settle all new trades immediately on insert (T+0 instant settlement)
+CREATE OR REPLACE FUNCTION auto_settle_trade()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    NEW.settlement_status := 'SETTLED';
+    NEW.settled_at := NOW();
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_auto_settle ON trades;
+CREATE TRIGGER trg_auto_settle
+    BEFORE INSERT ON trades
+    FOR EACH ROW
+    EXECUTE FUNCTION auto_settle_trade();
+
+-- Settlement summary view for audit/reporting
+CREATE OR REPLACE VIEW settlement_summary AS
+SELECT
+    DATE_TRUNC('day', created_at) AS settlement_date,
+    COUNT(*)                       AS total_trades,
+    COUNT(*) FILTER (WHERE settlement_status = 'SETTLED') AS settled,
+    COUNT(*) FILTER (WHERE settlement_status = 'PENDING') AS pending,
+    COUNT(*) FILTER (WHERE settlement_status = 'FAILED')  AS failed,
+    SUM(total_value)               AS total_notional,
+    SUM(total_value) FILTER (WHERE settlement_status = 'SETTLED') AS settled_notional
+FROM trades
+GROUP BY DATE_TRUNC('day', created_at)
+ORDER BY settlement_date DESC;
+
+GRANT SELECT ON settlement_summary TO authenticated;
+
+CREATE INDEX IF NOT EXISTS idx_trades_settlement ON trades (settlement_status, created_at)
+    WHERE settlement_status = 'PENDING';
+
+-- ============================================================
+-- VOLATILITY CALIBRATION: beta values + currency_pair per tea
+-- ============================================================
+-- Beta represents forex sensitivity (how much a 1% currency move
+-- affects the USD tea price). Calibrated per origin:
+--   Kenya:      beta 5-7  (KES-denominated; highly sensitive)
+--   India Assam: beta 5   (INR; moderate sensitivity)
+--   Darjeeling:  beta 6   (INR; premium, more volatile)
+--   Ceylon:      beta 7   (LKR; historically very volatile)
+--   Yunnan:      beta 3   (CNY; PBoC managed float, tighter)
+--   Rwanda/Malawi: beta 5 (USD-proxied but regional sensitivity)
+--
+-- currency_pair must match the key used in market-ticker rates map.
+-- ============================================================
+
+UPDATE teas SET beta = 6.0, currency_pair = 'usd_kes' WHERE symbol IN ('KEN-BP1', 'KEN-PF1');
+UPDATE teas SET beta = 5.0, currency_pair = 'usd_kes' WHERE symbol = 'KEN-DUST';
+UPDATE teas SET beta = 5.0, currency_pair = 'usd_inr' WHERE symbol = 'IND-ASM';
+UPDATE teas SET beta = 6.5, currency_pair = 'usd_inr' WHERE symbol = 'IND-DRJ';
+UPDATE teas SET beta = 7.0, currency_pair = 'usd_lkr' WHERE symbol IN ('SRI-BOP', 'SRI-PEK', 'SRI-OP');
+UPDATE teas SET beta = 3.0, currency_pair = 'usd_cny' WHERE symbol = 'CHN-YUN';
+UPDATE teas SET beta = 5.0, currency_pair = 'usd_kes' WHERE symbol IN ('RWA-OP', 'MLW-BP1');
+-- Any remaining teas default to KES sensitivity
+UPDATE teas SET beta = 4.0, currency_pair = 'usd_kes'
+WHERE (beta IS NULL OR beta = 1.0)
+  AND symbol NOT IN ('KEN-BP1','KEN-PF1','KEN-DUST','IND-ASM','IND-DRJ',
+                     'SRI-BOP','SRI-PEK','SRI-OP','CHN-YUN','RWA-OP','MLW-BP1');
+
+-- ============================================================
+-- REAL AUCTION DATA SCHEMA
+-- ============================================================
+-- These tables store real Mombasa auction data imported from
+-- the GeneralReport Excel files (per-lot) and the Auction
+-- Quantity file (weekly volumes). Data can be loaded ad-hoc
+-- via the import_auction_data.py script whenever a new report
+-- is received.
+--
+-- Grade → Tea symbol mapping used throughout:
+--   BP1   → KEN-BP1   (Broken Pekoe 1)
+--   PF1   → KEN-PF1   (Pekoe Fannings 1)
+--   DUST1 → KEN-DUST  (Dust 1)
+-- These VWAP prices are written back to teas.anchor_price and
+-- to price_history so that charts show real historical data.
+-- ============================================================
+
+-- One row per weekly auction sale
+CREATE TABLE IF NOT EXISTS auction_sales (
+    id               uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+    sale_number      integer     NOT NULL,               -- 37, 38 …
+    sale_code        text        NOT NULL,               -- "Sale 37"
+    sale_date        date,                               -- date of the auction session
+    country          text        DEFAULT 'Kenya',
+    total_lots       integer     DEFAULT 0,
+    lots_sold        integer     DEFAULT 0,
+    lots_unsold      integer     DEFAULT 0,
+    lots_outsold     integer     DEFAULT 0,
+    lots_private     integer     DEFAULT 0,
+    total_weight_kg  numeric(14,2) DEFAULT 0,
+    total_value      numeric(16,4) DEFAULT 0,            -- sum of lot values (USD)
+    vwap_usd_per_kg  numeric(10,4),                     -- volume-weighted avg all grades
+    kenya_index_price numeric(10,4),                    -- VWAP Kenya lots only → KENYA index
+    pf1_vwap         numeric(10,4),                     -- → KEN-PF1 anchor
+    bp1_vwap         numeric(10,4),                     -- → KEN-BP1 anchor
+    dust1_vwap       numeric(10,4),                     -- → KEN-DUST anchor
+    created_at       timestamptz DEFAULT now(),
+    UNIQUE(sale_number)
+);
+
+-- One row per lot in each auction
+CREATE TABLE IF NOT EXISTS auction_lots (
+    id                    uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+    sale_id               uuid        REFERENCES auction_sales(id) ON DELETE CASCADE,
+    sale_number           integer     NOT NULL,
+    broker_code           text,
+    lot_number            integer,
+    selling_mark          text,                          -- factory / estate name
+    grade                 text        NOT NULL,          -- BP1, PF1, DUST1 …
+    invoice_no            text,
+    sub_elevation         text,
+    category              text,                          -- M1, M2, M3, S1
+    rp                    text,                          -- Reprint flag
+    ra                    text,                          -- Reauction flag
+    certifications        text,
+    bags                  integer,
+    net_weight_per_bag_kg numeric(8,2),
+    total_weight_kg       numeric(10,2),
+    asking_price          numeric(10,4),
+    baseline_price        numeric(10,4),
+    registered_bid_price  numeric(10,4),
+    registered_bid_buyer  text,
+    second_highest_bid    numeric(10,4),
+    second_highest_buyer  text,
+    total_price           numeric(14,2),
+    status                text,                          -- Sold / Unsold / Outsold / Private Sold
+    purchased_price       numeric(10,4),                -- USD per kg (final sold price)
+    buyer_code            text,
+    buyer_name            text,
+    factory               text,
+    producer_country      text,
+    warehouse_company     text,
+    warehouse_location    text,
+    manufactured_date     text,
+    selling_end_time      timestamptz,
+    producer              text,
+    final_buyer_name      text,
+    final_price           numeric(10,4),
+    total_value           numeric(14,2),                -- USD total for this lot
+    transaction_type      text,
+    created_at            timestamptz DEFAULT now()
+);
+
+-- Aggregated per-grade stats per sale (fast lookup for charts / index calcs)
+CREATE TABLE IF NOT EXISTS auction_grade_summary (
+    id              uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+    sale_id         uuid        REFERENCES auction_sales(id) ON DELETE CASCADE,
+    sale_number     integer     NOT NULL,
+    sale_date       date,
+    grade           text        NOT NULL,
+    lots_sold       integer     DEFAULT 0,
+    lots_unsold     integer     DEFAULT 0,
+    total_weight_kg numeric(14,2) DEFAULT 0,
+    vwap            numeric(10,4),                      -- volume-weighted avg price USD/kg
+    avg_price       numeric(10,4),                      -- simple average
+    min_price       numeric(10,4),
+    max_price       numeric(10,4),
+    total_value     numeric(16,4) DEFAULT 0,
+    created_at      timestamptz DEFAULT now(),
+    UNIQUE(sale_id, grade)
+);
+
+-- Weekly offered / sold quantities (from Auction Quantity Excel)
+CREATE TABLE IF NOT EXISTS auction_weekly_volumes (
+    id             uuid    DEFAULT gen_random_uuid() PRIMARY KEY,
+    sale_date      date    NOT NULL,
+    sale_number    integer NOT NULL,
+    year           integer NOT NULL,
+    total_bags     integer,
+    main_bags      integer,
+    secondary_bags integer,
+    kenya_bags     integer,
+    foreign_bags   integer,
+    reprints_bags  integer,
+    fresh_bags     integer,
+    created_at     timestamptz DEFAULT now(),
+    UNIQUE(sale_date, year)
+);
+
+-- ============================================================
+-- ROW-LEVEL SECURITY FOR AUCTION TABLES
+-- ============================================================
+ALTER TABLE auction_sales         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auction_lots          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auction_grade_summary ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auction_weekly_volumes ENABLE ROW LEVEL SECURITY;
+
+-- All authenticated users can read auction data (public market data)
+DROP POLICY IF EXISTS "auction_sales_read"            ON auction_sales;
+DROP POLICY IF EXISTS "auction_lots_read"             ON auction_lots;
+DROP POLICY IF EXISTS "auction_grade_summary_read"    ON auction_grade_summary;
+DROP POLICY IF EXISTS "auction_weekly_volumes_read"   ON auction_weekly_volumes;
+DROP POLICY IF EXISTS "auction_sales_insert"          ON auction_sales;
+DROP POLICY IF EXISTS "auction_lots_insert"           ON auction_lots;
+DROP POLICY IF EXISTS "auction_grade_summary_insert"  ON auction_grade_summary;
+DROP POLICY IF EXISTS "auction_weekly_volumes_insert" ON auction_weekly_volumes;
+
+CREATE POLICY "auction_sales_read"
+    ON auction_sales FOR SELECT TO authenticated USING (true);
+CREATE POLICY "auction_lots_read"
+    ON auction_lots FOR SELECT TO authenticated USING (true);
+CREATE POLICY "auction_grade_summary_read"
+    ON auction_grade_summary FOR SELECT TO authenticated USING (true);
+CREATE POLICY "auction_weekly_volumes_read"
+    ON auction_weekly_volumes FOR SELECT TO authenticated USING (true);
+
+-- Only service role can insert / update (done via the import script)
+CREATE POLICY "auction_sales_insert"
+    ON auction_sales FOR INSERT TO service_role WITH CHECK (true);
+CREATE POLICY "auction_lots_insert"
+    ON auction_lots FOR INSERT TO service_role WITH CHECK (true);
+CREATE POLICY "auction_grade_summary_insert"
+    ON auction_grade_summary FOR INSERT TO service_role WITH CHECK (true);
+CREATE POLICY "auction_weekly_volumes_insert"
+    ON auction_weekly_volumes FOR INSERT TO service_role WITH CHECK (true);
+
+-- ============================================================
+-- INDEXES FOR AUCTION TABLES
+-- ============================================================
+CREATE INDEX IF NOT EXISTS idx_auction_sales_number
+    ON auction_sales (sale_number);
+CREATE INDEX IF NOT EXISTS idx_auction_sales_date
+    ON auction_sales (sale_date DESC);
+CREATE INDEX IF NOT EXISTS idx_auction_lots_sale
+    ON auction_lots (sale_id, grade);
+CREATE INDEX IF NOT EXISTS idx_auction_lots_grade
+    ON auction_lots (grade, producer_country);
+CREATE INDEX IF NOT EXISTS idx_auction_grade_summary_sale
+    ON auction_grade_summary (sale_id);
+CREATE INDEX IF NOT EXISTS idx_auction_grade_summary_date
+    ON auction_grade_summary (sale_date DESC, grade);
+CREATE INDEX IF NOT EXISTS idx_auction_weekly_date
+    ON auction_weekly_volumes (sale_date DESC);
+
+-- ============================================================
+-- EXPANDED KENYA GRADES
+-- ============================================================
+-- Adds three new tradable Kenyan grades sourced directly from
+-- Mombasa auction data.  Volumes from Sale 37:
+--   PD    (Pekoe Dust)           – 1,674,280 kg  largest by weight
+--   BMF   (Broken Mixed Fanning) –   128,956 kg
+--   FNGS1 (Fannings Grade 1)     –    83,582 kg
+-- ============================================================
+
+-- ============================================================
+-- SIMULATED DATA SUPPORT
+-- Adds is_simulated flag to price_history so generated
+-- placeholder data can be overwritten by real auction imports.
+-- ============================================================
+ALTER TABLE price_history ADD COLUMN IF NOT EXISTS is_simulated BOOLEAN NOT NULL DEFAULT false;
+
+-- Ensure a unique constraint exists on (symbol, recorded_at) so the
+-- ON CONFLICT clause in apply_auction_prices_to_teas works correctly.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'price_history'::regclass
+          AND contype   = 'u'
+          AND conname   = 'price_history_symbol_recorded_at_key'
+    ) THEN
+        ALTER TABLE price_history ADD CONSTRAINT price_history_symbol_recorded_at_key UNIQUE (symbol, recorded_at);
+    END IF;
+END $$;
+
+-- ============================================================
+-- EXPANDED KENYA GRADES
+-- ============================================================
+INSERT INTO teas (symbol, name, origin, grade, current_price, anchor_price,
+                  reference_forex, beta, currency_pair, last_update)
+VALUES
+    ('KEN-PD',   'Kenya Pekoe Dust',           'KEN', 'PD',    1.9762, 1.9762, 129.45, 5.5, 'usd_kes', now()),
+    ('KEN-BMF',  'Kenya Broken Mixed Fanning',  'KEN', 'BMF',   0.9680, 0.9680, 129.45, 5.0, 'usd_kes', now()),
+    ('KEN-FNGS', 'Kenya Fannings',              'KEN', 'FNGS1', 1.4033, 1.4033, 129.45, 5.0, 'usd_kes', now())
+ON CONFLICT (symbol) DO NOTHING;
+
+-- Expand index compositions to include the new grades
+UPDATE indexes
+SET teas = ARRAY['KEN-BP1','KEN-PF1','KEN-DUST','KEN-PD','KEN-BMF','KEN-FNGS']
+WHERE symbol IN ('KENYA', 'MOMBASA');
+
+UPDATE indexes
+SET teas = ARRAY['KEN-BP1','KEN-PF1','KEN-DUST','KEN-PD','KEN-BMF','KEN-FNGS','MLW-BP1','RWA-OP']
+WHERE symbol = 'AFRICA';
+
+-- Add new VWAP columns to auction_sales for the expanded grade set
+ALTER TABLE auction_sales ADD COLUMN IF NOT EXISTS pd_vwap   numeric(10,4);
+ALTER TABLE auction_sales ADD COLUMN IF NOT EXISTS bmf_vwap  numeric(10,4);
+ALTER TABLE auction_sales ADD COLUMN IF NOT EXISTS fngs_vwap numeric(10,4);
+
+-- ============================================================
+-- FUNCTION: apply_auction_prices_to_teas  (v2 — expanded)
+-- ============================================================
+-- Called after importing any auction sale.  Behaviour:
+--   • ALWAYS writes price_history candles for every grade
+--     (builds up the historical chart dataset over time).
+--   • Only updates teas.anchor_price when this sale is the
+--     most recent one imported — so importing a historical
+--     file never overwrites the current live anchor price.
+-- ============================================================
+CREATE OR REPLACE FUNCTION apply_auction_prices_to_teas(p_sale_id uuid)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+    v_sale      auction_sales%ROWTYPE;
+    v_ts        timestamptz;
+    v_is_latest boolean;
+BEGIN
+    SELECT * INTO v_sale FROM auction_sales WHERE id = p_sale_id;
+    IF NOT FOUND THEN RETURN; END IF;
+
+    v_ts := (v_sale.sale_date::timestamptz AT TIME ZONE 'Africa/Nairobi') + interval '12 hours';
+
+    -- Is this the most recently dated sale in the table?
+    -- COALESCE handles the edge case where this is the only sale (no other rows).
+    SELECT COALESCE(v_sale.sale_date >= MAX(sale_date), true)
+    INTO   v_is_latest
+    FROM   auction_sales
+    WHERE  id != p_sale_id;
+
+    -- ── Update anchor_price only for the most recent sale ───────────────
+    IF v_is_latest THEN
+        IF v_sale.pf1_vwap   > 0 THEN UPDATE teas SET anchor_price = v_sale.pf1_vwap   WHERE symbol = 'KEN-PF1';  END IF;
+        IF v_sale.bp1_vwap   > 0 THEN UPDATE teas SET anchor_price = v_sale.bp1_vwap   WHERE symbol = 'KEN-BP1';  END IF;
+        IF v_sale.dust1_vwap > 0 THEN UPDATE teas SET anchor_price = v_sale.dust1_vwap WHERE symbol = 'KEN-DUST'; END IF;
+        IF v_sale.pd_vwap    > 0 THEN UPDATE teas SET anchor_price = v_sale.pd_vwap    WHERE symbol = 'KEN-PD';   END IF;
+        IF v_sale.bmf_vwap   > 0 THEN UPDATE teas SET anchor_price = v_sale.bmf_vwap   WHERE symbol = 'KEN-BMF';  END IF;
+        IF v_sale.fngs_vwap  > 0 THEN UPDATE teas SET anchor_price = v_sale.fngs_vwap  WHERE symbol = 'KEN-FNGS'; END IF;
+    END IF;
+
+    -- ── Always accumulate price_history candles (never overwrite) ────────
+    -- Real auction data always overwrites simulated placeholders at the same timestamp.
+    -- ON CONFLICT ... DO UPDATE WHERE is_simulated = true ensures real ticks are never overwritten.
+    IF v_sale.pf1_vwap   > 0 THEN INSERT INTO price_history (symbol,price,volume,recorded_at,is_simulated) VALUES ('KEN-PF1',  v_sale.pf1_vwap,   v_sale.total_weight_kg, v_ts, false) ON CONFLICT (symbol,recorded_at) DO UPDATE SET price=EXCLUDED.price, volume=EXCLUDED.volume, is_simulated=false WHERE price_history.is_simulated=true; END IF;
+    IF v_sale.bp1_vwap   > 0 THEN INSERT INTO price_history (symbol,price,volume,recorded_at,is_simulated) VALUES ('KEN-BP1',  v_sale.bp1_vwap,   v_sale.total_weight_kg, v_ts, false) ON CONFLICT (symbol,recorded_at) DO UPDATE SET price=EXCLUDED.price, volume=EXCLUDED.volume, is_simulated=false WHERE price_history.is_simulated=true; END IF;
+    IF v_sale.dust1_vwap > 0 THEN INSERT INTO price_history (symbol,price,volume,recorded_at,is_simulated) VALUES ('KEN-DUST', v_sale.dust1_vwap, v_sale.total_weight_kg, v_ts, false) ON CONFLICT (symbol,recorded_at) DO UPDATE SET price=EXCLUDED.price, volume=EXCLUDED.volume, is_simulated=false WHERE price_history.is_simulated=true; END IF;
+    IF v_sale.pd_vwap    > 0 THEN INSERT INTO price_history (symbol,price,volume,recorded_at,is_simulated) VALUES ('KEN-PD',   v_sale.pd_vwap,    v_sale.total_weight_kg, v_ts, false) ON CONFLICT (symbol,recorded_at) DO UPDATE SET price=EXCLUDED.price, volume=EXCLUDED.volume, is_simulated=false WHERE price_history.is_simulated=true; END IF;
+    IF v_sale.bmf_vwap   > 0 THEN INSERT INTO price_history (symbol,price,volume,recorded_at,is_simulated) VALUES ('KEN-BMF',  v_sale.bmf_vwap,   v_sale.total_weight_kg, v_ts, false) ON CONFLICT (symbol,recorded_at) DO UPDATE SET price=EXCLUDED.price, volume=EXCLUDED.volume, is_simulated=false WHERE price_history.is_simulated=true; END IF;
+    IF v_sale.fngs_vwap  > 0 THEN INSERT INTO price_history (symbol,price,volume,recorded_at,is_simulated) VALUES ('KEN-FNGS', v_sale.fngs_vwap,  v_sale.total_weight_kg, v_ts, false) ON CONFLICT (symbol,recorded_at) DO UPDATE SET price=EXCLUDED.price, volume=EXCLUDED.volume, is_simulated=false WHERE price_history.is_simulated=true; END IF;
+    IF v_sale.kenya_index_price > 0 THEN
+        INSERT INTO price_history (symbol,price,volume,recorded_at,is_simulated) VALUES ('KENYA',   v_sale.kenya_index_price, v_sale.total_weight_kg, v_ts, false) ON CONFLICT (symbol,recorded_at) DO UPDATE SET price=EXCLUDED.price, volume=EXCLUDED.volume, is_simulated=false WHERE price_history.is_simulated=true;
+        INSERT INTO price_history (symbol,price,volume,recorded_at,is_simulated) VALUES ('MOMBASA', v_sale.kenya_index_price, v_sale.total_weight_kg, v_ts, false) ON CONFLICT (symbol,recorded_at) DO UPDATE SET price=EXCLUDED.price, volume=EXCLUDED.volume, is_simulated=false WHERE price_history.is_simulated=true;
+    END IF;
+END;
+$$;
+-- ============================================================
+-- ORDER FLOW REAL-TIME ENGINE
+-- Run this block in the Supabase SQL Editor after deploying.
+-- ============================================================
+
+-- ── 1. market_pressure table ─────────────────────────────────────────────────
+-- Stores live buy/sell aggregates per symbol.
+-- Updated by the trigger on every trade insert — typically within <100ms.
+-- Subscribed to via Supabase Realtime so the frontend receives depth
+-- updates the moment any user executes a trade.
+
+CREATE TABLE IF NOT EXISTS market_pressure (
+    symbol          TEXT        PRIMARY KEY,
+    buy_volume_5m   NUMERIC     NOT NULL DEFAULT 0,   -- kg bought, last 5 min
+    sell_volume_5m  NUMERIC     NOT NULL DEFAULT 0,   -- kg sold,   last 5 min
+    buy_volume_30m  NUMERIC     NOT NULL DEFAULT 0,   -- kg bought, last 30 min
+    sell_volume_30m NUMERIC     NOT NULL DEFAULT 0,   -- kg sold,   last 30 min
+    trade_count_5m  INT         NOT NULL DEFAULT 0,
+    trade_count_30m INT         NOT NULL DEFAULT 0,
+    last_side       TEXT,                             -- 'BUY' | 'SELL' — last trade direction
+    last_qty        NUMERIC     NOT NULL DEFAULT 0,   -- kg in the last trade
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Realtime requires FULL replica identity so old/new rows are visible
+ALTER TABLE market_pressure REPLICA IDENTITY FULL;
+
+ALTER TABLE market_pressure ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "market_pressure_read" ON market_pressure;
+CREATE POLICY "market_pressure_read" ON market_pressure
+    FOR SELECT TO authenticated USING (true);
+
+-- service_role writes via the trigger (SECURITY DEFINER — bypasses RLS)
+
+-- ── 2. Instant price-impact trigger ──────────────────────────────────────────
+--
+-- Fires AFTER EACH ROW inserted into trades.
+-- Does three things atomically:
+--   a) Re-aggregates the 5-min and 30-min buy/sell windows for this symbol
+--   b) Upserts market_pressure — frontend Realtime fires immediately
+--   c) Recalculates the tea's live price using Kyle's Lambda + tanh bounding
+--      and writes it to teas.current_price (triggering the existing teas
+--      Realtime subscription the frontend already has open)
+--
+-- No edge-function cron needed for flow impact — this fires in <100ms.
+
+CREATE OR REPLACE FUNCTION apply_trade_flow_impact()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_symbol        TEXT;
+    v_tea           RECORD;
+    v_buy_5m        NUMERIC := 0;
+    v_sell_5m       NUMERIC := 0;
+    v_buy_30m       NUMERIC := 0;
+    v_sell_30m      NUMERIC := 0;
+    v_cnt_5m        INT     := 0;
+    v_cnt_30m       INT     := 0;
+    v_net_flow      NUMERIC;
+    v_raw_impact    NUMERIC;
+    v_flow_effect   NUMERIC;
+    v_new_price     NUMERIC;
+
+    -- Tuning constants (mirror the edge function values)
+    c_ref_vol       CONSTANT NUMERIC := 5000;   -- kg  — "normal" 30-min volume
+    c_max_impact    CONSTANT NUMERIC := 0.02;   -- ±2% maximum price move per event
+BEGIN
+    -- ── Resolve which symbol this trade belongs to ─────────────────────────
+    IF NEW.tea_id IS NOT NULL THEN
+        SELECT symbol INTO v_symbol FROM teas WHERE id = NEW.tea_id;
+    ELSIF NEW.index_symbol IS NOT NULL THEN
+        v_symbol := NEW.index_symbol;
+    END IF;
+
+    IF v_symbol IS NULL THEN
+        RETURN NEW;  -- unrecognised trade row — skip cleanly
+    END IF;
+
+    -- ── Aggregate trade volumes for the two look-back windows ─────────────
+    -- Single-pass scan of the 30-min window; 5-min filter applied inline.
+    SELECT
+        COALESCE(SUM(CASE WHEN side = 'BUY'  AND created_at >= NOW() - INTERVAL '5 minutes'  THEN quantity END), 0),
+        COALESCE(SUM(CASE WHEN side = 'SELL' AND created_at >= NOW() - INTERVAL '5 minutes'  THEN quantity END), 0),
+        COALESCE(SUM(CASE WHEN side = 'BUY'  THEN quantity END), 0),
+        COALESCE(SUM(CASE WHEN side = 'SELL' THEN quantity END), 0),
+        COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '5 minutes'),
+        COUNT(*)
+    INTO v_buy_5m, v_sell_5m, v_buy_30m, v_sell_30m, v_cnt_5m, v_cnt_30m
+    FROM trades
+    WHERE (
+            (tea_id = NEW.tea_id AND NEW.tea_id IS NOT NULL)
+         OR (index_symbol = v_symbol AND NEW.index_symbol IS NOT NULL)
+    )
+    AND created_at >= NOW() - INTERVAL '30 minutes';
+
+    -- ── Push aggregates to market_pressure (Realtime fires here) ──────────
+    INSERT INTO market_pressure (
+        symbol, buy_volume_5m, sell_volume_5m,
+        buy_volume_30m, sell_volume_30m,
+        trade_count_5m, trade_count_30m,
+        last_side, last_qty, updated_at
+    ) VALUES (
+        v_symbol, v_buy_5m, v_sell_5m,
+        v_buy_30m, v_sell_30m,
+        v_cnt_5m, v_cnt_30m,
+        NEW.side, NEW.quantity, NOW()
+    )
+    ON CONFLICT (symbol) DO UPDATE SET
+        buy_volume_5m   = EXCLUDED.buy_volume_5m,
+        sell_volume_5m  = EXCLUDED.sell_volume_5m,
+        buy_volume_30m  = EXCLUDED.buy_volume_30m,
+        sell_volume_30m = EXCLUDED.sell_volume_30m,
+        trade_count_5m  = EXCLUDED.trade_count_5m,
+        trade_count_30m = EXCLUDED.trade_count_30m,
+        last_side       = EXCLUDED.last_side,
+        last_qty        = EXCLUDED.last_qty,
+        updated_at      = EXCLUDED.updated_at;
+
+    -- ── Apply flow impact to individual tea price (not composite indexes) ──
+    -- Composite indexes (KENYA, MOMBASA, etc.) are averages of tea prices —
+    -- adjusting them directly would create double-counting.  Their prices
+    -- will naturally reflect flow when the constituent teas are adjusted.
+    IF NEW.tea_id IS NULL THEN
+        RETURN NEW;  -- index trade: depth updated above; no direct price write
+    END IF;
+
+    SELECT * INTO v_tea FROM teas WHERE id = NEW.tea_id;
+    IF NOT FOUND OR v_tea.anchor_price IS NULL OR v_tea.anchor_price <= 0 THEN
+        RETURN NEW;
+    END IF;
+
+    -- ── Kyle's Lambda with tanh bounding (30-min window) ──────────────────
+    --
+    -- net_flow positive → more buying than selling → price nudges up
+    -- net_flow negative → more selling than buying → price nudges down
+    --
+    -- tanh() is PostgreSQL built-in (available since PG 9.x).
+    -- It maps any real number to (-1, +1) via the S-curve, preventing
+    -- a flood of large orders from creating an unbounded price spike.
+    --
+    v_net_flow    := v_buy_30m - v_sell_30m;
+    v_raw_impact  := v_net_flow / c_ref_vol;
+    v_flow_effect := tanh(v_raw_impact) * c_max_impact;
+
+    -- Apply the flow effect on top of the current live price (not anchor).
+    -- This means successive trades in the same direction compound correctly:
+    -- each new BUY pushes price a little higher than the last.
+    v_new_price := v_tea.current_price * (1.0 + v_flow_effect);
+
+    -- Hard safety clamp: ±15% of the real-world auction anchor.
+    -- Prevents any coordinated manipulation from moving prices to
+    -- levels that are economically absurd relative to real auction data.
+    v_new_price := GREATEST(
+        v_tea.anchor_price * 0.85,
+        LEAST(v_tea.anchor_price * 1.15, v_new_price)
+    );
+
+    -- Commit live price (triggers teas Realtime → frontend updates chart)
+    UPDATE teas
+    SET    current_price = v_new_price,
+           last_update   = NOW()
+    WHERE  id = NEW.tea_id;
+
+    -- Append tick to immutable price history
+    -- ON CONFLICT handles the rare case of two trades in the same millisecond
+    INSERT INTO price_history (symbol, price, volume, recorded_at, is_simulated)
+    VALUES (v_symbol, v_new_price, NEW.quantity, NOW(), false)
+    ON CONFLICT (symbol, recorded_at) DO UPDATE
+        SET price        = EXCLUDED.price,
+            volume       = price_history.volume + EXCLUDED.volume,
+            is_simulated = false;
+
+    RETURN NEW;
+END;
+$$;
+
+-- Install the trigger (idempotent — DROP first in case of re-run)
+DROP TRIGGER IF EXISTS trg_trade_flow_impact ON trades;
+CREATE TRIGGER trg_trade_flow_impact
+    AFTER INSERT ON trades
+    FOR EACH ROW
+    EXECUTE FUNCTION apply_trade_flow_impact();
+
+-- ── 3. Seed initial market_pressure rows from existing trade history ──────────
+-- Populates the table on first run so the frontend has data immediately.
+INSERT INTO market_pressure (
+    symbol, buy_volume_5m, sell_volume_5m,
+    buy_volume_30m, sell_volume_30m,
+    trade_count_5m, trade_count_30m,
+    last_side, last_qty, updated_at
+)
+SELECT
+    v_symbol,
+    COALESCE(SUM(CASE WHEN side = 'BUY'  AND created_at >= NOW() - INTERVAL '5 minutes'  THEN quantity END), 0),
+    COALESCE(SUM(CASE WHEN side = 'SELL' AND created_at >= NOW() - INTERVAL '5 minutes'  THEN quantity END), 0),
+    COALESCE(SUM(CASE WHEN side = 'BUY'  THEN quantity END), 0),
+    COALESCE(SUM(CASE WHEN side = 'SELL' THEN quantity END), 0),
+    COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '5 minutes'),
+    COUNT(*),
+    (SELECT side FROM trades t2
+     WHERE (t2.tea_id = t.tea_id OR t2.index_symbol = v_symbol)
+     ORDER BY t2.created_at DESC LIMIT 1),
+    (SELECT quantity FROM trades t3
+     WHERE (t3.tea_id = t.tea_id OR t3.index_symbol = v_symbol)
+     ORDER BY t3.created_at DESC LIMIT 1),
+    NOW()
+FROM (
+    SELECT COALESCE(te.symbol, tr.index_symbol) AS v_symbol,
+           tr.tea_id, tr.side, tr.quantity, tr.created_at
+    FROM   trades tr
+    LEFT JOIN teas te ON tr.tea_id = te.id
+    WHERE  tr.created_at >= NOW() - INTERVAL '30 minutes'
+) t
+GROUP BY v_symbol, t.tea_id
+ON CONFLICT (symbol) DO UPDATE SET
+    buy_volume_5m   = EXCLUDED.buy_volume_5m,
+    sell_volume_5m  = EXCLUDED.sell_volume_5m,
+    buy_volume_30m  = EXCLUDED.buy_volume_30m,
+    sell_volume_30m = EXCLUDED.sell_volume_30m,
+    trade_count_5m  = EXCLUDED.trade_count_5m,
+    trade_count_30m = EXCLUDED.trade_count_30m,
+    updated_at      = NOW();
+
+
+-- ============================================================
+-- ORDER FLOW REAL-TIME ENGINE  (run in Supabase SQL Editor)
+-- ============================================================
+-- Creates:
+--   1. market_pressure  — live buy/sell aggregates per symbol,
+--      updated instantly on every trade INSERT via trigger.
+--      Subscribed to via Supabase Realtime by the frontend.
+--   2. apply_trade_flow_impact()  — trigger function that:
+--        a. Recalculates 5-min and 30-min buy/sell volumes.
+--        b. Writes them to market_pressure (fires Realtime).
+--        c. Applies Kyle's-Lambda tanh-bounded flow impact
+--           directly to teas.current_price.
+--        d. Appends a price_history row for chart continuity.
+-- ============================================================
+
+-- 1. market_pressure table
+CREATE TABLE IF NOT EXISTS market_pressure (
+    symbol          TEXT        PRIMARY KEY,
+    buy_volume_5m   NUMERIC     NOT NULL DEFAULT 0,
+    sell_volume_5m  NUMERIC     NOT NULL DEFAULT 0,
+    buy_volume_30m  NUMERIC     NOT NULL DEFAULT 0,
+    sell_volume_30m NUMERIC     NOT NULL DEFAULT 0,
+    trade_count_5m  INT         NOT NULL DEFAULT 0,
+    trade_count_30m INT         NOT NULL DEFAULT 0,
+    last_side       TEXT        CHECK (last_side IN ('BUY','SELL')),
+    last_qty        NUMERIC     DEFAULT 0,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Enable Realtime so the frontend receives instant push updates
+ALTER TABLE market_pressure REPLICA IDENTITY FULL;
+
+ALTER TABLE market_pressure ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "market_pressure_read"  ON market_pressure;
+DROP POLICY IF EXISTS "market_pressure_write" ON market_pressure;
+CREATE POLICY "market_pressure_read"  ON market_pressure FOR SELECT TO authenticated USING (true);
+CREATE POLICY "market_pressure_write" ON market_pressure FOR ALL    TO service_role  USING (true);
+
+-- 2. Trigger function
+CREATE OR REPLACE FUNCTION apply_trade_flow_impact()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_symbol        TEXT;
+    v_tea           RECORD;
+    v_buy_5m        NUMERIC := 0;
+    v_sell_5m       NUMERIC := 0;
+    v_buy_30m       NUMERIC := 0;
+    v_sell_30m      NUMERIC := 0;
+    v_cnt_5m        INT     := 0;
+    v_cnt_30m       INT     := 0;
+    v_net_flow      NUMERIC;
+    v_raw_impact    NUMERIC;
+    v_flow_effect   NUMERIC;
+    v_new_price     NUMERIC;
+    -- Kyle's Lambda parameters (must match edge function constants)
+    v_ref_vol       CONSTANT NUMERIC := 5000;  -- kg normalisation reference
+    v_max_impact    CONSTANT NUMERIC := 0.02;  -- ±2 % max flow impact per tick
+BEGIN
+    -- ── Resolve the symbol being traded ───────────────────────────────
+    IF NEW.tea_id IS NOT NULL THEN
+        SELECT symbol INTO v_symbol FROM teas WHERE id = NEW.tea_id;
+    ELSIF NEW.index_symbol IS NOT NULL THEN
+        v_symbol := NEW.index_symbol;
+    END IF;
+    IF v_symbol IS NULL THEN RETURN NEW; END IF;
+
+    -- ── Aggregate buy/sell volumes over 5-min and 30-min windows ─────
+    -- We re-scan on every trade so the numbers are always current.
+    SELECT
+        COALESCE(SUM(quantity) FILTER (WHERE side='BUY'  AND created_at >= NOW()-INTERVAL'5 minutes'),  0),
+        COALESCE(SUM(quantity) FILTER (WHERE side='SELL' AND created_at >= NOW()-INTERVAL'5 minutes'),  0),
+        COALESCE(SUM(quantity) FILTER (WHERE side='BUY'),  0),
+        COALESCE(SUM(quantity) FILTER (WHERE side='SELL'), 0),
+        COUNT(*)              FILTER (WHERE created_at >= NOW()-INTERVAL'5 minutes'),
+        COUNT(*)
+    INTO v_buy_5m, v_sell_5m, v_buy_30m, v_sell_30m, v_cnt_5m, v_cnt_30m
+    FROM trades
+    WHERE created_at >= NOW() - INTERVAL '30 minutes'
+      AND (
+          (NEW.tea_id       IS NOT NULL AND tea_id      = NEW.tea_id)
+       OR (NEW.index_symbol IS NOT NULL AND index_symbol = v_symbol)
+      );
+
+    -- ── Push to market_pressure (fires Supabase Realtime to frontend) ─
+    INSERT INTO market_pressure
+        (symbol, buy_volume_5m, sell_volume_5m,
+         buy_volume_30m, sell_volume_30m,
+         trade_count_5m, trade_count_30m,
+         last_side, last_qty, updated_at)
+    VALUES
+        (v_symbol, v_buy_5m, v_sell_5m,
+         v_buy_30m, v_sell_30m,
+         v_cnt_5m,  v_cnt_30m,
+         NEW.side, NEW.quantity, NOW())
+    ON CONFLICT (symbol) DO UPDATE SET
+        buy_volume_5m   = EXCLUDED.buy_volume_5m,
+        sell_volume_5m  = EXCLUDED.sell_volume_5m,
+        buy_volume_30m  = EXCLUDED.buy_volume_30m,
+        sell_volume_30m = EXCLUDED.sell_volume_30m,
+        trade_count_5m  = EXCLUDED.trade_count_5m,
+        trade_count_30m = EXCLUDED.trade_count_30m,
+        last_side       = EXCLUDED.last_side,
+        last_qty        = EXCLUDED.last_qty,
+        updated_at      = EXCLUDED.updated_at;
+
+    -- ── Apply price impact for individual tea grades only ─────────────
+    -- Index prices are composites (computed from teas), not directly updated.
+    SELECT * INTO v_tea FROM teas WHERE symbol = v_symbol;
+    IF NOT FOUND
+       OR v_tea.anchor_price IS NULL
+       OR v_tea.anchor_price <= 0
+       OR v_tea.current_price IS NULL
+       OR v_tea.current_price <= 0
+    THEN
+        RETURN NEW;
+    END IF;
+
+    -- Kyle's Lambda with tanh bounding (30-min window gives persistence)
+    v_net_flow    := v_buy_30m - v_sell_30m;
+    v_raw_impact  := v_net_flow / v_ref_vol;
+    v_flow_effect := tanh(v_raw_impact) * v_max_impact;
+
+    v_new_price := v_tea.current_price * (1.0 + v_flow_effect);
+
+    -- Hard guard: must stay within ±15 % of real-world auction anchor
+    v_new_price := GREATEST(v_tea.anchor_price * 0.85,
+                    LEAST(  v_tea.anchor_price * 1.15, v_new_price));
+
+    -- Commit the live price (triggers existing teas Realtime to frontend)
+    UPDATE teas
+    SET  current_price = v_new_price,
+         last_update   = NOW()
+    WHERE symbol = v_symbol;
+
+    -- Append to immutable price history for chart continuity
+    INSERT INTO price_history (symbol, price, volume, recorded_at, is_simulated)
+    VALUES (v_symbol, v_new_price, NEW.quantity, NOW(), false)
+    ON CONFLICT (symbol, recorded_at)
+    DO UPDATE SET
+        price        = EXCLUDED.price,
+        volume       = price_history.volume + EXCLUDED.volume,
+        is_simulated = false;
+
+    RETURN NEW;
+END;
+$$;
+
+-- 3. Attach trigger to trades table
+DROP TRIGGER IF EXISTS trg_trade_flow_impact ON trades;
+CREATE TRIGGER trg_trade_flow_impact
+    AFTER INSERT ON trades
+    FOR EACH ROW
+    EXECUTE FUNCTION apply_trade_flow_impact();
+
+-- Allow tea_id to be NULL for index trades
+ALTER TABLE trades ALTER COLUMN tea_id DROP NOT NULL;
+ALTER TABLE trades DROP CONSTRAINT IF EXISTS trades_must_have_symbol;
+ALTER TABLE trades ADD CONSTRAINT trades_must_have_symbol
+    CHECK (tea_id IS NOT NULL OR index_symbol IS NOT NULL);
