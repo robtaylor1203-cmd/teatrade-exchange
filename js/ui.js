@@ -786,5 +786,36 @@ function adjustViewportScale() {
     // Let CSS media queries handle it by default
 }
 
+// =============================================
+// TOP TRADERS THIS WEEK
+// =============================================
+
+async function loadTopTraders() {
+    const container = document.getElementById('top-traders-list');
+    if (!container) return;
+    try {
+        const traders = await apiFetchTopTraders(5);
+        if (!traders || traders.length === 0) {
+            container.innerHTML = '<div style="padding: 12px 0; color: var(--text-muted); text-align: center;">No trades this week yet</div>';
+            return;
+        }
+        container.innerHTML = traders.map((t, i) => {
+            const vol = t.total_volume;
+            let label;
+            if (vol >= 1e6) label = (vol / 1e6).toFixed(1) + 'M kg';
+            else if (vol >= 1e3) label = (vol / 1e3).toFixed(0) + 'K kg';
+            else label = vol.toLocaleString() + ' kg';
+            const border = i < traders.length - 1 ? 'border-bottom: 1px solid var(--border);' : '';
+            const name = t.username || t.user_id?.slice(0, 8) || 'Anon';
+            return `<div style="display: flex; justify-content: space-between; padding: 8px 0; ${border}">
+                <span>${i + 1}. ${name}</span>
+                <span style="font-family: 'JetBrains Mono', monospace;">${label}</span>
+            </div>`;
+        }).join('');
+    } catch (e) {
+        console.warn('loadTopTraders error:', e);
+    }
+}
+
 // Run on page load
 adjustViewportScale();

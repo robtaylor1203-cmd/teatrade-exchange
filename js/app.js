@@ -163,8 +163,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Chat (slight delay to let DOM settle)
     setTimeout(() => { initChat(); }, 1000);
 
-    // Leaderboard & tea pairs
+    // Leaderboard, top traders & tea pairs
     await loadLeaderboard();
+    loadTopTraders();
     await loadTeaPairs();
 
     // User data
@@ -221,4 +222,5 @@ setInterval(async () => {
         updatePortfolioDisplay();
     }
     await loadLeaderboard();
+    loadTopTraders();
 }, 60000);

@@ -204,10 +204,23 @@ async function loadChartDataFromHistory(symbol, symbolType = 'tea', timeframeOve
     const tf = timeframeOverride || state.currentTimeframe || '1D';
     const cfg = TIMEFRAME_CONFIG[tf] || TIMEFRAME_CONFIG['1D'];
 
-    // Calculate the "since" timestamp for this timeframe
     let since = null;
     if (cfg.hoursBack) {
         since = new Date(Date.now() - cfg.hoursBack * 3600000).toISOString();
+    }
+
+    // For indexes, build composite OHLC from constituent tea price histories.
+    // The pre-averaged INDEX rows in price_history have negligible variation
+    // because Gaussian noise averages out across teas. Constituent tea rows
+    // contain real trade-driven price movement that makes charts meaningful.
+    if (symbolType === 'index') {
+        const _rev = { 'KENYA': 'MOMBASA', 'INDIA': 'KOLKATA', 'CEYLON': 'COLOMBO', 'ASIA': 'FUTURES' };
+        const idxDef = state.dbIndexes?.find(i => i.symbol === symbol)
+                    || state.dbIndexes?.find(i => i.symbol === (_rev[symbol] || symbol));
+        if (idxDef?.teas?.length) {
+            const compositeCandles = await _loadCompositeIndexOHLC(idxDef.teas, cfg, since);
+            if (compositeCandles && compositeCandles.length >= 3) return compositeCandles;
+        }
     }
 
     const rawData = await loadPriceHistory(symbol, cfg.limit, since);
@@ -217,6 +230,57 @@ async function loadChartDataFromHistory(symbol, symbolType = 'tea', timeframeOve
     }
 
     return null;
+}
+
+async function _loadCompositeIndexOHLC(teaSymbols, cfg, since) {
+    const allRows = await Promise.all(
+        teaSymbols.map(sym => loadPriceHistory(sym, cfg.limit, since))
+    );
+
+    // Bucket all teas' ticks by time interval, then average per bucket
+    const intervalMs = cfg.interval * 60000;
+    const buckets = {};
+
+    allRows.forEach((rows, teaIdx) => {
+        if (!rows) return;
+        rows.forEach(tick => {
+            const t = new Date(tick.recorded_at).getTime();
+            const bk = Math.floor(t / intervalMs) * intervalMs;
+            if (!buckets[bk]) buckets[bk] = { prices: new Array(teaSymbols.length).fill(null) };
+            // Keep the latest price per tea per bucket
+            buckets[bk].prices[teaIdx] = tick.price;
+        });
+    });
+
+    // Fill forward: within each bucket, if a tea has no tick, carry from previous bucket
+    const sortedKeys = Object.keys(buckets).map(Number).sort((a, b) => a - b);
+    const lastKnown = new Array(teaSymbols.length).fill(null);
+    const candles = [];
+
+    for (const bk of sortedKeys) {
+        const bp = buckets[bk].prices;
+        // Carry forward
+        for (let i = 0; i < bp.length; i++) {
+            if (bp[i] != null) lastKnown[i] = bp[i];
+            else bp[i] = lastKnown[i];
+        }
+        const valid = bp.filter(p => p != null && p > 0);
+        if (valid.length === 0) continue;
+        const avg = valid.reduce((a, b) => a + b, 0) / valid.length;
+        candles.push({ date: new Date(bk), open: avg, high: avg, low: avg, close: avg, volume: 0 });
+    }
+
+    // Build proper OHLC from consecutive candle close prices
+    // Each candle represents one interval; open = previous close, high/low track intra-bucket
+    if (candles.length > 1) {
+        for (let i = 1; i < candles.length; i++) {
+            candles[i].open = candles[i - 1].close;
+            candles[i].high = Math.max(candles[i].open, candles[i].close);
+            candles[i].low = Math.min(candles[i].open, candles[i].close);
+        }
+    }
+
+    return candles.length >= 3 ? candles : null;
 }
 
 // Load historical price data from database
@@ -545,9 +609,6 @@ function updateMainChartWithRealData() {
             changeEl.style.color = chg >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
         }
 
-        // Force chart redraw with latest data
-        state.cachedTimeframe = null;
-        drawChart();
     }
 }
 
@@ -643,7 +704,9 @@ function _getMainChartSymbolType() {
  * Returns null if the index can't be resolved or has no valid teas.
  */
 function _liveIndexPrice(indexSymbol) {
-    const idxDef = state.dbIndexes?.find(i => i.symbol === indexSymbol);
+    const _rev = { 'KENYA': 'MOMBASA', 'INDIA': 'KOLKATA', 'CEYLON': 'COLOMBO', 'ASIA': 'FUTURES' };
+    const idxDef = state.dbIndexes?.find(i => i.symbol === indexSymbol)
+                || state.dbIndexes?.find(i => i.symbol === (_rev[indexSymbol] || indexSymbol));
     if (!idxDef?.teas?.length) return null;
     const teaMap = {};
     state.teas.forEach(t => { teaMap[t.symbol] = t; });
@@ -674,11 +737,15 @@ function _pushPriceToActiveCharts(symbol, newPrice) {
         appendPriceToChart(state.chartData, newPrice * mainMult);
         if (typeof drawChart === 'function') drawChart();
     } else if (mainType === 'index' && state.chartData?.length > 0) {
-        const idxDef = state.dbIndexes?.find(i => i.symbol === mainSymbol);
+        const _revCard = { 'KENYA': 'MOMBASA', 'INDIA': 'KOLKATA', 'CEYLON': 'COLOMBO', 'ASIA': 'FUTURES' };
+        const altSymbol = _revCard[mainSymbol] || mainSymbol;
+        const idxDef = state.dbIndexes?.find(i => i.symbol === mainSymbol)
+                    || state.dbIndexes?.find(i => i.symbol === altSymbol);
         if (idxDef?.teas?.includes(symbol)) {
             const idxPrice = _liveIndexPrice(mainSymbol);
             if (idxPrice > 0) {
                 appendPriceToChart(state.chartData, idxPrice * mainMult);
+                updatePriceCache(mainSymbol, idxPrice, 'index');
                 if (typeof drawChart === 'function') drawChart();
             }
         }
@@ -708,6 +775,7 @@ function _pushPriceToActiveCharts(symbol, newPrice) {
                 const idxPrice = _liveIndexPrice(hubSymbol);
                 if (idxPrice > 0) {
                     appendPriceToChart(state.hubChartData, idxPrice * hubMult);
+                    updatePriceCache(hubSymbol, idxPrice, 'index');
                     if (typeof drawHubChart === 'function') drawHubChart();
                 }
             }

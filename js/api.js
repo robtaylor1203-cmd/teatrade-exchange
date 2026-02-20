@@ -883,6 +883,32 @@ async function apiFetchTraderProfile(username) {
 // TODAY'S OPENING PRICES (for accurate % change)
 // =============================================
 
+/**
+ * Fetch top traders by total volume (quantity) traded in the last 7 days.
+ * Groups by user_id, sums quantity, joins profiles for username.
+ */
+async function apiFetchTopTraders(limit = 5) {
+    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+    const { data, error } = await supabaseClient
+        .rpc('top_traders_by_volume', { since_ts: weekAgo, max_rows: limit });
+    if (error || !data) {
+        const fallback = await supabaseClient
+            .from('trades')
+            .select('user_id, quantity, profiles!inner(username)')
+            .gte('created_at', weekAgo)
+            .limit(1000);
+        if (!fallback.data) return [];
+        const agg = {};
+        fallback.data.forEach(t => {
+            const uid = t.user_id;
+            if (!agg[uid]) agg[uid] = { user_id: uid, username: t.profiles?.username || uid.slice(0, 8), total_volume: 0 };
+            agg[uid].total_volume += Math.abs(Number(t.quantity) || 0);
+        });
+        return Object.values(agg).sort((a, b) => b.total_volume - a.total_volume).slice(0, limit);
+    }
+    return data;
+}
+
 async function apiFetchTodayOpenPrices() {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
