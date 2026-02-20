@@ -60,22 +60,29 @@ function updatePortfolioDisplay() {
     let holdingsValue = 0;
     let html = '';
 
-    // Display tea positions
     state.positions.forEach(pos => {
         const tea = pos.teas || state.teas.find(t => t.id === pos.tea_id);
         if (!tea) return;
 
-        const currentValue = pos.quantity * tea.current_price;
-        const costBasis = pos.quantity * pos.avg_entry_price;
-        const pnl = currentValue - costBasis;
-        const pnlPct = (pnl / costBasis * 100).toFixed(1);
+        const isShort = pos.quantity < 0;
+        const absQty = Math.abs(pos.quantity);
+        const currentValue = absQty * tea.current_price;
+        const costBasis = absQty * pos.avg_entry_price;
+        const pnl = isShort
+            ? (pos.avg_entry_price - tea.current_price) * absQty
+            : (tea.current_price - pos.avg_entry_price) * absQty;
+        const pnlPct = costBasis > 0 ? (pnl / costBasis * 100).toFixed(1) : '0.0';
         holdingsValue += currentValue;
+
+        const badge = isShort
+            ? ' <span style="color: var(--accent-red); font-size: 10px; font-weight: 700;">SHORT</span>'
+            : '';
 
         html += `
             <div class="position-item">
                 <div>
-                    <div class="position-tea">${escapeHtml(tea.symbol)}</div>
-                    <div class="position-qty">${pos.quantity.toLocaleString()} kg @ $${pos.avg_entry_price.toFixed(2)}</div>
+                    <div class="position-tea">${escapeHtml(tea.symbol)}${badge}</div>
+                    <div class="position-qty">${absQty.toLocaleString()} kg @ $${pos.avg_entry_price.toFixed(2)}</div>
                 </div>
                 <div class="position-value">
                     <div class="position-current">$${currentValue.toFixed(2)}</div>
@@ -85,23 +92,30 @@ function updatePortfolioDisplay() {
         `;
     });
 
-    // Display index positions
     const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
     Object.entries(indexPositionsData).forEach(([symbol, pos]) => {
         const index = indexes.find(idx => idx.symbol === symbol);
-        if (!index || !pos || pos.quantity <= 0) return;
+        if (!index || !pos || pos.quantity === 0) return;
 
-        const currentValue = pos.quantity * index.price;
-        const costBasis = pos.quantity * pos.avg_entry_price;
-        const pnl = currentValue - costBasis;
-        const pnlPct = costBasis > 0 ? (pnl / costBasis * 100).toFixed(1) : 0;
+        const isShort = pos.quantity < 0;
+        const absQty = Math.abs(pos.quantity);
+        const currentValue = absQty * index.price;
+        const costBasis = absQty * pos.avg_entry_price;
+        const pnl = isShort
+            ? (pos.avg_entry_price - index.price) * absQty
+            : (index.price - pos.avg_entry_price) * absQty;
+        const pnlPct = costBasis > 0 ? (pnl / costBasis * 100).toFixed(1) : '0.0';
         holdingsValue += currentValue;
+
+        const dirBadge = isShort
+            ? '<span style="color: var(--accent-red); font-size: 10px; font-weight: 700;">SHORT</span>'
+            : '';
 
         html += `
             <div class="position-item">
                 <div>
-                    <div class="position-tea">${escapeHtml(symbol)} <span style="color: var(--accent-purple); font-size: 10px;">IDX</span></div>
-                    <div class="position-qty">${pos.quantity.toLocaleString()} kg @ $${pos.avg_entry_price.toFixed(2)}</div>
+                    <div class="position-tea">${escapeHtml(symbol)} <span style="color: var(--accent-purple); font-size: 10px;">IDX</span> ${dirBadge}</div>
+                    <div class="position-qty">${absQty.toLocaleString()} kg @ $${pos.avg_entry_price.toFixed(2)}</div>
                 </div>
                 <div class="position-value">
                     <div class="position-current">$${currentValue.toFixed(2)}</div>
@@ -173,38 +187,63 @@ function displayUserTrades(trades) {
 
     if (!tbody) return;
 
-    // Separate BUY and SELL trades
     const pairTrades = trades.filter(t => t.is_pair_trade);
     const regularTrades = trades.filter(t => !t.is_pair_trade);
 
-    const buyTrades = regularTrades.filter(t => t.side === 'BUY');
-    const sellTrades = regularTrades.filter(t => t.side === 'SELL');
-
-    // Match SELL trades to BUY trades (closing trades) — regular trades only
-    const closedBuyIds = new Set();
-    const closingInfo = {};
-
-    sellTrades.forEach(sell => {
-        const matchingBuy = buyTrades.find(buy =>
-            buy.tea_id === sell.tea_id &&
-            buy.quantity === sell.quantity &&
-            !closedBuyIds.has(buy.id) &&
-            buy.id < sell.id
-        );
-        if (matchingBuy) {
-            closedBuyIds.add(matchingBuy.id);
-            closingInfo[matchingBuy.id] = {
-                sellPrice: sell.price,
-                sellTime: sell.created_at
-            };
-        }
+    // ── Chronological netting: process trades per asset in order ──
+    // Mirrors the server-side netting logic so open/closed status is accurate.
+    const assetGroups = {};
+    regularTrades.forEach(t => {
+        const key = t.index_symbol || t.tea_id;
+        if (!assetGroups[key]) assetGroups[key] = [];
+        assetGroups[key].push(t);
     });
 
-    // For pair trades, match closing trades
+    const closedTradeIds = new Set();
+    const closingLegIds = new Set();
+    const closingInfo = {};
+
+    Object.values(assetGroups).forEach(group => {
+        group.sort((a, b) => a.id - b.id);
+        const openStack = [];
+
+        group.forEach(trade => {
+            const isBuy = trade.side === 'BUY';
+            let remaining = trade.quantity;
+
+            for (let i = 0; i < openStack.length && remaining > 0; i++) {
+                const entry = openStack[i];
+                if (entry.rem <= 0) continue;
+                const entryIsBuy = entry.trade.side === 'BUY';
+                if (entryIsBuy === isBuy) continue;
+
+                const closeQty = Math.min(remaining, entry.rem);
+                entry.rem -= closeQty;
+                remaining -= closeQty;
+
+                if (entry.rem <= 0) {
+                    closedTradeIds.add(entry.trade.id);
+                    if (entryIsBuy) {
+                        closingInfo[entry.trade.id] = { sellPrice: trade.price, sellTime: trade.created_at };
+                    } else {
+                        closingInfo[entry.trade.id] = { coverPrice: trade.price, coverTime: trade.created_at };
+                    }
+                }
+            }
+
+            if (remaining <= 0) {
+                closedTradeIds.add(trade.id);
+                closingLegIds.add(trade.id);
+            } else {
+                openStack.push({ trade, rem: remaining });
+            }
+        });
+    });
+
+    // ── Pair trade matching (unchanged) ──
     const closedPairIds = new Set();
     const pairClosingInfo = {};
     const openingPairTrades = [];
-    const closingPairTrades = [];
 
     const sortedPairTrades = [...pairTrades].sort((a, b) => a.id - b.id);
     sortedPairTrades.forEach(pt => {
@@ -218,17 +257,45 @@ function displayUserTrades(trades) {
         if (matchingOpen) {
             closedPairIds.add(matchingOpen.id);
             pairClosingInfo[matchingOpen.id] = { sellPrice: pt.price, sellTime: pt.created_at };
-            closingPairTrades.push(pt);
         } else {
             openingPairTrades.push(pt);
         }
     });
 
-    // Filter based on current filter setting
-    let displayRegular = buyTrades;
-    let displayPairs = openingPairTrades;
+    // ── Override open/closed using actual position state (source of truth) ──
+    const posQtyMap = {};
+    (state.positions || []).forEach(p => {
+        posQtyMap[p.tea_id] = (posQtyMap[p.tea_id] || 0) + p.quantity;
+    });
+    Object.entries(state.indexPositions || {}).forEach(([sym, p]) => {
+        if (p && p.quantity) posQtyMap[sym] = (posQtyMap[sym] || 0) + p.quantity;
+    });
+
+    Object.values(assetGroups).forEach(group => {
+        const sorted = [...group].sort((a, b) => b.id - a.id);
+        const key = sorted[0]?.index_symbol || sorted[0]?.tea_id;
+        const netQty = posQtyMap[key] || 0;
+        const posDir = netQty > 0 ? 'BUY' : netQty < 0 ? 'SELL' : null;
+        let remaining = Math.abs(netQty);
+
+        sorted.forEach(trade => {
+            if (posDir && trade.side === posDir && remaining > 0) {
+                remaining -= Math.min(remaining, trade.quantity);
+                closedTradeIds.delete(trade.id);
+            } else {
+                closedTradeIds.add(trade.id);
+            }
+        });
+    });
+
+    // ── Build display list (hide closing legs — they're shown via the opening trade's CLOSED status) ──
+    const visibleRegular = regularTrades.filter(t => !closingLegIds.has(t.id));
+
+    let displayRegular = [...visibleRegular];
+    let displayPairs = [...openingPairTrades];
+
     if (state.ordersFilter === 'open') {
-        displayRegular = buyTrades.filter(t => !closedBuyIds.has(t.id));
+        displayRegular = visibleRegular.filter(t => !closedTradeIds.has(t.id));
         displayPairs = openingPairTrades.filter(t => !closedPairIds.has(t.id));
     }
     let displayTrades = [...displayRegular, ...displayPairs].sort((a, b) => b.id - a.id);
@@ -251,12 +318,13 @@ function displayUserTrades(trades) {
             ? new Date(trade.created_at)
             : new Date(0);
         const timeStr = trade.created_at
-            ? time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+            ? time.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' ' +
+              time.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
             : '--:--';
         const orderId = '#' + String(trade.id).substring(0, 5).toUpperCase();
         const tea = state.teas.find(t => t.id === trade.tea_id);
 
-        const isClosed = closedBuyIds.has(trade.id) || closedPairIds.has(trade.id);
+        const isClosed = closedTradeIds.has(trade.id) || closedPairIds.has(trade.id);
         const closing = closingInfo[trade.id] || pairClosingInfo[trade.id];
 
         const isPairTrade = trade.is_pair_trade || false;
@@ -323,25 +391,41 @@ function displayUserTrades(trades) {
             const index = idxList.find(idx => idx.symbol === trade.index_symbol);
             teaSymbol = trade.index_symbol + ' IDX';
             total = trade.quantity * trade.price;
+            const isShortIdx = trade.side === 'SELL';
 
             if (index) {
-                pnl = (index.price - trade.price) * trade.quantity;
-                pnlPct = ((index.price - trade.price) / trade.price * 100);
+                if (isShortIdx) {
+                    pnl = (trade.price - index.price) * trade.quantity;
+                    pnlPct = ((trade.price - index.price) / trade.price * 100);
+                } else {
+                    pnl = (index.price - trade.price) * trade.quantity;
+                    pnlPct = ((index.price - trade.price) / trade.price * 100);
+                }
             } else {
                 pnl = 0;
                 pnlPct = 0;
             }
         } else {
-            // Regular single tea trade
+            // Regular single tea trade (long or short)
             teaSymbol = tea?.symbol || 'Unknown';
             total = trade.quantity * trade.price;
+            const isShortTrade = trade.side === 'SELL';
 
             if (isClosed && closing) {
-                pnl = (closing.sellPrice - trade.price) * trade.quantity;
-                pnlPct = ((closing.sellPrice - trade.price) / trade.price * 100);
+                const closePrice = closing.sellPrice ?? closing.coverPrice;
+                if (isShortTrade) {
+                    pnl = (trade.price - closePrice) * trade.quantity;
+                } else {
+                    pnl = (closePrice - trade.price) * trade.quantity;
+                }
+                pnlPct = trade.price > 0 ? (pnl / (trade.price * trade.quantity) * 100) : 0;
             } else if (tea) {
-                pnl = (tea.current_price - trade.price) * trade.quantity;
-                pnlPct = ((tea.current_price - trade.price) / trade.price * 100);
+                if (isShortTrade) {
+                    pnl = (trade.price - tea.current_price) * trade.quantity;
+                } else {
+                    pnl = (tea.current_price - trade.price) * trade.quantity;
+                }
+                pnlPct = trade.price > 0 ? (pnl / (trade.price * trade.quantity) * 100) : 0;
             } else {
                 pnl = 0;
                 pnlPct = 0;
@@ -435,8 +519,9 @@ function displayUserTrades(trades) {
             entryDisplay = trade.price.toFixed(4);
             qtyDisplay = '$' + trade.quantity.toLocaleString();
         } else {
-            sideLabel = 'BUY';
-            sideClass = 'buy-side';
+            const isBuySide = trade.side === 'BUY';
+            sideLabel = isBuySide ? 'BUY' : 'SHORT';
+            sideClass = isBuySide ? 'buy-side' : 'sell-side';
             entryDisplay = '$' + trade.price.toFixed(2);
             qtyDisplay = trade.quantity.toLocaleString();
         }
@@ -959,11 +1044,14 @@ async function _refreshOwnFollowCounts() {
 // =============================================
 
 let _tradeNotifyChannel = null;
-let _notifyFollowedIds = new Set();
+let _allFollowedIds = new Set();
+let _mutedFollowedIds = new Set();
 let _notifyPollTimer = null;
 let _lastSeenTradeId = 0;
+let _notifySeenTrades = new Set();
 
 function reconnectTradeNotifications() {
+    _stopNotifyPolling();
     if (_tradeNotifyChannel) {
         try { supabaseClient.removeChannel(_tradeNotifyChannel); } catch (_) {}
         _tradeNotifyChannel = null;
@@ -975,11 +1063,28 @@ async function _ensureTradeNotificationChannel() {
     if (!state.currentUser?.id) return;
 
     const follows = await apiFetchMyFollows();
-    _notifyFollowedIds = new Set(
-        follows.filter(f => f.notify).map(f => f.following_id)
+    _allFollowedIds = new Set(follows.map(f => f.following_id));
+    _mutedFollowedIds = new Set(
+        follows.filter(f => f.notify === false).map(f => f.following_id)
     );
 
-    if (_notifyFollowedIds.size === 0) {
+    for (const f of follows) {
+        if (_tradeNotifyProfileCache[f.following_id]) continue;
+        try {
+            const { data } = await supabaseClient
+                .from('profiles')
+                .select('username')
+                .eq('id', f.following_id)
+                .single();
+            if (data?.username) _tradeNotifyProfileCache[f.following_id] = data.username;
+        } catch (_) {}
+    }
+
+    console.log('[FollowNotify] all followed IDs:', [..._allFollowedIds]);
+    console.log('[FollowNotify] muted IDs:', [..._mutedFollowedIds]);
+    console.log('[FollowNotify] profile cache:', { ..._tradeNotifyProfileCache });
+
+    if (_allFollowedIds.size === 0) {
         _stopNotifyPolling();
         if (_tradeNotifyChannel) {
             supabaseClient.removeChannel(_tradeNotifyChannel);
@@ -988,31 +1093,36 @@ async function _ensureTradeNotificationChannel() {
         return;
     }
 
-    // Realtime channel (primary — may be blocked by RLS context)
     if (!_tradeNotifyChannel) {
         _tradeNotifyChannel = supabaseClient
             .channel('follow-trade-notifications')
             .on('postgres_changes',
                 { event: 'INSERT', schema: 'public', table: 'trades' },
                 (payload) => {
+                    console.log('[FollowNotify] Realtime INSERT:', payload.new?.id, payload.new?.user_id);
                     const trade = payload.new;
-                    if (!trade || !_notifyFollowedIds.has(trade.user_id)) return;
-                    if (trade.id && trade.id <= _lastSeenTradeId) return;
-                    _lastSeenTradeId = Math.max(_lastSeenTradeId, trade.id || 0);
+                    if (!trade || !_allFollowedIds.has(trade.user_id)) return;
+                    if (_mutedFollowedIds.has(trade.user_id)) return;
+                    const key = `${trade.id || trade.created_at}`;
+                    if (_notifySeenTrades.has(key)) return;
+                    _notifySeenTrades.add(key);
+                    if (trade.id) _lastSeenTradeId = Math.max(_lastSeenTradeId, trade.id);
                     _showTradeNotification(trade);
                 }
             )
-            .subscribe();
+            .subscribe((status) => {
+                console.log('[FollowNotify] Realtime status:', status);
+            });
     }
 
-    // Polling fallback — guaranteed to work via service-level REST query
+    await _initLastSeenTradeId();
     _startNotifyPolling();
 }
 
 function _startNotifyPolling() {
-    if (_notifyPollTimer) return;
-    _initLastSeenTradeId();
-    _notifyPollTimer = setInterval(_pollFollowedTrades, 30000);
+    _stopNotifyPolling();
+    _notifyPollTimer = setInterval(_pollFollowedTrades, 10000);
+    console.log('[FollowNotify] polling started (10s interval), lastSeenId:', _lastSeenTradeId);
 }
 
 function _stopNotifyPolling() {
@@ -1023,9 +1133,8 @@ function _stopNotifyPolling() {
 }
 
 async function _initLastSeenTradeId() {
-    if (_lastSeenTradeId > 0) return;
     try {
-        const ids = [..._notifyFollowedIds];
+        const ids = [..._allFollowedIds];
         if (ids.length === 0) return;
         const { data } = await supabaseClient
             .from('trades')
@@ -1038,23 +1147,28 @@ async function _initLastSeenTradeId() {
 }
 
 async function _pollFollowedTrades() {
-    if (!state.currentUser?.id || _notifyFollowedIds.size === 0) return;
+    if (!state.currentUser?.id || _allFollowedIds.size === 0) return;
 
     try {
-        const ids = [..._notifyFollowedIds];
-        const { data: trades } = await supabaseClient
+        const ids = [..._allFollowedIds];
+        const { data: trades, error } = await supabaseClient
             .from('trades')
             .select('id, user_id, side, quantity, price, tea_id, index_symbol, created_at')
             .in('user_id', ids)
             .gt('id', _lastSeenTradeId)
             .order('id', { ascending: true })
-            .limit(5);
+            .limit(10);
 
+        if (error) { console.warn('[FollowNotify] poll query error:', error.message); return; }
         if (!trades || trades.length === 0) return;
 
+        console.log('[FollowNotify] poll found', trades.length, 'new trades');
         for (const trade of trades) {
-            if (trade.id <= _lastSeenTradeId) continue;
-            _lastSeenTradeId = trade.id;
+            _lastSeenTradeId = Math.max(_lastSeenTradeId, trade.id);
+            const key = `${trade.id}`;
+            if (_notifySeenTrades.has(key)) continue;
+            _notifySeenTrades.add(key);
+            if (_mutedFollowedIds.has(trade.user_id)) continue;
             _showTradeNotification(trade);
         }
     } catch (e) {
@@ -1062,7 +1176,7 @@ async function _pollFollowedTrades() {
     }
 }
 
-function _showTradeNotification(trade) {
+async function _showTradeNotification(trade) {
     const stack = document.getElementById('follow-notify-stack');
     if (!stack) return;
 
@@ -1074,7 +1188,22 @@ function _showTradeNotification(trade) {
     const qty = Number(trade.quantity).toLocaleString();
     const price = Number(trade.price).toFixed(2);
     const total = (trade.quantity * trade.price).toFixed(2);
-    const username = _tradeNotifyProfileCache[trade.user_id] || 'A trader you follow';
+
+    let username = _tradeNotifyProfileCache[trade.user_id];
+    if (!username) {
+        try {
+            const { data } = await supabaseClient
+                .from('profiles')
+                .select('username')
+                .eq('id', trade.user_id)
+                .single();
+            if (data?.username) {
+                username = data.username;
+                _tradeNotifyProfileCache[trade.user_id] = username;
+            }
+        } catch (_) {}
+    }
+    if (!username) username = trade.user_id?.slice(0, 8) || 'Trader';
     const initials = username.slice(0, 2).toUpperCase();
 
     const isIndex = !!trade.index_symbol;
@@ -1143,16 +1272,8 @@ function _copyFollowTrade(selectVal, side, quantity, cardId) {
 const _tradeNotifyProfileCache = {};
 
 async function _buildNotifyProfileCache() {
-    const follows = await apiFetchMyFollows();
-    for (const f of follows) {
-        if (_tradeNotifyProfileCache[f.following_id]) continue;
-        const { data } = await supabaseClient
-            .from('profiles')
-            .select('username')
-            .eq('id', f.following_id)
-            .single();
-        if (data?.username) _tradeNotifyProfileCache[f.following_id] = data.username;
-    }
+    // Cache is now built inside _ensureTradeNotificationChannel;
+    // this function is kept as a no-op for backward compatibility.
 }
 
 async function toggleFollowNotify(targetUserId, currentState) {
@@ -1160,12 +1281,11 @@ async function toggleFollowNotify(targetUserId, currentState) {
     await apiToggleFollowNotify(targetUserId, newState);
 
     if (newState) {
-        _notifyFollowedIds.add(targetUserId);
+        _mutedFollowedIds.delete(targetUserId);
     } else {
-        _notifyFollowedIds.delete(targetUserId);
+        _mutedFollowedIds.add(targetUserId);
     }
 
-    _ensureTradeNotificationChannel();
     return newState;
 }
 
@@ -1336,16 +1456,21 @@ function renderFinancialTab() {
     positions.forEach(pos => {
         const tea = pos.teas || state.teas.find(t => t.id === pos.tea_id);
         if (!tea) return;
-        const curVal = pos.quantity * tea.current_price;
-        const cost = pos.quantity * pos.avg_entry_price;
-        const pnl = curVal - cost;
+        const isShort = pos.quantity < 0;
+        const absQty = Math.abs(pos.quantity);
+        const curVal = absQty * tea.current_price;
+        const cost = absQty * pos.avg_entry_price;
+        const pnl = isShort
+            ? (pos.avg_entry_price - tea.current_price) * absQty
+            : (tea.current_price - pos.avg_entry_price) * absQty;
         const pnlPct = cost > 0 ? (pnl / cost * 100).toFixed(1) : '0.0';
         holdingsValue += curVal;
         totalPnl += pnl;
+        const shortBadge = isShort ? ' <span style="color:var(--accent-red);font-size:10px;font-weight:700">SHORT</span>' : '';
         positionsHtml += `
             <div class="pf-pos-row">
-                <div class="pf-pos-symbol">${escapeHtml(tea.symbol)}</div>
-                <div class="pf-pos-qty">${pos.quantity.toLocaleString()} kg</div>
+                <div class="pf-pos-symbol">${escapeHtml(tea.symbol)}${shortBadge}</div>
+                <div class="pf-pos-qty">${absQty.toLocaleString()} kg</div>
                 <div class="pf-pos-avg">$${pos.avg_entry_price.toFixed(2)}</div>
                 <div class="pf-pos-cur">$${tea.current_price.toFixed(2)}</div>
                 <div class="pf-pos-val">$${curVal.toFixed(2)}</div>
@@ -1355,17 +1480,22 @@ function renderFinancialTab() {
 
     Object.entries(indexPositionsData).forEach(([symbol, pos]) => {
         const idx = indexes.find(i => i.symbol === symbol);
-        if (!idx || !pos || pos.quantity <= 0) return;
-        const curVal = pos.quantity * idx.price;
-        const cost = pos.quantity * pos.avg_entry_price;
-        const pnl = curVal - cost;
+        if (!idx || !pos || pos.quantity === 0) return;
+        const isShort = pos.quantity < 0;
+        const absQty = Math.abs(pos.quantity);
+        const curVal = absQty * idx.price;
+        const cost = absQty * pos.avg_entry_price;
+        const pnl = isShort
+            ? (pos.avg_entry_price - idx.price) * absQty
+            : (idx.price - pos.avg_entry_price) * absQty;
         const pnlPct = cost > 0 ? (pnl / cost * 100).toFixed(1) : '0.0';
         holdingsValue += curVal;
         totalPnl += pnl;
+        const shortBadge = isShort ? ' <span style="color:var(--accent-red);font-size:10px;font-weight:700">SHORT</span>' : '';
         positionsHtml += `
             <div class="pf-pos-row">
-                <div class="pf-pos-symbol">${escapeHtml(symbol)} <span class="pf-idx-badge">IDX</span></div>
-                <div class="pf-pos-qty">${pos.quantity.toLocaleString()} kg</div>
+                <div class="pf-pos-symbol">${escapeHtml(symbol)} <span class="pf-idx-badge">IDX</span>${shortBadge}</div>
+                <div class="pf-pos-qty">${absQty.toLocaleString()} kg</div>
                 <div class="pf-pos-avg">$${pos.avg_entry_price.toFixed(2)}</div>
                 <div class="pf-pos-cur">$${idx.price.toFixed(2)}</div>
                 <div class="pf-pos-val">$${curVal.toFixed(2)}</div>
@@ -1376,7 +1506,7 @@ function renderFinancialTab() {
     const totalValue = balance + holdingsValue;
     const overallReturn = totalValue - 10000;
     const overallPct = (overallReturn / 10000 * 100).toFixed(2);
-    const posCount = positions.length + Object.values(indexPositionsData).filter(p => p && p.quantity > 0).length;
+    const posCount = positions.length + Object.values(indexPositionsData).filter(p => p && p.quantity !== 0).length;
 
     panel.innerHTML = `
         <div class="pf-summary-grid">

@@ -685,7 +685,8 @@ function updateQuoteBoard() {
         const prefix = parts[0];
         const symbol = parts[1] || tea.symbol;
         const price = Number(tea.current_price) || 0;
-        const change = Number(tea.price_change_24h) || 0;
+        const prev = Number(tea.previous_price) || price;
+        const change = prev > 0 ? ((price - prev) / prev * 100) : 0;
         const volume = Number(tea.volume_24h) || 0;
         const isUp = change >= 0;
         const prevPrice = state.previousQuotePrices[tea.symbol];

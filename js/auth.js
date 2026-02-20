@@ -27,6 +27,7 @@ async function checkAuthState() {
             await loadUserProfile();
             updateUIForLoggedInUser();
             if (typeof startUserSubscriptions === 'function') startUserSubscriptions(user.id);
+            if (typeof _ensureTradeNotificationChannel === 'function') _ensureTradeNotificationChannel();
         } else {
             updateUIForLoggedOutUser();
         }
@@ -176,6 +177,7 @@ async function handleLogin(e) {
             await loadUserProfile();
             updateUIForLoggedInUser();
             if (typeof startUserSubscriptions === 'function') startUserSubscriptions(data.user.id);
+            if (typeof _ensureTradeNotificationChannel === 'function') _ensureTradeNotificationChannel();
             showToast('Welcome back!', `Good to see you, ${state.userProfile?.username || 'trader'}!`);
         }
 

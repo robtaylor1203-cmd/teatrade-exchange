@@ -3,14 +3,18 @@
  * Toast notifications, HTML escaping, formatters, and small helpers.
  */
 
+let _toastTimer = null;
 function showToast(title, message, isError = false) {
     const toast = document.getElementById('trade-toast');
     if (!toast) return;
+    if (_toastTimer) clearTimeout(_toastTimer);
     document.getElementById('toast-title').textContent = title;
     document.getElementById('toast-message').textContent = message;
     toast.classList.toggle('error', isError);
+    toast.classList.remove('visible');
+    void toast.offsetWidth;
     toast.classList.add('visible');
-    setTimeout(() => toast.classList.remove('visible'), 4000);
+    _toastTimer = setTimeout(() => { toast.classList.remove('visible'); _toastTimer = null; }, 4000);
 }
 
 function escapeHtml(text) {

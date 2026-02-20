@@ -126,31 +126,14 @@ function updateTradeButton() {
 
     const balance = parseFloat(state.userProfile?.cash_balance);
 
-    if (state.tradeType === 'BUY') {
-        if (!isNaN(balance) && total > balance) {
-            btn.textContent = 'Insufficient Balance';
-            btn.disabled = true;
-            return;
-        }
-        btn.textContent = `BUY ${qty.toLocaleString()} kg for $${total.toFixed(2)}`;
-    } else {
-        // SELL — check holdings
-        const selectValue = select.value;
-        const isIndex = selectValue.startsWith('INDEX_');
-
-        if (isIndex) {
-            btn.textContent = `SELL ${qty.toLocaleString()} kg for $${total.toFixed(2)}`;
-        } else {
-            const teaId = parseInt(selectValue);
-            const position = state.positions.find(p => p.tea_id === teaId);
-            if (!position || position.quantity < qty) {
-                btn.textContent = 'Insufficient Holdings';
-                btn.disabled = true;
-                return;
-            }
-            btn.textContent = `SELL ${qty.toLocaleString()} kg for $${total.toFixed(2)}`;
-        }
+    if (!isNaN(balance) && total > balance) {
+        btn.textContent = 'Insufficient Balance';
+        btn.disabled = true;
+        return;
     }
+
+    const side = state.tradeType === 'BUY' ? 'BUY' : 'SELL';
+    btn.textContent = `${side} ${qty.toLocaleString()} kg for $${total.toFixed(2)}`;
     btn.disabled = false;
 }
 
@@ -238,15 +221,8 @@ async function executeTrade() {
 
             state.userProfile.cash_balance = result.new_balance;
 
-            if (state.tradeType === 'BUY') {
-                showToast('Trade Executed!', `Bought ${qty.toLocaleString()} kg of ${productName} at $${executionPrice.toFixed(2)}/kg`);
-            } else {
-                const indexPos = state.indexPositions?.[indexSymbol];
-                const entryPrice = indexPos?.avg_entry_price || executionPrice;
-                const pnl = (executionPrice - entryPrice) * qty;
-                const pnlText = pnl >= 0 ? `Profit: +$${pnl.toFixed(2)}` : `Loss: -$${Math.abs(pnl).toFixed(2)}`;
-                showToast('Trade Executed!', `Sold ${qty.toLocaleString()} kg of ${productName}. ${pnlText}`);
-            }
+            const idxSideLabel = state.tradeType === 'BUY' ? 'Bought' : 'Shorted';
+            showToast('Trade Executed!', `${idxSideLabel} ${qty.toLocaleString()} kg of ${productName} at $${executionPrice.toFixed(2)}/kg`);
 
             await loadIndexPositions();
 
@@ -264,39 +240,38 @@ async function executeTrade() {
             const serverPrice = result.price;
             const serverTotal = result.total;
 
-            if (state.tradeType === 'BUY') {
-                showToast('Trade Executed!',
-                    `Bought ${qty.toLocaleString()} kg of ${tea.symbol} at $${serverPrice.toFixed(2)}/kg`);
+            const sideLabel = state.tradeType === 'BUY' ? 'Bought' : 'Shorted';
+            showToast('Trade Executed!',
+                `${sideLabel} ${qty.toLocaleString()} kg of ${tea.symbol} at $${serverPrice.toFixed(2)}/kg`);
 
-                // Register SL/TP orders if set
-                if (stopLoss || takeProfit) {
-                    state.pendingSlTpOrders[tea.id] = {
-                        sl: stopLoss, tp: takeProfit, side: 'BUY',
-                        qty: qty, symbol: tea.symbol, entryPrice: serverPrice
-                    };
-                    if (stopLoss && takeProfit) {
-                        showToast('SL/TP Set', `SL: $${stopLoss.toFixed(2)} | TP: $${takeProfit.toFixed(2)}`);
-                    } else if (stopLoss) {
-                        showToast('Stop Loss Set', `Will close at $${stopLoss.toFixed(2)}`);
-                    } else {
-                        showToast('Take Profit Set', `Will close at $${takeProfit.toFixed(2)}`);
-                    }
+            if (stopLoss || takeProfit) {
+                state.pendingSlTpOrders[tea.id] = {
+                    sl: stopLoss, tp: takeProfit, side: state.tradeType,
+                    qty: qty, symbol: tea.symbol, entryPrice: serverPrice
+                };
+                if (stopLoss && takeProfit) {
+                    showToast('SL/TP Set', `SL: $${stopLoss.toFixed(2)} | TP: $${takeProfit.toFixed(2)}`);
+                } else if (stopLoss) {
+                    showToast('Stop Loss Set', `Will close at $${stopLoss.toFixed(2)}`);
+                } else {
+                    showToast('Take Profit Set', `Will close at $${takeProfit.toFixed(2)}`);
                 }
-            } else {
-                const existingPosition = state.positions.find(p => p.tea_id === tea.id);
-                const entryPrice = existingPosition?.avg_entry_price || serverPrice;
-                const pnl = (serverPrice - entryPrice) * qty;
-                const pnlText = pnl >= 0 ? `Profit: +$${pnl.toFixed(2)}` : `Loss: -$${Math.abs(pnl).toFixed(2)}`;
-                showToast('Trade Executed!', `Sold ${qty.toLocaleString()} kg of ${tea.symbol}. ${pnlText}`);
             }
         }
+
+        // Brief success flash on the button
+        btn.textContent = '✓ Trade Executed';
+        btn.classList.add('trade-success');
+        btn.disabled = false;
 
         // Refresh data from server (source of truth)
         await loadPositions();
         await loadUserTrades();
         updateUIForLoggedInUser();
 
-        // Reset form
+        // Hold the success state for a moment, then reset form
+        await new Promise(r => setTimeout(r, 1500));
+        btn.classList.remove('trade-success');
         document.getElementById('trade-qty').value = '';
         document.getElementById('trade-sl').value = '';
         document.getElementById('trade-tp').value = '';
@@ -360,9 +335,10 @@ async function executeSlTpClose(teaId, order, currentPrice, triggerType) {
 // =============================================
 
 /**
- * Close (sell) a tea position at the current market price.
+ * Close a tea position at the current market price.
+ * Longs are closed by SELL, shorts are closed by BUY.
  * @param {number} teaId     - The tea instrument ID.
- * @param {number} quantity  - Quantity to sell.
+ * @param {number} quantity  - Signed quantity from position (positive=long, negative=short).
  * @param {string} teaSymbol - Display symbol (e.g. 'KEN-BP1').
  */
 async function closePosition(teaId, quantity, teaSymbol) {
@@ -377,9 +353,12 @@ async function closePosition(teaId, quantity, teaSymbol) {
         return;
     }
 
+    const isShort = position.quantity < 0;
+    const closeSide = isShort ? 'BUY' : 'SELL';
+    const closeQty = Math.abs(quantity);
+
     try {
-        // Server-side atomic SELL at current market price
-        const result = await apiExecuteTrade(teaSymbol, 'SELL', quantity);
+        const result = await apiExecuteTrade(teaSymbol, closeSide, closeQty);
 
         if (!result.success) {
             throw new Error(result.error || 'Close failed');
@@ -387,19 +366,24 @@ async function closePosition(teaId, quantity, teaSymbol) {
 
         state.userProfile.cash_balance = result.new_balance;
 
-        const pnl = (result.price - position.avg_entry_price) * quantity;
+        let pnl;
+        if (isShort) {
+            pnl = (position.avg_entry_price - result.price) * closeQty;
+        } else {
+            pnl = (result.price - position.avg_entry_price) * closeQty;
+        }
         const pnlText = pnl >= 0 ? `Profit: +$${pnl.toFixed(2)}` : `Loss: -$${Math.abs(pnl).toFixed(2)}`;
-        showToast('Position Closed!', `Sold ${quantity.toLocaleString()} kg of ${teaSymbol}. ${pnlText}`);
+        const action = isShort ? 'Covered' : 'Sold';
+        showToast('Position Closed!', `${action} ${closeQty.toLocaleString()} kg of ${teaSymbol}. ${pnlText}`);
 
         recordClosedTrade({
             ...position,
             symbol: teaSymbol,
-            quantity: quantity,
-            type: 'long'
+            quantity: closeQty,
+            type: isShort ? 'short' : 'long'
         }, result.price);
 
         await loadPositions();
-        // Brief delay to allow DB write to propagate before re-fetching
         await new Promise(r => setTimeout(r, 400));
         await loadUserTrades();
         updateUIForLoggedInUser();
@@ -411,9 +395,10 @@ async function closePosition(teaId, quantity, teaSymbol) {
 }
 
 /**
- * Close (sell) an index position at the current calculated index price.
+ * Close an index position at the current calculated index price.
+ * Longs are closed by SELL, shorts are closed by BUY.
  * @param {string} indexSymbol - e.g. 'KENYA'
- * @param {number} quantity
+ * @param {number} quantity    - Signed quantity from position.
  * @param {string} tradeId     - Original trade row ID (for reference).
  */
 async function closeIndexPosition(indexSymbol, quantity, tradeId) {
@@ -422,7 +407,6 @@ async function closeIndexPosition(indexSymbol, quantity, tradeId) {
         return;
     }
 
-    // Get current index price
     const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
     const index = indexes.find(idx => idx.symbol === indexSymbol);
     if (!index) {
@@ -431,16 +415,18 @@ async function closeIndexPosition(indexSymbol, quantity, tradeId) {
     }
 
     const position = state.indexPositions[indexSymbol];
-    if (!position || position.quantity < quantity) {
-        showToast('Error', 'Index position not found or insufficient quantity', true);
+    if (!position) {
+        showToast('Error', 'Index position not found', true);
         return;
     }
 
+    const isShort = position.quantity < 0;
+    const closeSide = isShort ? 'BUY' : 'SELL';
+    const closeQty = Math.abs(quantity);
     const price = index.price;
 
     try {
-        // C4 FIX: Server-side atomic SELL
-        const result = await apiExecuteIndexTrade(indexSymbol, 'SELL', quantity, price);
+        const result = await apiExecuteIndexTrade(indexSymbol, closeSide, closeQty, price);
 
         if (!result.success) {
             throw new Error(result.error || 'Close failed');
@@ -448,9 +434,15 @@ async function closeIndexPosition(indexSymbol, quantity, tradeId) {
 
         state.userProfile.cash_balance = result.new_balance;
 
-        const pnl = (price - position.avg_entry_price) * quantity;
+        let pnl;
+        if (isShort) {
+            pnl = (position.avg_entry_price - price) * closeQty;
+        } else {
+            pnl = (price - position.avg_entry_price) * closeQty;
+        }
         const pnlText = pnl >= 0 ? `Profit: +$${pnl.toFixed(2)}` : `Loss: -$${Math.abs(pnl).toFixed(2)}`;
-        showToast('Position Closed!', `Sold ${quantity.toLocaleString()} kg of ${indexSymbol} Index. ${pnlText}`);
+        const action = isShort ? 'Covered' : 'Sold';
+        showToast('Position Closed!', `${action} ${closeQty.toLocaleString()} kg of ${indexSymbol} Index. ${pnlText}`);
 
         await loadPositions();
         await loadIndexPositions();

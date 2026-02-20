@@ -7130,6 +7130,17 @@ body.modal-open {
     background: var(--text-muted);
     cursor: not-allowed;
 }
+.trade-execute-btn.trade-success {
+    background: var(--accent-green) !important;
+    color: white !important;
+    cursor: default;
+    animation: successPulse 0.4s ease;
+}
+@keyframes successPulse {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.04); }
+    100% { transform: scale(1); }
+}
 .trade-execute-btn.signin-prompt {
     background: var(--accent-blue);
     cursor: pointer;
@@ -7259,14 +7270,14 @@ body.modal-open {
 /* Trade Success Toast */
 .trade-toast {
     position: fixed;
-    top: 24px;
+    bottom: 24px;
     right: 24px;
     background: var(--bg-secondary);
     border: 1px solid var(--accent-green);
     border-radius: 8px;
     padding: 16px 20px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-    z-index: 10001;
+    z-index: 10003;
     display: none;
     animation: slideIn 0.3s ease;
 }
@@ -7293,14 +7304,14 @@ body.modal-open {
 /* Follow Trade Notification Stack */
 .follow-notify-stack {
     position: fixed;
-    bottom: 24px;
+    bottom: 80px;
     right: 24px;
     z-index: 10002;
     display: flex;
     flex-direction: column-reverse;
     gap: 10px;
     pointer-events: none;
-    max-height: 80vh;
+    max-height: 70vh;
     overflow: hidden;
 }
 .follow-notify-card {
