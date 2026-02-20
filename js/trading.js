@@ -34,7 +34,7 @@ function setTradeType(type) {
     btn.classList.remove('buy', 'sell');
     btn.classList.add(type.toLowerCase());
 
-    updateTradeButton();
+    updateTradeSummary();
 }
 
 /**
@@ -84,10 +84,26 @@ function updateTradeSummary() {
     }
 
     const qty = parseFloat(qtyInput.value) || 0;
+    const leverage = parseFloat(document.getElementById('trade-leverage')?.value) || 10;
+    const SPREAD_PCT = 0.01;
 
-    priceInput.value = price > 0 ? price.toFixed(3) : '';
-    const total = price * qty;
-    valueEl.textContent = '$' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const isBuy = state.tradeType === 'BUY';
+    const execPrice = price > 0 ? (isBuy ? price * (1 + SPREAD_PCT / 2) : price * (1 - SPREAD_PCT / 2)) : 0;
+    priceInput.value = execPrice > 0 ? execPrice.toFixed(3) : '';
+
+    const priceLabel = document.getElementById('trade-price-label');
+    if (priceLabel) priceLabel.textContent = isBuy ? 'Ask Price ($/kg)' : 'Bid Price ($/kg)';
+    const notional = execPrice * qty;
+    const margin = notional / leverage;
+    const spreadCost = Math.abs(execPrice - price) * qty;
+
+    valueEl.textContent = '$' + notional.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const marginEl = document.getElementById('trade-margin');
+    if (marginEl) marginEl.textContent = '$' + margin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const spreadEl = document.getElementById('trade-spread-cost');
+    if (spreadEl) spreadEl.textContent = '$' + spreadCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     updateTradeButton();
 }
@@ -101,11 +117,15 @@ function updateTradeButton() {
     const select = document.getElementById('trade-tea-select');
     const qty = parseFloat(document.getElementById('trade-qty').value) || 0;
     const price = parseFloat(document.getElementById('trade-price').value) || 0;
-    const total = price * qty;
+    const leverage = parseFloat(document.getElementById('trade-leverage')?.value) || 10;
+    const SPREAD_PCT = 0.01;
+    const isBuy = state.tradeType === 'BUY';
+    const execPrice = isBuy ? price * (1 + SPREAD_PCT / 2) : price * (1 - SPREAD_PCT / 2);
+    const margin = (execPrice * qty) / leverage;
 
     if (!state.currentUser) {
         btn.textContent = 'Sign in to Trade';
-        btn.disabled = false; // Keep enabled so it opens auth modal
+        btn.disabled = false;
         btn.classList.add('signin-prompt');
         return;
     }
@@ -126,14 +146,14 @@ function updateTradeButton() {
 
     const balance = getActiveBalance();
 
-    if (!isNaN(balance) && total > balance) {
-        btn.textContent = 'Insufficient Balance';
+    if (!isNaN(balance) && margin > balance) {
+        btn.textContent = 'Insufficient Margin';
         btn.disabled = true;
         return;
     }
 
     const side = state.tradeType === 'BUY' ? 'BUY' : 'SELL';
-    btn.textContent = `${side} ${qty.toLocaleString()} kg for $${total.toFixed(2)}`;
+    btn.textContent = `${side} ${qty.toLocaleString()} kg — margin $${margin.toFixed(2)} (${leverage}x)`;
     btn.disabled = false;
 }
 
@@ -162,6 +182,7 @@ async function executeTrade() {
     const selectValue = select.value;
     const qty = parseFloat(document.getElementById('trade-qty').value);
     const price = parseFloat(document.getElementById('trade-price').value);
+    const leverage = parseFloat(document.getElementById('trade-leverage')?.value) || 10;
     const total = price * qty;
 
     // SL / TP values
@@ -213,7 +234,7 @@ async function executeTrade() {
                 ? _liveIndex.price
                 : price;
 
-            const result = await apiExecuteIndexTrade(indexSymbol, state.tradeType, qty, executionPrice);
+            const result = await apiExecuteIndexTrade(indexSymbol, state.tradeType, qty, executionPrice, leverage);
 
             if (!result.success) {
                 throw new Error(result.error || 'Index trade failed');
@@ -222,13 +243,14 @@ async function executeTrade() {
             setActiveBalance(result.new_balance);
 
             const idxSideLabel = state.tradeType === 'BUY' ? 'Bought' : 'Shorted';
-            showToast('Trade Executed!', `${idxSideLabel} ${qty.toLocaleString()} kg of ${productName} at $${executionPrice.toFixed(2)}/kg`);
+            const _sc = result.spread_cost ? ` — Spread: $${Number(result.spread_cost).toFixed(2)}` : '';
+            showToast('Trade Executed!', `${idxSideLabel} ${qty.toLocaleString()} kg of ${productName} at $${(result.execution_price || executionPrice).toFixed(2)}/kg (${leverage}x)${_sc}`);
 
             await loadIndexPositions();
 
         } else {
             // ── TEA TRADE (server-side atomic execution) ────────────────
-            const result = await apiExecuteTrade(tea.symbol, state.tradeType, qty);
+            const result = await apiExecuteTrade(tea.symbol, state.tradeType, qty, leverage);
 
             if (!result.success) {
                 throw new Error(result.error || 'Trade failed');
@@ -240,8 +262,9 @@ async function executeTrade() {
             const serverTotal = result.total;
 
             const sideLabel = state.tradeType === 'BUY' ? 'Bought' : 'Shorted';
+            const _sc = result.spread_cost ? ` — Spread: $${Number(result.spread_cost).toFixed(2)}` : '';
             showToast('Trade Executed!',
-                `${sideLabel} ${qty.toLocaleString()} kg of ${tea.symbol} at $${serverPrice.toFixed(2)}/kg`);
+                `${sideLabel} ${qty.toLocaleString()} kg of ${tea.symbol} at $${serverPrice.toFixed(2)}/kg (${leverage}x)${_sc}`);
 
             if (stopLoss || takeProfit) {
                 state.pendingSlTpOrders[tea.id] = {

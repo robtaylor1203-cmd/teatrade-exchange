@@ -78,12 +78,16 @@ function updatePortfolioDisplay() {
         const badge = isShort
             ? ' <span style="color: var(--accent-red); font-size: 10px; font-weight: 700;">SHORT</span>'
             : '';
+        const levBadge = (pos.leverage && pos.leverage > 1)
+            ? ` <span style="color: var(--accent-orange); font-size: 10px; font-weight: 700;">${pos.leverage}x</span>`
+            : '';
+        const marginInfo = pos.margin_used ? `Margin: $${Number(pos.margin_used).toFixed(2)}` : '';
 
         html += `
             <div class="position-item">
                 <div>
-                    <div class="position-tea">${escapeHtml(tea.symbol)}${badge}</div>
-                    <div class="position-qty">${absQty.toLocaleString()} kg @ $${pos.avg_entry_price.toFixed(2)}</div>
+                    <div class="position-tea">${escapeHtml(tea.symbol)}${badge}${levBadge}</div>
+                    <div class="position-qty">${absQty.toLocaleString()} kg @ $${pos.avg_entry_price.toFixed(2)} ${marginInfo ? '· ' + marginInfo : ''}</div>
                 </div>
                 <div class="position-value">
                     <div class="position-current">$${currentValue.toFixed(2)}</div>
@@ -111,12 +115,16 @@ function updatePortfolioDisplay() {
         const dirBadge = isShort
             ? '<span style="color: var(--accent-red); font-size: 10px; font-weight: 700;">SHORT</span>'
             : '';
+        const idxLevBadge = (pos.leverage && pos.leverage > 1)
+            ? ` <span style="color: var(--accent-orange); font-size: 10px; font-weight: 700;">${pos.leverage}x</span>`
+            : '';
+        const idxMarginInfo = pos.margin_used ? `Margin: $${Number(pos.margin_used).toFixed(2)}` : '';
 
         html += `
             <div class="position-item">
                 <div>
-                    <div class="position-tea">${escapeHtml(symbol)} <span style="color: var(--accent-purple); font-size: 10px;">IDX</span> ${dirBadge}</div>
-                    <div class="position-qty">${absQty.toLocaleString()} kg @ $${pos.avg_entry_price.toFixed(2)}</div>
+                    <div class="position-tea">${escapeHtml(symbol)} <span style="color: var(--accent-purple); font-size: 10px;">IDX</span> ${dirBadge}${idxLevBadge}</div>
+                    <div class="position-qty">${absQty.toLocaleString()} kg @ $${pos.avg_entry_price.toFixed(2)} ${idxMarginInfo ? '· ' + idxMarginInfo : ''}</div>
                 </div>
                 <div class="position-value">
                     <div class="position-current">$${currentValue.toFixed(2)}</div>
@@ -128,14 +136,61 @@ function updatePortfolioDisplay() {
 
     listEl.innerHTML = html;
 
-    const totalValue = getActiveBalance() + holdingsValue;
-    valueEl.textContent = '$' + totalValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    // Calculate margin metrics
+    let totalUsedMargin = 0;
+    let totalUnrealizedPnl = 0;
+    state.positions.forEach(pos => {
+        totalUsedMargin += Number(pos.margin_used) || 0;
+        const tea = pos.teas || state.teas.find(t => t.id === pos.tea_id);
+        if (tea) {
+            const isShort = pos.quantity < 0;
+            const absQty = Math.abs(pos.quantity);
+            totalUnrealizedPnl += isShort
+                ? (pos.avg_entry_price - tea.current_price) * absQty
+                : (tea.current_price - pos.avg_entry_price) * absQty;
+        }
+    });
+    Object.entries(indexPositionsData).forEach(([symbol, pos]) => {
+        totalUsedMargin += Number(pos.margin_used) || 0;
+        const index = indexes.find(idx => idx.symbol === symbol);
+        if (index && pos && pos.quantity !== 0) {
+            const isShort = pos.quantity < 0;
+            const absQty = Math.abs(pos.quantity);
+            totalUnrealizedPnl += isShort
+                ? (pos.avg_entry_price - index.price) * absQty
+                : (index.price - pos.avg_entry_price) * absQty;
+        }
+    });
+
+    const balance = getActiveBalance();
+    const equity = balance + totalUnrealizedPnl;
+    const freeMargin = equity - totalUsedMargin;
+    const marginLevel = totalUsedMargin > 0 ? (equity / totalUsedMargin * 100) : Infinity;
+
+    valueEl.textContent = '$' + equity.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
     const startBal = state.tradingMode === 'REAL' ? 0 : 10000;
-    const totalPnl = totalValue - startBal;
+    const totalPnl = equity - startBal;
     const totalPnlPct = startBal > 0 ? (totalPnl / startBal * 100).toFixed(2) : '0.00';
     pnlEl.textContent = `${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)} (${totalPnlPct}%)`;
     pnlEl.className = 'portfolio-pnl ' + (totalPnl >= 0 ? 'up' : 'down');
+
+    // Render margin summary below positions list
+    let marginHtml = document.getElementById('portfolio-margin-summary');
+    if (!marginHtml) {
+        marginHtml = document.createElement('div');
+        marginHtml.id = 'portfolio-margin-summary';
+        marginHtml.style.cssText = 'padding:8px 12px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);';
+        listEl.parentNode.insertBefore(marginHtml, listEl.nextSibling);
+    }
+    const mlColor = marginLevel < 100 ? 'var(--accent-red)' : marginLevel < 200 ? 'var(--accent-orange)' : 'var(--accent-green)';
+    marginHtml.innerHTML = totalUsedMargin > 0
+        ? `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Balance</span><span>$${balance.toFixed(2)}</span></div>` +
+          `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Equity</span><span style="font-weight:600;">$${equity.toFixed(2)}</span></div>` +
+          `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Used Margin</span><span>$${totalUsedMargin.toFixed(2)}</span></div>` +
+          `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Free Margin</span><span>$${freeMargin.toFixed(2)}</span></div>` +
+          `<div style="display:flex;justify-content:space-between;"><span>Margin Level</span><span style="color:${mlColor};font-weight:600;">${marginLevel === Infinity ? '∞' : marginLevel.toFixed(0) + '%'}</span></div>`
+        : '';
 }
 
 // =============================================
@@ -1455,6 +1510,8 @@ function renderFinancialTab() {
     let totalPnl = 0;
     let positionsHtml = '';
 
+    let totalUsedMargin = 0;
+
     positions.forEach(pos => {
         const tea = pos.teas || state.teas.find(t => t.id === pos.tea_id);
         if (!tea) return;
@@ -1468,10 +1525,12 @@ function renderFinancialTab() {
         const pnlPct = cost > 0 ? (pnl / cost * 100).toFixed(1) : '0.0';
         holdingsValue += curVal;
         totalPnl += pnl;
+        totalUsedMargin += Number(pos.margin_used) || 0;
         const shortBadge = isShort ? ' <span style="color:var(--accent-red);font-size:10px;font-weight:700">SHORT</span>' : '';
+        const levBadge = (pos.leverage && pos.leverage > 1) ? ` <span style="color:var(--accent-orange);font-size:10px;font-weight:700">${pos.leverage}x</span>` : '';
         positionsHtml += `
             <div class="pf-pos-row">
-                <div class="pf-pos-symbol">${escapeHtml(tea.symbol)}${shortBadge}</div>
+                <div class="pf-pos-symbol">${escapeHtml(tea.symbol)}${shortBadge}${levBadge}</div>
                 <div class="pf-pos-qty">${absQty.toLocaleString()} kg</div>
                 <div class="pf-pos-avg">$${pos.avg_entry_price.toFixed(2)}</div>
                 <div class="pf-pos-cur">$${tea.current_price.toFixed(2)}</div>
@@ -1493,10 +1552,12 @@ function renderFinancialTab() {
         const pnlPct = cost > 0 ? (pnl / cost * 100).toFixed(1) : '0.0';
         holdingsValue += curVal;
         totalPnl += pnl;
+        totalUsedMargin += Number(pos.margin_used) || 0;
         const shortBadge = isShort ? ' <span style="color:var(--accent-red);font-size:10px;font-weight:700">SHORT</span>' : '';
+        const levBadge = (pos.leverage && pos.leverage > 1) ? ` <span style="color:var(--accent-orange);font-size:10px;font-weight:700">${pos.leverage}x</span>` : '';
         positionsHtml += `
             <div class="pf-pos-row">
-                <div class="pf-pos-symbol">${escapeHtml(symbol)} <span class="pf-idx-badge">IDX</span>${shortBadge}</div>
+                <div class="pf-pos-symbol">${escapeHtml(symbol)} <span class="pf-idx-badge">IDX</span>${shortBadge}${levBadge}</div>
                 <div class="pf-pos-qty">${absQty.toLocaleString()} kg</div>
                 <div class="pf-pos-avg">$${pos.avg_entry_price.toFixed(2)}</div>
                 <div class="pf-pos-cur">$${idx.price.toFixed(2)}</div>
@@ -1505,16 +1566,20 @@ function renderFinancialTab() {
             </div>`;
     });
 
-    const totalValue = balance + holdingsValue;
-    const overallReturn = totalValue - 10000;
-    const overallPct = (overallReturn / 10000 * 100).toFixed(2);
+    const equity = balance + totalPnl;
+    const freeMargin = equity - totalUsedMargin;
+    const marginLevel = totalUsedMargin > 0 ? (equity / totalUsedMargin * 100) : Infinity;
+    const startBal = state.tradingMode === 'REAL' ? 0 : 10000;
+    const overallReturn = equity - startBal;
+    const overallPct = startBal > 0 ? (overallReturn / startBal * 100).toFixed(2) : '0.00';
     const posCount = positions.length + Object.values(indexPositionsData).filter(p => p && p.quantity !== 0).length;
+    const mlColor = marginLevel < 100 ? 'var(--accent-red)' : marginLevel < 200 ? 'var(--accent-orange)' : 'var(--accent-green)';
 
     panel.innerHTML = `
         <div class="pf-summary-grid">
             <div class="pf-summary-card pf-summary-main">
-                <div class="pf-summary-label">Total Portfolio Value</div>
-                <div class="pf-summary-value-big">$${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                <div class="pf-summary-label">Equity</div>
+                <div class="pf-summary-value-big">$${equity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 <div class="pf-summary-return ${overallReturn >= 0 ? 'up' : 'down'}">${overallReturn >= 0 ? '+' : ''}$${overallReturn.toFixed(2)} (${overallPct}%)</div>
             </div>
             <div class="pf-summary-card">
@@ -1522,12 +1587,20 @@ function renderFinancialTab() {
                 <div class="pf-summary-value">$${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             </div>
             <div class="pf-summary-card">
-                <div class="pf-summary-label">Holdings Value</div>
-                <div class="pf-summary-value">$${holdingsValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                <div class="pf-summary-label">Used Margin</div>
+                <div class="pf-summary-value">$${totalUsedMargin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+            <div class="pf-summary-card">
+                <div class="pf-summary-label">Free Margin</div>
+                <div class="pf-summary-value">$${freeMargin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             </div>
             <div class="pf-summary-card">
                 <div class="pf-summary-label">Unrealised P&amp;L</div>
                 <div class="pf-summary-value ${totalPnl >= 0 ? 'up' : 'down'}">${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)}</div>
+            </div>
+            <div class="pf-summary-card">
+                <div class="pf-summary-label">Margin Level</div>
+                <div class="pf-summary-value" style="color:${mlColor}">${marginLevel === Infinity ? '∞' : marginLevel.toFixed(0) + '%'}</div>
             </div>
             <div class="pf-summary-card">
                 <div class="pf-summary-label">Open Positions</div>

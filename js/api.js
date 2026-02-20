@@ -729,8 +729,8 @@ async function _invokeEdgeFunction(fnName, body) {
  * @param {number} quantity - Quantity in kg
  * @returns {Promise<{success: boolean, trade_id?: string, price?: number, total?: number, new_balance?: number, error?: string}>}
  */
-async function apiExecuteTrade(symbol, side, quantity) {
-    return _invokeEdgeFunction('execute-trade', { symbol, side, quantity, mode: state.tradingMode });
+async function apiExecuteTrade(symbol, side, quantity, leverage = 1) {
+    return _invokeEdgeFunction('execute-trade', { symbol, side, quantity, leverage, mode: state.tradingMode });
 }
 
 // =============================================
@@ -745,8 +745,8 @@ async function apiExecuteTrade(symbol, side, quantity) {
  * @param {number} price    - Current index price (server validates within 5%)
  * @returns {Promise<{success: boolean, ...}>}
  */
-async function apiExecuteIndexTrade(symbol, side, quantity, price) {
-    return _invokeEdgeFunction('execute-index-trade', { action: 'trade', symbol, side, quantity, price, mode: state.tradingMode });
+async function apiExecuteIndexTrade(symbol, side, quantity, price, leverage = 1) {
+    return _invokeEdgeFunction('execute-index-trade', { action: 'trade', symbol, side, quantity, price, leverage, mode: state.tradingMode });
 }
 
 /**

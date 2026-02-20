@@ -9,7 +9,7 @@
  * Globals used from market.js     : calculateRegionalIndexes,
  *     getPriceHistorySync
  * Globals used from charts.js     : drawChart
- * Globals used from quoteModal.js : openQuickQuoteModal
+ * Globals used from hub.js        : openHubForSymbol
  * Globals used from trading.js    : setTradeType, updateTradeSummary
  * Globals used from ui.js         : selectTeaForTrading, switchWatchlistTab
  * Globals used from portfolio.js  : switchPortfolioTab
@@ -249,17 +249,11 @@ function handleSearchResult(item) {
 }
 
 // =============================================
-// OPEN TEA CHART (Quick Quote Modal)
+// OPEN TEA CHART (Fullscreen Hub)
 // =============================================
 
 function openTeaChart(symbol) {
-    const tea = state.teas.find(t => t.symbol === symbol);
-    if (!tea) {
-        showToast('Tea Not Found', 'Could not find tea data', true);
-        return;
-    }
-
-    openQuickQuoteModal(tea);
+    openHubForSymbol(symbol);
 }
 
 // =============================================
@@ -317,53 +311,7 @@ function switchToTea(symbol) {
 // =============================================
 
 function openIndexChart(indexSymbol) {
-    const indexes = calculateRegionalIndexes();
-    const idx = indexes.find(i => i.symbol === indexSymbol);
-
-    if (!idx) {
-        showToast('Index Not Found', 'Could not find index data', true);
-        return;
-    }
-
-    const chartSection = document.getElementById('chart-section');
-    chartSection.style.opacity = '0.7';
-    chartSection.style.transform = 'scale(0.98)';
-
-    setTimeout(() => {
-        const _idxCurr = typeof getCurrencyForSymbol === 'function' ? getCurrencyForSymbol(idx.symbol) : '$';
-        const _idxFk = idx.forexKey || null;
-        state.mainChartData = {
-            name: idx.name,
-            symbol: idx.symbol,
-            basePrice: idx.price,
-            currency: _idxCurr,
-            forexKey: _idxFk,
-            change: idx.change,
-            volume: '\u2014',
-            isIndex: true
-        };
-
-        document.getElementById('main-chart-title').textContent = state.mainChartData.name;
-        const priceEl = document.getElementById('main-chart-price');
-        priceEl.textContent = formatIndexPrice(idx.price, _idxCurr);
-        priceEl.className = 'chart-stat-value ' + (idx.change >= 0 ? 'up' : 'down');
-
-        const idxChangeEl = document.getElementById('main-chart-change');
-        idxChangeEl.textContent = `${idx.change >= 0 ? '+' : ''}${idx.change.toFixed(2)}%`;
-        idxChangeEl.style.color = idx.change >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-
-        state.cachedTimeframe = null;
-        if (window.mainYAxisCache) window.mainYAxisCache = {};
-        state.chartData = getPriceHistorySync(idx.symbol, 'index');
-        drawChart();
-
-        chartSection.style.opacity = '1';
-        chartSection.style.transform = 'scale(1)';
-
-        showToast('Index Chart', `Now viewing ${idx.name}`);
-    }, 150);
-
-    document.getElementById('chart-section')?.scrollIntoView({ behavior: 'smooth' });
+    openHubForSymbol(indexSymbol);
 }
 
 // =============================================

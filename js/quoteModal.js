@@ -140,8 +140,7 @@ function openQuickQuoteModal(tea) {
             : totalVolume.toString();
     document.getElementById('qq-avg').textContent    = `$${avg24h.toFixed(2)}`;
 
-    // Set trade price
-    document.getElementById('qq-trade-price').value = price.toFixed(2);
+    // Set trade price & qty, then refresh the full summary
     document.getElementById('qq-qty').value = 100;
 
     // Update mobile trade bar price
@@ -150,10 +149,7 @@ function openQuickQuoteModal(tea) {
     const mobileLabelEl = document.getElementById('qq-mobile-trade-label');
     if (mobileLabelEl) mobileLabelEl.textContent = tea.name || tea.symbol;
 
-    const balance = getActiveBalance() || 10000;
-    document.getElementById('qq-balance').textContent = `$${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-
-    // Reset trade type to BUY
+    // Reset trade type to BUY, then refresh the full summary (price, margin, balance)
     setQuickTradeType('BUY');
     updateQuickTradeSummary();
 
@@ -256,8 +252,10 @@ function executeMobileQQTrade() {
     const tp  = document.getElementById('qq-mobile-tp')?.value;
 
     if (qty) document.getElementById('qq-qty').value = qty;
-    if (sl)  document.getElementById('qq-sl').value  = sl;
-    if (tp)  document.getElementById('qq-tp').value  = tp;
+    const slEl = document.getElementById('qq-sl');
+    const tpEl = document.getElementById('qq-tp');
+    if (sl && slEl) slEl.value = sl;
+    if (tp && tpEl) tpEl.value = tp;
 
     updateQuickTradeSummary();
     executeQuickTrade();
@@ -331,32 +329,12 @@ function toggleQQSymbolDropdown(e) {
 }
 
 function selectQQSymbol(symbol, isIndex) {
-    // Close dropdown
     const list     = document.getElementById('qq-symbol-list');
     const dropdown = document.getElementById('qq-symbol-dropdown');
     if (list)     list.classList.remove('show');
     if (dropdown) dropdown.classList.remove('open');
 
-    if (isIndex) {
-        const indexes = calculateRegionalIndexes();
-        const idx = indexes.find(i => i.symbol === symbol);
-        if (!idx) return;
-        const fakeTea = {
-            id: 'INDEX_' + idx.symbol,
-            symbol: idx.symbol,
-            name: idx.name,
-            current_price: idx.price,
-            previous_price: idx.previousPrice,
-            price_change_24h: idx.change,
-            volume_24h: 0,
-            isIndex: true
-        };
-        openQuickQuoteModal(fakeTea);
-    } else {
-        const tea = state.teas.find(t => t.symbol === symbol);
-        if (!tea) return;
-        openQuickQuoteModal(tea);
-    }
+    openHubForSymbol(symbol);
 }
 
 // Close dropdown on outside click
@@ -541,17 +519,61 @@ function setQuickTradeType(type) {
 }
 
 function updateQuickTradeSummary() {
-    const qty   = parseFloat(document.getElementById('qq-qty').value) || 0;
-    const price = parseFloat(document.getElementById('qq-trade-price').value) || 0;
-    const total = qty * price;
-    const balance    = getActiveBalance() || 10000;
-    const afterTrade = state.qqTradeType === 'BUY' ? balance - total : balance + total;
+    const qty = parseFloat(document.getElementById('qq-qty')?.value) || 0;
+    const leverage = parseFloat(document.getElementById('qq-leverage')?.value) || 10;
+    const SPREAD_PCT = 0.01;
 
-    document.getElementById('qq-order-value').textContent = `$${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-    document.getElementById('qq-after-trade').textContent = `$${afterTrade.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    const tea = state.qqCurrentTea;
+    let marketPrice = 0;
+    if (tea) {
+        if (tea.isIndex || isIndexSymbol(tea.symbol)) {
+            const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
+            const idx = indexes.find(i => i.symbol === tea.symbol);
+            marketPrice = idx?.price || tea.current_price || 0;
+        } else {
+            const liveTea = state.teas?.find(t => t.symbol === tea.symbol);
+            marketPrice = liveTea?.current_price || tea.current_price || 0;
+        }
+    }
+
+    const isBuy = state.qqTradeType === 'BUY';
+    const execPrice = isBuy ? marketPrice * (1 + SPREAD_PCT / 2) : marketPrice * (1 - SPREAD_PCT / 2);
+    const notional = execPrice * qty;
+    const margin = notional / leverage;
+    const spreadCost = Math.abs(execPrice - marketPrice) * qty;
+    const balance = getActiveBalance() || 10000;
+
+    const _fmt = (v) => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const mktEl = document.getElementById('qq-market-price');
+    if (mktEl) mktEl.textContent = `$${marketPrice.toFixed(2)}/kg`;
+
+    const priceEl = document.getElementById('qq-trade-price');
+    if (priceEl) priceEl.textContent = `$${execPrice.toFixed(3)}/kg`;
+
+    const labelEl = document.getElementById('qq-exec-price-label');
+    if (labelEl) labelEl.innerHTML = isBuy
+        ? 'Your Price <small style="color:var(--text-muted)">(+0.5% spread)</small>'
+        : 'Your Price <small style="color:var(--text-muted)">(-0.5% spread)</small>';
+
+    const orderEl = document.getElementById('qq-order-value');
+    if (orderEl) orderEl.textContent = _fmt(notional);
+
+    const marginEl = document.getElementById('qq-margin-required');
+    if (marginEl) marginEl.textContent = _fmt(margin);
+
+    const spreadEl = document.getElementById('qq-spread-cost');
+    if (spreadEl) spreadEl.textContent = _fmt(spreadCost);
+
+    const balEl = document.getElementById('qq-balance');
+    if (balEl) balEl.textContent = _fmt(balance);
 
     const execBtn = document.getElementById('qq-execute-btn');
-    execBtn.textContent = `${state.qqTradeType} ${qty} kg`;
+    if (execBtn) {
+        execBtn.textContent = qty > 0
+            ? `${state.qqTradeType} ${qty.toLocaleString()} kg — ${_fmt(margin)}`
+            : `${state.qqTradeType} 0 kg`;
+    }
 }
 
 // =============================================
@@ -1173,9 +1195,14 @@ async function executeQuickTrade() {
         return;
     }
 
-    // Check balance for BUY
-    if (state.qqTradeType === 'BUY' && total > getActiveBalance()) {
-        showToast('Insufficient Balance', "You don't have enough funds", true);
+    const qqLeverage = parseFloat(document.getElementById('qq-leverage')?.value) || 10;
+    const SPREAD_PCT = 0.01;
+    const isBuy = state.qqTradeType === 'BUY';
+    const execPrice = isBuy ? price * (1 + SPREAD_PCT / 2) : price * (1 - SPREAD_PCT / 2);
+    const notional = execPrice * qty;
+    const qqMarginReq = notional / qqLeverage;
+    if (qqMarginReq > getActiveBalance()) {
+        showToast('Insufficient Margin', `Need $${qqMarginReq.toFixed(2)} (have $${getActiveBalance().toFixed(2)})`, true);
         return;
     }
 
@@ -1190,7 +1217,7 @@ async function executeQuickTrade() {
             // === INDEX TRADE (C4 FIX: server-side) ===
             const indexSymbol = state.qqCurrentTea.symbol;
 
-            const result = await apiExecuteIndexTrade(indexSymbol, state.qqTradeType, qty, price);
+            const result = await apiExecuteIndexTrade(indexSymbol, state.qqTradeType, qty, price, qqLeverage);
             if (!result.success) {
                 throw new Error(result.error || 'Index trade failed');
             }
@@ -1200,7 +1227,7 @@ async function executeQuickTrade() {
 
         } else {
             // === TEA TRADE (server-side atomic) ===
-            const result = await apiExecuteTrade(state.qqCurrentTea.symbol, state.qqTradeType, qty);
+            const result = await apiExecuteTrade(state.qqCurrentTea.symbol, state.qqTradeType, qty, qqLeverage);
             if (!result.success) {
                 throw new Error(result.error || 'Trade failed');
             }
@@ -1214,14 +1241,14 @@ async function executeQuickTrade() {
         updatePortfolioDisplay();
         updateUIForLoggedInUser();
 
-        showToast(`${state.qqTradeType} Order Filled`, `${qty} kg of ${productName} @ $${price.toFixed(2)}`);
+        showToast(`${state.qqTradeType} Order Filled`, `${qty} kg of ${productName} @ $${execPrice.toFixed(3)} (${qqLeverage}x leverage)`);
         closeQuickQuoteModal();
 
     } catch (error) {
         console.error('Trade error:', error);
         showToast('Trade Failed', error.message || 'Failed to execute trade', true);
         execBtn.disabled    = false;
-        execBtn.textContent = `${state.qqTradeType} ${qty} kg`;
+        updateQuickTradeSummary();
     }
 }
 

@@ -8,7 +8,7 @@
     <title>TeaTrade Exchange | Global Tea Market Terminal</title>
     <link rel="icon" type="image/png" href="images/favicon-nb.png">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260218p">
+    <link rel="stylesheet" href="styles.css?v=20260220a">
     <script src="https://browser.sentry-cdn.com/7.99.0/bundle.tracing.min.js" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
@@ -310,33 +310,49 @@
                     <div class="quick-trade-input-group">
                         <label>Quantity (kg)</label>
                         <input type="number" class="quick-trade-input" id="qq-qty" value="100" min="1" oninput="updateQuickTradeSummary()">
+                        <div class="quick-amounts" style="display:flex;gap:4px;margin-top:4px;">
+                            <button type="button" class="qq-quick-amt" onclick="document.getElementById('qq-qty').value=100;updateQuickTradeSummary()">100</button>
+                            <button type="button" class="qq-quick-amt" onclick="document.getElementById('qq-qty').value=500;updateQuickTradeSummary()">500</button>
+                            <button type="button" class="qq-quick-amt" onclick="document.getElementById('qq-qty').value=1000;updateQuickTradeSummary()">1K</button>
+                            <button type="button" class="qq-quick-amt" onclick="document.getElementById('qq-qty').value=5000;updateQuickTradeSummary()">5K</button>
+                        </div>
                     </div>
                     <div class="quick-trade-input-group">
-                        <label>Price ($/kg)</label>
-                        <input type="number" class="quick-trade-input" id="qq-trade-price" readonly>
-                    </div>
-                    <div class="qq-sltp-section">
-                        <div class="qq-sltp-group">
-                            <label><span class="dot sl"></span>Stop Loss</label>
-                            <input type="number" class="quick-trade-input" id="qq-sl" placeholder="0.00" step="0.01">
-                        </div>
-                        <div class="qq-sltp-group">
-                            <label><span class="dot tp"></span>Take Profit</label>
-                            <input type="number" class="quick-trade-input" id="qq-tp" placeholder="0.00" step="0.01">
-                        </div>
+                        <label>Leverage</label>
+                        <select class="quick-trade-input" id="qq-leverage" onchange="updateQuickTradeSummary()" style="cursor:pointer;-webkit-appearance:none;appearance:none;padding-right:28px;background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 8px center;">
+                            <option value="1">1x (No Leverage)</option>
+                            <option value="2">2x</option>
+                            <option value="5">5x</option>
+                            <option value="10" selected>10x</option>
+                            <option value="15">15x</option>
+                            <option value="20">20x</option>
+                            <option value="25">25x</option>
+                        </select>
                     </div>
                     <div class="quick-trade-summary">
                         <div class="quick-trade-summary-row">
-                            <span>Order Value</span>
-                            <span id="qq-order-value">$342.00</span>
+                            <span>Market Price</span>
+                            <span id="qq-market-price">$0.00/kg</span>
+                        </div>
+                        <div class="quick-trade-summary-row">
+                            <span id="qq-exec-price-label">Your Price <small style="color:var(--text-muted)">(+0.5%)</small></span>
+                            <span id="qq-trade-price">$0.00/kg</span>
+                        </div>
+                        <div class="quick-trade-summary-row" style="border-top:1px solid var(--border);padding-top:6px;margin-top:4px;">
+                            <span>Notional Value</span>
+                            <span id="qq-order-value">$0.00</span>
+                        </div>
+                        <div class="quick-trade-summary-row" style="font-weight:600;">
+                            <span>Margin Required</span>
+                            <span id="qq-margin-required">$0.00</span>
+                        </div>
+                        <div class="quick-trade-summary-row">
+                            <span>Spread Cost</span>
+                            <span id="qq-spread-cost" style="color:var(--accent-red);">$0.00</span>
                         </div>
                         <div class="quick-trade-summary-row">
                             <span>Your Balance</span>
                             <span id="qq-balance">$10,000.00</span>
-                        </div>
-                        <div class="quick-trade-summary-row">
-                            <span>After Trade</span>
-                            <span id="qq-after-trade">$9,658.00</span>
                         </div>
                     </div>
                     <button class="quick-trade-execute buy" id="qq-execute-btn" onclick="executeQuickTrade()">BUY 100 kg</button>
@@ -1078,23 +1094,47 @@
                                         <button type="button" onclick="setHubQuickAmount('buy', 5000)">5K</button>
                                     </div>
                                 </div>
+                                <div class="form-group">
+                                    <label>Leverage</label>
+                                    <select id="hub-buy-leverage" class="form-input" onchange="updateHubOrderPreview()">
+                                        <option value="1">1x (No Leverage)</option>
+                                        <option value="2">2x</option>
+                                        <option value="5">5x</option>
+                                        <option value="10" selected>10x</option>
+                                        <option value="15">15x</option>
+                                        <option value="20">20x</option>
+                                        <option value="25">25x</option>
+                                    </select>
+                                </div>
                                 <div class="order-preview">
                                     <div class="preview-row">
-                                        <span>Est. Price</span>
-                                        <span id="hub-buy-est-price">$0.00</span>
+                                        <span>Market Price</span>
+                                        <span id="hub-buy-market-price">$0.00/kg</span>
                                     </div>
                                     <div class="preview-row">
-                                        <span>Total Cost</span>
+                                        <span>Your Price <small style="color:var(--text-muted)">(+0.5% spread)</small></span>
+                                        <span id="hub-buy-est-price">$0.00/kg</span>
+                                    </div>
+                                    <div class="preview-row" style="border-top: 1px solid var(--border); padding-top: 6px; margin-top: 4px;">
+                                        <span>Notional Value</span>
                                         <span id="hub-buy-total-cost">$0.00</span>
                                     </div>
+                                    <div class="preview-row" style="font-weight: 600;">
+                                        <span>Margin Required</span>
+                                        <span id="hub-buy-margin">$0.00</span>
+                                    </div>
                                     <div class="preview-row">
-                                        <span>Commission</span>
-                                        <span id="hub-buy-commission">$0.00</span>
+                                        <span>Spread Cost</span>
+                                        <span id="hub-buy-commission" style="color: var(--accent-red);">$0.00</span>
+                                    </div>
+                                    <div class="preview-row">
+                                        <span>Overnight Rate</span>
+                                        <span id="hub-buy-overnight">0.014%/day</span>
                                     </div>
                                 </div>
-                                <button class="trade-button buy" onclick="executeHubTrade('buy')">
+                                <button class="trade-button buy" id="hub-buy-btn" onclick="executeHubTrade('buy')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-                                    Place Buy Order
+                                    <span id="hub-buy-btn-label">Place Buy Order</span>
                                 </button>
                             </div>
                             
@@ -1131,23 +1171,47 @@
                                         <button type="button" onclick="setHubQuickAmount('sell', 5000)">5K</button>
                                     </div>
                                 </div>
+                                <div class="form-group">
+                                    <label>Leverage</label>
+                                    <select id="hub-sell-leverage" class="form-input" onchange="updateHubOrderPreview()">
+                                        <option value="1">1x (No Leverage)</option>
+                                        <option value="2">2x</option>
+                                        <option value="5">5x</option>
+                                        <option value="10" selected>10x</option>
+                                        <option value="15">15x</option>
+                                        <option value="20">20x</option>
+                                        <option value="25">25x</option>
+                                    </select>
+                                </div>
                                 <div class="order-preview">
                                     <div class="preview-row">
-                                        <span>Est. Price</span>
-                                        <span id="hub-sell-est-price">$0.00</span>
+                                        <span>Market Price</span>
+                                        <span id="hub-sell-market-price">$0.00/kg</span>
                                     </div>
                                     <div class="preview-row">
-                                        <span>Total Value</span>
+                                        <span>Your Price <small style="color:var(--text-muted)">(-0.5% spread)</small></span>
+                                        <span id="hub-sell-est-price">$0.00/kg</span>
+                                    </div>
+                                    <div class="preview-row" style="border-top: 1px solid var(--border); padding-top: 6px; margin-top: 4px;">
+                                        <span>Notional Value</span>
                                         <span id="hub-sell-total-cost">$0.00</span>
                                     </div>
+                                    <div class="preview-row" style="font-weight: 600;">
+                                        <span>Margin Required</span>
+                                        <span id="hub-sell-margin">$0.00</span>
+                                    </div>
                                     <div class="preview-row">
-                                        <span>Commission</span>
-                                        <span id="hub-sell-commission">$0.00</span>
+                                        <span>Spread Cost</span>
+                                        <span id="hub-sell-commission" style="color: var(--accent-red);">$0.00</span>
+                                    </div>
+                                    <div class="preview-row">
+                                        <span>Overnight Rate</span>
+                                        <span id="hub-sell-overnight">0.014%/day</span>
                                     </div>
                                 </div>
-                                <button class="trade-button sell" onclick="executeHubTrade('sell')">
+                                <button class="trade-button sell" id="hub-sell-btn" onclick="executeHubTrade('sell')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
-                                    Place Sell Order
+                                    <span id="hub-sell-btn-label">Place Sell Order</span>
                                 </button>
                             </div>
                         </div>
@@ -1350,14 +1414,36 @@
                             <input type="number" class="trade-input" id="trade-qty" placeholder="100" min="1" step="1" oninput="updateTradeSummary()">
                         </div>
                         <div class="trade-input-group">
-                            <label>Price ($/kg)</label>
+                            <label id="trade-price-label">Your Price ($/kg)</label>
                             <input type="number" class="trade-input" id="trade-price" placeholder="3.42" step="0.001" readonly>
+                        </div>
+                    </div>
+                    <div class="trade-input-row">
+                        <div class="trade-input-group" style="flex:1;">
+                            <label>Leverage</label>
+                            <select class="trade-input" id="trade-leverage" onchange="updateTradeSummary()" style="width:100%;">
+                                <option value="1">1x</option>
+                                <option value="2">2x</option>
+                                <option value="5">5x</option>
+                                <option value="10" selected>10x</option>
+                                <option value="15">15x</option>
+                                <option value="20">20x</option>
+                                <option value="25">25x</option>
+                            </select>
                         </div>
                     </div>
                     <div class="trade-summary">
                         <div class="trade-summary-row">
-                            <span class="trade-summary-label">Order Value</span>
+                            <span class="trade-summary-label">Notional Value</span>
                             <span class="trade-summary-value" id="trade-value">$0.00</span>
+                        </div>
+                        <div class="trade-summary-row" style="font-weight:600;">
+                            <span class="trade-summary-label">Margin Required</span>
+                            <span class="trade-summary-value" id="trade-margin">$0.00</span>
+                        </div>
+                        <div class="trade-summary-row">
+                            <span class="trade-summary-label">Spread Cost</span>
+                            <span class="trade-summary-value" id="trade-spread-cost" style="color:var(--accent-red);">$0.00</span>
                         </div>
                         <div class="trade-summary-row">
                             <span class="trade-summary-label">Your Balance</span>
@@ -1402,7 +1488,12 @@
 
             <!-- Portfolio Section -->
             <div class="panel-section portfolio-section" id="portfolio-section" style="display: none;">
-                <div class="panel-title">Your Portfolio</div>
+                <div class="panel-title">
+                    Your Portfolio
+                    <button class="portfolio-popout-btn" onclick="openPortfolioModal()" title="Open full portfolio">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14L21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+                    </button>
+                </div>
                 <div class="portfolio-tabs">
                     <button class="portfolio-tab active" onclick="switchPortfolioTab('positions')">Positions</button>
                     <button class="portfolio-tab" onclick="switchPortfolioTab('orders')">Orders</button>
@@ -1820,17 +1911,17 @@
 
     <!-- Scripts -->
     <script src="js/monitoring.js?v=20260218g"></script>
-    <script src="js/config.js?v=20260219s"></script>
+    <script src="js/config.js?v=20260220a"></script>
     <script src="js/utils.js?v=20260218"></script>
-    <script src="js/api.js?v=20260219r"></script>
+    <script src="js/api.js?v=20260220a"></script>
     <script src="js/auth.js?v=20260218i"></script>
-    <script src="js/market.js?v=20260219u"></script>
-    <script src="js/charts.js?v=20260219f"></script>
-    <script src="js/trading.js?v=20260218g"></script>
-    <script src="js/portfolio.js?v=20260219e"></script>
+    <script src="js/market.js?v=20260220a"></script>
+    <script src="js/charts.js?v=20260220a"></script>
+    <script src="js/trading.js?v=20260220a"></script>
+    <script src="js/portfolio.js?v=20260220a"></script>
     <script src="js/ui.js?v=20260219u"></script>
-    <script src="js/hub.js?v=20260219a"></script>
-    <script src="js/quoteModal.js?v=20260219c"></script>
+    <script src="js/hub.js?v=20260220a"></script>
+    <script src="js/quoteModal.js?v=20260220a"></script>
     <script src="js/multiChart.js?v=20260218"></script>
     <script src="js/weather.js?v=20260219d"></script>
     <script src="js/macro-popout.js?v=20260219t"></script>

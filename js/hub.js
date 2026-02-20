@@ -74,6 +74,67 @@ function _getHubCurrencyInfoForSymbol(sym) {
 }
 
 // =============================================
+// OPEN HUB FOR A SPECIFIC SYMBOL
+// =============================================
+
+function openHubForSymbol(teaOrSymbol) {
+    let symbol, name, price, isIndex, currency, forexKey;
+
+    if (typeof teaOrSymbol === 'string') {
+        symbol = teaOrSymbol;
+        const tea = state.teas?.find(t => t.symbol === symbol);
+        if (tea) {
+            name = tea.name || symbol;
+            price = tea.current_price;
+            isIndex = false;
+        } else {
+            const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
+            const idx = indexes.find(i => i.symbol === symbol);
+            if (idx) {
+                name = idx.name;
+                price = idx.price;
+                isIndex = true;
+            } else {
+                return;
+            }
+        }
+    } else {
+        const tea = teaOrSymbol;
+        symbol = tea.symbol;
+        name = tea.name || symbol;
+        price = tea.current_price || 0;
+        isIndex = !!tea.isIndex || isIndexSymbol(symbol);
+    }
+
+    currency = typeof getCurrencyForSymbol === 'function' ? getCurrencyForSymbol(symbol) : '$';
+    const dbIdx = state.dbIndexes?.find(i => i.symbol === symbol);
+    forexKey = dbIdx?.forexKey || null;
+
+    state.mainChartData = {
+        name: name,
+        symbol: symbol,
+        basePrice: price,
+        currency: currency,
+        forexKey: forexKey,
+        change: 0,
+        isIndex: isIndex,
+        isTea: !isIndex
+    };
+
+    const titleEl = document.getElementById('main-chart-title');
+    if (titleEl) titleEl.textContent = name;
+
+    const panel = document.getElementById('chart-section');
+    if (!panel) return;
+
+    if (!panel.classList.contains('panel-maximized')) {
+        toggleMaximize('chart-section');
+    } else {
+        initTradingHub();
+    }
+}
+
+// =============================================
 // MAXIMIZE FUNCTIONS
 // =============================================
 
@@ -1251,17 +1312,58 @@ function updateHubOrderPreview() {
         return curr + val.toFixed(2);
     };
 
-    const buyTotal = buyQty * buy.price;
-    const buyCommission = buyTotal * 0.001;
-    document.getElementById('hub-buy-est-price').textContent = `${_fmt(buy.price, buy.currency)}/kg`;
-    document.getElementById('hub-buy-total-cost').textContent = _fmt(buyTotal, buy.currency);
-    document.getElementById('hub-buy-commission').textContent = _fmt(buyCommission, buy.currency);
+    const SPREAD_PCT = 0.01;
+    const OVERNIGHT_RATE = 0.05 / 365;
 
-    const sellTotal = sellQty * sell.price;
-    const sellCommission = sellTotal * 0.001;
-    document.getElementById('hub-sell-est-price').textContent = `${_fmt(sell.price, sell.currency)}/kg`;
-    document.getElementById('hub-sell-total-cost').textContent = _fmt(sellTotal, sell.currency);
-    document.getElementById('hub-sell-commission').textContent = _fmt(sellCommission, sell.currency);
+    // BUY preview: user pays ASK = market * (1 + spread/2)
+    const buyLeverage = parseFloat(document.getElementById('hub-buy-leverage')?.value) || 10;
+    const buyAskPrice = buy.price * (1 + SPREAD_PCT / 2);
+    const buyNotional = buyQty * buyAskPrice;
+    const buyMargin = buyNotional / buyLeverage;
+    const buySpreadCost = (buyAskPrice - buy.price) * buyQty;
+    const buyOvernightEst = buyNotional * OVERNIGHT_RATE;
+
+    const mktPriceEl = document.getElementById('hub-buy-market-price');
+    if (mktPriceEl) mktPriceEl.textContent = `${_fmt(buy.price, buy.currency)}/kg`;
+    document.getElementById('hub-buy-est-price').textContent = `${_fmt(buyAskPrice, buy.currency)}/kg`;
+    document.getElementById('hub-buy-total-cost').textContent = _fmt(buyNotional, buy.currency);
+    const buyMarginEl = document.getElementById('hub-buy-margin');
+    if (buyMarginEl) buyMarginEl.textContent = _fmt(buyMargin, buy.currency);
+    document.getElementById('hub-buy-commission').textContent = _fmt(buySpreadCost, buy.currency);
+    const buyOvEl = document.getElementById('hub-buy-overnight');
+    if (buyOvEl) buyOvEl.textContent = buyQty > 0 ? `${(OVERNIGHT_RATE * 100).toFixed(3)}%/day (~${_fmt(buyOvernightEst, buy.currency)}/night)` : '0.014%/day';
+
+    // SELL preview: user gets BID = market * (1 - spread/2)
+    const sellLeverage = parseFloat(document.getElementById('hub-sell-leverage')?.value) || 10;
+    const sellBidPrice = sell.price * (1 - SPREAD_PCT / 2);
+    const sellNotional = sellQty * sellBidPrice;
+    const sellMargin = sellNotional / sellLeverage;
+    const sellSpreadCost = (sell.price - sellBidPrice) * sellQty;
+    const sellOvernightEst = sellNotional * OVERNIGHT_RATE;
+
+    const sellMktEl = document.getElementById('hub-sell-market-price');
+    if (sellMktEl) sellMktEl.textContent = `${_fmt(sell.price, sell.currency)}/kg`;
+    document.getElementById('hub-sell-est-price').textContent = `${_fmt(sellBidPrice, sell.currency)}/kg`;
+    document.getElementById('hub-sell-total-cost').textContent = _fmt(sellNotional, sell.currency);
+    const sellMarginEl = document.getElementById('hub-sell-margin');
+    if (sellMarginEl) sellMarginEl.textContent = _fmt(sellMargin, sell.currency);
+    document.getElementById('hub-sell-commission').textContent = _fmt(sellSpreadCost, sell.currency);
+    const sellOvEl = document.getElementById('hub-sell-overnight');
+    if (sellOvEl) sellOvEl.textContent = sellQty > 0 ? `${(OVERNIGHT_RATE * 100).toFixed(3)}%/day (~${_fmt(sellOvernightEst, sell.currency)}/night)` : '0.014%/day';
+
+    // Update button labels with commitment summary
+    const buyBtnLabel = document.getElementById('hub-buy-btn-label');
+    if (buyBtnLabel) {
+        buyBtnLabel.textContent = buyQty > 0
+            ? `BUY ${buyQty.toLocaleString()} kg — ${_fmt(buyMargin, buy.currency)}`
+            : 'Place Buy Order';
+    }
+    const sellBtnLabel = document.getElementById('hub-sell-btn-label');
+    if (sellBtnLabel) {
+        sellBtnLabel.textContent = sellQty > 0
+            ? `SELL ${sellQty.toLocaleString()} kg — ${_fmt(sellMargin, sell.currency)}`
+            : 'Place Sell Order';
+    }
 
     // Handle limit price visibility
     const buyOrderType = document.getElementById('hub-buy-order-type')?.value;
@@ -1354,6 +1456,7 @@ async function executeHubTrade(side) {
     let symbol = document.getElementById(`hub-${side}-symbol`)?.value;
     const quantity = parseFloat(document.getElementById(`hub-${side}-quantity`)?.value);
     const orderType = document.getElementById(`hub-${side}-order-type`)?.value;
+    const leverage = parseFloat(document.getElementById(`hub-${side}-leverage`)?.value) || 10;
 
     if (!quantity || quantity <= 0) {
         showToast('Please enter a valid quantity', 'error');
@@ -1443,22 +1546,27 @@ async function executeHubTrade(side) {
             );
             loadPendingOrders();
         } else if (isIndex) {
-            const result = await apiExecuteIndexTrade(lookupSymbol, side.toUpperCase(), quantity, price);
+            const result = await apiExecuteIndexTrade(lookupSymbol, side.toUpperCase(), quantity, price, leverage);
             if (!result.success) {
                 throw new Error(result.error || 'Index trade failed');
             }
             setActiveBalance(result.new_balance);
             const _ci = _getHubCurrencyInfoForSymbol(symbol);
-            const _dp = price * _ci.multiplier;
+            const _dp = (result.execution_price || price) * _ci.multiplier;
             const _dps = _dp >= 100 ? _ci.symbol + _dp.toFixed(1) : _ci.symbol + _dp.toFixed(2);
-            showToast(`${side.toUpperCase()} order filled: ${symbol} ${quantity} kg @ ${_dps}`, 'success');
+            const _sc = result.spread_cost ? ` | Spread: $${Number(result.spread_cost).toFixed(2)}` : '';
+            const _mu = result.margin_used ? ` | Margin: $${Number(result.margin_used).toFixed(2)}` : '';
+            showToast(`${side.toUpperCase()} filled: ${symbol} ${quantity}kg @ ${_dps} (${leverage}x)${_sc}${_mu}`, 'success');
         } else {
-            const result = await apiExecuteTrade(symbol, side.toUpperCase(), quantity);
+            const result = await apiExecuteTrade(symbol, side.toUpperCase(), quantity, leverage);
             if (!result.success) {
                 throw new Error(result.error || 'Trade failed');
             }
             setActiveBalance(result.new_balance);
-            showToast(`${side.toUpperCase()} order filled: ${symbol} ${quantity} kg @ $${price.toFixed(2)}`, 'success');
+            const execP = result.execution_price || price;
+            const _sc = result.spread_cost ? ` | Spread: $${Number(result.spread_cost).toFixed(2)}` : '';
+            const _mu = result.margin_used ? ` | Margin: $${Number(result.margin_used).toFixed(2)}` : '';
+            showToast(`${side.toUpperCase()} filled: ${symbol} ${quantity}kg @ $${execP.toFixed(2)} (${leverage}x)${_sc}${_mu}`, 'success');
         }
 
         addTradeToLog({

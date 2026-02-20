@@ -7,7 +7,7 @@
  * Globals used from config.js  : state, teaDisplayData, cardData, isIndexSymbol
  * Globals used from market.js  : calculateRegionalIndexes
  * Globals used from utils.js   : showToast
- * Globals from quoteModal.js   : openQuickQuoteModal
+ * Globals from hub.js          : openHubForSymbol
  *
  * Functions called from other files (available at runtime as globals):
  *   updateTradeSummary, updateTradeButton, updateHubOrderPreview,
@@ -16,16 +16,25 @@
 
 // Country prefix → flag emoji + display label
 const COUNTRY_MAP = {
-    KEN: { flag: '🇰🇪', label: 'Kenya'     },
-    CHN: { flag: '🇨🇳', label: 'China'     },
-    IND: { flag: '🇮🇳', label: 'India'     },
-    SRI: { flag: '🇱🇰', label: 'Sri Lanka' },
-    MLW: { flag: '🇲🇼', label: 'Malawi'    },
-    RWA: { flag: '🇷🇼', label: 'Rwanda'    },
-    UGA: { flag: '🇺🇬', label: 'Uganda'    },
-    TZA: { flag: '🇹🇿', label: 'Tanzania'  },
-    VIE: { flag: '🇻🇳', label: 'Vietnam'   },
-    JPN: { flag: '🇯🇵', label: 'Japan'     },
+    KEN: { flag: '🇰🇪', label: 'Kenya'      },
+    CHN: { flag: '🇨🇳', label: 'China'      },
+    IND: { flag: '🇮🇳', label: 'India'      },
+    SRI: { flag: '🇱🇰', label: 'Sri Lanka'  },
+    MLW: { flag: '🇲🇼', label: 'Malawi'     },
+    RWA: { flag: '🇷🇼', label: 'Rwanda'     },
+    UGA: { flag: '🇺🇬', label: 'Uganda'     },
+    TZA: { flag: '🇹🇿', label: 'Tanzania'   },
+    VIE: { flag: '🇻🇳', label: 'Vietnam'    },
+    JPN: { flag: '🇯🇵', label: 'Japan'      },
+    BGD: { flag: '🇧🇩', label: 'Bangladesh' },
+    IDN: { flag: '🇮🇩', label: 'Indonesia'  },
+    KOL: { flag: '🇮🇳', label: 'Kolkata'    },
+    GUW: { flag: '🇮🇳', label: 'Guwahati'   },
+    JAL: { flag: '🇮🇳', label: 'Jalpaiguri' },
+    COC: { flag: '🇮🇳', label: 'Cochin'     },
+    CMB: { flag: '🇮🇳', label: 'Coimbatore' },
+    SIL: { flag: '🇮🇳', label: 'Siliguri'   },
+    COO: { flag: '🇮🇳', label: 'Coonoor'    },
 };
 
 // =============================================
@@ -345,10 +354,7 @@ function updateWatchlistTeas() {
 }
 
 function openWatchlistChart(symbol) {
-    const tea = state.teas.find(t => t.symbol === symbol);
-    if (tea) {
-        openQuickQuoteModal(tea);
-    }
+    openHubForSymbol(symbol);
 }
 
 function switchWatchlistTab(tab) {
@@ -705,7 +711,7 @@ function updateQuoteBoard() {
         const country = COUNTRY_MAP[prefix];
         const countryHtml = country
             ? `<div class="quote-country" title="${country.label}"><span class="quote-country-flag">${country.flag}</span><span class="quote-country-code">${prefix}</span></div>`
-            : '';
+            : `<div class="quote-country" style="visibility:hidden;"><span class="quote-country-code">${prefix}</span></div>`;
 
         return `
             <div class="quote-card ${flashClass} ${selectedClass}" onclick="selectTeaForTrading('${escapeHtml(tea.symbol)}')">
@@ -721,11 +727,7 @@ function updateQuoteBoard() {
 
 function selectTeaForTrading(symbol) {
     state.selectedQuoteSymbol = symbol;
-
-    const tea = state.teas.find(t => t.symbol === symbol);
-    if (!tea) return;
-
-    openQuickQuoteModal(tea);
+    openHubForSymbol(symbol);
 }
 
 // =============================================

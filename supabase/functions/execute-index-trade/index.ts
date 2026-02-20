@@ -83,7 +83,8 @@ serve(async (req) => {
 
     // ── ACTION: INDEX TRADE ────────────────────────────────────────
     if (action === 'trade') {
-      const { symbol, side, quantity } = body
+      const { symbol, side, quantity, leverage } = body
+      const lev = Math.max(1, Math.min(25, Number(leverage) || 1))
 
       if (!symbol || typeof symbol !== 'string') {
         return new Response(JSON.stringify({ success: false, error: 'Missing or invalid symbol' }), {
@@ -165,6 +166,7 @@ serve(async (req) => {
         p_quantity: qty,
         p_price: executionPrice,
         p_mode: tradingMode,
+        p_leverage: lev,
       })
 
       if (error) {

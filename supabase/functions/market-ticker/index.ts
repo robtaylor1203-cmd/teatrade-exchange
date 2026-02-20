@@ -506,6 +506,11 @@ serve(async (req) => {
     if (fillErr) console.error('fill_pending_orders error:', fillErr.message);
     else if (fillResult?.filled > 0) console.log(`🎯 Filled ${fillResult.filled} pending order(s)`);
 
+    // 10. Stop-out check — liquidate users whose equity < 50% of used margin
+    const { data: stopOutResult, error: stopOutErr } = await supabase.rpc('check_stop_outs');
+    if (stopOutErr) console.error('check_stop_outs error:', stopOutErr.message);
+    else if (stopOutResult?.users_liquidated > 0) console.log(`🛑 Stop-out: liquidated ${stopOutResult.users_liquidated} user(s)`);
+
     return new Response(JSON.stringify({
       success: true,
       source: sourceStatus,

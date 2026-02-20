@@ -113,7 +113,7 @@ function renderMultiChartPanels() {
                             <span class="mc-panel-price ${isUp ? 'up' : 'down'}">$${panel.tea.current_price.toFixed(2)} (${isUp ? '+' : ''}${change.toFixed(1)}%)</span>
                         </div>
                         <div class="mc-panel-actions">
-                            <button class="mc-panel-btn trade" onclick="openQuickQuoteModal(state.teas.find(t => t.symbol === '${panel.symbol}'))">Trade</button>
+                            <button class="mc-panel-btn trade" onclick="openHubForSymbol('${panel.symbol}')">Trade</button>
                             <button class="mc-panel-btn close" onclick="removeMultiChartPanel(${panel.id})">×</button>
                         </div>
                     </div>
