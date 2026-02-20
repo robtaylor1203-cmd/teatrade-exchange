@@ -77,15 +77,40 @@ log = logging.getLogger('sim')
 # ── SYMBOL UNIVERSE ───────────────────────────────────────────────────────────
 
 TEA_SYMBOLS = [
+    # Kenya (Mombasa)
     'KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS',
-    'IND-ASM', 'IND-DRJ',
-    'SRI-BOP', 'SRI-PEK',
-    'CHN-YUN',
-    'MLW-BP1', 'RWA-OP',
+    # India — Kolkata
+    'IND-ASM', 'IND-DRJ', 'KOL-SF', 'KOL-AUT', 'KOL-GOLD',
+    # Sri Lanka (Colombo)
+    'SRI-BOP', 'SRI-PEK', 'SRI-OP', 'SRI-FBOP', 'SRI-DUST', 'SRI-BOP1',
+    # Indonesia (Jakarta)
+    'IDN-BOP', 'IDN-PF', 'IDN-DUST', 'IDN-BT',
+    # Bangladesh (Chittagong)
+    'BGD-BOP', 'BGD-BP', 'BGD-DUST', 'BGD-FNGS',
+    # India — Guwahati (Assam)
+    'GUW-BOP', 'GUW-BP', 'GUW-OF', 'GUW-PF',
+    # India — Jalpaiguri (Dooars/Terai)
+    'JAL-BOP', 'JAL-BP', 'JAL-DUST', 'JAL-PF',
+    # India — Cochin (Kerala)
+    'COC-BOP', 'COC-OP', 'COC-DUST', 'COC-PF',
+    # India — Coimbatore (Tamil Nadu)
+    'CMB-BOP', 'CMB-BP', 'CMB-DUST', 'CMB-OP',
+    # India — Siliguri (Darjeeling/Terai)
+    'SIL-DRJ', 'SIL-BOP', 'SIL-DUST', 'SIL-FNGS',
+    # India — Coonoor (Nilgiris)
+    'COO-BOP', 'COO-OP', 'COO-DUST', 'COO-PF',
+    # Malawi (Limbe)
+    'MLW-BP1', 'MLW-PF1', 'MLW-DUST', 'MLW-FNGS',
+    # Rwanda
+    'RWA-OP',
 ]
 
 INDEX_SYMBOLS = [
-    'KENYA', 'INDIA', 'CEYLON', 'CHINA', 'AFRICA', 'ASIA',
+    'KENYA', 'INDIA', 'CEYLON', 'INDONESIA', 'BANGLADESH', 'MALAWI',
+    'AFRICA', 'ASIA',
+    'MOMBASA', 'KOLKATA', 'COLOMBO', 'JAKARTA', 'CHITTAGONG',
+    'GUWAHATI', 'JALPAIGURI', 'COCHIN', 'COIMBATORE',
+    'LIMBE', 'SILIGURI', 'COONOOR', 'FUTURES',
 ]
 
 # Trader personality archetypes — controls how a bot behaves
@@ -157,12 +182,27 @@ def fetch_tea_prices() -> dict:
 
 def compute_index_price(index_sym: str, prices: dict) -> Optional[float]:
     compositions = {
-        'KENYA':   ['KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS'],
-        'INDIA':   ['IND-ASM', 'IND-DRJ'],
-        'CEYLON':  ['SRI-BOP', 'SRI-PEK'],
-        'CHINA':   ['CHN-YUN'],
-        'AFRICA':  ['KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS', 'MLW-BP1', 'RWA-OP'],
-        'ASIA':    ['IND-ASM', 'IND-DRJ', 'SRI-BOP', 'SRI-PEK', 'CHN-YUN'],
+        'KENYA':      ['KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS'],
+        'INDIA':      ['IND-ASM','IND-DRJ','KOL-SF','KOL-AUT','KOL-GOLD','GUW-BOP','GUW-BP','GUW-OF','GUW-PF','JAL-BOP','JAL-BP','JAL-DUST','JAL-PF','COC-BOP','COC-OP','COC-DUST','COC-PF','CMB-BOP','CMB-BP','CMB-DUST','CMB-OP','SIL-DRJ','SIL-BOP','SIL-DUST','SIL-FNGS','COO-BOP','COO-OP','COO-DUST','COO-PF'],
+        'CEYLON':     ['SRI-BOP', 'SRI-PEK', 'SRI-OP', 'SRI-FBOP', 'SRI-DUST', 'SRI-BOP1'],
+        'INDONESIA':  ['IDN-BOP', 'IDN-PF', 'IDN-DUST', 'IDN-BT'],
+        'BANGLADESH': ['BGD-BOP', 'BGD-BP', 'BGD-DUST', 'BGD-FNGS'],
+        'MALAWI':     ['MLW-BP1', 'MLW-PF1', 'MLW-DUST', 'MLW-FNGS'],
+        'AFRICA':     ['KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS', 'MLW-BP1', 'MLW-PF1', 'MLW-DUST', 'MLW-FNGS', 'RWA-OP'],
+        'ASIA':       ['IND-ASM','IND-DRJ','SRI-BOP','SRI-PEK','IDN-BOP','BGD-BOP','GUW-BOP','COC-OP','CMB-BOP','COO-BOP','SIL-DRJ','JAL-BOP'],
+        'MOMBASA':    ['KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS'],
+        'KOLKATA':    ['IND-ASM', 'IND-DRJ', 'KOL-SF', 'KOL-AUT', 'KOL-GOLD'],
+        'COLOMBO':    ['SRI-BOP', 'SRI-PEK', 'SRI-OP', 'SRI-FBOP', 'SRI-DUST', 'SRI-BOP1'],
+        'JAKARTA':    ['IDN-BOP', 'IDN-PF', 'IDN-DUST', 'IDN-BT'],
+        'CHITTAGONG': ['BGD-BOP', 'BGD-BP', 'BGD-DUST', 'BGD-FNGS'],
+        'GUWAHATI':   ['GUW-BOP', 'GUW-BP', 'GUW-OF', 'GUW-PF'],
+        'JALPAIGURI': ['JAL-BOP', 'JAL-BP', 'JAL-DUST', 'JAL-PF'],
+        'COCHIN':     ['COC-BOP', 'COC-OP', 'COC-DUST', 'COC-PF'],
+        'COIMBATORE': ['CMB-BOP', 'CMB-BP', 'CMB-DUST', 'CMB-OP'],
+        'LIMBE':      ['MLW-BP1', 'MLW-PF1', 'MLW-DUST', 'MLW-FNGS'],
+        'SILIGURI':   ['SIL-DRJ', 'SIL-BOP', 'SIL-DUST', 'SIL-FNGS'],
+        'COONOOR':    ['COO-BOP', 'COO-OP', 'COO-DUST', 'COO-PF'],
+        'FUTURES':    ['KEN-BP1', 'IND-ASM', 'SRI-BOP', 'IDN-BOP', 'BGD-BOP', 'MLW-BP1'],
     }
     teas = compositions.get(index_sym, [])
     vals = [prices[t] for t in teas if t in prices]

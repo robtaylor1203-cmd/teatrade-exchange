@@ -261,8 +261,11 @@ function populateHubTeaSelects() {
         sellSelect.appendChild(sellTeaOptgroup);
     }
 
-    // Add indexes (tradable as composite products)
-    const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
+    // Build tradable index list from dbIndexes (all indexes are tradable)
+    const regionalCalc = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
+    const priceMap = {};
+    regionalCalc.forEach(r => { priceMap[r.symbol] = r; });
+    const indexes = (state.dbIndexes || defaultDbIndexes || []).map(idx => priceMap[idx.symbol] || idx);
     if (indexes && indexes.length > 0) {
         const indexOptgroup = document.createElement('optgroup');
         indexOptgroup.label = 'Indexes';

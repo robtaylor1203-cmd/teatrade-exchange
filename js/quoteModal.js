@@ -150,8 +150,7 @@ function openQuickQuoteModal(tea) {
     const mobileLabelEl = document.getElementById('qq-mobile-trade-label');
     if (mobileLabelEl) mobileLabelEl.textContent = tea.name || tea.symbol;
 
-    // Update balance
-    const balance = state.userProfile?.cash_balance || 10000;
+    const balance = getActiveBalance() || 10000;
     document.getElementById('qq-balance').textContent = `$${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
     // Reset trade type to BUY
@@ -210,7 +209,7 @@ function toggleMobileQQTradeForm() {
         document.getElementById('qq-mobile-price').value = price.toFixed(2);
         document.getElementById('qq-mobile-qty').value = document.getElementById('qq-qty')?.value || 100;
 
-        const balance = state.userProfile?.cash_balance || 10000;
+        const balance = getActiveBalance() || 10000;
         document.getElementById('qq-mobile-balance').textContent = `$${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
         // Sync BUY/SELL state
@@ -289,8 +288,7 @@ function toggleQQSymbolDropdown(e) {
     // Group teas by origin
     const origins = {};
     state.teas.forEach(t => {
-        const parts  = t.symbol.split('-');
-        const origin = parts[0] || 'Other';
+        const origin = t.origin || t.symbol.split('-')[0] || 'Other';
         const label  = state.originNames[origin] || origin;
         if (!origins[label]) origins[label] = [];
         origins[label].push(t);
@@ -546,7 +544,7 @@ function updateQuickTradeSummary() {
     const qty   = parseFloat(document.getElementById('qq-qty').value) || 0;
     const price = parseFloat(document.getElementById('qq-trade-price').value) || 0;
     const total = qty * price;
-    const balance    = state.userProfile?.cash_balance || 10000;
+    const balance    = getActiveBalance() || 10000;
     const afterTrade = state.qqTradeType === 'BUY' ? balance - total : balance + total;
 
     document.getElementById('qq-order-value').textContent = `$${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
@@ -1176,7 +1174,7 @@ async function executeQuickTrade() {
     }
 
     // Check balance for BUY
-    if (state.qqTradeType === 'BUY' && total > (state.userProfile?.cash_balance || 0)) {
+    if (state.qqTradeType === 'BUY' && total > getActiveBalance()) {
         showToast('Insufficient Balance', "You don't have enough funds", true);
         return;
     }
@@ -1197,7 +1195,7 @@ async function executeQuickTrade() {
                 throw new Error(result.error || 'Index trade failed');
             }
 
-            if (state.userProfile) state.userProfile.cash_balance = result.new_balance;
+            setActiveBalance(result.new_balance);
             await loadIndexPositions();
 
         } else {
@@ -1207,7 +1205,7 @@ async function executeQuickTrade() {
                 throw new Error(result.error || 'Trade failed');
             }
 
-            if (state.userProfile) state.userProfile.cash_balance = result.new_balance;
+            setActiveBalance(result.new_balance);
             await loadPositions();
         }
 

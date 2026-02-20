@@ -450,7 +450,7 @@ async function executePairTrade() {
         return;
     }
 
-    if (amount > state.userProfile.cash_balance) {
+    if (amount > getActiveBalance()) {
         showToast('Insufficient Funds', 'Not enough cash balance', true);
         return;
     }
@@ -484,7 +484,7 @@ async function executePairTrade() {
             throw new Error(result.error || 'Pair trade failed');
         }
 
-        state.userProfile.cash_balance = result.new_balance;
+        setActiveBalance(result.new_balance);
 
         // Save values before closing modal (which nulls currentPairTrade)
         const tradeInfo = {

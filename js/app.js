@@ -98,8 +98,8 @@ async function loadIndexPairs() {
             { id: 'idx-kenya-india',   base_symbol: 'KENYA',  quote_symbol: 'INDIA',  isIndex: true },
             { id: 'idx-india-ceylon',  base_symbol: 'INDIA',  quote_symbol: 'CEYLON', isIndex: true },
             { id: 'idx-africa-asia',   base_symbol: 'AFRICA', quote_symbol: 'ASIA',   isIndex: true },
-            { id: 'idx-kenya-ceylon',  base_symbol: 'KENYA',  quote_symbol: 'CEYLON', isIndex: true },
-            { id: 'idx-china-india',   base_symbol: 'CHINA',  quote_symbol: 'INDIA',  isIndex: true },
+            { id: 'idx-kenya-ceylon',  base_symbol: 'KENYA',  quote_symbol: 'CEYLON',     isIndex: true },
+            { id: 'idx-indo-bangla',   base_symbol: 'INDONESIA', quote_symbol: 'BANGLADESH', isIndex: true },
         ];
     }
 }
@@ -117,7 +117,8 @@ async function loadOrigins() {
         console.error('Failed to load origins:', error);
         state.originNames = {
             KEN: 'Kenya', IND: 'India', SRI: 'Sri Lanka',
-            CHN: 'China', JPN: 'Japan', MLW: 'Malawi', RWA: 'Rwanda'
+            IDN: 'Indonesia', BGD: 'Bangladesh', MLW: 'Malawi',
+            RWA: 'Rwanda', CHN: 'China'
         };
     }
 }

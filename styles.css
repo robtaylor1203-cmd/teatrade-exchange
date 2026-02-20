@@ -5806,6 +5806,24 @@ body.modal-open {
     .user-menu {
         gap: 6px;
     }
+    .mode-toggle-wrapper {
+        padding: 3px 6px;
+        gap: 4px;
+    }
+    .mode-label-text {
+        font-size: 8px;
+    }
+    .mode-switch {
+        width: 26px;
+        height: 14px;
+    }
+    .mode-slider::before {
+        height: 10px;
+        width: 10px;
+    }
+    .mode-switch input:checked + .mode-slider::before {
+        transform: translateX(12px);
+    }
 
     /* Main content - full width */
     .center-content {
@@ -6902,6 +6920,73 @@ body.modal-open {
 }
 
 /* User Menu (logged in state) */
+/* ═══ Trading Mode Toggle ═══ */
+.mode-toggle-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+}
+.mode-label-text {
+    color: var(--text-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    user-select: none;
+}
+.mode-toggle-wrapper.mode-real .mode-label-text#mode-label-real {
+    color: var(--accent-green);
+    font-weight: 700;
+}
+.mode-toggle-wrapper:not(.mode-real) .mode-label-text#mode-label-virtual {
+    color: var(--accent-blue, #4fc3f7);
+    font-weight: 700;
+}
+.mode-badge {
+    display: none;
+}
+.mode-switch {
+    position: relative;
+    display: inline-block;
+    width: 32px;
+    height: 16px;
+}
+.mode-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.mode-slider {
+    position: absolute;
+    inset: 0;
+    background: var(--accent-blue, #4fc3f7);
+    border-radius: 16px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+.mode-slider::before {
+    content: '';
+    position: absolute;
+    height: 12px;
+    width: 12px;
+    left: 2px;
+    bottom: 2px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.3s;
+}
+.mode-switch input:checked + .mode-slider {
+    background: var(--accent-green);
+}
+.mode-switch input:checked + .mode-slider::before {
+    transform: translateX(16px);
+}
+
 .user-menu {
     display: flex;
     align-items: center;

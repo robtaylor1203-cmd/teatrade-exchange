@@ -105,7 +105,8 @@ serve(async (req) => {
 
     // ── 2. PARSE REQUEST ───────────────────────────────────────────
     const body = await req.json()
-    const { symbol, side, quantity } = body
+    const { symbol, side, quantity, mode } = body
+    const tradingMode = (mode === 'REAL') ? 'REAL' : 'VIRTUAL'
 
     if (!symbol || typeof symbol !== 'string') {
       return new Response(JSON.stringify({ success: false, error: 'Missing or invalid symbol' }), {
@@ -133,6 +134,7 @@ serve(async (req) => {
       p_tea_symbol: symbol,
       p_side: side,
       p_quantity: qty,
+      p_mode: tradingMode,
     })
 
     if (error) {

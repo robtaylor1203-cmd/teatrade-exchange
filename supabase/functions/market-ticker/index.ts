@@ -21,6 +21,8 @@ const FOREX_BASELINES: Record<string, number> = {
   USD_INR: 87.50,
   USD_LKR: 305.00,
   USD_CNY: 7.20,
+  USD_IDR: 15700,
+  USD_BDT: 110.00,
 };
 const BRENT_BASELINE = 82.50;
 
@@ -158,6 +160,8 @@ const TICK_VOL: Record<string, number> = {
   USD_INR: 0.0007,
   USD_LKR: 0.0010,
   USD_CNY: 0.0005,
+  USD_IDR: 0.0006,
+  USD_BDT: 0.0007,
 };
 const DEFAULT_TICK_VOL = 0.0008;
 
@@ -188,6 +192,16 @@ function getSeasonalFactor(currencyPair: string, symbol: string): number {
   if (currencyPair === 'USD_CNY') {
     if (month === 12 || month === 1) return 1.07;
     if (month >= 4 && month <= 6)   return 1.03;
+    return 1.0;
+  }
+  if (currencyPair === 'USD_IDR') {
+    if (month >= 5 && month <= 9) return 1.03;
+    if (month >= 11 || month <= 1) return 0.97;
+    return 1.0;
+  }
+  if (currencyPair === 'USD_BDT') {
+    if (month >= 6 && month <= 9) return 1.05;
+    if (month >= 1 && month <= 3) return 0.97;
     return 1.0;
   }
   return 1.0;
@@ -294,6 +308,8 @@ serve(async (req) => {
       USD_INR: pick('INR', FOREX_BASELINES.USD_INR, 0.25),
       USD_LKR: pick('LKR', FOREX_BASELINES.USD_LKR, 2.00),
       USD_CNY: pick('CNY', FOREX_BASELINES.USD_CNY, 0.03),
+      USD_IDR: pick('IDR', FOREX_BASELINES.USD_IDR, 15.0),
+      USD_BDT: pick('BDT', FOREX_BASELINES.USD_BDT, 0.30),
     };
 
     const brentPrice = liveBrent ?? simulateTick(BRENT_BASELINE, 0.35);
@@ -308,6 +324,8 @@ serve(async (req) => {
       { key: 'usd_inr',     value: rates.USD_INR   },
       { key: 'usd_lkr',     value: rates.USD_LKR   },
       { key: 'usd_cny',     value: rates.USD_CNY   },
+      { key: 'usd_idr',     value: rates.USD_IDR   },
+      { key: 'usd_bdt',     value: rates.USD_BDT   },
       { key: 'brent_crude', value: brentPrice       },
       { key: 'data_source', value: sourceStatus     },
       { key: 'last_tick',   value: new Date().toISOString() },

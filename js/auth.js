@@ -217,7 +217,23 @@ async function loadUserProfile() {
         const { data, error } = await apiGetProfile(state.currentUser.id);
         if (error) throw error;
         state.userProfile = data;
-        console.log('Profile loaded, balance:', state.userProfile?.cash_balance);
+
+        const saved = localStorage.getItem('teatrade_trading_mode');
+        if (saved === 'REAL' || saved === 'VIRTUAL') state.tradingMode = saved;
+
+        console.log('Profile loaded, mode:', state.tradingMode, 'balance:', getActiveBalance());
+        updateBalanceDisplay();
+
+        const toggle = document.getElementById('mode-toggle');
+        if (toggle) toggle.checked = (state.tradingMode === 'REAL');
+        const indicator = document.getElementById('mode-indicator');
+        if (indicator) {
+            indicator.classList.toggle('mode-real', state.tradingMode === 'REAL');
+            indicator.classList.toggle('mode-virtual', state.tradingMode !== 'REAL');
+        }
+        const label = document.getElementById('mode-label');
+        if (label) label.textContent = state.tradingMode === 'REAL' ? 'REAL' : 'VIRTUAL';
+
         await loadPositions();
         await loadIndexPositions();
         _syncLocalFollowsToDb();
@@ -634,8 +650,7 @@ function updateUIForLoggedInUser() {
     document.getElementById('logged-in-ui').style.display = 'flex';
     document.getElementById('portfolio-section').style.display = 'block';
 
-    // Update balance displays - use real DB balance, never a fake fallback
-    const balance = parseFloat(state.userProfile?.cash_balance ?? 0);
+    const balance = getActiveBalance();
     const formatted = '$' + balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     document.getElementById('user-balance').textContent = formatted;
     document.getElementById('trade-balance').textContent = formatted;

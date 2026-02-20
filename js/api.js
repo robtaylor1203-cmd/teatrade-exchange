@@ -114,7 +114,8 @@ async function apiFetchPositions(userId) {
     return supabaseClient
         .from('positions')
         .select('*, teas(*)')
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .eq('trading_mode', state.tradingMode);
 }
 
 // C2 FIX: apiInsertPosition(), apiUpdatePosition(), apiDeletePosition() REMOVED.
@@ -134,7 +135,8 @@ async function apiFetchIndexPositions(userId) {
     return supabaseClient
         .from('index_positions')
         .select('*')
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .eq('trading_mode', state.tradingMode);
 }
 
 // C2 FIX: apiInsertIndexPosition(), apiUpdateIndexPosition(), apiDeleteIndexPosition() REMOVED.
@@ -159,6 +161,7 @@ async function apiFetchTrades(userId) {
         .from('trades')
         .select('*')
         .eq('user_id', userId)
+        .eq('trading_mode', state.tradingMode)
         .order('created_at', { ascending: false });
 }
 
@@ -317,7 +320,7 @@ async function apiInsertChatMessage(data) {
 async function apiLookupUserByUsername(username) {
     return supabaseClient
         .from('profiles')
-        .select('id, username, email, cash_balance, follower_count, following_count')
+        .select('id, username, email, cash_balance, virtual_balance, real_balance, follower_count, following_count')
         .ilike('username', username)
         .single();
 }
@@ -562,6 +565,9 @@ function subscribeToProfile(userId) {
             }, async (payload) => {
                 if (payload.new && state.userProfile) {
                     state.userProfile.cash_balance = payload.new.cash_balance;
+                    if (payload.new.virtual_balance !== undefined) state.userProfile.virtual_balance = payload.new.virtual_balance;
+                    if (payload.new.real_balance !== undefined) state.userProfile.real_balance = payload.new.real_balance;
+                    updateBalanceDisplay();
                     if (typeof updateUIForLoggedInUser === 'function') updateUIForLoggedInUser();
                 }
             })
@@ -724,7 +730,7 @@ async function _invokeEdgeFunction(fnName, body) {
  * @returns {Promise<{success: boolean, trade_id?: string, price?: number, total?: number, new_balance?: number, error?: string}>}
  */
 async function apiExecuteTrade(symbol, side, quantity) {
-    return _invokeEdgeFunction('execute-trade', { symbol, side, quantity });
+    return _invokeEdgeFunction('execute-trade', { symbol, side, quantity, mode: state.tradingMode });
 }
 
 // =============================================
@@ -740,7 +746,7 @@ async function apiExecuteTrade(symbol, side, quantity) {
  * @returns {Promise<{success: boolean, ...}>}
  */
 async function apiExecuteIndexTrade(symbol, side, quantity, price) {
-    return _invokeEdgeFunction('execute-index-trade', { action: 'trade', symbol, side, quantity, price });
+    return _invokeEdgeFunction('execute-index-trade', { action: 'trade', symbol, side, quantity, price, mode: state.tradingMode });
 }
 
 /**
@@ -750,7 +756,7 @@ async function apiExecuteIndexTrade(symbol, side, quantity, price) {
  * @returns {Promise<{success: boolean, ...}>}
  */
 async function apiClosePairTrade(tradeId, exitRatio) {
-    return _invokeEdgeFunction('execute-index-trade', { action: 'close_pair', trade_id: tradeId, exit_ratio: exitRatio });
+    return _invokeEdgeFunction('execute-index-trade', { action: 'close_pair', trade_id: tradeId, exit_ratio: exitRatio, mode: state.tradingMode });
 }
 
 /**
@@ -759,7 +765,7 @@ async function apiClosePairTrade(tradeId, exitRatio) {
  * @returns {Promise<{success: boolean, ...}>}
  */
 async function apiOpenPairTrade(params) {
-    return _invokeEdgeFunction('execute-index-trade', { action: 'open_pair', ...params });
+    return _invokeEdgeFunction('execute-index-trade', { action: 'open_pair', ...params, mode: state.tradingMode });
 }
 
 /**
@@ -768,7 +774,7 @@ async function apiOpenPairTrade(params) {
  * @returns {Promise<{success: boolean, new_balance?: number, error?: string}>}
  */
 async function apiResetAccount() {
-    return _invokeEdgeFunction('execute-index-trade', { action: 'reset' });
+    return _invokeEdgeFunction('execute-index-trade', { action: 'reset', mode: state.tradingMode });
 }
 
 // =============================================
@@ -780,12 +786,13 @@ async function apiPlaceOrder(symbol, isIndex, side, orderType, quantity, targetP
         action: 'place_order',
         symbol, is_index: isIndex, side, order_type: orderType,
         quantity, target_price: targetPrice,
-        expires_hours: expiresHours || null
+        expires_hours: expiresHours || null,
+        mode: state.tradingMode
     });
 }
 
 async function apiCancelOrder(orderId) {
-    return _invokeEdgeFunction('execute-index-trade', { action: 'cancel_order', order_id: orderId });
+    return _invokeEdgeFunction('execute-index-trade', { action: 'cancel_order', order_id: orderId, mode: state.tradingMode });
 }
 
 async function apiFetchPendingOrders() {
@@ -793,6 +800,7 @@ async function apiFetchPendingOrders() {
         .from('pending_orders')
         .select('*')
         .eq('user_id', state.currentUser?.id)
+        .eq('trading_mode', state.tradingMode)
         .order('created_at', { ascending: false });
 }
 

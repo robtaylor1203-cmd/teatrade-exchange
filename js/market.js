@@ -423,12 +423,23 @@ function calculateMarketIndexes() {
         });
     } else {
         const lkr = Number(state.macroIndicators.usd_lkr) || 305;
-        const inr = Number(state.macroIndicators.usd_inr) || 87.5;
+        const inr = Number(state.macroIndicators.usd_inr) || 83.5;
+        const idr = Number(state.macroIndicators.usd_idr) || 15700;
+        const bdt = Number(state.macroIndicators.usd_bdt) || 110;
         result.KENYA = calcIndex(['KEN-BP1', 'KEN-PF1', 'KEN-DUST']);
-        result.MOMBASA = calcIndex(['KEN-BP1', 'KEN-PF1', 'KEN-DUST']);
-        result.KOLKATA = calcIndex(['IND-ASM', 'IND-DRJ'], inr);
-        result.COLOMBO = calcIndex(['SRI-BOP', 'SRI-PEK'], lkr);
-        result.FUTURES = calcIndex(['KEN-BP1', 'IND-ASM', 'SRI-BOP', 'CHN-YUN', 'IND-DRJ'], 1000);
+        result.MOMBASA = calcIndex(['KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS']);
+        result.KOLKATA = calcIndex(['IND-ASM', 'IND-DRJ', 'KOL-SF', 'KOL-AUT', 'KOL-GOLD'], inr);
+        result.COLOMBO = calcIndex(['SRI-BOP', 'SRI-PEK', 'SRI-OP', 'SRI-FBOP', 'SRI-DUST', 'SRI-BOP1'], lkr);
+        result.JAKARTA = calcIndex(['IDN-BOP', 'IDN-PF', 'IDN-DUST', 'IDN-BT'], idr);
+        result.CHITTAGONG = calcIndex(['BGD-BOP', 'BGD-BP', 'BGD-DUST', 'BGD-FNGS'], bdt);
+        result.GUWAHATI = calcIndex(['GUW-BOP', 'GUW-BP', 'GUW-OF', 'GUW-PF'], inr);
+        result.JALPAIGURI = calcIndex(['JAL-BOP', 'JAL-BP', 'JAL-DUST', 'JAL-PF'], inr);
+        result.COCHIN = calcIndex(['COC-BOP', 'COC-OP', 'COC-DUST', 'COC-PF'], inr);
+        result.COIMBATORE = calcIndex(['CMB-BOP', 'CMB-BP', 'CMB-DUST', 'CMB-OP'], inr);
+        result.LIMBE = calcIndex(['MLW-BP1', 'MLW-PF1', 'MLW-DUST', 'MLW-FNGS']);
+        result.SILIGURI = calcIndex(['SIL-DRJ', 'SIL-BOP', 'SIL-DUST', 'SIL-FNGS'], inr);
+        result.COONOOR = calcIndex(['COO-BOP', 'COO-OP', 'COO-DUST', 'COO-PF'], inr);
+        result.FUTURES = calcIndex(['KEN-BP1', 'IND-ASM', 'SRI-BOP', 'IDN-BOP', 'BGD-BOP', 'MLW-BP1'], 1000);
     }
 
     return result;
@@ -557,14 +568,7 @@ function calculateRegionalIndexes() {
 
     const indexes = state.dbIndexes.length > 0
         ? state.dbIndexes.filter(i => !i.is_market_card)
-        : [
-            { symbol: 'KENYA', name: 'Kenya Tea Index', teas: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST'], color: 'var(--accent-green)' },
-            { symbol: 'INDIA', name: 'India Tea Index', teas: ['IND-ASM', 'IND-DRJ'], color: 'var(--accent-orange)' },
-            { symbol: 'CEYLON', name: 'Ceylon Tea Index', teas: ['SRI-BOP', 'SRI-PEK'], color: 'var(--accent-purple)' },
-            { symbol: 'CHINA', name: 'China Tea Index', teas: ['CHN-YUN'], color: 'var(--accent-red)' },
-            { symbol: 'AFRICA', name: 'African Tea Index', teas: ['KEN-BP1', 'KEN-PF1', 'MLW-BP1', 'RWA-OP'], color: 'var(--accent-green)' },
-            { symbol: 'ASIA', name: 'Asian Tea Index', teas: ['IND-ASM', 'IND-DRJ', 'SRI-BOP', 'SRI-PEK', 'CHN-YUN'], color: 'var(--accent-blue)' }
-        ];
+        : defaultDbIndexes.filter(i => !i.is_market_card);
 
     return indexes.map(idx => {
         const prices = idx.teas.map(s => teaMap[s]?.current_price || 0).filter(p => p > 0);
@@ -680,7 +684,7 @@ function handleTickerUpdate(payload) {
  * Resolve the symbol currently shown on the main chart.
  * Returns the symbol string (e.g. 'KENYA', 'KEN-BP1') or null.
  */
-const _CARD_TO_INDEX = { 'MOMBASA': 'KENYA', 'KOLKATA': 'INDIA', 'COLOMBO': 'CEYLON', 'FUTURES': 'ASIA', 'KENYAN': 'KENYA' };
+const _CARD_TO_INDEX = { 'KENYAN': 'KENYA' };
 
 function _getMainChartSymbol() {
     const sym = state.mainChartData?.symbol;
@@ -722,19 +726,12 @@ function _liveIndexPrice(indexSymbol) {
  * ticks — updateChartsWithNewPrices only updates DOM price displays.
  */
 function _pushPriceToActiveCharts(symbol, newPrice) {
-    // Helper: get the forex multiplier for a chart's display currency
-    const _chartForexMult = (mcd) => {
-        if (!mcd?.forexKey) return 1;
-        return Number(state.macroIndicators?.[mcd.forexKey]) || 1;
-    };
-
-    // ── Main chart ────────────────────────────────────────────────────────
+    // ── Main chart (data stored in USD; forex applied at render) ──────────
     const mainSymbol = _getMainChartSymbol();
     const mainType   = _getMainChartSymbolType();
-    const mainMult   = _chartForexMult(state.mainChartData);
 
     if (mainType === 'tea' && mainSymbol === symbol && state.chartData?.length > 0) {
-        appendPriceToChart(state.chartData, newPrice * mainMult);
+        appendPriceToChart(state.chartData, newPrice);
         if (typeof drawChart === 'function') drawChart();
     } else if (mainType === 'index' && state.chartData?.length > 0) {
         const _revCard = { 'KENYA': 'MOMBASA', 'INDIA': 'KOLKATA', 'CEYLON': 'COLOMBO', 'ASIA': 'FUTURES' };
@@ -744,37 +741,30 @@ function _pushPriceToActiveCharts(symbol, newPrice) {
         if (idxDef?.teas?.includes(symbol)) {
             const idxPrice = _liveIndexPrice(mainSymbol);
             if (idxPrice > 0) {
-                appendPriceToChart(state.chartData, idxPrice * mainMult);
+                appendPriceToChart(state.chartData, idxPrice);
                 updatePriceCache(mainSymbol, idxPrice, 'index');
                 if (typeof drawChart === 'function') drawChart();
             }
         }
     }
 
-    // ── Hub fullscreen chart ──────────────────────────────────────────────
+    // ── Hub fullscreen chart (data stored in USD; forex applied at render) ──
     const hubSection = document.getElementById('chart-section');
     if (hubSection?.classList.contains('panel-maximized') && state.hubChartData?.length > 0) {
         const hubRaw    = document.getElementById('hub-buy-symbol')?.value || '';
-        const _cardMap  = { 'MOMBASA': 'KENYA', 'KOLKATA': 'INDIA', 'COLOMBO': 'CEYLON', 'FUTURES': 'ASIA', 'KENYAN': 'KENYA' };
+        const _cardMap  = { 'KENYAN': 'KENYA' };
         const hubSymbol = _cardMap[hubRaw] || hubRaw;
         const hubIsIdx  = typeof isIndexSymbol === 'function' && isIndexSymbol(hubSymbol);
-        const _revCard  = { 'KENYA': 'MOMBASA', 'INDIA': 'KOLKATA', 'CEYLON': 'COLOMBO', 'ASIA': 'FUTURES' };
-        const hubCard   = _revCard[hubSymbol] || hubSymbol;
-        const hubIdx    = state.dbIndexes?.find(i => i.symbol === hubCard)
-                       || state.dbIndexes?.find(i => i.symbol === hubRaw || i.symbol === hubSymbol);
-        const hubMult   = (hubIdx?.forexKey && state.macroIndicators?.[hubIdx.forexKey])
-                            ? Number(state.macroIndicators[hubIdx.forexKey]) || 1
-                            : 1;
 
         if (!hubIsIdx && hubSymbol === symbol) {
-            appendPriceToChart(state.hubChartData, newPrice * hubMult);
+            appendPriceToChart(state.hubChartData, newPrice);
             if (typeof drawHubChart === 'function') drawHubChart();
         } else if (hubIsIdx) {
             const idxDef = state.dbIndexes?.find(i => i.symbol === hubSymbol);
             if (idxDef?.teas?.includes(symbol)) {
                 const idxPrice = _liveIndexPrice(hubSymbol);
                 if (idxPrice > 0) {
-                    appendPriceToChart(state.hubChartData, idxPrice * hubMult);
+                    appendPriceToChart(state.hubChartData, idxPrice);
                     updatePriceCache(hubSymbol, idxPrice, 'index');
                     if (typeof drawHubChart === 'function') drawHubChart();
                 }

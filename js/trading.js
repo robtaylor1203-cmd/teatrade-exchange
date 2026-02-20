@@ -124,7 +124,7 @@ function updateTradeButton() {
         return;
     }
 
-    const balance = parseFloat(state.userProfile?.cash_balance);
+    const balance = getActiveBalance();
 
     if (!isNaN(balance) && total > balance) {
         btn.textContent = 'Insufficient Balance';
@@ -219,7 +219,7 @@ async function executeTrade() {
                 throw new Error(result.error || 'Index trade failed');
             }
 
-            state.userProfile.cash_balance = result.new_balance;
+            setActiveBalance(result.new_balance);
 
             const idxSideLabel = state.tradeType === 'BUY' ? 'Bought' : 'Shorted';
             showToast('Trade Executed!', `${idxSideLabel} ${qty.toLocaleString()} kg of ${productName} at $${executionPrice.toFixed(2)}/kg`);
@@ -234,8 +234,7 @@ async function executeTrade() {
                 throw new Error(result.error || 'Trade failed');
             }
 
-            // Update local state from server response
-            state.userProfile.cash_balance = result.new_balance;
+            setActiveBalance(result.new_balance);
 
             const serverPrice = result.price;
             const serverTotal = result.total;
@@ -318,7 +317,7 @@ async function executeSlTpClose(teaId, order, currentPrice, triggerType) {
 
         delete state.pendingSlTpOrders[teaId];
 
-        state.userProfile.cash_balance = result.new_balance;
+        setActiveBalance(result.new_balance);
         await loadPositions();
         updateUIForLoggedInUser();
 
@@ -364,7 +363,7 @@ async function closePosition(teaId, quantity, teaSymbol) {
             throw new Error(result.error || 'Close failed');
         }
 
-        state.userProfile.cash_balance = result.new_balance;
+        setActiveBalance(result.new_balance);
 
         let pnl;
         if (isShort) {
@@ -432,7 +431,7 @@ async function closeIndexPosition(indexSymbol, quantity, tradeId) {
             throw new Error(result.error || 'Close failed');
         }
 
-        state.userProfile.cash_balance = result.new_balance;
+        setActiveBalance(result.new_balance);
 
         let pnl;
         if (isShort) {
@@ -537,7 +536,7 @@ async function closePairPosition(tradeId) {
             throw new Error(result.error || 'Pair close failed');
         }
 
-        state.userProfile.cash_balance = result.new_balance;
+        setActiveBalance(result.new_balance);
 
         const pnl = result.pnl || 0;
         const baseShort = pair.base_symbol.split('-')[1] || pair.base_symbol;

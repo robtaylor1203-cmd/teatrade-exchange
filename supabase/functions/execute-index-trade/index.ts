@@ -79,6 +79,7 @@ serve(async (req) => {
     // 2. PARSE REQUEST
     const body = await req.json()
     const { action } = body
+    const tradingMode = (body.mode === 'REAL') ? 'REAL' : 'VIRTUAL'
 
     // ── ACTION: INDEX TRADE ────────────────────────────────────────
     if (action === 'trade') {
@@ -163,6 +164,7 @@ serve(async (req) => {
         p_side: side,
         p_quantity: qty,
         p_price: executionPrice,
+        p_mode: tradingMode,
       })
 
       if (error) {
@@ -263,6 +265,7 @@ serve(async (req) => {
         p_pair_id: pair_id || null,
         p_tea_id: tea_id || null,
         p_index_symbol: index_symbol || null,
+        p_mode: tradingMode,
       })
 
       if (error) {
@@ -285,6 +288,7 @@ serve(async (req) => {
       const { data, error } = await supabaseAdmin.rpc('reset_account', {
         p_user_id: user.id,
         p_default_balance: 10000,
+        p_mode: tradingMode,
       })
 
       if (error) {
@@ -338,6 +342,7 @@ serve(async (req) => {
         p_quantity: qty,
         p_target_price: tp,
         p_expires_hours: expires_hours ? Number(expires_hours) : null,
+        p_mode: tradingMode,
       })
 
       if (error) {

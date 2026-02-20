@@ -48,10 +48,11 @@ function updatePortfolioDisplay() {
                 No positions yet. Start trading!
             </div>
         `;
-        const totalValue = state.userProfile?.cash_balance || 10000;
+        const totalValue = getActiveBalance() || 10000;
         valueEl.textContent = '$' + totalValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-        const pnl = totalValue - 10000;
-        const pnlPct = (pnl / 10000 * 100).toFixed(2);
+        const startBal = state.tradingMode === 'REAL' ? 0 : 10000;
+        const pnl = totalValue - startBal;
+        const pnlPct = startBal > 0 ? (pnl / startBal * 100).toFixed(2) : '0.00';
         pnlEl.textContent = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} (${pnlPct}%)`;
         pnlEl.className = 'portfolio-pnl ' + (pnl >= 0 ? 'up' : 'down');
         return;
@@ -127,11 +128,12 @@ function updatePortfolioDisplay() {
 
     listEl.innerHTML = html;
 
-    const totalValue = (state.userProfile?.cash_balance || 0) + holdingsValue;
+    const totalValue = getActiveBalance() + holdingsValue;
     valueEl.textContent = '$' + totalValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
-    const totalPnl = totalValue - 10000;
-    const totalPnlPct = (totalPnl / 10000 * 100).toFixed(2);
+    const startBal = state.tradingMode === 'REAL' ? 0 : 10000;
+    const totalPnl = totalValue - startBal;
+    const totalPnlPct = startBal > 0 ? (totalPnl / startBal * 100).toFixed(2) : '0.00';
     pnlEl.textContent = `${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)} (${totalPnlPct}%)`;
     pnlEl.className = 'portfolio-pnl ' + (totalPnl >= 0 ? 'up' : 'down');
 }
@@ -665,7 +667,7 @@ async function cancelPendingOrder(orderId) {
         if (!result.success) throw new Error(result.error || 'Cancel failed');
 
         if (result.new_balance !== undefined && state.userProfile) {
-            state.userProfile.cash_balance = result.new_balance;
+            setActiveBalance(result.new_balance);
             updatePortfolioDisplay();
         }
         showToast('Order Cancelled', result.refunded > 0 ? `$${Number(result.refunded).toFixed(2)} returned to balance` : 'Order removed');
@@ -920,7 +922,7 @@ async function confirmResetAccount() {
         state.indexPositions = {};
         state.currentTradesData = [];
         state.tradeHistory = [];
-        state.userProfile.cash_balance = result.new_balance || 10000;
+        setActiveBalance(result.new_balance || 10000);
 
         // Clear localStorage trade history
         localStorage.removeItem('tradeHistory');
@@ -1444,7 +1446,7 @@ function renderFinancialTab() {
     const panel = document.getElementById('portfolio-financial-panel');
     if (!panel) return;
 
-    const balance = parseFloat(state.userProfile?.cash_balance ?? 0);
+    const balance = getActiveBalance();
     const positions = state.positions || [];
     const indexPositionsData = state.indexPositions || {};
     const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];

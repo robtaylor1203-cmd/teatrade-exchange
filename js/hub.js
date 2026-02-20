@@ -30,11 +30,10 @@ let tradeLogEntries = [];
  */
 function _getHubCurrencyInfo() {
     const raw = document.getElementById('hub-buy-symbol')?.value || '';
-    const _cardMap = { 'MOMBASA': 'KENYA', 'KOLKATA': 'INDIA', 'COLOMBO': 'CEYLON', 'FUTURES': 'ASIA', 'KENYAN': 'KENYA' };
-    const _reverseCard = { 'KENYA': 'MOMBASA', 'INDIA': 'KOLKATA', 'CEYLON': 'COLOMBO', 'ASIA': 'FUTURES' };
+    const _cardMap = { 'KENYAN': 'KENYA' };
 
     const tradeSym = _cardMap[raw] || raw;
-    const cardSym = _reverseCard[tradeSym] || tradeSym;
+    const cardSym = tradeSym;
 
     const cardIdx = state.dbIndexes?.find(i => i.symbol === cardSym);
     if (cardIdx?.forexKey && state.macroIndicators?.[cardIdx.forexKey]) {
@@ -141,14 +140,7 @@ function initTradingHub() {
     // Pre-populate with current chart symbol (keep indexes as-is, they are tradable)
     let currentSymbol = state.mainChartData?.symbol || '';
 
-    // Map market card display symbols to their tradable index equivalents
-    const cardToIndex = {
-        'KENYAN': 'KENYA',
-        'MOMBASA': 'KENYA',
-        'KOLKATA': 'INDIA',
-        'COLOMBO': 'CEYLON',
-        'FUTURES': 'ASIA',
-    };
+    const cardToIndex = { 'KENYAN': 'KENYA' };
     if (cardToIndex[currentSymbol]) currentSymbol = cardToIndex[currentSymbol];
 
     const buySelect = document.getElementById('hub-buy-symbol');
@@ -381,7 +373,7 @@ function hubChartMouseMove(e) {
         </div>
         <div class="hub-tooltip-row">
             <span class="hub-tooltip-label">Volume</span>
-            <span class="hub-tooltip-value">${formatVolume(dataPoint.volume || 0)} kg</span>
+            <span class="hub-tooltip-value">${dataPoint.volume ? formatVolume(dataPoint.volume) + ' kg' : '—'}</span>
         </div>
     `;
 
@@ -488,8 +480,7 @@ function generateInitialChartData(symbol) {
 function generateHubChartData() {
     const symbol = document.getElementById('hub-buy-symbol')?.value || 'KENYA';
 
-    const _cardMap = { 'MOMBASA': 'KENYA', 'KOLKATA': 'INDIA', 'COLOMBO': 'CEYLON', 'FUTURES': 'ASIA', 'KENYAN': 'KENYA' };
-    const lookupSymbol = _cardMap[symbol] || symbol;
+    const lookupSymbol = symbol === 'KENYAN' ? 'KENYA' : symbol;
     const isIndex = isIndexSymbol(lookupSymbol);
     const symbolType = isIndex ? 'index' : 'tea';
 
@@ -497,12 +488,6 @@ function generateHubChartData() {
 
     if (!data || data.length === 0) {
         data = generateInitialChartData(symbol);
-    }
-
-    const ci = _getHubCurrencyInfo();
-    if (ci.multiplier !== 1 && data && data.length > 0) {
-        const m = ci.multiplier;
-        data = data.map(d => ({ ...d, open: d.open * m, high: d.high * m, low: d.low * m, close: d.close * m }));
     }
 
     return data;
@@ -515,9 +500,11 @@ function generateHubChartData() {
 function updateHubPriceDisplay() {
     if (!state.hubChartData || state.hubChartData.length === 0) return;
 
-    const lastPrice = state.hubChartData[state.hubChartData.length - 1].close;
-    const firstPrice = state.hubChartData[0].close;
-    const change = ((lastPrice - firstPrice) / firstPrice) * 100;
+    const ci = _getHubCurrencyInfo();
+    const m = ci.multiplier || 1;
+    const lastPrice = state.hubChartData[state.hubChartData.length - 1].close * m;
+    const firstPrice = state.hubChartData[0].close * m;
+    const change = firstPrice > 0 ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0;
 
     const priceEl = document.getElementById('hub-chart-price');
     const changeEl = document.getElementById('hub-chart-change');
@@ -714,9 +701,19 @@ function drawHubChart() {
         return;
     }
 
+    // Forex multiplier: data is USD, display in local currency
+    const _fxInfo = _getHubCurrencyInfo();
+    const _fx = _fxInfo.multiplier || 1;
+
+    // Build display-currency data (source stays in USD)
+    const displayData = state.hubChartData.map(d => ({
+        ...d,
+        open: d.open * _fx, high: d.high * _fx, low: d.low * _fx, close: d.close * _fx
+    }));
+
     // Calculate price range with Y-axis stabilization
     let dataMinPrice = Infinity, dataMaxPrice = -Infinity;
-    state.hubChartData.forEach(d => {
+    displayData.forEach(d => {
         if (d && typeof d.low === 'number' && typeof d.high === 'number') {
             dataMinPrice = Math.min(dataMinPrice, d.low);
             dataMaxPrice = Math.max(dataMaxPrice, d.high);
@@ -724,15 +721,16 @@ function drawHubChart() {
     });
 
     // Expand range to include entry price if user has a position
-    if (window.hubEntryPrice && isFinite(window.hubEntryPrice)) {
-        dataMinPrice = Math.min(dataMinPrice, window.hubEntryPrice);
-        dataMaxPrice = Math.max(dataMaxPrice, window.hubEntryPrice);
+    const _displayEntry = (window.hubEntryPrice && isFinite(window.hubEntryPrice)) ? window.hubEntryPrice * _fx : null;
+    if (_displayEntry) {
+        dataMinPrice = Math.min(dataMinPrice, _displayEntry);
+        dataMaxPrice = Math.max(dataMaxPrice, _displayEntry);
     }
 
     // Fallback if prices are invalid
     if (!isFinite(dataMinPrice) || !isFinite(dataMaxPrice) || dataMinPrice === dataMaxPrice) {
-        dataMinPrice = 3.0;
-        dataMaxPrice = 4.0;
+        dataMinPrice = 3.0 * _fx;
+        dataMaxPrice = 4.0 * _fx;
     }
 
     // Y-AXIS STABILIZATION: Use wider, stable range to prevent frequent rescaling
@@ -768,7 +766,7 @@ function drawHubChart() {
     const chartWidth = width - padding.left - padding.right;
     const chartHeight = height - padding.top - padding.bottom;
 
-    const getX = (i) => padding.left + (i / (state.hubChartData.length - 1)) * chartWidth;
+    const getX = (i) => padding.left + (i / (displayData.length - 1)) * chartWidth;
     const getY = (price) => padding.top + (1 - (price - minPrice) / (maxPrice - minPrice)) * chartHeight;
 
     // Draw grid
@@ -783,7 +781,7 @@ function drawHubChart() {
     }
 
     // Draw average price line (dashed)
-    const avgPrice = state.hubChartData.reduce((sum, d) => sum + d.close, 0) / state.hubChartData.length;
+    const avgPrice = displayData.reduce((sum, d) => sum + d.close, 0) / displayData.length;
     const avgY = getY(avgPrice);
     ctx.strokeStyle = '#f59e0b';
     ctx.lineWidth = 1;
@@ -799,12 +797,12 @@ function drawHubChart() {
         const period = 20;
         const multiplier = 2;
 
-        if (state.hubChartData.length >= period) {
+        if (displayData.length >= period) {
             ctx.fillStyle = 'rgba(96, 165, 250, 0.1)';
             ctx.beginPath();
 
-            for (let i = period - 1; i < state.hubChartData.length; i++) {
-                const slice = state.hubChartData.slice(i - period + 1, i + 1);
+            for (let i = period - 1; i < displayData.length; i++) {
+                const slice = displayData.slice(i - period + 1, i + 1);
                 const avg = slice.reduce((a, b) => a + b.close, 0) / period;
                 const stdDev = Math.sqrt(slice.reduce((a, b) => a + Math.pow(b.close - avg, 2), 0) / period);
                 const upper = avg + multiplier * stdDev;
@@ -817,8 +815,8 @@ function drawHubChart() {
                 }
             }
 
-            for (let i = state.hubChartData.length - 1; i >= period - 1; i--) {
-                const slice = state.hubChartData.slice(i - period + 1, i + 1);
+            for (let i = displayData.length - 1; i >= period - 1; i--) {
+                const slice = displayData.slice(i - period + 1, i + 1);
                 const avg = slice.reduce((a, b) => a + b.close, 0) / period;
                 const stdDev = Math.sqrt(slice.reduce((a, b) => a + Math.pow(b.close - avg, 2), 0) / period);
                 const lower = avg - multiplier * stdDev;
@@ -831,17 +829,17 @@ function drawHubChart() {
     }
 
     if (state.hubStudies.sma10) {
-        drawHubSMA(ctx, 10, '#facc15', getX, getY);
+        drawHubSMA(ctx, 10, '#facc15', getX, getY, displayData);
     }
 
     if (state.hubStudies.sma20) {
-        drawHubSMA(ctx, 20, '#f59e0b', getX, getY);
+        drawHubSMA(ctx, 20, '#f59e0b', getX, getY, displayData);
     }
 
     // Draw price line or candles
     if (state.hubChartType === 'line') {
         ctx.beginPath();
-        state.hubChartData.forEach((d, i) => {
+        displayData.forEach((d, i) => {
             if (i === 0) {
                 ctx.moveTo(getX(i), getY(d.close));
             } else {
@@ -853,16 +851,16 @@ function drawHubChart() {
         ctx.stroke();
 
         // Draw subtle area fill matching main chart
-        ctx.lineTo(getX(state.hubChartData.length - 1), height - padding.bottom);
+        ctx.lineTo(getX(displayData.length - 1), height - padding.bottom);
         ctx.lineTo(getX(0), height - padding.bottom);
         ctx.closePath();
         ctx.fillStyle = 'rgba(26, 115, 232, 0.15)';
         ctx.fill();
     } else {
         // Draw candles
-        const candleWidth = Math.max(2, (chartWidth / state.hubChartData.length) - 2);
+        const candleWidth = Math.max(2, (chartWidth / displayData.length) - 2);
 
-        state.hubChartData.forEach((d, i) => {
+        displayData.forEach((d, i) => {
             const x = getX(i);
             const isUp = d.close >= d.open;
 
@@ -895,9 +893,9 @@ function drawHubChart() {
     }
 
     // Draw last price callout
-    const lastPrice = state.hubChartData[state.hubChartData.length - 1].close;
+    const lastPrice = displayData[displayData.length - 1].close;
     const lastY = getY(lastPrice);
-    const isUp = state.hubChartData.length > 1 && state.hubChartData[state.hubChartData.length - 1].close >= state.hubChartData[state.hubChartData.length - 2].close;
+    const isUp = displayData.length > 1 && displayData[displayData.length - 1].close >= displayData[displayData.length - 2].close;
 
     ctx.fillStyle = isUp ? '#10b981' : '#ef4444';
     ctx.fillRect(width - padding.right, lastY - 10, padding.right, 20);
@@ -906,9 +904,9 @@ function drawHubChart() {
     ctx.fillText(_hubFmtPrice(lastPrice), width - padding.right + 5, lastY + 4);
 
     // Draw user's entry price line if they have a position
-    if (window.hubEntryPrice && window.hubEntryPrice >= minPrice && window.hubEntryPrice <= maxPrice) {
-        const entryY = getY(window.hubEntryPrice);
-        const isProfit = lastPrice >= window.hubEntryPrice;
+    if (_displayEntry && _displayEntry >= minPrice && _displayEntry <= maxPrice) {
+        const entryY = getY(_displayEntry);
+        const isProfit = lastPrice >= _displayEntry;
         const pnlColor = isProfit ? '#10b981' : '#ef4444';
 
         // Draw dotted entry line
@@ -922,9 +920,9 @@ function drawHubChart() {
         ctx.setLineDash([]);
 
         // Draw entry price label on left side
-        const pnlDiff = lastPrice - window.hubEntryPrice;
-        const pnlPercent = ((lastPrice / window.hubEntryPrice) - 1) * 100;
-        const labelText = `Entry $${window.hubEntryPrice.toFixed(2)}`;
+        const pnlDiff = lastPrice - _displayEntry;
+        const pnlPercent = ((_displayEntry > 0 ? (lastPrice / _displayEntry) - 1 : 0) * 100);
+        const labelText = `Entry ${_hubFmtPrice(_displayEntry)}`;
         const pnlText = `${pnlDiff >= 0 ? '+' : ''}${pnlPercent.toFixed(1)}%`;
 
         // Draw label background on left
@@ -953,7 +951,7 @@ function drawHubChart() {
 
     // Store chart metadata for crosshair interaction
     window.hubChartMeta = {
-        data: state.hubChartData,
+        data: displayData,
         padding: padding,
         minPrice: minPrice,
         maxPrice: maxPrice,
@@ -966,16 +964,17 @@ function drawHubChart() {
     };
 }
 
-function drawHubSMA(ctx, period, color, getX, getY) {
-    if (state.hubChartData.length < period) return;
+function drawHubSMA(ctx, period, color, getX, getY, chartData) {
+    const src = chartData || state.hubChartData;
+    if (src.length < period) return;
 
     ctx.beginPath();
     ctx.strokeStyle = color;
     ctx.lineWidth = 1.5;
 
     let started = false;
-    for (let i = period - 1; i < state.hubChartData.length; i++) {
-        const slice = state.hubChartData.slice(i - period + 1, i + 1);
+    for (let i = period - 1; i < src.length; i++) {
+        const slice = src.slice(i - period + 1, i + 1);
         const avg = slice.reduce((a, b) => a + b.close, 0) / period;
 
         if (!started) {
@@ -1276,7 +1275,7 @@ function updateHubOrderPreview() {
 
     // Update chart title to match selected symbol
     const hubTitle = document.getElementById('hub-chart-title');
-    const indexSymbols = ['KENYA', 'KENYAN', 'INDIA', 'CEYLON', 'CHINA', 'JAPAN', 'AFRICA', 'ASIA'];
+    const indexSymbols = getIndexSymbols();
     const isIndex = indexSymbols.includes(buySymbol);
 
     const priceDisplay = document.querySelector('#trading-hub-chart-panel .price-display h3');
@@ -1436,7 +1435,7 @@ async function executeHubTrade(side) {
                 throw new Error(result.error || 'Order placement failed');
             }
             if (result.new_balance !== undefined) {
-                state.userProfile.cash_balance = result.new_balance;
+                setActiveBalance(result.new_balance);
             }
             showToast(
                 `${orderType.toUpperCase()} ${side.toUpperCase()} order placed`,
@@ -1448,7 +1447,7 @@ async function executeHubTrade(side) {
             if (!result.success) {
                 throw new Error(result.error || 'Index trade failed');
             }
-            state.userProfile.cash_balance = result.new_balance;
+            setActiveBalance(result.new_balance);
             const _ci = _getHubCurrencyInfoForSymbol(symbol);
             const _dp = price * _ci.multiplier;
             const _dps = _dp >= 100 ? _ci.symbol + _dp.toFixed(1) : _ci.symbol + _dp.toFixed(2);
@@ -1458,7 +1457,7 @@ async function executeHubTrade(side) {
             if (!result.success) {
                 throw new Error(result.error || 'Trade failed');
             }
-            state.userProfile.cash_balance = result.new_balance;
+            setActiveBalance(result.new_balance);
             showToast(`${side.toUpperCase()} order filled: ${symbol} ${quantity} kg @ $${price.toFixed(2)}`, 'success');
         }
 
@@ -1496,7 +1495,7 @@ function startTradeLogSimulation() {
     if (state.tradeLogInterval) clearInterval(state.tradeLogInterval);
 
     // Generate initial entries
-    const symbols = ['TEA-KE', 'TEA-LK', 'TEA-IN', 'TEA-CN', 'TEA-JP'];
+    const symbols = ['TEA-KE', 'TEA-LK', 'TEA-IN', 'TEA-ID', 'TEA-BD', 'TEA-MW'];
     for (let i = 0; i < 8; i++) {
         const symbol = symbols[Math.floor(Math.random() * symbols.length)];
         const tea = state.teas?.find(t => t.symbol === symbol);

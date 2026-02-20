@@ -42,6 +42,7 @@ function _getChartCurrencyInfo() {
 // Shared window state set during drawChart so hover handlers can use it
 let _chartWStart    = null;
 let _chartWDuration = 0;
+let _chartDisplayData = null;
 
 // Timeframe → milliseconds (module-level so drawRSIChart and hover handlers can use it)
 const WINDOW_MS = {
@@ -177,7 +178,7 @@ function generateChartData(timeframe) {
     let symbol, symbolType;
 
     // Market card display symbols → tradable index symbols for data lookup
-    const _cardToIndex = { 'MOMBASA': 'KENYA', 'KOLKATA': 'INDIA', 'COLOMBO': 'CEYLON', 'FUTURES': 'ASIA', 'KENYAN': 'KENYA' };
+    const _cardToIndex = { 'KENYAN': 'KENYA' };
 
     if (state.mainChartData?.isTea) {
         symbol = state.mainChartData.symbol;
@@ -220,18 +221,6 @@ function generateChartData(timeframe) {
     }
 
     const sampled = sampleHistoricalData(fullHistory, timeframe, config);
-
-    const ci = _getChartCurrencyInfo();
-    if (ci.multiplier !== 1 && sampled.length > 0) {
-        const m = ci.multiplier;
-        for (const c of sampled) {
-            c.open  *= m;
-            c.high  *= m;
-            c.low   *= m;
-            c.close *= m;
-        }
-    }
-
     return sampled;
 }
 
@@ -458,12 +447,20 @@ function drawChart() {
         return;
     }
 
-    const prices = state.chartData.map(d => Number(d.close) || 0).filter(p => p > 0);
+    // Forex multiplier: data stored in USD, display in local currency
+    const _ci = _getChartCurrencyInfo();
+    const _fx = _ci.multiplier || 1;
+    const displayData = state.chartData.map(d => ({
+        ...d,
+        open: d.open * _fx, high: d.high * _fx, low: d.low * _fx, close: d.close * _fx
+    }));
+
+    const prices = displayData.map(d => Number(d.close) || 0).filter(p => p > 0);
     if (prices.length === 0) return;
 
     // SMART Y-AXIS: tight range derived from visible data only
-    const lows  = state.chartData.map(d => Number(d.low)  || 0).filter(p => p > 0);
-    const highs = state.chartData.map(d => Number(d.high) || 0).filter(p => p > 0);
+    const lows  = displayData.map(d => Number(d.low)  || 0).filter(p => p > 0);
+    const highs = displayData.map(d => Number(d.high) || 0).filter(p => p > 0);
     if (lows.length === 0 || highs.length === 0) return;
 
     const dataMinPrice = Math.min(...lows);
@@ -507,7 +504,7 @@ function drawChart() {
     const highPrice = Math.max(...prices);
     const lowPrice = Math.min(...prices);
     const currentPrice = prices[prices.length - 1];
-    const openPrice = Number(state.chartData[0].open) || currentPrice;
+    const openPrice = Number(displayData[0].open) || currentPrice;
     const totalChange = openPrice > 0 ? ((currentPrice - openPrice) / openPrice * 100) : 0;
 
     state.chartMetrics = { minPrice, maxPrice, priceRange, avgPrice, highPrice, lowPrice, currentPrice, openPrice, totalChange };
@@ -534,6 +531,7 @@ function drawChart() {
     // Share with hover handlers
     _chartWStart    = wStart;
     _chartWDuration = wDuration;
+    _chartDisplayData = displayData;
 
     // Converts candle index → X canvas position based on its actual date.
     // Returns null if the date is missing or outside the window.
@@ -596,18 +594,17 @@ function drawChart() {
     // lastX / lastY: position of the most-recent valid candle in the window
     let lastX = leftMargin + chartWidth;
     const lastY = h * 0.1 + (1 - (currentPrice - minPrice) / priceRange) * chartHeight;
-    for (let i = state.chartData.length - 1; i >= 0; i--) {
+    for (let i = displayData.length - 1; i >= 0; i--) {
         const x = candleX(i);
         if (x !== null) { lastX = x; break; }
     }
 
     if (state.chartType === 'candle') {
-        // Draw candlesticks — each placed at its real date within the window
-        const candleWidth = Math.max(4, Math.min(20, (chartWidth / Math.max(state.chartData.length, 1)) * 0.7));
+        const candleWidth = Math.max(4, Math.min(20, (chartWidth / Math.max(displayData.length, 1)) * 0.7));
 
-        state.chartData.forEach((d, i) => {
+        displayData.forEach((d, i) => {
             const x = candleX(i);
-            if (x === null) return; // outside window or invalid date
+            if (x === null) return;
 
             const openY  = h * 0.1 + (1 - (Number(d.open)  - minPrice) / priceRange) * chartHeight;
             const closeY = h * 0.1 + (1 - (Number(d.close) - minPrice) / priceRange) * chartHeight;
@@ -632,14 +629,13 @@ function drawChart() {
             ctx.strokeRect(x - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
         });
     } else {
-        // Draw line chart — each point at its real date within the window
         ctx.beginPath();
         ctx.strokeStyle = '#1a73e8';
         ctx.lineWidth = 2;
 
         let lineStarted = false;
         let lineLastX = lastX;
-        state.chartData.forEach((d, i) => {
+        displayData.forEach((d, i) => {
             const p = Number(d.close) || 0;
             if (!p) return;
             const x = candleX(i);
@@ -683,39 +679,28 @@ function drawChart() {
         ctx.stroke();
     }
 
-    // SMA 10
     if (state.activeStudies.sma10) {
-        const sma10 = calculateSMA(state.chartData, 10);
+        const sma10 = calculateSMA(displayData, 10);
         drawIndicatorLine(sma10, studyColors.sma10, 1.5);
     }
-
-    // SMA 20
     if (state.activeStudies.sma20) {
-        const sma20 = calculateSMA(state.chartData, 20);
+        const sma20 = calculateSMA(displayData, 20);
         drawIndicatorLine(sma20, studyColors.sma20, 1.5);
     }
-
-    // SMA 50
     if (state.activeStudies.sma50) {
-        const sma50 = calculateSMA(state.chartData, 50);
+        const sma50 = calculateSMA(displayData, 50);
         drawIndicatorLine(sma50, studyColors.sma50, 1.5);
     }
-
-    // EMA 10
     if (state.activeStudies.ema10) {
-        const ema10 = calculateEMA(state.chartData, 10);
+        const ema10 = calculateEMA(displayData, 10);
         drawIndicatorLine(ema10, studyColors.ema10, 1.5);
     }
-
-    // EMA 20
     if (state.activeStudies.ema20) {
-        const ema20 = calculateEMA(state.chartData, 20);
+        const ema20 = calculateEMA(displayData, 20);
         drawIndicatorLine(ema20, studyColors.ema20, 1.5);
     }
-
-    // Bollinger Bands
     if (state.activeStudies.bollinger) {
-        const bb = calculateBollingerBands(state.chartData, 20, 2);
+        const bb = calculateBollingerBands(displayData, 20, 2);
 
         // Draw upper band
         drawIndicatorLine(bb.upper, studyColors.bollinger, 1);
@@ -755,11 +740,11 @@ function drawChart() {
     if (state.chartType === 'line') {
         // Find high/low candle index from state.chartData (not filtered prices array)
         let highIdx = -1, lowIdx = -1;
-        state.chartData.forEach((d, i) => {
+        displayData.forEach((d, i) => {
             const c = Number(d.close) || 0;
             if (!c) return;
-            if (highIdx < 0 || c >= Number(state.chartData[highIdx].close)) highIdx = i;
-            if (lowIdx  < 0 || c <= Number(state.chartData[lowIdx].close))  lowIdx  = i;
+            if (highIdx < 0 || c >= Number(displayData[highIdx].close)) highIdx = i;
+            if (lowIdx  < 0 || c <= Number(displayData[lowIdx].close))  lowIdx  = i;
         });
 
         if (highIdx >= 0) {
@@ -773,7 +758,7 @@ function drawChart() {
                 ctx.font = '9px JetBrains Mono, monospace';
                 ctx.fillStyle = '#10b981';
                 ctx.textAlign = 'center';
-                ctx.fillText('H $' + highPrice.toFixed(2), hx, hy - 10);
+                ctx.fillText('H ' + _ci.symbol + highPrice.toFixed(2), hx, hy - 10);
             }
         }
 
@@ -787,7 +772,7 @@ function drawChart() {
                 ctx.fill();
                 ctx.fillStyle = '#ef4444';
                 ctx.textAlign = 'center';
-                ctx.fillText('L $' + lowPrice.toFixed(2), lx, ly + 16);
+                ctx.fillText('L ' + _ci.symbol + lowPrice.toFixed(2), lx, ly + 16);
             }
         }
 
@@ -989,7 +974,7 @@ function drawRSIChart() {
     rsiCtx.clearRect(0, 0, w, h);
 
     // Calculate RSI
-    const rsiData = calculateRSI(state.chartData, 14);
+    const rsiData = calculateRSI(displayData || state.chartData, 14);
 
     // Update RSI value display
     const currentRSI = rsiData[rsiData.length - 1];
@@ -1229,16 +1214,17 @@ function setupChartHover() {
         crosshair.querySelector('.crosshair-v').style.left = x + 'px';
         crosshair.querySelector('.crosshair-h').style.top = y + 'px';
 
-        // Build tooltip content (Bloomberg style)
-        const dpOpen = Number(dataPoint.open) || 0;
-        const dpHigh = Number(dataPoint.high) || 0;
-        const dpLow = Number(dataPoint.low) || 0;
-        const dpClose = Number(dataPoint.close) || 0;
+        const _ttCi = _getChartCurrencyInfo();
+        const _ttFx = _ttCi.multiplier || 1;
+        const dpOpen = (Number(dataPoint.open) || 0) * _ttFx;
+        const dpHigh = (Number(dataPoint.high) || 0) * _ttFx;
+        const dpLow = (Number(dataPoint.low) || 0) * _ttFx;
+        const dpClose = (Number(dataPoint.close) || 0) * _ttFx;
         const dpChange = dpOpen > 0 ? ((dpClose - dpOpen) / dpOpen * 100) : 0;
         const changeClass = dpChange >= 0 ? 'up' : 'down';
         const changeSign = dpChange >= 0 ? '+' : '';
 
-        const _tc = state.mainChartData?.currency || '$';
+        const _tc = _ttCi.symbol || '$';
         const _tf = (v) => v >= 100 ? _tc + v.toFixed(1) : _tc + v.toFixed(3);
         tooltip.innerHTML = `
             <div class="tooltip-date">${formatChartDate(dataPoint.date, state.currentTimeframe)}</div>
@@ -1262,10 +1248,10 @@ function setupChartHover() {
                 <span class="tooltip-label">Change</span>
                 <span class="tooltip-value ${changeClass}">${changeSign}${dpChange.toFixed(2)}%</span>
             </div>
-            <div class="tooltip-row">
+            ${dataPoint.volume ? `<div class="tooltip-row">
                 <span class="tooltip-label">Volume</span>
-                <span class="tooltip-value">${formatVolume(dataPoint.volume || 0)} kg</span>
-            </div>
+                <span class="tooltip-value">${formatVolume(dataPoint.volume)} kg</span>
+            </div>` : ''}
         `;
 
         // Position tooltip
