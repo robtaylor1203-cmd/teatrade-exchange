@@ -487,10 +487,8 @@ serve(async (req) => {
       const indexRows: Array<{symbol:string;price:number;volume:number;recorded_at:string;is_simulated:boolean}> = [];
       for (const idx of (allIndexes || [])) {
         const avg = avgOf(idx.teas || []);
-        if (avg !== null) {
-          const ip = avg * (idx.multiplier || 1);
-          if (isFinite(ip) && ip > 0)
-            indexRows.push({ symbol: idx.symbol, price: ip, volume: 0, recorded_at: timestamp, is_simulated: false });
+        if (avg !== null && isFinite(avg) && avg > 0) {
+          indexRows.push({ symbol: idx.symbol, price: avg, volume: 0, recorded_at: timestamp, is_simulated: false });
         }
       }
 

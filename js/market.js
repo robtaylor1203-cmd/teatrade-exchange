@@ -49,7 +49,7 @@ async function getPriceHistory(symbol, symbolType = 'tea') {
         try {
             const dbData = await loadChartDataFromHistory(symbol, symbolType);
 
-            if (dbData && dbData.length >= 2) {
+            if (dbData && dbData.length >= 1) {
                 state.priceDataCache.data[cacheKey] = dbData;
                 state.priceDataCache.loaded[cacheKey] = true;
                 state.priceDataCache.lastUpdate[cacheKey] = Date.now();
@@ -199,34 +199,41 @@ const TIMEFRAME_CONFIG = {
     'ALL': { interval: 10080, hoursBack: null,  limit: 10000 }
 };
 
-// Load chart data from database with timeframe-aware filtering
+// Load chart data from database with timeframe-aware filtering.
+// When the primary time window yields too few candles, progressively widens
+// the window so the chart always has meaningful data to render.
 async function loadChartDataFromHistory(symbol, symbolType = 'tea', timeframeOverride = null) {
     const tf = timeframeOverride || state.currentTimeframe || '1D';
     const cfg = TIMEFRAME_CONFIG[tf] || TIMEFRAME_CONFIG['1D'];
 
-    let since = null;
+    const _sinceFromHours = h => h ? new Date(Date.now() - h * 3600000).toISOString() : null;
+    let since = _sinceFromHours(cfg.hoursBack);
+
+    const _rev = { 'KENYA': 'MOMBASA', 'INDIA': 'KOLKATA', 'CEYLON': 'COLOMBO', 'ASIA': 'FUTURES' };
+    const _allIdx = (state.dbIndexes?.length ? state.dbIndexes : defaultDbIndexes) || [];
+    const idxDef = symbolType === 'index'
+        ? (_allIdx.find(i => i.symbol === symbol)
+            || _allIdx.find(i => i.symbol === (_rev[symbol] || symbol)))
+        : null;
+
+    // Attempt load at the requested window first, then widen if too sparse.
+    // Wider windows re-use the same OHLC interval so candle size stays consistent.
+    const windows = [since];
     if (cfg.hoursBack) {
-        since = new Date(Date.now() - cfg.hoursBack * 3600000).toISOString();
+        windows.push(_sinceFromHours(cfg.hoursBack * 4));   // 4× wider
+        windows.push(null);                                   // all-time fallback
     }
 
-    // For indexes, build composite OHLC from constituent tea price histories.
-    // The pre-averaged INDEX rows in price_history have negligible variation
-    // because Gaussian noise averages out across teas. Constituent tea rows
-    // contain real trade-driven price movement that makes charts meaningful.
-    if (symbolType === 'index') {
-        const _rev = { 'KENYA': 'MOMBASA', 'INDIA': 'KOLKATA', 'CEYLON': 'COLOMBO', 'ASIA': 'FUTURES' };
-        const idxDef = state.dbIndexes?.find(i => i.symbol === symbol)
-                    || state.dbIndexes?.find(i => i.symbol === (_rev[symbol] || symbol));
+    for (const win of windows) {
         if (idxDef?.teas?.length) {
-            const compositeCandles = await _loadCompositeIndexOHLC(idxDef.teas, cfg, since);
-            if (compositeCandles && compositeCandles.length >= 3) return compositeCandles;
+            const compositeCandles = await _loadCompositeIndexOHLC(idxDef.teas, cfg, win);
+            if (compositeCandles && compositeCandles.length >= 1) return compositeCandles;
         }
-    }
 
-    const rawData = await loadPriceHistory(symbol, cfg.limit, since);
-
-    if (rawData && rawData.length >= 3) {
-        return convertToOHLC(rawData, cfg.interval);
+        const rawData = await loadPriceHistory(symbol, cfg.limit, win);
+        if (rawData && rawData.length >= 2) {
+            return convertToOHLC(rawData, cfg.interval);
+        }
     }
 
     return null;
@@ -307,7 +314,7 @@ async function _loadCompositeIndexOHLC(teaSymbols, cfg, since) {
         }
     }
 
-    return candles.length >= 3 ? candles : null;
+    return candles.length >= 1 ? candles : null;
 }
 
 // Load historical price data from database
@@ -374,6 +381,20 @@ function convertToOHLC(priceData, intervalMinutes = 60) {
     }
 
     return candles;
+}
+
+// Seed a chart array with a first candle if empty, otherwise append.
+function _seedOrAppendChart(stateObj, key, price) {
+    if (!stateObj[key]) stateObj[key] = [];
+    if (stateObj[key].length === 0) {
+        const now = new Date();
+        stateObj[key].push({
+            date: new Date(Math.floor(now.getTime() / 3600000) * 3600000),
+            open: price, high: price, low: price, close: price, volume: 0
+        });
+    } else {
+        appendPriceToChart(stateObj[key], price);
+    }
 }
 
 // Append a new price tick to existing chart data (real-time update)
@@ -524,10 +545,13 @@ function updateAllMarketIndexes() {
         }
     });
 
-    // Incrementally update index price caches (do NOT wipe history)
-    Object.entries(indexes).forEach(([symbol, idx]) => {
-        if (idx && idx.price > 0) {
-            updatePriceCache(symbol, idx.price, 'index');
+    // Incrementally update index price caches (do NOT wipe history).
+    // The cache stores USD — use _liveIndexPrice which returns raw USD
+    // rather than the local-currency value from calculateMarketIndexes.
+    Object.entries(indexes).forEach(([symbol]) => {
+        const usdPrice = typeof _liveIndexPrice === 'function' ? _liveIndexPrice(symbol) : null;
+        if (usdPrice && usdPrice > 0) {
+            updatePriceCache(symbol, usdPrice, 'index');
         }
     });
 }
@@ -579,6 +603,15 @@ function swapChartIndex(cardIndex) {
         state.chartData = [];
         // Clear Y-axis cache so the new instrument rescales from its own data
         if (window.mainYAxisCache) window.mainYAxisCache = {};
+
+        // Invalidate price cache for the new symbol to force fresh DB load
+        if (state.priceDataCache) {
+            const _ck = `INDEX_${state.mainChartData.symbol}`;
+            delete state.priceDataCache.loaded[_ck];
+            delete state.priceDataCache.data[_ck];
+            delete state.priceDataCache.lastUpdate[_ck];
+        }
+
         drawChart();
 
         chartSection.style.opacity = '1';
@@ -651,13 +684,14 @@ function updateMainChartStats() {
         const price = Number(state.mainChartData.basePrice) || 0;
         const change = Number(state.mainChartData.change) || 0;
         const isUp = change >= 0;
+        const curr = state.mainChartData.currency || '$';
 
-        priceEl.textContent = '$' + price.toFixed(2);
+        priceEl.textContent = formatIndexPrice(price, curr, state.mainChartData.symbol);
         priceEl.className = 'chart-stat-value ' + (isUp ? 'up' : 'down');
 
         if (changeEl) {
             const changeAmt = (price * change / 100).toFixed(2);
-            changeEl.textContent = `${isUp ? '+' : ''}$${changeAmt} (${isUp ? '+' : ''}${change.toFixed(1)}%)`;
+            changeEl.textContent = `${isUp ? '+' : ''}${curr}${changeAmt} (${isUp ? '+' : ''}${change.toFixed(1)}%)`;
             changeEl.style.color = isUp ? 'var(--accent-green)' : 'var(--accent-red)';
         }
     }
@@ -736,8 +770,9 @@ function _getMainChartSymbolType() {
  */
 function _liveIndexPrice(indexSymbol) {
     const _rev = { 'KENYA': 'MOMBASA', 'INDIA': 'KOLKATA', 'CEYLON': 'COLOMBO', 'ASIA': 'FUTURES' };
-    const idxDef = state.dbIndexes?.find(i => i.symbol === indexSymbol)
-                || state.dbIndexes?.find(i => i.symbol === (_rev[indexSymbol] || indexSymbol));
+    const _allIdx = (state.dbIndexes?.length ? state.dbIndexes : defaultDbIndexes) || [];
+    const idxDef = _allIdx.find(i => i.symbol === indexSymbol)
+                || _allIdx.find(i => i.symbol === (_rev[indexSymbol] || indexSymbol));
     if (!idxDef?.teas?.length) return null;
     const teaMap = {};
     state.teas.forEach(t => { teaMap[t.symbol] = t; });
@@ -748,52 +783,50 @@ function _liveIndexPrice(indexSymbol) {
 
 /**
  * When a real-time tick arrives for `symbol` (a tea), push the new price
- * into every live chart rendering that symbol OR an index containing it,
- * then redraw. This is the SOLE path for chart data mutation from live
- * ticks — updateChartsWithNewPrices only updates DOM price displays.
+ * into every live chart's state array (chartData, hubChartData, etc.).
+ * This function ONLY mutates state — it never calls draw functions.
+ * Rendering is batched via updateChartsWithNewPrices() (debounced).
  */
 function _pushPriceToActiveCharts(symbol, newPrice) {
     // ── Main chart (data stored in USD; forex applied at render) ──────────
     const mainSymbol = _getMainChartSymbol();
     const mainType   = _getMainChartSymbolType();
 
-    if (mainType === 'tea' && mainSymbol === symbol && state.chartData?.length > 0) {
-        appendPriceToChart(state.chartData, newPrice);
-        if (typeof drawChart === 'function') drawChart();
-    } else if (mainType === 'index' && state.chartData?.length > 0) {
+    if (mainType === 'tea' && mainSymbol === symbol) {
+        _seedOrAppendChart(state, 'chartData', newPrice);
+    } else if (mainType === 'index') {
         const _revCard = { 'KENYA': 'MOMBASA', 'INDIA': 'KOLKATA', 'CEYLON': 'COLOMBO', 'ASIA': 'FUTURES' };
         const altSymbol = _revCard[mainSymbol] || mainSymbol;
-        const idxDef = state.dbIndexes?.find(i => i.symbol === mainSymbol)
-                    || state.dbIndexes?.find(i => i.symbol === altSymbol);
+        const _allIdx = (state.dbIndexes?.length ? state.dbIndexes : defaultDbIndexes) || [];
+        const idxDef = _allIdx.find(i => i.symbol === mainSymbol)
+                    || _allIdx.find(i => i.symbol === altSymbol);
         if (idxDef?.teas?.includes(symbol)) {
             const idxPrice = _liveIndexPrice(mainSymbol);
             if (idxPrice > 0) {
-                appendPriceToChart(state.chartData, idxPrice);
+                _seedOrAppendChart(state, 'chartData', idxPrice);
                 updatePriceCache(mainSymbol, idxPrice, 'index');
-                if (typeof drawChart === 'function') drawChart();
             }
         }
     }
 
     // ── Hub fullscreen chart (data stored in USD; forex applied at render) ──
     const hubSection = document.getElementById('chart-section');
-    if (hubSection?.classList.contains('panel-maximized') && state.hubChartData?.length > 0) {
+    if (hubSection?.classList.contains('panel-maximized')) {
         const hubRaw    = document.getElementById('hub-buy-symbol')?.value || '';
         const _cardMap  = { 'KENYAN': 'KENYA' };
         const hubSymbol = _cardMap[hubRaw] || hubRaw;
         const hubIsIdx  = typeof isIndexSymbol === 'function' && isIndexSymbol(hubSymbol);
 
         if (!hubIsIdx && hubSymbol === symbol) {
-            appendPriceToChart(state.hubChartData, newPrice);
-            if (typeof drawHubChart === 'function') drawHubChart();
+            _seedOrAppendChart(state, 'hubChartData', newPrice);
         } else if (hubIsIdx) {
-            const idxDef = state.dbIndexes?.find(i => i.symbol === hubSymbol);
+            const _hubAllIdx = (state.dbIndexes?.length ? state.dbIndexes : defaultDbIndexes) || [];
+            const idxDef = _hubAllIdx.find(i => i.symbol === hubSymbol);
             if (idxDef?.teas?.includes(symbol)) {
                 const idxPrice = _liveIndexPrice(hubSymbol);
                 if (idxPrice > 0) {
-                    appendPriceToChart(state.hubChartData, idxPrice);
+                    _seedOrAppendChart(state, 'hubChartData', idxPrice);
                     updatePriceCache(hubSymbol, idxPrice, 'index');
-                    if (typeof drawHubChart === 'function') drawHubChart();
                 }
             }
         }
@@ -809,7 +842,8 @@ function _pushPriceToActiveCharts(symbol, newPrice) {
         if (!qqIsIdx && qqSym === symbol) {
             qqPrice = newPrice;
         } else if (qqIsIdx) {
-            const idxDef = state.dbIndexes?.find(i => i.symbol === qqSym);
+            const _qqAllIdx = (state.dbIndexes?.length ? state.dbIndexes : defaultDbIndexes) || [];
+            const idxDef = _qqAllIdx.find(i => i.symbol === qqSym);
             if (idxDef?.teas?.includes(symbol)) {
                 qqPrice = _liveIndexPrice(qqSym);
             }
@@ -820,10 +854,7 @@ function _pushPriceToActiveCharts(symbol, newPrice) {
             if (state.priceDataCache?.data?.[cacheKey]?.length > 0) {
                 appendPriceToChart(state.priceDataCache.data[cacheKey], qqPrice);
             }
-            if (typeof drawQuickQuoteChart === 'function') {
-                state.qqCurrentTea = { ...state.qqCurrentTea, current_price: qqPrice };
-                drawQuickQuoteChart(state.qqCurrentTea);
-            }
+            state.qqCurrentTea = { ...state.qqCurrentTea, current_price: qqPrice };
         }
     }
 }
@@ -1239,8 +1270,8 @@ setInterval(async () => {
 
 /**
  * Called after the debounced ticker batch completes.
- * Only updates DOM price/change displays. All chart data mutation
- * happens in _pushPriceToActiveCharts which fires per-tick.
+ * Updates DOM price/change displays AND redraws all active charts
+ * exactly once per batch (main chart, hub chart, quick-quote chart).
  */
 function updateChartsWithNewPrices() {
     // ── Main chart price display ──────────────────────────────────────────
@@ -1255,7 +1286,12 @@ function updateChartsWithNewPrices() {
         const rawUsd = _liveIndexPrice(mainSymbol);
         if (rawUsd && rawUsd > 0) {
             const fk = state.mainChartData?.forexKey;
-            const mult = (fk && state.macroIndicators?.[fk]) ? Number(state.macroIndicators[fk]) : 1;
+            let mult = (fk && state.macroIndicators?.[fk]) ? Number(state.macroIndicators[fk]) : 0;
+            if (!mult || mult <= 0) {
+                const _allIdx = (state.dbIndexes?.length ? state.dbIndexes : (typeof defaultDbIndexes !== 'undefined' ? defaultDbIndexes : [])) || [];
+                const _idxDef = _allIdx.find(i => i.symbol === mainSymbol);
+                mult = _idxDef?.multiplier || 1;
+            }
             mainPrice = rawUsd * mult;
         }
     }
@@ -1266,10 +1302,21 @@ function updateChartsWithNewPrices() {
         if (priceEl) {
             priceEl.textContent = formatIndexPrice(mainPrice, state.mainChartData.currency || '$');
         }
-        if (!state.chartData?.length) {
-            state.cachedTimeframe = null;
-            drawChart();
-        }
+    }
+
+    // ── Redraw all active charts exactly once per batch ────────────────────
+    if (typeof drawChart === 'function' && document.getElementById('priceChart')) {
+        drawChart();
+    }
+
+    const hubSection = document.getElementById('chart-section');
+    if (typeof drawHubChart === 'function' && hubSection?.classList.contains('panel-maximized')) {
+        drawHubChart();
+    }
+
+    const qqModal = document.getElementById('quick-quote-modal');
+    if (typeof drawQuickQuoteChart === 'function' && state.qqCurrentTea && qqModal?.classList.contains('active')) {
+        drawQuickQuoteChart(state.qqCurrentTea);
     }
 }
 

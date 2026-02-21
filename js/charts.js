@@ -29,12 +29,21 @@ function _getChartCurrencyInfo() {
     const curr = mcd.currency || '$';
     if (curr === '$') return { symbol: '$', multiplier: 1 };
 
+    // Try live forex rate from macroIndicators first
     if (mcd.forexKey && state.macroIndicators?.[mcd.forexKey]) {
         return { symbol: curr, multiplier: Number(state.macroIndicators[mcd.forexKey]) || 1 };
     }
-    const idx = state.dbIndexes?.find(i => i.symbol === mcd.symbol);
-    if (idx?.forexKey && state.macroIndicators?.[idx.forexKey]) {
-        return { symbol: curr, multiplier: Number(state.macroIndicators[idx.forexKey]) || idx.multiplier || 1 };
+
+    // Fall back to index definition (DB or hardcoded defaults)
+    const _allIdx = (state.dbIndexes?.length ? state.dbIndexes : (typeof defaultDbIndexes !== 'undefined' ? defaultDbIndexes : [])) || [];
+    const idx = _allIdx.find(i => i.symbol === mcd.symbol);
+    if (idx) {
+        if (idx.forexKey && state.macroIndicators?.[idx.forexKey]) {
+            return { symbol: curr, multiplier: Number(state.macroIndicators[idx.forexKey]) || idx.multiplier || 1 };
+        }
+        if (idx.multiplier && idx.multiplier > 1) {
+            return { symbol: curr, multiplier: idx.multiplier };
+        }
     }
     return { symbol: curr, multiplier: 1 };
 }
@@ -167,6 +176,8 @@ function toggleStudy(study) {
 // =============================================
 
 function generateChartData(timeframe) {
+    if (state.isFetchingHistory) return [];
+
     const config = timeframeConfig[timeframe];
     if (!config) return [];
 
@@ -206,18 +217,15 @@ function generateChartData(timeframe) {
 
     fullHistory = getPriceHistorySync(symbol, symbolType);
 
-    // Trigger an async DB load only when cache is completely empty.
-    // Do NOT use a threshold like < 5 — longer timeframes legitimately
-    // return few candles from live ticks alone, and re-triggering on every
-    // draw creates an infinite drawChart → getPriceHistory → drawChart loop
-    // that crashes the tab on 3M / 1Y / ALL.
     if (!fullHistory || fullHistory.length === 0) {
-        getPriceHistory(symbol, symbolType).then(data => {
-            if (data && data.length > 0) {
+        state.isFetchingHistory = true;
+        getPriceHistory(symbol, symbolType)
+            .catch(() => {})
+            .finally(() => {
+                state.isFetchingHistory = false;
                 state.cachedTimeframe = null;
                 drawChart();
-            }
-        }).catch(() => {});
+            });
     }
 
     const sampled = sampleHistoricalData(fullHistory, timeframe, config);
@@ -449,7 +457,22 @@ function drawChart() {
 
     // Forex multiplier: data stored in USD, display in local currency
     const _ci = _getChartCurrencyInfo();
-    const _fx = _ci.multiplier || 1;
+    let _fx = _ci.multiplier || 1;
+    const _toDate = d => (d instanceof Date) ? d : new Date(d);
+
+    // Sanity guard: detect data that is ALREADY in local currency (i.e. was
+    // double-converted somewhere upstream). Compare the raw median close against
+    // the expected USD range for the symbol. If the median is already > 50 (no
+    // single tea costs > $50/kg), the data is likely already in local currency
+    // and must NOT be multiplied again.
+    if (_fx > 1) {
+        const _rawCloses = state.chartData.map(d => Number(d.close) || 0).filter(p => p > 0).sort((a, b) => a - b);
+        const _rawMedian = _rawCloses.length > 0 ? _rawCloses[Math.floor(_rawCloses.length / 2)] : 0;
+        if (_rawMedian > 50) {
+            _fx = 1;
+        }
+    }
+
     const displayData = state.chartData.map(d => ({
         ...d,
         open: d.open * _fx, high: d.high * _fx, low: d.low * _fx, close: d.close * _fx
@@ -458,27 +481,65 @@ function drawChart() {
     const prices = displayData.map(d => Number(d.close) || 0).filter(p => p > 0);
     if (prices.length === 0) return;
 
-    // SMART Y-AXIS: tight range derived from visible data only
-    const lows  = displayData.map(d => Number(d.low)  || 0).filter(p => p > 0);
-    const highs = displayData.map(d => Number(d.high) || 0).filter(p => p > 0);
-    if (lows.length === 0 || highs.length === 0) return;
+    const chartWidth = w - leftMargin - rightMargin;
+    const chartHeight = h - bottomMargin - (h * 0.1);
 
-    const dataMinPrice = Math.min(...lows);
-    const dataMaxPrice = Math.max(...highs);
-    const dataRange    = dataMaxPrice - dataMinPrice;
-    const midPrice     = (dataMaxPrice + dataMinPrice) / 2;
+    // ── Strict time boundaries (right edge = now, left edge = now - span) ──
+    const now = Date.now();
+    const timeRangeMs = WINDOW_MS[state.currentTimeframe];
+    let wEndMs = now;
+    let wStartMs;
 
-    // Padding: 12% of data range on each side, at least 2% of mid price
-    const pad      = Math.max(dataRange * 0.12, midPrice * 0.02);
-    // Minimum total axis span: 6% of mid price (prevents microscopic zoom on flat data)
-    const minSpan  = midPrice * 0.06;
-
-    let minPrice = dataMinPrice - pad;
-    let maxPrice = dataMaxPrice + pad;
-    if ((maxPrice - minPrice) < minSpan) {
-        minPrice = midPrice - minSpan / 2;
-        maxPrice = midPrice + minSpan / 2;
+    if (timeRangeMs) {
+        wStartMs = now - timeRangeMs;
+    } else {
+        // 'ALL': span from earliest data point to now
+        const firstTs = displayData.length > 0 ? _toDate(displayData[0].date).getTime() : NaN;
+        wStartMs = (!isNaN(firstTs) ? firstTs : now) - 86400000;
     }
+
+    let wDuration = Math.max(wEndMs - wStartMs, 3600000);
+    wStartMs = wEndMs - wDuration;
+
+    // Filter visible data for Y-axis scaling
+    let visibleData = displayData.filter(d => {
+        if (!d.date) return true;
+        const t = _toDate(d.date).getTime();
+        return !isNaN(t) && t >= wStartMs && t <= wEndMs;
+    });
+
+    // If no candles fall in window, expand to show whatever data exists
+    if (visibleData.length === 0 && displayData.length > 0) {
+        const dts = displayData.map(d => d.date ? _toDate(d.date).getTime() : null).filter(t => t && !isNaN(t));
+        if (dts.length > 0) {
+            const earliest = Math.min(...dts);
+            const latest = Math.max(...dts);
+            const span = Math.max(latest - earliest, 3600000);
+            wStartMs = earliest - span * 0.05;
+            wEndMs = Math.max(now, latest + span * 0.15);
+            wDuration = wEndMs - wStartMs;
+            visibleData = displayData;
+        }
+    }
+
+    const yData = visibleData.length > 0 ? visibleData : displayData;
+
+    // SMART Y-AXIS: percentile-based range ignores extreme outlier spikes
+    const sortedCloses = yData.map(d => Number(d.close) || 0).filter(p => p > 0).sort((a, b) => a - b);
+    if (sortedCloses.length === 0) return;
+
+    const p2Idx  = Math.floor(sortedCloses.length * 0.02);
+    const p98Idx = Math.min(Math.ceil(sortedCloses.length * 0.98), sortedCloses.length - 1);
+    const minClose = sortedCloses[p2Idx];
+    const maxClose = sortedCloses[p98Idx];
+
+    // Dynamic proportional padding — no absolute integer floors
+    let rawSpan = maxClose - minClose;
+    if (rawSpan === 0) rawSpan = minClose * 0.01 || 0.1;
+    const pad = rawSpan * 0.1;
+
+    let minPrice = Math.max(0, minClose - pad);
+    let maxPrice = maxClose + pad;
 
     // Light EMA smoothing to avoid axis jumping between refreshes.
     const chartedSymbol = state.mainChartData?.symbol || 'MAIN';
@@ -500,59 +561,31 @@ function drawChart() {
     window.mainYAxisCache[cacheKey] = { min: minPrice, max: maxPrice };
 
     const priceRange = maxPrice - minPrice;
-    const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
-    const highPrice = Math.max(...prices);
-    const lowPrice = Math.min(...prices);
+    const visibleCloses = yData.map(d => Number(d.close) || 0).filter(p => p > 0);
+    const avgPrice = visibleCloses.reduce((a, b) => a + b, 0) / visibleCloses.length;
+    const highPrice = Math.max(...visibleCloses);
+    const lowPrice = Math.min(...visibleCloses);
     const currentPrice = prices[prices.length - 1];
     const openPrice = Number(displayData[0].open) || currentPrice;
     const totalChange = openPrice > 0 ? ((currentPrice - openPrice) / openPrice * 100) : 0;
 
     state.chartMetrics = { minPrice, maxPrice, priceRange, avgPrice, highPrice, lowPrice, currentPrice, openPrice, totalChange };
-
-    const chartWidth = w - leftMargin - rightMargin;
-    const chartHeight = h - bottomMargin - (h * 0.1);
-
-    // ── Adaptive time window based on selected timeframe ────────────────────
-    // Preferred window is [now - timeframeDuration, now], but if data doesn't
-    // span that far back, shrink wStart to the earliest candle (with a small
-    // buffer) so the chart fills the full width with available data.
-    const _toDate = d => (d instanceof Date) ? d : new Date(d);
-    const wEnd = new Date();
-    let wStart;
-    const windowSpan = WINDOW_MS[state.currentTimeframe];
-    const dataTimestamps = state.chartData
-        .map(d => d.date ? _toDate(d.date).getTime() : null)
-        .filter(t => t && !isNaN(t));
-    const earliestData = dataTimestamps.length > 0 ? Math.min(...dataTimestamps) : null;
-
-    if (windowSpan) {
-        const idealStart = wEnd.getTime() - windowSpan;
-        if (earliestData && earliestData > idealStart) {
-            // Data doesn't go back far enough — fit to available data with 5% buffer
-            const dataSpan = wEnd.getTime() - earliestData;
-            const buffer = dataSpan * 0.05;
-            wStart = new Date(earliestData - buffer);
-        } else {
-            wStart = new Date(idealStart);
-        }
-    } else {
-        // ALL: span from earliest candle to now
-        wStart = earliestData ? new Date(earliestData) : new Date(wEnd.getTime() - 31536000000);
-    }
-    const wDuration = wEnd.getTime() - wStart.getTime();
     // Share with hover handlers
+    const wStart = new Date(wStartMs);
     _chartWStart    = wStart;
     _chartWDuration = wDuration;
     _chartDisplayData = displayData;
 
-    // Converts candle index → X canvas position based on its actual date.
-    // Returns null if the date is missing or outside the window.
+    // Time-based X coordinate mapper — strict linear mapping from timestamp to pixel
+    const getX = (timestamp) => leftMargin + ((timestamp - wStartMs) / wDuration) * chartWidth;
+
+    // Convenience wrapper: maps candle index → X via its date timestamp
     function candleX(i) {
-        const d = state.chartData[i]?.date;
+        const d = displayData[i]?.date;
         if (!d) return null;
         const t = _toDate(d).getTime();
         if (isNaN(t)) return null;
-        return leftMargin + ((t - wStart.getTime()) / wDuration) * chartWidth;
+        return getX(t);
     }
 
     // Draw grid lines and Y-axis labels
@@ -581,15 +614,15 @@ function drawChart() {
         ctx.fillText(_cfmt(priceVal), leftMargin - 8, y + 3);
     }
 
-    // Draw X-axis labels — evenly spaced dates within the fixed timeframe window
+    // Draw X-axis labels — decoupled time grid (~1 label every 90px)
     ctx.textAlign = 'center';
     ctx.fillStyle = '#6b7280';
-    const labelCount = config.labels.length;
-    for (let i = 0; i < labelCount; i++) {
-        const frac = labelCount > 1 ? i / (labelCount - 1) : 0;
-        const x = leftMargin + frac * chartWidth;
-        const labelDate = new Date(wStart.getTime() + frac * wDuration);
-        ctx.fillText(formatChartDate(labelDate, state.currentTimeframe), x, h - 8);
+    const maxLabels = Math.max(2, Math.floor(chartWidth / 90));
+    const timeStep  = wDuration / maxLabels;
+    for (let i = 0; i <= maxLabels; i++) {
+        const gridTime = wStartMs + (i * timeStep);
+        const x = getX(gridTime);
+        ctx.fillText(formatChartDate(new Date(gridTime), state.currentTimeframe), x, h - 8);
     }
 
     // Draw average line (dashed)
@@ -802,12 +835,12 @@ function drawChart() {
     ctx.font = '9px JetBrains Mono, monospace';
     ctx.fillStyle = '#f59e0b';
     ctx.textAlign = 'left';
-    ctx.fillText('AVG $' + avgPrice.toFixed(2), leftMargin + 5, avgY - 5);
+    ctx.fillText('AVG ' + _ci.symbol + avgPrice.toFixed(2), leftMargin + 5, avgY - 5);
 
     // =============================================
     // LIVE PRICE CALLOUT (Trading212 style)
     // =============================================
-    drawPriceCallout(ctx, w, h, currentPrice, lastY, priceRange > 0);
+    drawPriceCallout(ctx, w, h, currentPrice, lastY, priceRange > 0, _ci.symbol);
 
     // =============================================
     // DRAW ORDER POSITION LINES (Trading212 style)
@@ -824,7 +857,7 @@ function drawChart() {
 // LIVE PRICE CALLOUT BOX
 // =============================================
 
-function drawPriceCallout(ctx, w, h, price, priceY, isValid) {
+function drawPriceCallout(ctx, w, h, price, priceY, isValid, currSymbol) {
     if (!isValid || !price) return;
 
     // Determine direction from last price
@@ -861,7 +894,8 @@ function drawPriceCallout(ctx, w, h, price, priceY, isValid) {
     ctx.font = 'bold 11px JetBrains Mono, monospace';
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
-    ctx.fillText('$' + price.toFixed(2), boxX + boxWidth / 2, boxY + boxHeight / 2 + 4);
+    const _cs = currSymbol || '$';
+    ctx.fillText(_cs + price.toFixed(2), boxX + boxWidth / 2, boxY + boxHeight / 2 + 4);
 
     // Draw small arrow indicator
     const arrowX = boxX + 8;
@@ -1049,7 +1083,7 @@ function drawRSIChart() {
     rsiCtx.strokeStyle = studyColors.rsi;
     rsiCtx.lineWidth = 1.5;
 
-    // RSI uses the same time window as the main chart (stored in module-level vars)
+    // RSI uses the same strict time-based X mapping as the main chart
     function rsiCandleX(i) {
         if (!_chartWStart || !_chartWDuration) return null;
         const d = state.chartData[i]?.date;
@@ -1116,10 +1150,24 @@ function setupRSIHover() {
         // Calculate RSI data if needed
         const currentRsiData = calculateRSI(state.chartData, 14);
 
-        // Find data point
-        const relX = x - leftMargin;
-        const index = Math.round((relX / chartWidth) * (state.chartData.length - 1));
-        const dataPoint = state.chartData[Math.max(0, Math.min(index, state.chartData.length - 1))];
+        // Map mouse X → time → nearest data point
+        const hoverFrac = (x - leftMargin) / chartWidth;
+        const hoverTime = _chartWStart
+            ? _chartWStart.getTime() + hoverFrac * _chartWDuration
+            : null;
+
+        let index = 0;
+        if (hoverTime !== null && state.chartData.length > 0) {
+            let bestDist = Infinity;
+            state.chartData.forEach((d, i) => {
+                if (!d.date) return;
+                const t = (d.date instanceof Date ? d.date : new Date(d.date)).getTime();
+                const dist = Math.abs(t - hoverTime);
+                if (dist < bestDist) { bestDist = dist; index = i; }
+            });
+        }
+        index = Math.max(0, Math.min(index, state.chartData.length - 1));
+        const dataPoint = state.chartData[index];
         const rsiValue = currentRsiData[Math.max(0, Math.min(index, currentRsiData.length - 1))];
 
         if (!dataPoint || rsiValue === null) {
@@ -1198,10 +1246,9 @@ function setupChartHover() {
             return;
         }
 
-        // Find nearest candle by time-proportional X position
-        const relX = x - leftMargin;
-        const hoverFrac = relX / chartWidth;
-        const hoverTime = _chartWStart && _chartWDuration
+        // Map mouse X → time → nearest data point
+        const hoverFrac = (x - leftMargin) / chartWidth;
+        const hoverTime = _chartWStart
             ? _chartWStart.getTime() + hoverFrac * _chartWDuration
             : null;
 
@@ -1214,10 +1261,9 @@ function setupChartHover() {
                 const dist = Math.abs(t - hoverTime);
                 if (dist < bestDist) { bestDist = dist; index = i; }
             });
-        } else {
-            index = Math.round(hoverFrac * (state.chartData.length - 1));
         }
-        const dataPoint = state.chartData[Math.max(0, Math.min(index, state.chartData.length - 1))];
+        index = Math.max(0, Math.min(index, state.chartData.length - 1));
+        const dataPoint = state.chartData[index];
 
         if (!dataPoint || !dataPoint.date) return;
 

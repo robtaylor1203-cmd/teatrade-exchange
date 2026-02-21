@@ -33,19 +33,14 @@ function _getHubCurrencyInfo() {
     const _cardMap = { 'KENYAN': 'KENYA' };
 
     const tradeSym = _cardMap[raw] || raw;
-    const cardSym = tradeSym;
+    const _allIdx = (state.dbIndexes?.length ? state.dbIndexes : (typeof defaultDbIndexes !== 'undefined' ? defaultDbIndexes : [])) || [];
 
-    const cardIdx = state.dbIndexes?.find(i => i.symbol === cardSym);
+    const cardIdx = _allIdx.find(i => i.symbol === tradeSym);
     if (cardIdx?.forexKey && state.macroIndicators?.[cardIdx.forexKey]) {
         return { symbol: cardIdx.currency || '$', multiplier: Number(state.macroIndicators[cardIdx.forexKey]) || cardIdx.multiplier || 1 };
     }
-
-    const idx = state.dbIndexes?.find(i => i.symbol === tradeSym);
-    if (idx?.forexKey && state.macroIndicators?.[idx.forexKey]) {
-        return { symbol: idx.currency || '$', multiplier: Number(state.macroIndicators[idx.forexKey]) || idx.multiplier || 1 };
-    }
-    if (idx?.currency && idx.currency !== '$') {
-        return { symbol: idx.currency, multiplier: idx.multiplier || 1 };
+    if (cardIdx?.currency && cardIdx.currency !== '$') {
+        return { symbol: cardIdx.currency, multiplier: cardIdx.multiplier || 1 };
     }
     return { symbol: '$', multiplier: 1 };
 }
@@ -65,10 +60,13 @@ function _getHubCurrencyInfoForSymbol(sym) {
     if (!sym) return { symbol: '$', multiplier: 1 };
     const _revCard = { 'KENYA': 'MOMBASA', 'INDIA': 'KOLKATA', 'CEYLON': 'COLOMBO', 'ASIA': 'FUTURES' };
     const cardSym = _revCard[sym] || sym;
-    const idx = state.dbIndexes?.find(i => i.symbol === cardSym) ||
-                state.dbIndexes?.find(i => i.symbol === sym);
+    const _allIdx = (state.dbIndexes?.length ? state.dbIndexes : (typeof defaultDbIndexes !== 'undefined' ? defaultDbIndexes : [])) || [];
+    const idx = _allIdx.find(i => i.symbol === cardSym) || _allIdx.find(i => i.symbol === sym);
     if (idx?.forexKey && state.macroIndicators?.[idx.forexKey]) {
-        return { symbol: idx.currency || '$', multiplier: Number(state.macroIndicators[idx.forexKey]) || 1 };
+        return { symbol: idx.currency || '$', multiplier: Number(state.macroIndicators[idx.forexKey]) || idx.multiplier || 1 };
+    }
+    if (idx?.currency && idx.currency !== '$') {
+        return { symbol: idx.currency, multiplier: idx.multiplier || 1 };
     }
     return { symbol: '$', multiplier: 1 };
 }
@@ -120,6 +118,20 @@ function openHubForSymbol(teaOrSymbol) {
         isIndex: isIndex,
         isTea: !isIndex
     };
+
+    // Invalidate price cache for this symbol so the hub chart loads fresh
+    // data from DB rather than serving stale entries from a previous session.
+    if (state.priceDataCache) {
+        const _ck = isIndex ? `INDEX_${symbol}` : symbol;
+        delete state.priceDataCache.loaded[_ck];
+        delete state.priceDataCache.data[_ck];
+        delete state.priceDataCache.lastUpdate[_ck];
+    }
+
+    // Clear main chart data so it doesn't flash stale data from previous symbol
+    state.chartData = [];
+    state.cachedTimeframe = null;
+    if (window.mainYAxisCache) window.mainYAxisCache = {};
 
     const titleEl = document.getElementById('main-chart-title');
     if (titleEl) titleEl.textContent = name;
@@ -249,9 +261,23 @@ function initTradingHub() {
         }
     }
 
-    // Always regenerate hub chart data from price cache so currency
-    // conversion is applied based on the hub's own selected symbol.
+    // Regenerate hub chart data: use sync cache for immediate render,
+    // then force an async DB reload to ensure fresh, correct data.
     state.hubChartData = generateHubChartData();
+
+    // Async reload: fetch fresh data from DB for the selected symbol.
+    // This overwrites any stale/mismatched cache entries and redraws.
+    const _hubSym = document.getElementById('hub-buy-symbol')?.value || '';
+    const _hubLookup = _hubSym === 'KENYAN' ? 'KENYA' : _hubSym;
+    const _hubIsIdx = typeof isIndexSymbol === 'function' && isIndexSymbol(_hubLookup);
+    const _hubSymType = _hubIsIdx ? 'index' : 'tea';
+    loadChartDataFromHistory(_hubLookup, _hubSymType).then(freshData => {
+        if (!freshData || freshData.length === 0) return;
+        const nowSym = document.getElementById('hub-buy-symbol')?.value || '';
+        if (nowSym !== _hubSym) return;
+        state.hubChartData = freshData;
+        drawHubChart();
+    }).catch(() => {});
 
     // Update hub title to match main chart
     const hubTitle = document.getElementById('hub-chart-title');
@@ -482,13 +508,18 @@ function generateInitialChartData(symbol) {
     // Get from unified cache (sync version for immediate rendering)
     let data = getPriceHistorySync(lookupSymbol, symbolType);
 
-    // Fallback to generation if cache is empty
+    // Fallback to generation if cache is empty.
+    // IMPORTANT: all values MUST be in raw USD — the chart renderer applies
+    // the forex multiplier at draw-time.
     if (!data || data.length === 0) {
         let currentPrice;
         if (isIndex) {
-            const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
-            const index = indexes.find(idx => idx.symbol === lookupSymbol);
-            currentPrice = index?.price || 3.50;
+            // Use raw USD average (same source as _liveIndexPrice)
+            currentPrice = (typeof _liveIndexPrice === 'function')
+                ? _liveIndexPrice(lookupSymbol) : null;
+            if (!currentPrice || currentPrice <= 0) {
+                currentPrice = 3.50;
+            }
         } else {
             const tea = state.teas?.find(t => t.symbol === symbol);
             currentPrice = tea?.current_price || 3.50;
@@ -499,7 +530,6 @@ function generateInitialChartData(symbol) {
         const now = Date.now();
         const dayMs = 24 * 60 * 60 * 1000;
 
-        // Use a seeded random based on symbol to ensure consistency
         const seed = symbol.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
         const seededRandom = (i) => {
             const x = Math.sin(seed + i * 9999) * 10000;
@@ -529,10 +559,11 @@ function generateInitialChartData(symbol) {
             price = close;
         }
 
-        // Store in unified cache for consistency
+        // Store in cache but with lastUpdate=0 so getPriceHistory still
+        // triggers a DB load to replace this synthetic data with real data.
         const cacheKey = symbolType === 'index' ? `INDEX_${lookupSymbol}` : lookupSymbol;
         state.priceDataCache.data[cacheKey] = data;
-        state.priceDataCache.lastUpdate[cacheKey] = Date.now();
+        state.priceDataCache.lastUpdate[cacheKey] = 0;
     }
 
     return data;
@@ -562,7 +593,15 @@ function updateHubPriceDisplay() {
     if (!state.hubChartData || state.hubChartData.length === 0) return;
 
     const ci = _getHubCurrencyInfo();
-    const m = ci.multiplier || 1;
+    let m = ci.multiplier || 1;
+
+    // Sanity guard: skip multiplier if data is already in local currency
+    if (m > 1) {
+        const _rawCloses = state.hubChartData.map(d => Number(d.close) || 0).filter(p => p > 0).sort((a, b) => a - b);
+        const _rawMedian = _rawCloses.length > 0 ? _rawCloses[Math.floor(_rawCloses.length / 2)] : 0;
+        if (_rawMedian > 50) m = 1;
+    }
+
     const lastPrice = state.hubChartData[state.hubChartData.length - 1].close * m;
     const firstPrice = state.hubChartData[0].close * m;
     const change = firstPrice > 0 ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0;
@@ -579,6 +618,151 @@ function updateHubPriceDisplay() {
         changeEl.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
         changeEl.className = 'trading-hub-change ' + (change >= 0 ? 'up' : 'down');
     }
+}
+
+/**
+ * Sync the hub chart to whichever symbol is selected in the trade dropdown.
+ * Called when the user changes the BUY or SELL instrument.
+ */
+function syncHubChartToTradeSymbol(selectId) {
+    const rawSym = document.getElementById(selectId || 'hub-buy-symbol')?.value || '';
+    if (!rawSym) return;
+
+    const lookupSymbol = rawSym === 'KENYAN' ? 'KENYA' : rawSym;
+    const isIdx = typeof isIndexSymbol === 'function' && isIndexSymbol(lookupSymbol);
+
+    const _allIdx = (state.dbIndexes?.length ? state.dbIndexes : (typeof defaultDbIndexes !== 'undefined' ? defaultDbIndexes : [])) || [];
+    const tea = !isIdx ? state.teas?.find(t => t.symbol === rawSym) : null;
+    const dbIdx = _allIdx.find(i => i.symbol === lookupSymbol);
+    const name = tea
+        ? (tea.name || rawSym)
+        : (dbIdx?.name || lookupSymbol + ' Index');
+    const currency = typeof getCurrencyForSymbol === 'function' ? getCurrencyForSymbol(lookupSymbol) : '$';
+    const forexKey = dbIdx?.forexKey || null;
+    let price;
+    if (tea) {
+        price = tea.current_price || 0;
+    } else {
+        const rawUsd = _liveIndexPrice(lookupSymbol) || 0;
+        const fxRate = (forexKey && state.macroIndicators?.[forexKey])
+            ? Number(state.macroIndicators[forexKey])
+            : (dbIdx?.multiplier || 1);
+        price = rawUsd * fxRate;
+    }
+
+    state.mainChartData = {
+        name, symbol: lookupSymbol, basePrice: price,
+        currency, forexKey, change: 0,
+        isIndex: isIdx, isTea: !isIdx
+    };
+
+    // Update hub title
+    const hubTitle = document.getElementById('hub-chart-title');
+    if (hubTitle) hubTitle.textContent = name;
+
+    // Update main chart title & price so both views stay in sync
+    const titleEl = document.getElementById('main-chart-title');
+    if (titleEl) titleEl.textContent = name;
+    const priceEl = document.getElementById('main-chart-price');
+    if (priceEl) {
+        priceEl.textContent = formatIndexPrice(price, currency, lookupSymbol);
+        priceEl.className = 'chart-stat-value up';
+    }
+
+    // Invalidate cache for fresh load
+    if (state.priceDataCache) {
+        const _ck = isIdx ? `INDEX_${lookupSymbol}` : lookupSymbol;
+        delete state.priceDataCache.loaded[_ck];
+        delete state.priceDataCache.data[_ck];
+        delete state.priceDataCache.lastUpdate[_ck];
+    }
+
+    // Reset main chart state so drawChart() regenerates from the new symbol
+    state.chartData = [];
+    state.cachedTimeframe = null;
+    if (window.mainYAxisCache) window.mainYAxisCache = {};
+
+    // Redraw both canvases immediately (sync data, possibly empty placeholder)
+    drawChart();
+    state.hubChartData = generateHubChartData();
+    drawHubChart();
+
+    // Async: load fresh data from DB, then redraw both charts
+    const _symType = isIdx ? 'index' : 'tea';
+    loadChartDataFromHistory(lookupSymbol, _symType).then(freshData => {
+        if (!freshData || freshData.length === 0) return;
+        const nowSym = document.getElementById(selectId || 'hub-buy-symbol')?.value || '';
+        if (nowSym !== rawSym) return;
+        state.hubChartData = freshData;
+        state.chartData = [];
+        state.cachedTimeframe = null;
+        updateHubPriceDisplay();
+        drawChart();
+        drawHubChart();
+    }).catch(() => {});
+}
+
+/**
+ * Sync the main chart to the trade-tea-select dropdown on the main page.
+ * Values are numeric tea IDs (e.g. "3") or "INDEX_KENYA".
+ */
+function syncChartToTradeSelect() {
+    const select = document.getElementById('trade-tea-select');
+    const val = select?.value;
+    if (!val) return;
+
+    let symbol, name, price, isIdx, currency, forexKey;
+    const _allIdx = (state.dbIndexes?.length ? state.dbIndexes : (typeof defaultDbIndexes !== 'undefined' ? defaultDbIndexes : [])) || [];
+
+    if (val.startsWith('INDEX_')) {
+        symbol = val.replace('INDEX_', '');
+        isIdx = true;
+        const dbIdx = _allIdx.find(i => i.symbol === symbol);
+        name = dbIdx?.name || symbol + ' Index';
+        const rawUsd = _liveIndexPrice(symbol) || 0;
+        currency = typeof getCurrencyForSymbol === 'function' ? getCurrencyForSymbol(symbol) : '$';
+        forexKey = dbIdx?.forexKey || null;
+        const fxRate = (forexKey && state.macroIndicators?.[forexKey])
+            ? Number(state.macroIndicators[forexKey])
+            : (dbIdx?.multiplier || 1);
+        price = rawUsd * fxRate;
+    } else {
+        const tea = state.teas?.find(t => String(t.id) === val);
+        if (!tea) return;
+        symbol = tea.symbol;
+        isIdx = false;
+        name = tea.name || symbol;
+        price = tea.current_price || 0;
+        currency = '$';
+        forexKey = null;
+    }
+
+    state.mainChartData = {
+        name, symbol, basePrice: price,
+        currency, forexKey, change: 0,
+        isIndex: isIdx, isTea: !isIdx
+    };
+
+    const titleEl = document.getElementById('main-chart-title');
+    if (titleEl) titleEl.textContent = name;
+    const priceEl = document.getElementById('main-chart-price');
+    if (priceEl) {
+        priceEl.textContent = formatIndexPrice(price, currency, symbol);
+        priceEl.className = 'chart-stat-value up';
+    }
+
+    if (state.priceDataCache) {
+        const _ck = isIdx ? `INDEX_${symbol}` : symbol;
+        delete state.priceDataCache.loaded[_ck];
+        delete state.priceDataCache.data[_ck];
+        delete state.priceDataCache.lastUpdate[_ck];
+    }
+
+    state.chartData = [];
+    state.cachedTimeframe = null;
+    if (window.mainYAxisCache) window.mainYAxisCache = {};
+
+    drawChart();
 }
 
 function updateHubStudyToggles() {
@@ -764,7 +948,17 @@ function drawHubChart() {
 
     // Forex multiplier: data is USD, display in local currency
     const _fxInfo = _getHubCurrencyInfo();
-    const _fx = _fxInfo.multiplier || 1;
+    let _fx = _fxInfo.multiplier || 1;
+
+    // Sanity guard: if raw data is already in local currency (median > $50),
+    // skip the forex multiplication to prevent double-conversion.
+    if (_fx > 1) {
+        const _rawCloses = state.hubChartData.map(d => Number(d.close) || 0).filter(p => p > 0).sort((a, b) => a - b);
+        const _rawMedian = _rawCloses.length > 0 ? _rawCloses[Math.floor(_rawCloses.length / 2)] : 0;
+        if (_rawMedian > 50) {
+            _fx = 1;
+        }
+    }
 
     // Build display-currency data (source stays in USD)
     const displayData = state.hubChartData.map(d => ({
@@ -772,12 +966,17 @@ function drawHubChart() {
         open: d.open * _fx, high: d.high * _fx, low: d.low * _fx, close: d.close * _fx
     }));
 
-    // Calculate price range with Y-axis stabilization
+    // Calculate price range with Y-axis stabilization + outlier guard
+    const _hubCloses = displayData.map(d => Number(d.close) || 0).filter(p => p > 0).sort((a, b) => a - b);
+    const _hubMedian = _hubCloses.length > 0 ? _hubCloses[Math.floor(_hubCloses.length / 2)] : 0;
+    const _hubCeil = _hubMedian > 0 ? _hubMedian * 10 : Infinity;
     let dataMinPrice = Infinity, dataMaxPrice = -Infinity;
     displayData.forEach(d => {
         if (d && typeof d.low === 'number' && typeof d.high === 'number') {
-            dataMinPrice = Math.min(dataMinPrice, d.low);
-            dataMaxPrice = Math.max(dataMaxPrice, d.high);
+            if (d.high < _hubCeil) {
+                dataMinPrice = Math.min(dataMinPrice, d.low);
+                dataMaxPrice = Math.max(dataMaxPrice, d.high);
+            }
         }
     });
 

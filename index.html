@@ -1064,7 +1064,7 @@
                             <div class="trade-form" id="hub-buy-form">
                                 <div class="form-group">
                                     <label>Symbol</label>
-                                    <select id="hub-buy-symbol" class="form-input" onchange="updateHubOrderPreview()">
+                                    <select id="hub-buy-symbol" class="form-input" onchange="updateHubOrderPreview(); syncHubChartToTradeSymbol();">
                                         <option value="TEA-KE">TEA-KE (Kenya)</option>
                                         <option value="TEA-LK">TEA-LK (Sri Lanka)</option>
                                         <option value="TEA-IN">TEA-IN (India)</option>
@@ -1141,7 +1141,7 @@
                             <div class="trade-form" id="hub-sell-form" style="display: none;">
                                 <div class="form-group">
                                     <label>Symbol</label>
-                                    <select id="hub-sell-symbol" class="form-input" onchange="updateHubOrderPreview()">
+                                    <select id="hub-sell-symbol" class="form-input" onchange="updateHubOrderPreview(); syncHubChartToTradeSymbol('hub-sell-symbol');">
                                         <option value="TEA-KE">TEA-KE (Kenya)</option>
                                         <option value="TEA-LK">TEA-LK (Sri Lanka)</option>
                                         <option value="TEA-IN">TEA-IN (India)</option>
@@ -1406,7 +1406,7 @@
                         <button type="button" class="trade-type-btn buy active" id="btn-trade-buy" onclick="setTradeType('BUY')">BUY</button>
                         <button type="button" class="trade-type-btn sell" id="btn-trade-sell" onclick="setTradeType('SELL')">SELL</button>
                     </div>
-                    <select class="trade-select" id="trade-tea-select" onchange="updateTradeSummary()">
+                    <select class="trade-select" id="trade-tea-select" onchange="updateTradeSummary(); syncChartToTradeSelect();">
                         <option value="">Select Tea...</option>
                     </select>
                     <div class="trade-input-row">
