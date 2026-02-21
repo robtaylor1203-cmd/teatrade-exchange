@@ -619,6 +619,74 @@ function subscribeToPendingOrders(userId) {
 }
 
 /**
+ * Subscribe to margin call / stop-out notifications for the current user.
+ * Shows a prominent warning toast when the server detects danger levels.
+ */
+function subscribeToMarginNotifications(userId) {
+    const key = 'marginNotifRetries';
+    if (!_realtimeState[key]) _realtimeState[key] = 0;
+
+    function create() {
+        if (state.marginNotifSubscription) {
+            try { supabaseClient.removeChannel(state.marginNotifSubscription); } catch (_) {}
+        }
+        state.marginNotifSubscription = supabaseClient
+            .channel(`user:margin:${userId}`)
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'margin_notifications',
+                filter: `user_id=eq.${userId}`
+            }, (payload) => {
+                const n = payload.new;
+                if (!n) return;
+                if (n.type === 'STOP_OUT') {
+                    _showMarginAlert('STOP OUT — Positions Liquidated',
+                        n.message || 'All positions have been closed to protect your account.',
+                        'stop_out');
+                    if (typeof loadPositions === 'function') loadPositions();
+                    if (typeof loadIndexPositions === 'function') loadIndexPositions();
+                } else if (n.type === 'MARGIN_CALL') {
+                    _showMarginAlert('Margin Call Warning',
+                        n.message || `Margin level at ${Number(n.margin_level).toFixed(0)}%. Deposit funds or close positions.`,
+                        'margin_call');
+                }
+            })
+            .subscribe((status) => {
+                _handleChannelStatus(status, `margin:${userId.slice(0, 8)}`, key, create);
+            });
+        return state.marginNotifSubscription;
+    }
+    return create();
+}
+
+/**
+ * Display a prominent margin alert overlay.
+ */
+function _showMarginAlert(title, message, type) {
+    const existing = document.getElementById('margin-alert-overlay');
+    if (existing) existing.remove();
+
+    const isStopOut = type === 'stop_out';
+    const overlay = document.createElement('div');
+    overlay.id = 'margin-alert-overlay';
+    overlay.className = `margin-alert ${isStopOut ? 'margin-alert-danger' : 'margin-alert-warning'}`;
+    overlay.innerHTML = `
+        <div class="margin-alert-icon">${isStopOut ? '🛑' : '⚠️'}</div>
+        <div class="margin-alert-content">
+            <div class="margin-alert-title">${title}</div>
+            <div class="margin-alert-msg">${message}</div>
+        </div>
+        <button class="margin-alert-close" onclick="this.parentElement.remove()">✕</button>
+    `;
+    document.body.appendChild(overlay);
+
+    if (!isStopOut) {
+        setTimeout(() => { if (overlay.parentElement) overlay.remove(); }, 30000);
+    }
+}
+
+/**
  * Start all user-specific Realtime subscriptions.
  * Call this after login.
  */
@@ -627,13 +695,15 @@ function startUserSubscriptions(userId) {
     subscribeToTrades(userId);
     subscribeToProfile(userId);
     subscribeToPendingOrders(userId);
+    subscribeToMarginNotifications(userId);
 }
 
 /**
  * Tear down user-specific subscriptions on logout.
  */
 function stopUserSubscriptions() {
-    ['positionsSubscription', 'tradesSubscription', 'profileSubscription', 'pendingOrdersSubscription'].forEach(key => {
+    ['positionsSubscription', 'tradesSubscription', 'profileSubscription',
+     'pendingOrdersSubscription', 'marginNotifSubscription'].forEach(key => {
         if (state[key]) {
             try { supabaseClient.removeChannel(state[key]); } catch (_) {}
             state[key] = null;

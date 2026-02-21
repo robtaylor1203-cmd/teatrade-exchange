@@ -85,8 +85,9 @@ const state = {
     onlineUsers: new Set(),
     unreadChatCount: 0,
 
-    // Pairs
+    // Pairs & Watchlist
     teaPairs: [],
+    teaWatchlist: [],
     currentPairTrade: null,
     selectedLeverage: 1,
     pairsSortColumn: 'pair',
@@ -239,8 +240,6 @@ const teaDisplayData = {
     'MLW-FNGS': { grade: 'FNGS', estate: 'Malawi Fannings', origin: 'Malawi',  lot: 24802, qty: 6200,  buyer: '\u2014', status: 'BIDDING' },
     // Rwanda
     'RWA-OP':   { grade: 'OP',   estate: 'Rwanda OP',       origin: 'Rwanda',  lot: 24608, qty: 6200,  buyer: '\u2014', status: 'BIDDING' },
-    // China (legacy — not in any active index)
-    'CHN-YUN':  { grade: 'YUN',  estate: 'Yunnan Gold',     origin: 'China',   lot: 24601, qty: 12400, buyer: '\u2014', status: 'BIDDING' },
     // Auction display variants
     'IND-DRJ-2': { grade: 'DRJ', estate: 'Darjeeling Second Flush', origin: 'India', lot: 24612, qty: 11200, buyer: '\u2014', status: 'BIDDING', priceFrom: 'IND-DRJ' },
     'KEN-BP1-2': { grade: 'BP1', estate: 'Kenya Premium BP1', origin: 'Kenya', lot: 24613, qty: 19500, buyer: '\u2014', status: 'BIDDING', priceFrom: 'KEN-BP1' },
@@ -267,11 +266,11 @@ const bottomMargin = 25;
 
 // Timeframe configurations
 const timeframeConfig = {
-    '1D':  { points: 96,  labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'], labelFormat: 'time',  baseDate: new Date() },
+    '1D':  { points: 288, labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'], labelFormat: 'time',  baseDate: new Date() },
     '1W':  { points: 168, labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],               labelFormat: 'day',   baseDate: new Date() },
-    '1M':  { points: 120, labels: ['W1', 'W2', 'W3', 'W4'],                                        labelFormat: 'week',  baseDate: new Date() },
+    '1M':  { points: 180, labels: ['W1', 'W2', 'W3', 'W4'],                                        labelFormat: 'week',  baseDate: new Date() },
     '3M':  { points: 130, labels: ['M1', 'M2', 'M3'],                                              labelFormat: 'month', baseDate: new Date() },
-    '1Y':  { points: 280, labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], labelFormat: 'month', baseDate: new Date() },
+    '1Y':  { points: 365, labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], labelFormat: 'month', baseDate: new Date() },
     'ALL': { points: 800, labels: ['2022', '2023', '2024', '2025', '2026'],                        labelFormat: 'year',  baseDate: new Date() }
 };
 
@@ -333,6 +332,7 @@ function setActiveBalance(newBalance) {
         state.userProfile.virtual_balance = newBalance;
         state.userProfile.cash_balance = newBalance;
     }
+    updateBalanceDisplay();
 }
 
 /**

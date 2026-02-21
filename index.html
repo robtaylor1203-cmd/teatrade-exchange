@@ -1266,19 +1266,21 @@
                 </div>
             </div>
 
-            <!-- Auction Data Table -->
+            <!-- Tradable Instruments Table -->
             <div class="auction-section">
                 <div class="section-header">
-                    <div class="section-title">Live Auction Results &#8212; Mombasa Sale 06/2026</div>
+                    <div class="section-title">Tradable Instruments</div>
                     <div class="section-filters">
                         <div class="market-toggle">
                             <button class="toggle-btn active" id="toggle-singles" onclick="setMarketView('singles')">Singles</button>
                             <button class="toggle-btn" id="toggle-pairs" onclick="setMarketView('pairs')">Pairs</button>
                         </div>
                         <div class="grade-filters" id="grade-filters">
-                            <button class="filter-btn active">All Grades</button>
-                            <button class="filter-btn">Orthodox</button>
-                            <button class="filter-btn">CTC</button>
+                            <button class="filter-btn active" onclick="filterInstruments('all')">All</button>
+                            <button class="filter-btn" onclick="filterInstruments('kenya')">Kenya</button>
+                            <button class="filter-btn" onclick="filterInstruments('india')">India</button>
+                            <button class="filter-btn" onclick="filterInstruments('srilanka')">Sri Lanka</button>
+                            <button class="filter-btn" onclick="filterInstruments('other')">Other</button>
                         </div>
                     </div>
                 </div>
@@ -1288,19 +1290,18 @@
                 <table class="data-table" id="auction-table">
                     <thead>
                         <tr>
-                            <th>Lot #</th>
-                            <th>Grade</th>
-                            <th>Estate / Factory</th>
+                            <th>Symbol</th>
+                            <th>Name</th>
                             <th>Origin</th>
-                            <th>Qty (kg)</th>
-                            <th>Bid $/kg</th>
-                            <th>Change</th>
-                            <th>Buyer</th>
-                            <th>Status</th>
+                            <th>Price</th>
+                            <th>24h Change</th>
+                            <th>Volume</th>
+                            <th>Spread</th>
+                            <th style="text-align:center;">&#9733;</th>
                         </tr>
                     </thead>
                     <tbody id="auction-table-body">
-                        <!-- Populated dynamically from database -->
+                        <!-- Populated dynamically -->
                     </tbody>
                 </table>
                 </div>
@@ -1781,6 +1782,10 @@
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                     Financial
                 </button>
+                <button class="portfolio-tab" data-tab="history" onclick="switchPortfolioModalTab('history')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    History
+                </button>
                 <button class="portfolio-tab" data-tab="social" onclick="switchPortfolioModalTab('social')">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     Social
@@ -1790,6 +1795,9 @@
             <div class="portfolio-modal-body">
                 <div id="portfolio-tab-financial" class="portfolio-tab-content" style="display:block;">
                     <div id="portfolio-financial-panel"></div>
+                </div>
+                <div id="portfolio-tab-history" class="portfolio-tab-content" style="display:none;">
+                    <div id="portfolio-history-panel"></div>
                 </div>
                 <div id="portfolio-tab-social" class="portfolio-tab-content" style="display:none;">
                     <div class="portfolio-watchlist-col">

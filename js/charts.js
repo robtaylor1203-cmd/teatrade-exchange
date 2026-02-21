@@ -512,20 +512,32 @@ function drawChart() {
     const chartWidth = w - leftMargin - rightMargin;
     const chartHeight = h - bottomMargin - (h * 0.1);
 
-    // ── Fixed time window based on selected timeframe ─────────────────────
-    // The window is always [now - timeframeDuration, now] so the axis is
-    // stable regardless of how much data is loaded. Data points are plotted
-    // at their correct proportional position within this window.
+    // ── Adaptive time window based on selected timeframe ────────────────────
+    // Preferred window is [now - timeframeDuration, now], but if data doesn't
+    // span that far back, shrink wStart to the earliest candle (with a small
+    // buffer) so the chart fills the full width with available data.
     const _toDate = d => (d instanceof Date) ? d : new Date(d);
     const wEnd = new Date();
     let wStart;
     const windowSpan = WINDOW_MS[state.currentTimeframe];
+    const dataTimestamps = state.chartData
+        .map(d => d.date ? _toDate(d.date).getTime() : null)
+        .filter(t => t && !isNaN(t));
+    const earliestData = dataTimestamps.length > 0 ? Math.min(...dataTimestamps) : null;
+
     if (windowSpan) {
-        wStart = new Date(wEnd.getTime() - windowSpan);
+        const idealStart = wEnd.getTime() - windowSpan;
+        if (earliestData && earliestData > idealStart) {
+            // Data doesn't go back far enough — fit to available data with 5% buffer
+            const dataSpan = wEnd.getTime() - earliestData;
+            const buffer = dataSpan * 0.05;
+            wStart = new Date(earliestData - buffer);
+        } else {
+            wStart = new Date(idealStart);
+        }
     } else {
         // ALL: span from earliest candle to now
-        const ts = state.chartData.map(d => d.date ? _toDate(d.date).getTime() : null).filter(t => t && !isNaN(t));
-        wStart = ts.length > 0 ? new Date(Math.min(...ts)) : new Date(wEnd.getTime() - 31536000000);
+        wStart = earliestData ? new Date(earliestData) : new Date(wEnd.getTime() - 31536000000);
     }
     const wDuration = wEnd.getTime() - wStart.getTime();
     // Share with hover handlers

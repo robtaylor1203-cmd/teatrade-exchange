@@ -17,7 +17,6 @@
 // Country prefix → flag emoji + display label
 const COUNTRY_MAP = {
     KEN: { flag: '🇰🇪', label: 'Kenya'      },
-    CHN: { flag: '🇨🇳', label: 'China'      },
     IND: { flag: '🇮🇳', label: 'India'      },
     SRI: { flag: '🇱🇰', label: 'Sri Lanka'  },
     MLW: { flag: '🇲🇼', label: 'Malawi'     },
@@ -38,107 +37,116 @@ const COUNTRY_MAP = {
 };
 
 // =============================================
-// AUCTION TABLE
+// TRADABLE INSTRUMENTS TABLE
 // =============================================
+
+let _instrumentFilter = 'all';
+
+const ORIGIN_FILTER_MAP = {
+    kenya: ['Kenya'],
+    india: ['India'],
+    srilanka: ['Sri Lanka'],
+    other: ['Indonesia', 'Bangladesh', 'Malawi', 'Rwanda']
+};
+
+function filterInstruments(filter) {
+    _instrumentFilter = filter;
+    document.querySelectorAll('#grade-filters .filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent.trim().toLowerCase().replace(/\s/g, '') === filter || (filter === 'all' && btn.textContent.trim() === 'All'));
+    });
+    updateAuctionTable();
+}
+
+function getTeaWatchlist() {
+    if (!state.teaWatchlist) {
+        try { state.teaWatchlist = JSON.parse(localStorage.getItem('tt_tea_watchlist')) || []; }
+        catch { state.teaWatchlist = []; }
+    }
+    return state.teaWatchlist;
+}
+
+function saveTeaWatchlist() {
+    localStorage.setItem('tt_tea_watchlist', JSON.stringify(state.teaWatchlist || []));
+}
+
+function toggleTeaWatchlist(symbol) {
+    const wl = getTeaWatchlist();
+    const idx = wl.indexOf(symbol);
+    if (idx >= 0) wl.splice(idx, 1);
+    else wl.push(symbol);
+    state.teaWatchlist = wl;
+    saveTeaWatchlist();
+    updateAuctionTable();
+    updateWatchlistTeas();
+}
 
 function updateAuctionTable() {
     const tbody = document.getElementById('auction-table-body');
     if (!tbody || !state.teas.length) return;
 
-    // Build tea lookup map
-    const teaMap = {};
-    state.teas.forEach(tea => teaMap[tea.symbol] = tea);
+    const SPREAD_PCT = 0.01;
+    const wl = getTeaWatchlist();
 
-    // Build auction items from display data
-    const auctionItems = Object.entries(teaDisplayData).map(([symbol, displayData]) => {
-        // Get price source - either this symbol or priceFrom reference
-        const priceSymbol = displayData.priceFrom || symbol;
-        const tea = teaMap[priceSymbol] || {
-            symbol: priceSymbol,
-            current_price: displayData.soldPrice || 0,
-            previous_price: displayData.soldPrice || 0
-        };
-        return { symbol, tea, displayData };
+    let items = state.teas.map(tea => {
+        const dd = teaDisplayData[tea.symbol];
+        const origin = dd?.origin || tea.name?.split(' ')[0] || '';
+        return { tea, origin, dd };
     });
 
-    // Sort: BIDDING first, then PENDING, then SOLD (by soldTime desc)
-    const statusOrder = { 'BIDDING': 0, 'PENDING': 1, 'SOLD': 2 };
-    auctionItems.sort((a, b) => {
-        const statusDiff = statusOrder[a.displayData.status] - statusOrder[b.displayData.status];
-        if (statusDiff !== 0) return statusDiff;
-        if (a.displayData.status === 'SOLD') {
-            return (b.displayData.soldTime || 0) - (a.displayData.soldTime || 0);
-        }
-        return 0;
+    if (_instrumentFilter !== 'all') {
+        const allowed = ORIGIN_FILTER_MAP[_instrumentFilter] || [];
+        items = items.filter(i => allowed.includes(i.origin));
+    }
+
+    items.sort((a, b) => {
+        const aStarred = wl.includes(a.tea.symbol) ? 0 : 1;
+        const bStarred = wl.includes(b.tea.symbol) ? 0 : 1;
+        if (aStarred !== bStarred) return aStarred - bStarred;
+        return (a.origin || '').localeCompare(b.origin || '') || a.tea.symbol.localeCompare(b.tea.symbol);
     });
 
-    // Detect price changes only for BIDDING lots
     const changedTeas = {};
-    auctionItems.forEach(({ symbol, tea, displayData }) => {
-        if (displayData.status === 'BIDDING') {
-            const trackKey = symbol;
-            if (state.previousAuctionPrices[trackKey] !== undefined &&
-                state.previousAuctionPrices[trackKey] !== tea.current_price) {
-                changedTeas[symbol] = tea.current_price > state.previousAuctionPrices[trackKey] ? 'up' : 'down';
-            }
-            state.previousAuctionPrices[trackKey] = tea.current_price;
+    items.forEach(({ tea }) => {
+        if (state.previousAuctionPrices[tea.symbol] !== undefined &&
+            state.previousAuctionPrices[tea.symbol] !== tea.current_price) {
+            changedTeas[tea.symbol] = tea.current_price > state.previousAuctionPrices[tea.symbol] ? 'up' : 'down';
         }
+        state.previousAuctionPrices[tea.symbol] = tea.current_price;
     });
 
-    tbody.innerHTML = auctionItems.map(({ symbol, tea, displayData }) => {
-        const status = displayData.status;
-        const buyer = displayData.buyer;
-
-        let displayPrice;
-        let changeStr;
-        let changeClass = '';
-        let flashClass = '';
-
-        if (status === 'SOLD') {
-            displayPrice = displayData.soldPrice || tea.current_price;
-            changeStr = '\u2014';
-        } else if (status === 'PENDING') {
-            displayPrice = tea.current_price;
-            changeStr = '\u2014';
-        } else {
-            // BIDDING - live price with changes
-            displayPrice = tea.current_price;
-            const change = tea.previous_price
-                ? ((tea.current_price - tea.previous_price) / tea.previous_price * 100)
-                : 0;
-            changeStr = change !== 0 ? `${change >= 0 ? '+' : ''}${change.toFixed(1)}%` : '\u2014';
-            changeClass = change > 0 ? 'up' : change < 0 ? 'down' : '';
-            flashClass = changedTeas[symbol] ? `flash-${changedTeas[symbol]}` : '';
-        }
-
-        let statusColor;
-        if (status === 'SOLD') {
-            statusColor = 'var(--accent-green)';
-        } else if (status === 'BIDDING') {
-            statusColor = 'var(--accent-orange)';
-        } else {
-            statusColor = 'var(--text-muted)';
-        }
+    tbody.innerHTML = items.map(({ tea, origin }) => {
+        const price = Number(tea.current_price) || 0;
+        const prev = Number(tea.previous_price) || price;
+        const change = prev > 0 ? ((price - prev) / prev * 100) : 0;
+        const changeStr = change !== 0 ? `${change >= 0 ? '+' : ''}${change.toFixed(1)}%` : '\u2014';
+        const changeClass = change > 0 ? 'up' : change < 0 ? 'down' : '';
+        const flashClass = changedTeas[tea.symbol] ? `flash-${changedTeas[tea.symbol]}` : '';
+        const volume = Number(tea.volume_24h) || 0;
+        const volStr = volume >= 1000 ? `${Math.round(volume / 1000)}K` : String(volume);
+        const askPrice = price * (1 + SPREAD_PCT / 2);
+        const bidPrice = price * (1 - SPREAD_PCT / 2);
+        const spreadVal = askPrice - bidPrice;
+        const isStarred = wl.includes(tea.symbol);
+        const parts = tea.symbol.split('-');
+        const shortSym = parts[1] || tea.symbol;
+        const prefix = parts[0];
 
         return `
-            <tr>
-                <td style="font-family: 'JetBrains Mono', monospace;">#${escapeHtml(String(displayData.lot))}</td>
-                <td><span class="grade-badge">${escapeHtml(displayData.grade)}</span></td>
-                <td>${escapeHtml(displayData.estate)}</td>
-                <td class="auction-center">${escapeHtml(displayData.origin)}</td>
-                <td>${displayData.qty.toLocaleString()}</td>
-                <td class="price-cell ${changeClass} ${flashClass}" data-tea="${escapeHtml(symbol)}">
-                    <span>$${displayPrice.toFixed(2)}</span>
-                    <button class="price-alert-btn ${state.priceAlerts[symbol] ? 'has-alert' : ''}" onclick="event.stopPropagation(); openPriceAlertModal('${escapeHtml(symbol)}', ${displayPrice})" title="Set price alert">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                        </svg>
+            <tr onclick="openHubForSymbol('${escapeHtml(tea.symbol)}')" style="cursor:pointer;">
+                <td style="font-family:'JetBrains Mono',monospace;font-weight:600;white-space:nowrap;">
+                    <span style="color:var(--text-muted);font-size:10px;vertical-align:baseline;">${escapeHtml(prefix)}-</span>${escapeHtml(shortSym)}
+                </td>
+                <td>${escapeHtml(tea.name || tea.symbol)}</td>
+                <td class="auction-center">${escapeHtml(origin)}</td>
+                <td class="price-cell ${changeClass} ${flashClass}" data-tea="${escapeHtml(tea.symbol)}">$${price.toFixed(2)}</td>
+                <td class="${changeClass}">${changeStr}</td>
+                <td style="color:var(--text-muted);">${volStr}</td>
+                <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);">$${spreadVal.toFixed(3)}</td>
+                <td style="text-align:center;">
+                    <button class="watchlist-star-btn ${isStarred ? 'starred' : ''}" onclick="event.stopPropagation(); toggleTeaWatchlist('${escapeHtml(tea.symbol)}')" title="${isStarred ? 'Remove from watchlist' : 'Add to watchlist'}">
+                        ${isStarred ? '\u2605' : '\u2606'}
                     </button>
                 </td>
-                <td class="${changeClass}">${changeStr}</td>
-                <td>${escapeHtml(buyer)}</td>
-                <td><span style="color: ${statusColor};">${escapeHtml(status)}</span></td>
             </tr>
         `;
     }).join('');
@@ -322,8 +330,19 @@ function updateWatchlistTeas() {
     const container = document.getElementById('watchlist-teas');
     if (!container || !state.teas || state.teas.length === 0) return;
 
-    // Show top 5 teas with most volume/activity
-    const watchlistTeas = state.teas.slice(0, 5);
+    const wl = getTeaWatchlist();
+    let watchlistTeas;
+
+    if (wl.length > 0) {
+        watchlistTeas = wl.map(sym => state.teas.find(t => t.symbol === sym)).filter(Boolean);
+    } else {
+        watchlistTeas = state.teas.slice(0, 5);
+    }
+
+    if (watchlistTeas.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted);font-size:11px;padding:12px 0;text-align:center;">Star instruments below to add them here</div>';
+        return;
+    }
 
     let html = '';
     watchlistTeas.forEach(tea => {
@@ -600,8 +619,7 @@ function updateGlobalTicker() {
 
     const DASH = '\u2014';
 
-    // Ticker items config: flag (HTML entity pairs), label, state key, prefix, decimals
-    const tickerItems = [
+    const macroItems = [
         { flag: '\uD83C\uDDF0\uD83C\uDDEA', label: 'KES',  key: 'usd_kes',     prefix: '',  decimals: 2 },
         { flag: '\uD83C\uDDEE\uD83C\uDDF3', label: 'INR',  key: 'usd_inr',     prefix: '',  decimals: 2 },
         { flag: '\uD83C\uDDF1\uD83C\uDDF0', label: 'LKR',  key: 'usd_lkr',     prefix: '',  decimals: 2 },
@@ -609,68 +627,94 @@ function updateGlobalTicker() {
         { flag: '\uD83D\uDEE2\uFE0F',       label: 'OIL',  key: 'brent_crude', prefix: '$', decimals: 2 }
     ];
 
-    // Check if any data has arrived
-    const hasData = tickerItems.some(t => {
+    const hasData = macroItems.some(t => {
         const v = state.macroIndicators?.[t.key];
         return v != null && !isNaN(Number(v));
     });
 
-    if (!hasData) {
+    if (!hasData && (!state.teas || state.teas.length === 0)) {
         track.innerHTML = '<div class="ticker-item ticker-loading"><span class="ticker-symbol">Waiting for market data...</span></div>';
         return;
     }
 
-    // Build ticker items (render twice for seamless CSS scroll loop)
-    function buildItems() {
-        return tickerItems.map(t => {
+    function buildMacroItems() {
+        return macroItems.map(t => {
             const raw = state.macroIndicators?.[t.key];
             const val = Number(raw);
-            const prev = Number(state.previousMacro?.[t.key]);
+            const baseline = Number(state.macroBaseline?.[t.key]);
 
-            let priceStr, changeClass;
             if (raw == null || isNaN(val)) {
-                priceStr = DASH;
-                changeClass = '';
-            } else {
-                priceStr = `${t.prefix}${val.toFixed(t.decimals)}`;
-                if (!isNaN(prev) && prev !== 0) {
-                    changeClass = val > prev ? 'up' : val < prev ? 'down' : '';
-                } else {
-                    changeClass = '';
-                }
+                return `<div class="ticker-item">` +
+                    `<span class="ticker-flag">${t.flag}</span>` +
+                    `<span class="ticker-symbol">${t.label}</span>` +
+                    `<span class="ticker-price">${DASH}</span>` +
+                    `</div>`;
             }
 
-            // Also add top teas for a richer tape
+            const priceStr = `${t.prefix}${val.toFixed(t.decimals)}`;
+            let changePct = 0;
+            if (!isNaN(baseline) && baseline > 0) {
+                changePct = ((val - baseline) / baseline) * 100;
+            }
+            const changeClass = changePct > 0 ? 'up' : changePct < 0 ? 'down' : '';
+            const changeStr = changePct !== 0
+                ? `${changePct >= 0 ? '+' : ''}${changePct.toFixed(1)}%`
+                : `${DASH}`;
+
             return `<div class="ticker-item">` +
                 `<span class="ticker-flag">${t.flag}</span>` +
                 `<span class="ticker-symbol">${t.label}</span>` +
                 `<span class="ticker-price ${changeClass}">${priceStr}</span>` +
+                `<span class="ticker-change ${changeClass}">${changeStr}</span>` +
                 `</div>`;
         }).join('');
     }
 
-    // Also inject live tea prices into the tape
     function buildTeaItems() {
         if (!state.teas || state.teas.length === 0) return '';
-        return state.teas.slice(0, 8).map(tea => {
-            const price = tea.current_price || 0;
-            const change = tea.price_change_24h || 0;
-            const isUp = change >= 0;
+        return state.teas.map(tea => {
+            const price = Number(tea.current_price) || 0;
+            const prev = Number(tea.previous_price) || price;
+            const changePct = prev > 0 ? ((price - prev) / prev) * 100 : 0;
+            const changeClass = changePct > 0.01 ? 'up' : changePct < -0.01 ? 'down' : '';
+            const changeStr = Math.abs(changePct) > 0.01
+                ? `${changePct >= 0 ? '+' : ''}${changePct.toFixed(1)}%`
+                : '+0.0%';
             const symbol = tea.symbol || '';
-            return `<div class="ticker-item ticker-tea">` +
+            return `<div class="ticker-item ticker-tea" onclick="openHubForSymbol('${escapeHtml(symbol)}')" style="cursor:pointer;">` +
                 `<span class="ticker-symbol">${escapeHtml(symbol)}</span>` +
-                `<span class="ticker-price">$${price.toFixed(2)}</span>` +
-                `<span class="ticker-change ${isUp ? 'up' : 'down'}">${isUp ? '+' : ''}${change.toFixed(1)}%</span>` +
+                `<span class="ticker-price ${changeClass}">$${price.toFixed(2)}</span>` +
+                `<span class="ticker-change ${changeClass}">${changeStr}</span>` +
                 `</div>`;
         }).join('');
     }
 
-    const forexBlock = buildItems();
-    const teaBlock = buildTeaItems();
-    const separator = '<div class="ticker-separator">\u2502</div>';
+    function buildIndexItems() {
+        const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
+        if (indexes.length === 0) return '';
+        const topIdx = indexes.filter(i => ['KENYA', 'INDIA', 'CEYLON', 'AFRICA', 'ASIA', 'FUTURES', 'INDONESIA', 'BANGLADESH'].includes(i.symbol));
+        return topIdx.map(idx => {
+            const price = idx.price || 0;
+            const prev = idx.previousPrice || price;
+            const changePct = prev > 0 ? ((price - prev) / prev) * 100 : 0;
+            const changeClass = changePct > 0.01 ? 'up' : changePct < -0.01 ? 'down' : '';
+            const changeStr = Math.abs(changePct) > 0.01
+                ? `${changePct >= 0 ? '+' : ''}${changePct.toFixed(1)}%`
+                : '+0.0%';
+            return `<div class="ticker-item ticker-index" onclick="openHubForSymbol('${escapeHtml(idx.symbol)}')" style="cursor:pointer;">` +
+                `<span class="ticker-symbol">${escapeHtml(idx.symbol)}</span>` +
+                `<span class="ticker-price ${changeClass}">$${price.toFixed(2)}</span>` +
+                `<span class="ticker-change ${changeClass}">${changeStr}</span>` +
+                `</div>`;
+        }).join('');
+    }
 
-    // Duplicate the whole set for seamless infinite scroll
-    const onePass = forexBlock + separator + teaBlock;
+    const sep = '<div class="ticker-separator">\u2502</div>';
+    const macro = buildMacroItems();
+    const indexes = buildIndexItems();
+    const teas = buildTeaItems();
+
+    const onePass = macro + sep + indexes + sep + teas;
     track.innerHTML = onePass + onePass;
 }
 

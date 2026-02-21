@@ -83,8 +83,6 @@ SYMBOLS = [
     # ── Sri Lankan grades ────────────────────────────────────────
     {"symbol": "SRI-BOP",  "current_price": 3.80,   "vol": 0.011, "volume": 500_000},
     {"symbol": "SRI-PEK",  "current_price": 3.20,   "vol": 0.011, "volume": 350_000},
-    # ── Chinese grades ───────────────────────────────────────────
-    {"symbol": "CHN-YUN",  "current_price": 5.54,   "vol": 0.009, "volume": 450_000},
     # ── Kenya / Africa indexes ───────────────────────────────────
     {"symbol": "KENYA",    "current_price": 2.05,   "vol": 0.009, "volume": 5_500_000},
     {"symbol": "MOMBASA",  "current_price": 2.05,   "vol": 0.009, "volume": 5_500_000},

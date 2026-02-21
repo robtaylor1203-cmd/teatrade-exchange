@@ -36,20 +36,30 @@ const BOT_TRADERS: BotDef[] = [
   { name: 'Amara Traore',      archetype: 'passive',     preferredRegion: 'MLW' },
   { name: 'Hassan Diallo',     archetype: 'contrarian',  preferredRegion: 'RWA' },
   { name: 'Nadia Osei',        archetype: 'scalper',     preferredRegion: 'KEN' },
-  // South Asian tea traders
-  { name: 'Priya Sharma',      archetype: 'momentum',   preferredRegion: 'IND' },
-  { name: 'Raj Malhotra',      archetype: 'whale',      preferredRegion: 'IND' },
-  { name: 'Ananya Reddy',      archetype: 'scalper',     preferredRegion: 'IND' },
-  { name: 'David Singh',       archetype: 'passive',     preferredRegion: 'IND' },
+  // South Asian tea traders — India regional specialists
+  { name: 'Priya Sharma',      archetype: 'momentum',   preferredRegion: 'GUW' },
+  { name: 'Raj Malhotra',      archetype: 'whale',      preferredRegion: 'COC' },
+  { name: 'Ananya Reddy',      archetype: 'scalper',     preferredRegion: 'CMB' },
+  { name: 'David Singh',       archetype: 'passive',     preferredRegion: 'JAL' },
+  { name: 'Vikram Iyer',       archetype: 'momentum',   preferredRegion: 'COO' },
+  { name: 'Deepa Nair',        archetype: 'contrarian',  preferredRegion: 'SIL' },
+  { name: 'Sanjay Gupta',      archetype: 'whale',      preferredRegion: 'KOL' },
+  { name: 'Kavitha Rao',       archetype: 'scalper',     preferredRegion: 'IND' },
+  // Sri Lanka specialists
   { name: 'Zara Hussain',      archetype: 'contrarian',  preferredRegion: 'SRI' },
   { name: 'Arjun Fernando',    archetype: 'momentum',   preferredRegion: 'SRI' },
-  // East Asian traders
-  { name: 'Marcus Chen',       archetype: 'whale',      preferredRegion: 'CHN' },
-  { name: 'Mei Lin Wu',        archetype: 'scalper',     preferredRegion: 'CHN' },
+  // Indonesia & Bangladesh
+  { name: 'Budi Santoso',      archetype: 'momentum',   preferredRegion: 'IDN' },
+  { name: 'Dewi Kartika',      archetype: 'passive',     preferredRegion: 'IDN' },
+  { name: 'Rahim Chowdhury',   archetype: 'whale',      preferredRegion: 'BGD' },
+  { name: 'Fatima Begum',      archetype: 'scalper',     preferredRegion: 'BGD' },
+  // East Asian traders (no region preference — trade broadly)
+  { name: 'Marcus Chen',       archetype: 'whale' },
+  { name: 'Mei Lin Wu',        archetype: 'scalper' },
   { name: 'Ayumi Tanaka',      archetype: 'contrarian' },
   { name: 'Yuki Watanabe',     archetype: 'scalper' },
   { name: 'Stephen Kwon',      archetype: 'momentum' },
-  { name: 'Victoria Chang',    archetype: 'passive',     preferredRegion: 'CHN' },
+  { name: 'Victoria Chang',    archetype: 'passive' },
   // European / Western institutional traders
   { name: 'Oliver Bennett',    archetype: 'whale' },
   { name: 'Elena Volkov',      archetype: 'momentum' },
@@ -75,17 +85,48 @@ const ARCHETYPES = {
 }
 
 const TEA_SYMBOLS = [
+  // Kenya (Mombasa)
   'KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS',
+  // India — original
   'IND-ASM', 'IND-DRJ',
-  'SRI-BOP', 'SRI-PEK',
-  'CHN-YUN',
-  'MLW-BP1', 'RWA-OP',
+  // India — Guwahati (Assam CTC)
+  'GUW-BOP', 'GUW-BP', 'GUW-OF', 'GUW-PF',
+  // India — Jalpaiguri (Dooars/Terai)
+  'JAL-BOP', 'JAL-BP', 'JAL-DUST', 'JAL-PF',
+  // India — Cochin (Kerala)
+  'COC-BOP', 'COC-OP', 'COC-DUST', 'COC-PF',
+  // India — Coimbatore (Tamil Nadu)
+  'CMB-BOP', 'CMB-BP', 'CMB-DUST', 'CMB-OP',
+  // India — Siliguri (Darjeeling/Terai)
+  'SIL-DRJ', 'SIL-BOP', 'SIL-DUST', 'SIL-FNGS',
+  // India — Coonoor (Nilgiris)
+  'COO-BOP', 'COO-OP', 'COO-DUST', 'COO-PF',
+  // India — Kolkata (Darjeeling specialty)
+  'KOL-SF', 'KOL-AUT', 'KOL-GOLD',
+  // Sri Lanka (Colombo)
+  'SRI-BOP', 'SRI-PEK', 'SRI-OP', 'SRI-FBOP', 'SRI-DUST', 'SRI-BOP1',
+  // Indonesia (Jakarta)
+  'IDN-BOP', 'IDN-PF', 'IDN-DUST', 'IDN-BT',
+  // Bangladesh (Chittagong)
+  'BGD-BOP', 'BGD-BP', 'BGD-DUST', 'BGD-FNGS',
+  // Malawi (Limbe)
+  'MLW-BP1', 'MLW-PF1', 'MLW-DUST', 'MLW-FNGS',
+  // Rwanda
+  'RWA-OP',
 ]
 
-const INDEX_SYMBOLS = ['KENYA', 'INDIA', 'CEYLON', 'CHINA', 'AFRICA', 'ASIA']
+const INDEX_SYMBOLS = [
+  // Country composites
+  'KENYA', 'INDIA', 'CEYLON', 'INDONESIA', 'BANGLADESH', 'MALAWI', 'AFRICA', 'ASIA',
+  // Auction centres
+  'MOMBASA', 'COLOMBO', 'KOLKATA', 'JAKARTA', 'CHITTAGONG',
+  'GUWAHATI', 'JALPAIGURI', 'COCHIN', 'COIMBATORE', 'LIMBE', 'SILIGURI', 'COONOOR',
+  // Composite
+  'FUTURES',
+]
 
 const SIM_EMAIL_DOMAIN = '@teatrade.sim'
-const BOTS_PER_TICK = 3   // max new bots created per invocation (rate-limit safe)
+const BOTS_PER_TICK = 5   // max new bots created per invocation (rate-limit safe)
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -229,7 +270,7 @@ serve(async (req) => {
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const numTraders = Math.min(activeBots.length, Math.floor(randBetween(5, 16)))
+    const numTraders = Math.min(activeBots.length, Math.floor(randBetween(8, 24)))
     const tradingBots = shuffle(activeBots).slice(0, numTraders)
 
     let tradesPlaced = 0

@@ -95,11 +95,28 @@ async function loadIndexPairs() {
     } catch (error) {
         console.error('Failed to load index pairs:', error);
         state.indexPairs = [
-            { id: 'idx-kenya-india',   base_symbol: 'KENYA',  quote_symbol: 'INDIA',  isIndex: true },
-            { id: 'idx-india-ceylon',  base_symbol: 'INDIA',  quote_symbol: 'CEYLON', isIndex: true },
-            { id: 'idx-africa-asia',   base_symbol: 'AFRICA', quote_symbol: 'ASIA',   isIndex: true },
-            { id: 'idx-kenya-ceylon',  base_symbol: 'KENYA',  quote_symbol: 'CEYLON',     isIndex: true },
-            { id: 'idx-indo-bangla',   base_symbol: 'INDONESIA', quote_symbol: 'BANGLADESH', isIndex: true },
+            // Country vs Country
+            { id: 'idx-kenya-india',     base_symbol: 'KENYA',      quote_symbol: 'INDIA',      isIndex: true },
+            { id: 'idx-kenya-ceylon',    base_symbol: 'KENYA',      quote_symbol: 'CEYLON',     isIndex: true },
+            { id: 'idx-india-ceylon',    base_symbol: 'INDIA',      quote_symbol: 'CEYLON',     isIndex: true },
+            { id: 'idx-indo-bangla',     base_symbol: 'INDONESIA',  quote_symbol: 'BANGLADESH', isIndex: true },
+            { id: 'idx-africa-asia',     base_symbol: 'AFRICA',     quote_symbol: 'ASIA',       isIndex: true },
+            // Auction Centre Cross-Region
+            { id: 'idx-mom-col',         base_symbol: 'MOMBASA',    quote_symbol: 'COLOMBO',    isIndex: true },
+            { id: 'idx-mom-kol',         base_symbol: 'MOMBASA',    quote_symbol: 'KOLKATA',    isIndex: true },
+            { id: 'idx-kol-col',         base_symbol: 'KOLKATA',    quote_symbol: 'COLOMBO',    isIndex: true },
+            { id: 'idx-kol-guw',         base_symbol: 'KOLKATA',    quote_symbol: 'GUWAHATI',   isIndex: true },
+            { id: 'idx-col-jak',         base_symbol: 'COLOMBO',    quote_symbol: 'JAKARTA',    isIndex: true },
+            { id: 'idx-chi-jak',         base_symbol: 'CHITTAGONG', quote_symbol: 'JAKARTA',    isIndex: true },
+            { id: 'idx-guw-jal',         base_symbol: 'GUWAHATI',   quote_symbol: 'JALPAIGURI', isIndex: true },
+            { id: 'idx-coc-cmb',         base_symbol: 'COCHIN',     quote_symbol: 'COIMBATORE', isIndex: true },
+            { id: 'idx-sil-coo',         base_symbol: 'SILIGURI',   quote_symbol: 'COONOOR',    isIndex: true },
+            { id: 'idx-lim-mom',         base_symbol: 'LIMBE',      quote_symbol: 'MOMBASA',    isIndex: true },
+            // Composite
+            { id: 'idx-fut-africa',      base_symbol: 'FUTURES',    quote_symbol: 'AFRICA',     isIndex: true },
+            { id: 'idx-fut-asia',        base_symbol: 'FUTURES',    quote_symbol: 'ASIA',       isIndex: true },
+            { id: 'idx-fut-kenya',       base_symbol: 'FUTURES',    quote_symbol: 'KENYA',      isIndex: true },
+            { id: 'idx-fut-india',       base_symbol: 'FUTURES',    quote_symbol: 'INDIA',      isIndex: true },
         ];
     }
 }
@@ -118,7 +135,7 @@ async function loadOrigins() {
         state.originNames = {
             KEN: 'Kenya', IND: 'India', SRI: 'Sri Lanka',
             IDN: 'Indonesia', BGD: 'Bangladesh', MLW: 'Malawi',
-            RWA: 'Rwanda', CHN: 'China'
+            RWA: 'Rwanda'
         };
     }
 }
@@ -130,6 +147,10 @@ async function loadOrigins() {
 document.addEventListener('DOMContentLoaded', async () => {
     // Auth first
     await checkAuthState();
+
+    // Hydrate tea watchlist from localStorage
+    try { state.teaWatchlist = JSON.parse(localStorage.getItem('tt_tea_watchlist')) || []; }
+    catch { state.teaWatchlist = []; }
 
     // Load reference data from Supabase (indexes, origins, pairs)
     await loadIndexes();

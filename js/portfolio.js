@@ -140,7 +140,9 @@ function updatePortfolioDisplay() {
     let totalUsedMargin = 0;
     let totalUnrealizedPnl = 0;
     state.positions.forEach(pos => {
-        totalUsedMargin += Number(pos.margin_used) || 0;
+        const lev = Number(pos.leverage) || 1;
+        const cost = Math.abs(pos.quantity) * pos.avg_entry_price;
+        totalUsedMargin += Number(pos.margin_used) || (cost / lev);
         const tea = pos.teas || state.teas.find(t => t.id === pos.tea_id);
         if (tea) {
             const isShort = pos.quantity < 0;
@@ -151,7 +153,9 @@ function updatePortfolioDisplay() {
         }
     });
     Object.entries(indexPositionsData).forEach(([symbol, pos]) => {
-        totalUsedMargin += Number(pos.margin_used) || 0;
+        const idxLev = Number(pos.leverage) || 1;
+        const idxCost = Math.abs(pos.quantity) * pos.avg_entry_price;
+        totalUsedMargin += Number(pos.margin_used) || (idxCost / idxLev);
         const index = indexes.find(idx => idx.symbol === symbol);
         if (index && pos && pos.quantity !== 0) {
             const isShort = pos.quantity < 0;
@@ -165,7 +169,12 @@ function updatePortfolioDisplay() {
     const balance = getActiveBalance();
     const equity = balance + totalUnrealizedPnl;
     const freeMargin = equity - totalUsedMargin;
-    const marginLevel = totalUsedMargin > 0 ? (equity / totalUsedMargin * 100) : Infinity;
+
+    // Position Health: what % of invested margin remains after P&L?
+    // 100% = break-even, 0% = margin fully consumed by losses
+    const positionHealth = totalUsedMargin > 0
+        ? ((totalUsedMargin + totalUnrealizedPnl) / totalUsedMargin * 100)
+        : Infinity;
 
     valueEl.textContent = '$' + equity.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
@@ -175,6 +184,11 @@ function updatePortfolioDisplay() {
     pnlEl.textContent = `${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)} (${totalPnlPct}%)`;
     pnlEl.className = 'portfolio-pnl ' + (totalPnl >= 0 ? 'up' : 'down');
 
+    // Client-side position-health warnings (supplements server-side checks)
+    if (totalUsedMargin > 0 && positionHealth !== Infinity) {
+        _checkClientMarginLevel(positionHealth, equity, totalUsedMargin);
+    }
+
     // Render margin summary below positions list
     let marginHtml = document.getElementById('portfolio-margin-summary');
     if (!marginHtml) {
@@ -183,14 +197,41 @@ function updatePortfolioDisplay() {
         marginHtml.style.cssText = 'padding:8px 12px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);';
         listEl.parentNode.insertBefore(marginHtml, listEl.nextSibling);
     }
-    const mlColor = marginLevel < 100 ? 'var(--accent-red)' : marginLevel < 200 ? 'var(--accent-orange)' : 'var(--accent-green)';
+    const phColor = positionHealth <= 5 ? 'var(--accent-red)' : positionHealth <= 40 ? 'var(--accent-orange)' : positionHealth <= 70 ? '#f59e0b' : 'var(--accent-green)';
+    const phDisplay = positionHealth === Infinity ? '—' : positionHealth.toFixed(1) + '%';
     marginHtml.innerHTML = totalUsedMargin > 0
         ? `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Balance</span><span>$${balance.toFixed(2)}</span></div>` +
           `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Equity</span><span style="font-weight:600;">$${equity.toFixed(2)}</span></div>` +
-          `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Used Margin</span><span>$${totalUsedMargin.toFixed(2)}</span></div>` +
-          `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Free Margin</span><span>$${freeMargin.toFixed(2)}</span></div>` +
-          `<div style="display:flex;justify-content:space-between;"><span>Margin Level</span><span style="color:${mlColor};font-weight:600;">${marginLevel === Infinity ? '∞' : marginLevel.toFixed(0) + '%'}</span></div>`
+          `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Invested</span><span>$${totalUsedMargin.toFixed(2)}</span></div>` +
+          `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Free Funds</span><span>$${freeMargin.toFixed(2)}</span></div>` +
+          `<div style="display:flex;justify-content:space-between;"><span>Position Health</span><span style="color:${phColor};font-weight:600;">${phDisplay}</span></div>`
         : '';
+}
+
+let _lastMarginWarningTime = 0;
+const _MARGIN_WARN_COOLDOWN_MS = 60_000;
+
+function _checkClientMarginLevel(positionHealth, equity, usedMargin) {
+    const now = Date.now();
+    if (now - _lastMarginWarningTime < _MARGIN_WARN_COOLDOWN_MS) return;
+
+    const lostPct = Math.max(0, 100 - positionHealth).toFixed(0);
+
+    if (positionHealth <= 5) {
+        _lastMarginWarningTime = now;
+        if (typeof _showMarginAlert === 'function') {
+            _showMarginAlert('CRITICAL — Approaching Stop-Out',
+                `Positions have lost ${lostPct}% of invested capital. Auto-liquidation triggers at 95% loss. Close positions now!`,
+                'stop_out');
+        }
+    } else if (positionHealth <= 40) {
+        _lastMarginWarningTime = now;
+        if (typeof _showMarginAlert === 'function') {
+            _showMarginAlert('Margin Call Warning',
+                `Positions have lost ${lostPct}% of invested capital. Close positions or deposit funds to avoid liquidation.`,
+                'margin_call');
+        }
+    }
 }
 
 // =============================================
@@ -1492,8 +1533,10 @@ function switchPortfolioModalTab(tab) {
         btn.classList.toggle('active', btn.dataset.tab === tab);
     });
     document.getElementById('portfolio-tab-financial').style.display = tab === 'financial' ? 'block' : 'none';
+    document.getElementById('portfolio-tab-history').style.display   = tab === 'history'   ? 'block' : 'none';
     document.getElementById('portfolio-tab-social').style.display    = tab === 'social'    ? 'flex'  : 'none';
     if (tab === 'financial') renderFinancialTab();
+    if (tab === 'history') renderHistoryTab();
     if (tab === 'social') renderPortfolioModal();
 }
 
@@ -1525,7 +1568,9 @@ function renderFinancialTab() {
         const pnlPct = cost > 0 ? (pnl / cost * 100).toFixed(1) : '0.0';
         holdingsValue += curVal;
         totalPnl += pnl;
-        totalUsedMargin += Number(pos.margin_used) || 0;
+        const lev = Number(pos.leverage) || 1;
+        const marginUsed = Number(pos.margin_used) || (cost / lev);
+        totalUsedMargin += marginUsed;
         const shortBadge = isShort ? ' <span style="color:var(--accent-red);font-size:10px;font-weight:700">SHORT</span>' : '';
         const levBadge = (pos.leverage && pos.leverage > 1) ? ` <span style="color:var(--accent-orange);font-size:10px;font-weight:700">${pos.leverage}x</span>` : '';
         positionsHtml += `
@@ -1552,7 +1597,9 @@ function renderFinancialTab() {
         const pnlPct = cost > 0 ? (pnl / cost * 100).toFixed(1) : '0.0';
         holdingsValue += curVal;
         totalPnl += pnl;
-        totalUsedMargin += Number(pos.margin_used) || 0;
+        const idxLev = Number(pos.leverage) || 1;
+        const idxMarginUsed = Number(pos.margin_used) || (cost / idxLev);
+        totalUsedMargin += idxMarginUsed;
         const shortBadge = isShort ? ' <span style="color:var(--accent-red);font-size:10px;font-weight:700">SHORT</span>' : '';
         const levBadge = (pos.leverage && pos.leverage > 1) ? ` <span style="color:var(--accent-orange);font-size:10px;font-weight:700">${pos.leverage}x</span>` : '';
         positionsHtml += `
@@ -1568,12 +1615,53 @@ function renderFinancialTab() {
 
     const equity = balance + totalPnl;
     const freeMargin = equity - totalUsedMargin;
-    const marginLevel = totalUsedMargin > 0 ? (equity / totalUsedMargin * 100) : Infinity;
     const startBal = state.tradingMode === 'REAL' ? 0 : 10000;
     const overallReturn = equity - startBal;
     const overallPct = startBal > 0 ? (overallReturn / startBal * 100).toFixed(2) : '0.00';
     const posCount = positions.length + Object.values(indexPositionsData).filter(p => p && p.quantity !== 0).length;
-    const mlColor = marginLevel < 100 ? 'var(--accent-red)' : marginLevel < 200 ? 'var(--accent-orange)' : 'var(--accent-green)';
+
+    // Position Health: what % of invested margin remains after P&L?
+    // 100% = break-even, 40% = margin call, 5% = stop-out, 0% = wiped out
+    const posHealth = totalUsedMargin > 0
+        ? ((totalUsedMargin + totalPnl) / totalUsedMargin * 100)
+        : (posCount > 0 ? 0 : Infinity);
+    const phColor = posHealth <= 5 ? 'var(--accent-red)' : posHealth <= 40 ? 'var(--accent-orange)' : posHealth <= 70 ? '#f59e0b' : 'var(--accent-green)';
+
+    let barStatus, barStatusColor;
+    if (equity < 0) {
+        barStatus = 'LIQUIDATION'; barStatusColor = 'var(--accent-red)';
+    } else if (posCount > 0 && posHealth <= 5) {
+        barStatus = 'STOP OUT'; barStatusColor = 'var(--accent-red)';
+    } else if (posCount > 0 && posHealth <= 40) {
+        barStatus = 'MARGIN CALL'; barStatusColor = 'var(--accent-orange)';
+    } else if (posCount > 0 && posHealth <= 70) {
+        barStatus = 'CAUTION'; barStatusColor = '#f59e0b';
+    } else {
+        barStatus = 'HEALTHY'; barStatusColor = 'var(--accent-green)';
+    }
+
+    // Bar visualises position health as a fill (100% = full green, 0% = full red)
+    const healthPct = Math.max(0, Math.min(posHealth, 100));
+    let barUsedPct, barFreePct;
+    if (posCount === 0 || totalUsedMargin <= 0) {
+        barUsedPct = 0;
+        barFreePct = 100;
+    } else if (equity <= 0 || posHealth <= 0) {
+        barUsedPct = 100;
+        barFreePct = 0;
+    } else {
+        barUsedPct = Math.max(0, 100 - healthPct);
+        barFreePct = healthPct;
+    }
+
+    const showMarkers = totalUsedMargin > 0 && posCount > 0 && posHealth > 0;
+    // Position markers on the bar: how much loss it takes to reach 40% / 5%
+    const marginCallLine = showMarkers ? Math.min(100 - 40, 99) : 0;  // 60% from left
+    const stopOutLine = showMarkers ? Math.min(100 - 5, 99) : 0;      // 95% from left
+
+    const phDisplay = posHealth === Infinity
+        ? (posCount > 0 ? '∞' : '—')
+        : posHealth.toFixed(1) + '%';
 
     panel.innerHTML = `
         <div class="pf-summary-grid">
@@ -1582,25 +1670,55 @@ function renderFinancialTab() {
                 <div class="pf-summary-value-big">$${equity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 <div class="pf-summary-return ${overallReturn >= 0 ? 'up' : 'down'}">${overallReturn >= 0 ? '+' : ''}$${overallReturn.toFixed(2)} (${overallPct}%)</div>
             </div>
+        </div>
+
+        <div class="pf-margin-bar-container">
+            <div class="pf-margin-bar-header">
+                <span class="pf-margin-bar-title">Position Health</span>
+                <span class="pf-margin-bar-status" style="color:${barStatusColor}">${barStatus}</span>
+                <span class="pf-margin-bar-level" style="color:${phColor}">Capital Remaining: ${phDisplay}</span>
+            </div>
+            <div class="pf-margin-bar-track ${equity < 0 ? 'pf-bar-danger' : ''}">
+                <div class="pf-margin-bar-used" style="width:${barUsedPct.toFixed(1)}%"></div>
+                <div class="pf-margin-bar-free" style="width:${barFreePct.toFixed(1)}%;left:${barUsedPct.toFixed(1)}%"></div>
+                ${showMarkers ? `
+                <div class="pf-margin-bar-marker pf-margin-marker-call" style="left:${marginCallLine.toFixed(1)}%">
+                    <div class="pf-margin-marker-line"></div>
+                    <div class="pf-margin-marker-label">WARNING (40%)</div>
+                </div>
+                <div class="pf-margin-bar-marker pf-margin-marker-stop" style="left:${stopOutLine.toFixed(1)}%">
+                    <div class="pf-margin-marker-line"></div>
+                    <div class="pf-margin-marker-label">CLOSE OUT (5%)</div>
+                </div>` : ''}
+            </div>
+            <div class="pf-margin-bar-legend">
+                <div class="pf-margin-legend-item">
+                    <span class="pf-margin-legend-dot" style="background:var(--accent-blue)"></span>
+                    <span>Invested: $${totalUsedMargin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div class="pf-margin-legend-item">
+                    <span class="pf-margin-legend-dot" style="background:var(--accent-green)"></span>
+                    <span>Remaining: $${Math.max(totalUsedMargin + totalPnl, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div class="pf-margin-legend-item">
+                    <span class="pf-margin-legend-dot" style="background:${totalPnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}"></span>
+                    <span>P&amp;L: ${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="pf-summary-grid pf-summary-detail-grid">
             <div class="pf-summary-card">
                 <div class="pf-summary-label">Cash Balance</div>
                 <div class="pf-summary-value">$${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             </div>
             <div class="pf-summary-card">
-                <div class="pf-summary-label">Used Margin</div>
+                <div class="pf-summary-label">Invested</div>
                 <div class="pf-summary-value">$${totalUsedMargin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             </div>
             <div class="pf-summary-card">
-                <div class="pf-summary-label">Free Margin</div>
+                <div class="pf-summary-label">Free Funds</div>
                 <div class="pf-summary-value">$${freeMargin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-            </div>
-            <div class="pf-summary-card">
-                <div class="pf-summary-label">Unrealised P&amp;L</div>
-                <div class="pf-summary-value ${totalPnl >= 0 ? 'up' : 'down'}">${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)}</div>
-            </div>
-            <div class="pf-summary-card">
-                <div class="pf-summary-label">Margin Level</div>
-                <div class="pf-summary-value" style="color:${mlColor}">${marginLevel === Infinity ? '∞' : marginLevel.toFixed(0) + '%'}</div>
             </div>
             <div class="pf-summary-card">
                 <div class="pf-summary-label">Open Positions</div>
@@ -1666,6 +1784,183 @@ async function _loadOwnTrades() {
     } catch (e) {
         feedEl.innerHTML = '<div class="portfolio-notification-placeholder">Error loading trades</div>';
     }
+}
+
+// =============================================
+// HISTORY TAB
+// =============================================
+
+let _historyPage = 0;
+const _HISTORY_PAGE_SIZE = 50;
+
+async function renderHistoryTab() {
+    const panel = document.getElementById('portfolio-history-panel');
+    if (!panel) return;
+
+    _historyPage = 0;
+    panel.innerHTML = `
+        <div class="pf-history-stats" id="pf-history-stats">
+            <div class="pf-history-stat-loading">Loading stats...</div>
+        </div>
+        <div class="pf-section">
+            <div class="pf-section-title">Trade History</div>
+            <div class="pf-history-filters" id="pf-history-filters">
+                <button class="pf-hist-filter active" data-filter="all" onclick="_filterHistory('all')">All</button>
+                <button class="pf-hist-filter" data-filter="BUY" onclick="_filterHistory('BUY')">Buys</button>
+                <button class="pf-hist-filter" data-filter="SELL" onclick="_filterHistory('SELL')">Sells</button>
+            </div>
+            <div id="pf-history-table-wrap">
+                <div class="portfolio-notification-placeholder">Loading...</div>
+            </div>
+        </div>
+    `;
+
+    await _loadFullHistory('all');
+}
+
+let _allHistoryTrades = [];
+
+async function _loadFullHistory(filter) {
+    const wrap = document.getElementById('pf-history-table-wrap');
+    const statsEl = document.getElementById('pf-history-stats');
+    if (!wrap || !state.currentUser) return;
+
+    try {
+        let query = supabaseClient
+            .from('trades')
+            .select('id, side, quantity, price, total_value, tea_id, index_symbol, trading_mode, created_at')
+            .eq('user_id', state.currentUser.id)
+            .order('created_at', { ascending: false })
+            .limit(500);
+
+        const { data: trades, error } = await query;
+
+        if (error || !trades?.length) {
+            wrap.innerHTML = '<div class="pf-empty">No trade history yet.</div>';
+            if (statsEl) statsEl.innerHTML = '';
+            return;
+        }
+
+        _allHistoryTrades = trades;
+
+        const teaMap = {};
+        (state.teas || []).forEach(t => { teaMap[t.id] = t; });
+
+        let totalBuys = 0, totalSells = 0, totalVolume = 0, totalValue = 0;
+        let winCount = 0, lossCount = 0;
+        const symbolVolume = {};
+
+        trades.forEach(t => {
+            const val = Number(t.total_value) || (Number(t.quantity) * Number(t.price));
+            totalValue += val;
+            totalVolume += Number(t.quantity) || 0;
+            if (t.side === 'BUY') totalBuys++; else totalSells++;
+
+            const sym = t.index_symbol || teaMap[t.tea_id]?.symbol || '???';
+            symbolVolume[sym] = (symbolVolume[sym] || 0) + (Number(t.quantity) || 0);
+        });
+
+        const topSymbols = Object.entries(symbolVolume)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5);
+
+        if (statsEl) {
+            statsEl.innerHTML = `
+                <div class="pf-history-stat-grid">
+                    <div class="pf-hist-stat">
+                        <div class="pf-hist-stat-val">${trades.length}</div>
+                        <div class="pf-hist-stat-label">Total Trades</div>
+                    </div>
+                    <div class="pf-hist-stat">
+                        <div class="pf-hist-stat-val" style="color:var(--accent-green)">${totalBuys}</div>
+                        <div class="pf-hist-stat-label">Buys</div>
+                    </div>
+                    <div class="pf-hist-stat">
+                        <div class="pf-hist-stat-val" style="color:var(--accent-red)">${totalSells}</div>
+                        <div class="pf-hist-stat-label">Sells</div>
+                    </div>
+                    <div class="pf-hist-stat">
+                        <div class="pf-hist-stat-val">${totalVolume >= 1000 ? (totalVolume / 1000).toFixed(1) + 'K' : totalVolume.toLocaleString()}</div>
+                        <div class="pf-hist-stat-label">Volume (kg)</div>
+                    </div>
+                    <div class="pf-hist-stat">
+                        <div class="pf-hist-stat-val">$${totalValue >= 10000 ? (totalValue / 1000).toFixed(1) + 'K' : totalValue.toFixed(2)}</div>
+                        <div class="pf-hist-stat-label">Total Value</div>
+                    </div>
+                    <div class="pf-hist-stat">
+                        <div class="pf-hist-stat-val">${topSymbols.length > 0 ? topSymbols[0][0] : '\u2014'}</div>
+                        <div class="pf-hist-stat-label">Most Traded</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        _renderHistoryRows(filter, teaMap);
+
+    } catch (e) {
+        wrap.innerHTML = '<div class="pf-empty">Error loading trade history.</div>';
+    }
+}
+
+function _renderHistoryRows(filter, teaMap) {
+    const wrap = document.getElementById('pf-history-table-wrap');
+    if (!wrap) return;
+
+    if (!teaMap) {
+        teaMap = {};
+        (state.teas || []).forEach(t => { teaMap[t.id] = t; });
+    }
+
+    const filtered = filter === 'all'
+        ? _allHistoryTrades
+        : _allHistoryTrades.filter(t => t.side === filter);
+
+    if (filtered.length === 0) {
+        wrap.innerHTML = `<div class="pf-empty">No ${filter === 'all' ? '' : filter.toLowerCase() + ' '}trades found.</div>`;
+        return;
+    }
+
+    const rows = filtered.map(t => {
+        const sym = t.index_symbol || teaMap[t.tea_id]?.symbol || '???';
+        const isIdx = !!t.index_symbol;
+        const isBuy = t.side === 'BUY';
+        const qty = Number(t.quantity) || 0;
+        const price = Number(t.price) || 0;
+        const total = Number(t.total_value) || (qty * price);
+        const dt = new Date(t.created_at);
+        const dateStr = dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
+        const timeStr = dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const idxBadge = isIdx ? ' <span class="pf-idx-badge">IDX</span>' : '';
+        const modeLabel = t.trading_mode === 'REAL' ? '<span class="pf-mode-real">REAL</span>' : '<span class="pf-mode-virtual">VIRTUAL</span>';
+
+        return `<div class="pf-hist-row">
+            <div class="pf-hist-cell pf-hist-side ${isBuy ? 'buy' : 'sell'}">${t.side}</div>
+            <div class="pf-hist-cell pf-hist-sym">${escapeHtml(sym)}${idxBadge}</div>
+            <div class="pf-hist-cell pf-hist-qty">${qty.toLocaleString()} kg</div>
+            <div class="pf-hist-cell pf-hist-price">$${price.toFixed(2)}</div>
+            <div class="pf-hist-cell pf-hist-total">$${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div class="pf-hist-cell pf-hist-mode">${modeLabel}</div>
+            <div class="pf-hist-cell pf-hist-date">${dateStr}</div>
+            <div class="pf-hist-cell pf-hist-time">${timeStr}</div>
+        </div>`;
+    }).join('');
+
+    wrap.innerHTML = `
+        <div class="pf-hist-table">
+            <div class="pf-hist-header">
+                <div>Side</div><div>Symbol</div><div>Quantity</div><div>Price</div><div>Total</div><div>Mode</div><div>Date</div><div>Time</div>
+            </div>
+            ${rows}
+        </div>
+        <div class="pf-hist-count">${filtered.length} trade${filtered.length !== 1 ? 's' : ''} shown</div>
+    `;
+}
+
+function _filterHistory(filter) {
+    document.querySelectorAll('.pf-hist-filter').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === filter);
+    });
+    _renderHistoryRows(filter);
 }
 
 async function renderPortfolioModal() {

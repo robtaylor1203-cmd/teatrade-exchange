@@ -818,7 +818,7 @@ function drawQuickQuoteChart(tea) {
     const warmupPeriod = 25;
     // 1H: 60 ticks = up to 5h of 5-min candles so the chart always has enough
     // data to display even if the edge function hasn't been very active today.
-    const qqPointsMap = { '1H': 60, '1D': 96, '1W': 168, '1M': 120 };
+    const qqPointsMap = { '1H': 60, '1D': 288, '1W': 168, '1M': 180 };
     const maxPoints = (qqPointsMap[state.qqTimeframe] || 96) + warmupPeriod;
     let historySlice = fullHistory.slice(-maxPoints);
     if (historySlice.length === 0) historySlice = fullHistory.slice(-50);

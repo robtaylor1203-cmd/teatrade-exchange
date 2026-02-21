@@ -56,8 +56,7 @@ except Exception as e:
 GRADE_SYMBOL_MAP = {
     "BP1": "KEN-BP1", "PF1": "KEN-PF1", "PD": "KEN-DUST", "DUST": "KEN-DUST",
     "ASM": "IND-ASM", "ASSAM": "IND-ASM", "DRJ": "IND-DRJ", "DARJEELING": "IND-DRJ",
-    "BOP": "SRI-BOP", "PEK": "SRI-PEK", "OP": "SRI-OP",
-    "YUN": "CHN-YUN"
+    "BOP": "SRI-BOP", "PEK": "SRI-PEK", "OP": "SRI-OP"
 }
 
 def get_strategy(filename: str):

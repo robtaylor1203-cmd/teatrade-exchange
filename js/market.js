@@ -237,8 +237,12 @@ async function _loadCompositeIndexOHLC(teaSymbols, cfg, since) {
         teaSymbols.map(sym => loadPriceHistory(sym, cfg.limit, since))
     );
 
-    // Bucket all teas' ticks by time interval, then average per bucket
     const intervalMs = cfg.interval * 60000;
+
+    // Group every tick into sub-buckets keyed by (interval, tickTime) so we
+    // can compute a cross-tea average at each individual tick time, then
+    // derive proper OHLC (open/high/low/close) from ALL tick-level averages
+    // within the candle interval — not just the single last-price average.
     const buckets = {};
 
     allRows.forEach((rows, teaIdx) => {
@@ -246,37 +250,60 @@ async function _loadCompositeIndexOHLC(teaSymbols, cfg, since) {
         rows.forEach(tick => {
             const t = new Date(tick.recorded_at).getTime();
             const bk = Math.floor(t / intervalMs) * intervalMs;
-            if (!buckets[bk]) buckets[bk] = { prices: new Array(teaSymbols.length).fill(null) };
-            // Keep the latest price per tea per bucket
-            buckets[bk].prices[teaIdx] = tick.price;
+            if (!buckets[bk]) buckets[bk] = { ticks: [] };
+            buckets[bk].ticks.push({ time: t, teaIdx, price: tick.price });
         });
     });
 
-    // Fill forward: within each bucket, if a tea has no tick, carry from previous bucket
     const sortedKeys = Object.keys(buckets).map(Number).sort((a, b) => a - b);
     const lastKnown = new Array(teaSymbols.length).fill(null);
     const candles = [];
 
     for (const bk of sortedKeys) {
-        const bp = buckets[bk].prices;
-        // Carry forward
-        for (let i = 0; i < bp.length; i++) {
-            if (bp[i] != null) lastKnown[i] = bp[i];
-            else bp[i] = lastKnown[i];
+        const bucket = buckets[bk];
+
+        // Group ticks by their exact time, compute cross-tea average at each
+        const ticksByTime = {};
+        bucket.ticks.forEach(t => {
+            if (!ticksByTime[t.time]) ticksByTime[t.time] = {};
+            ticksByTime[t.time][t.teaIdx] = t.price;
+            lastKnown[t.teaIdx] = t.price;
+        });
+
+        // For each tick-time, fill forward missing teas and compute average
+        const tickTimes = Object.keys(ticksByTime).map(Number).sort((a, b) => a - b);
+        const avgAtEachTick = [];
+
+        for (const tt of tickTimes) {
+            const teaPrices = ticksByTime[tt];
+            const merged = lastKnown.map((lk, i) => teaPrices[i] != null ? teaPrices[i] : lk);
+            // Update lastKnown with any new values from this tick
+            merged.forEach((p, i) => { if (p != null) lastKnown[i] = p; });
+
+            const valid = merged.filter(p => p != null && p > 0);
+            if (valid.length > 0) {
+                avgAtEachTick.push(valid.reduce((a, b) => a + b, 0) / valid.length);
+            }
         }
-        const valid = bp.filter(p => p != null && p > 0);
-        if (valid.length === 0) continue;
-        const avg = valid.reduce((a, b) => a + b, 0) / valid.length;
-        candles.push({ date: new Date(bk), open: avg, high: avg, low: avg, close: avg, volume: 0 });
+
+        if (avgAtEachTick.length === 0) continue;
+
+        candles.push({
+            date:   new Date(bk),
+            open:   avgAtEachTick[0],
+            high:   Math.max(...avgAtEachTick),
+            low:    Math.min(...avgAtEachTick),
+            close:  avgAtEachTick[avgAtEachTick.length - 1],
+            volume: 0
+        });
     }
 
-    // Build proper OHLC from consecutive candle close prices
-    // Each candle represents one interval; open = previous close, high/low track intra-bucket
+    // Connect candles: open of this candle = close of previous
     if (candles.length > 1) {
         for (let i = 1; i < candles.length; i++) {
             candles[i].open = candles[i - 1].close;
-            candles[i].high = Math.max(candles[i].open, candles[i].close);
-            candles[i].low = Math.min(candles[i].open, candles[i].close);
+            candles[i].high = Math.max(candles[i].high, candles[i].open, candles[i].close);
+            candles[i].low  = Math.min(candles[i].low, candles[i].open, candles[i].close);
         }
     }
 
@@ -567,8 +594,8 @@ function calculateRegionalIndexes() {
     state.teas.forEach(tea => teaMap[tea.symbol] = tea);
 
     const indexes = state.dbIndexes.length > 0
-        ? state.dbIndexes.filter(i => !i.is_market_card)
-        : defaultDbIndexes.filter(i => !i.is_market_card);
+        ? state.dbIndexes
+        : defaultDbIndexes;
 
     return indexes.map(idx => {
         const prices = idx.teas.map(s => teaMap[s]?.current_price || 0).filter(p => p > 0);
