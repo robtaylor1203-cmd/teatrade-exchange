@@ -60,24 +60,27 @@ function updateTradeSummary() {
 
     const selectValue = select.value;
     let price = 0;
+    let baseSpread = 0.01;
+    let volMultiplier = 1.0;
+    let tradingMode = 'FULL';
 
     if (selectValue) {
         if (selectValue.startsWith('INDEX_')) {
-            // Index trade — use the live calculated index price
             const indexSymbol = selectValue.replace('INDEX_', '');
             const indexes = typeof calculateRegionalIndexes === 'function'
                 ? calculateRegionalIndexes() : [];
             const idx = indexes.find(i => i.symbol === indexSymbol);
             price = idx?.price || 0;
         } else {
-            // Tea trade — look up the live current_price from state.teas
             const teaId = parseInt(selectValue);
             const tea = state.teas?.find(t => t.id === teaId);
             price = tea?.current_price || 0;
+            baseSpread = Number(tea?.base_spread) || 0.01;
+            volMultiplier = Number(tea?.volatility_multiplier) || 1.0;
+            tradingMode = tea?.trading_mode || 'FULL';
         }
     }
 
-    // Fallback to dataset.price if state isn't loaded yet
     if (!price) {
         const selectedOption = select.options[select.selectedIndex];
         price = selectedOption?.dataset?.price ? parseFloat(selectedOption.dataset.price) : 0;
@@ -85,7 +88,7 @@ function updateTradeSummary() {
 
     const qty = parseFloat(qtyInput.value) || 0;
     const leverage = parseFloat(document.getElementById('trade-leverage')?.value) || 10;
-    const SPREAD_PCT = 0.01;
+    const SPREAD_PCT = baseSpread * volMultiplier;
 
     const isBuy = state.tradeType === 'BUY';
     const execPrice = price > 0 ? (isBuy ? price * (1 + SPREAD_PCT / 2) : price * (1 - SPREAD_PCT / 2)) : 0;
@@ -103,7 +106,15 @@ function updateTradeSummary() {
     if (marginEl) marginEl.textContent = '$' + margin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     const spreadEl = document.getElementById('trade-spread-cost');
-    if (spreadEl) spreadEl.textContent = '$' + spreadCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (spreadEl) {
+        let spreadLabel = '$' + spreadCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (volMultiplier > 1.05) spreadLabel += ` (${volMultiplier.toFixed(1)}x)`;
+        spreadEl.textContent = spreadLabel;
+        spreadEl.classList.toggle('spread-elevated', volMultiplier > 1.05);
+    }
+
+    // Store for use by updateTradeButton
+    state._currentTradingMode = tradingMode;
 
     updateTradeButton();
 }
@@ -118,10 +129,10 @@ function updateTradeButton() {
     const qty = parseFloat(document.getElementById('trade-qty').value) || 0;
     const price = parseFloat(document.getElementById('trade-price').value) || 0;
     const leverage = parseFloat(document.getElementById('trade-leverage')?.value) || 10;
-    const SPREAD_PCT = 0.01;
     const isBuy = state.tradeType === 'BUY';
-    const execPrice = isBuy ? price * (1 + SPREAD_PCT / 2) : price * (1 - SPREAD_PCT / 2);
-    const margin = (execPrice * qty) / leverage;
+    const margin = (price * qty) / leverage;
+
+    btn.classList.remove('btn-halted', 'btn-close-only');
 
     if (!state.currentUser) {
         btn.textContent = 'Sign in to Trade';
@@ -136,6 +147,34 @@ function updateTradeButton() {
         btn.textContent = 'Select a Tea';
         btn.disabled = true;
         return;
+    }
+
+    // ── Trading mode enforcement ──────────────────────────────────
+    const tradingMode = state._currentTradingMode || 'FULL';
+
+    if (tradingMode === 'HALTED') {
+        btn.textContent = 'MARKET HALTED';
+        btn.disabled = true;
+        btn.classList.add('btn-halted');
+        return;
+    }
+
+    if (tradingMode === 'CLOSE_ONLY') {
+        // In CLOSE_ONLY, only allow trades that reduce exposure.
+        // For teas: SELL closes a long → allowed. BUY opens → blocked.
+        const selectValue = select.value;
+        let userHasPosition = false;
+        if (selectValue && !selectValue.startsWith('INDEX_')) {
+            const teaId = parseInt(selectValue);
+            userHasPosition = state.positions?.some(p => p.tea_id === teaId) || false;
+        }
+
+        if (isBuy || !userHasPosition) {
+            btn.textContent = 'CLOSE ONLY';
+            btn.disabled = true;
+            btn.classList.add('btn-close-only');
+            return;
+        }
     }
 
     if (qty <= 0) {

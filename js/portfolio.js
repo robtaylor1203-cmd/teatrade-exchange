@@ -48,7 +48,7 @@ function updatePortfolioDisplay() {
                 No positions yet. Start trading!
             </div>
         `;
-        const totalValue = getActiveBalance() || 10000;
+        const totalValue = getActiveBalance();
         valueEl.textContent = '$' + totalValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         const startBal = state.tradingMode === 'REAL' ? 0 : 10000;
         const pnl = totalValue - startBal;
@@ -69,10 +69,16 @@ function updatePortfolioDisplay() {
         const absQty = Math.abs(pos.quantity);
         const currentValue = absQty * tea.current_price;
         const costBasis = absQty * pos.avg_entry_price;
+        const spread = (Number(tea.base_spread) || 0.01) * (Number(tea.volatility_multiplier) || 1.0);
+        const exitPrice = isShort
+            ? tea.current_price * (1 + spread / 2)
+            : tea.current_price * (1 - spread / 2);
         const pnl = isShort
-            ? (pos.avg_entry_price - tea.current_price) * absQty
-            : (tea.current_price - pos.avg_entry_price) * absQty;
-        const pnlPct = costBasis > 0 ? (pnl / costBasis * 100).toFixed(1) : '0.0';
+            ? (pos.avg_entry_price - exitPrice) * absQty
+            : (exitPrice - pos.avg_entry_price) * absQty;
+        const lev = Number(pos.leverage) || 1;
+        const margin = costBasis / lev;
+        const pnlPct = margin > 0 ? (pnl / margin * 100).toFixed(1) : '0.0';
         holdingsValue += currentValue;
 
         const badge = isShort
@@ -106,10 +112,16 @@ function updatePortfolioDisplay() {
         const absQty = Math.abs(pos.quantity);
         const currentValue = absQty * index.price;
         const costBasis = absQty * pos.avg_entry_price;
+        const idxSpread = 0.01;
+        const exitPrice = isShort
+            ? index.price * (1 + idxSpread / 2)
+            : index.price * (1 - idxSpread / 2);
         const pnl = isShort
-            ? (pos.avg_entry_price - index.price) * absQty
-            : (index.price - pos.avg_entry_price) * absQty;
-        const pnlPct = costBasis > 0 ? (pnl / costBasis * 100).toFixed(1) : '0.0';
+            ? (pos.avg_entry_price - exitPrice) * absQty
+            : (exitPrice - pos.avg_entry_price) * absQty;
+        const lev = Number(pos.leverage) || 1;
+        const margin = costBasis / lev;
+        const pnlPct = margin > 0 ? (pnl / margin * 100).toFixed(1) : '0.0';
         holdingsValue += currentValue;
 
         const dirBadge = isShort
@@ -147,9 +159,11 @@ function updatePortfolioDisplay() {
         if (tea) {
             const isShort = pos.quantity < 0;
             const absQty = Math.abs(pos.quantity);
+            const sp = (Number(tea.base_spread) || 0.01) * (Number(tea.volatility_multiplier) || 1.0);
+            const ep = isShort ? tea.current_price * (1 + sp / 2) : tea.current_price * (1 - sp / 2);
             totalUnrealizedPnl += isShort
-                ? (pos.avg_entry_price - tea.current_price) * absQty
-                : (tea.current_price - pos.avg_entry_price) * absQty;
+                ? (pos.avg_entry_price - ep) * absQty
+                : (ep - pos.avg_entry_price) * absQty;
         }
     });
     Object.entries(indexPositionsData).forEach(([symbol, pos]) => {
@@ -160,9 +174,11 @@ function updatePortfolioDisplay() {
         if (index && pos && pos.quantity !== 0) {
             const isShort = pos.quantity < 0;
             const absQty = Math.abs(pos.quantity);
+            const isp = 0.01;
+            const iep = isShort ? index.price * (1 + isp / 2) : index.price * (1 - isp / 2);
             totalUnrealizedPnl += isShort
-                ? (pos.avg_entry_price - index.price) * absQty
-                : (index.price - pos.avg_entry_price) * absQty;
+                ? (pos.avg_entry_price - iep) * absQty
+                : (iep - pos.avg_entry_price) * absQty;
         }
     });
 
@@ -197,7 +213,7 @@ function updatePortfolioDisplay() {
         marginHtml.style.cssText = 'padding:8px 12px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);';
         listEl.parentNode.insertBefore(marginHtml, listEl.nextSibling);
     }
-    const phColor = positionHealth <= 5 ? 'var(--accent-red)' : positionHealth <= 40 ? 'var(--accent-orange)' : positionHealth <= 70 ? '#f59e0b' : 'var(--accent-green)';
+    const phColor = positionHealth <= 2 ? 'var(--accent-red)' : positionHealth <= 15 ? 'var(--accent-orange)' : positionHealth <= 50 ? '#f59e0b' : 'var(--accent-green)';
     const phDisplay = positionHealth === Infinity ? '—' : positionHealth.toFixed(1) + '%';
     marginHtml.innerHTML = totalUsedMargin > 0
         ? `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Balance</span><span>$${balance.toFixed(2)}</span></div>` +
@@ -217,14 +233,14 @@ function _checkClientMarginLevel(positionHealth, equity, usedMargin) {
 
     const lostPct = Math.max(0, 100 - positionHealth).toFixed(0);
 
-    if (positionHealth <= 5) {
+    if (positionHealth <= 2) {
         _lastMarginWarningTime = now;
         if (typeof _showMarginAlert === 'function') {
             _showMarginAlert('CRITICAL — Approaching Stop-Out',
-                `Positions have lost ${lostPct}% of invested capital. Auto-liquidation triggers at 95% loss. Close positions now!`,
+                `Positions have lost ${lostPct}% of invested capital. Auto-liquidation triggers at 98% loss. Close positions now!`,
                 'stop_out');
         }
-    } else if (positionHealth <= 40) {
+    } else if (positionHealth <= 15) {
         _lastMarginWarningTime = now;
         if (typeof _showMarginAlert === 'function') {
             _showMarginAlert('Margin Call Warning',
@@ -441,20 +457,28 @@ function displayUserTrades(trades) {
                 total = trade.quantity;
                 const entryRatio = trade.price;
 
-                const teaMap = {};
-                state.teas.forEach(t => teaMap[t.symbol] = t);
-                const baseTea = teaMap[pair.base_symbol];
-                const quoteTea = teaMap[pair.quote_symbol];
-
-                if (baseTea && quoteTea && quoteTea.current_price > 0) {
-                    const currentRatio = baseTea.current_price / quoteTea.current_price;
-                    const ratioChange = (currentRatio - entryRatio) / entryRatio;
+                if (isClosed && closing) {
+                    const exitRatio = closing.sellPrice ?? closing.coverPrice;
+                    const ratioChange = (exitRatio - entryRatio) / entryRatio;
                     const direction = trade.side === 'BUY' ? 1 : -1;
                     pnl = total * ratioChange * leverage * direction;
                     pnlPct = ratioChange * 100 * leverage * direction;
                 } else {
-                    pnl = 0;
-                    pnlPct = 0;
+                    const teaMap = {};
+                    state.teas.forEach(t => teaMap[t.symbol] = t);
+                    const baseTea = teaMap[pair.base_symbol];
+                    const quoteTea = teaMap[pair.quote_symbol];
+
+                    if (baseTea && quoteTea && quoteTea.current_price > 0) {
+                        const currentRatio = baseTea.current_price / quoteTea.current_price;
+                        const ratioChange = (currentRatio - entryRatio) / entryRatio;
+                        const direction = trade.side === 'BUY' ? 1 : -1;
+                        pnl = total * ratioChange * leverage * direction;
+                        pnlPct = ratioChange * 100 * leverage * direction;
+                    } else {
+                        pnl = 0;
+                        pnlPct = 0;
+                    }
                 }
             } else {
                 teaSymbol = 'PAIR';
@@ -463,7 +487,6 @@ function displayUserTrades(trades) {
                 pnlPct = 0;
             }
         } else if (isIndexTrade && trade.is_pair_trade) {
-            // Index PAIR trade — index_symbol stored as "BASE/QUOTE"
             const parts = trade.index_symbol.split('/');
             const baseSymbol = parts[0];
             const quoteSymbol = parts[1];
@@ -471,43 +494,65 @@ function displayUserTrades(trades) {
             total = trade.quantity;
             const entryRatio = trade.price;
 
-            const baseIdx = typeof getIndexPrice === 'function' ? getIndexPrice(baseSymbol) : null;
-            const quoteIdx = typeof getIndexPrice === 'function' ? getIndexPrice(quoteSymbol) : null;
-
-            if (baseIdx && quoteIdx && quoteIdx.price > 0) {
-                const currentRatio = baseIdx.price / quoteIdx.price;
-                const ratioChange = (currentRatio - entryRatio) / entryRatio;
+            if (isClosed && closing) {
+                const exitRatio = closing.sellPrice ?? closing.coverPrice;
+                const ratioChange = (exitRatio - entryRatio) / entryRatio;
                 const direction = trade.side === 'BUY' ? 1 : -1;
                 pnl = total * ratioChange * leverage * direction;
                 pnlPct = ratioChange * 100 * leverage * direction;
             } else {
-                pnl = 0;
-                pnlPct = 0;
+                const baseIdx = typeof getIndexPrice === 'function' ? getIndexPrice(baseSymbol) : null;
+                const quoteIdx = typeof getIndexPrice === 'function' ? getIndexPrice(quoteSymbol) : null;
+
+                if (baseIdx && quoteIdx && quoteIdx.price > 0) {
+                    const currentRatio = baseIdx.price / quoteIdx.price;
+                    const ratioChange = (currentRatio - entryRatio) / entryRatio;
+                    const direction = trade.side === 'BUY' ? 1 : -1;
+                    pnl = total * ratioChange * leverage * direction;
+                    pnlPct = ratioChange * 100 * leverage * direction;
+                } else {
+                    pnl = 0;
+                    pnlPct = 0;
+                }
             }
         } else if (isIndexTrade) {
-            const idxList = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
-            const index = idxList.find(idx => idx.symbol === trade.index_symbol);
             teaSymbol = trade.index_symbol + ' IDX';
             total = trade.quantity * trade.price;
             const isShortIdx = trade.side === 'SELL';
+            const idxMargin = total / leverage;
 
-            if (index) {
+            if (isClosed && closing) {
+                const closePrice = closing.sellPrice ?? closing.coverPrice;
                 if (isShortIdx) {
-                    pnl = (trade.price - index.price) * trade.quantity;
-                    pnlPct = ((trade.price - index.price) / trade.price * 100);
+                    pnl = (trade.price - closePrice) * trade.quantity;
                 } else {
-                    pnl = (index.price - trade.price) * trade.quantity;
-                    pnlPct = ((index.price - trade.price) / trade.price * 100);
+                    pnl = (closePrice - trade.price) * trade.quantity;
                 }
+                pnlPct = idxMargin > 0 ? (pnl / idxMargin * 100) : 0;
             } else {
-                pnl = 0;
-                pnlPct = 0;
+                const idxList = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
+                const index = idxList.find(idx => idx.symbol === trade.index_symbol);
+
+                if (index) {
+                    const isp = 0.01;
+                    const idxExit = isShortIdx ? index.price * (1 + isp / 2) : index.price * (1 - isp / 2);
+                    if (isShortIdx) {
+                        pnl = (trade.price - idxExit) * trade.quantity;
+                    } else {
+                        pnl = (idxExit - trade.price) * trade.quantity;
+                    }
+                    pnlPct = idxMargin > 0 ? (pnl / idxMargin * 100) : 0;
+                } else {
+                    pnl = 0;
+                    pnlPct = 0;
+                }
             }
         } else {
             // Regular single tea trade (long or short)
             teaSymbol = tea?.symbol || 'Unknown';
             total = trade.quantity * trade.price;
             const isShortTrade = trade.side === 'SELL';
+            const teaMargin = total / leverage;
 
             if (isClosed && closing) {
                 const closePrice = closing.sellPrice ?? closing.coverPrice;
@@ -516,14 +561,16 @@ function displayUserTrades(trades) {
                 } else {
                     pnl = (closePrice - trade.price) * trade.quantity;
                 }
-                pnlPct = trade.price > 0 ? (pnl / (trade.price * trade.quantity) * 100) : 0;
+                pnlPct = teaMargin > 0 ? (pnl / teaMargin * 100) : 0;
             } else if (tea) {
+                const tsp = (Number(tea.base_spread) || 0.01) * (Number(tea.volatility_multiplier) || 1.0);
+                const teaExit = isShortTrade ? tea.current_price * (1 + tsp / 2) : tea.current_price * (1 - tsp / 2);
                 if (isShortTrade) {
-                    pnl = (trade.price - tea.current_price) * trade.quantity;
+                    pnl = (trade.price - teaExit) * trade.quantity;
                 } else {
-                    pnl = (tea.current_price - trade.price) * trade.quantity;
+                    pnl = (teaExit - trade.price) * trade.quantity;
                 }
-                pnlPct = trade.price > 0 ? (pnl / (trade.price * trade.quantity) * 100) : 0;
+                pnlPct = teaMargin > 0 ? (pnl / teaMargin * 100) : 0;
             } else {
                 pnl = 0;
                 pnlPct = 0;
@@ -1395,16 +1442,32 @@ async function openTraderProfile(username, returnPct, totalValue, rank) {
     const modal = document.getElementById('trader-profile-modal');
     if (!modal) return;
 
+    const hasPrecomputed = returnPct != null && totalValue != null;
     const followed  = isTraderFollowed(username);
-    const rankEmoji = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
     const initials  = username.slice(0, 2).toUpperCase();
 
-    const _buildCard = (rp, tv) => {
-        const retClass = rp >= 0 ? 'up' : 'down';
-        const retSign  = rp >= 0 ? '+' : '';
-        const startVal = tv / (1 + rp / 100) || 0;
-        const gainLoss = tv - startVal;
+    const _rankStr = (r) => {
+        if (r == null) return '';
+        return r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '🥉' : `#${r}`;
+    };
+
+    const _buildCard = (rp, tv, r, profileMeta) => {
+        const isLoading = rp == null || tv == null;
+        const retClass = isLoading ? '' : (rp >= 0 ? 'up' : 'down');
+        const retSign  = isLoading ? '' : (rp >= 0 ? '+' : '');
+        const startVal = isLoading ? 0 : (tv / (1 + rp / 100) || 0);
+        const gainLoss = isLoading ? 0 : (tv - startVal);
         const gainSign = gainLoss >= 0 ? '+' : '';
+
+        const rankLabel = r != null ? `${_rankStr(r)} Rank ${r}` : '';
+        const joinDate = profileMeta?.created_at
+            ? new Date(profileMeta.created_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+            : '';
+        const subtitleParts = [rankLabel, joinDate ? `Joined ${joinDate}` : ''].filter(Boolean);
+        const subtitle = subtitleParts.join(' · ') || 'Trader';
+
+        const tradeCount = profileMeta?._tradeCount;
+        const mainAsset = profileMeta?._mainAsset;
 
         return `
             <div class="trader-profile-overlay" onclick="closeTraderProfile()"></div>
@@ -1413,8 +1476,8 @@ async function openTraderProfile(username, returnPct, totalValue, rank) {
                 <div class="trader-profile-header">
                     <div class="trader-profile-avatar">${initials}</div>
                     <div class="trader-profile-info">
-                        <div class="trader-profile-name">${escapeHtml(username)}</div>
-                        <div class="trader-profile-rank">${rankEmoji} Rank ${rank} · Feb 2026</div>
+                        <div class="trader-profile-name">${escapeHtml(profileMeta?.display_name || username)}</div>
+                        <div class="trader-profile-rank">${subtitle}</div>
                         <div id="trader-profile-follow-counts" class="trader-profile-follow-counts">
                             <span class="follow-count-item"><strong>—</strong> Followers</span>
                             <span class="follow-count-divider">·</span>
@@ -1425,20 +1488,24 @@ async function openTraderProfile(username, returnPct, totalValue, rank) {
                 <div class="trader-profile-stats" id="trader-profile-stats-grid">
                     <div class="trader-stat-box">
                         <div class="trader-stat-label">Return</div>
-                        <div class="trader-stat-value ${retClass}">${retSign}${rp.toFixed(1)}%</div>
+                        <div class="trader-stat-value ${retClass}">${isLoading ? '—' : `${retSign}${rp.toFixed(1)}%`}</div>
                     </div>
                     <div class="trader-stat-box">
                         <div class="trader-stat-label">Portfolio Value</div>
-                        <div class="trader-stat-value">$${tv.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
+                        <div class="trader-stat-value">${isLoading ? '—' : '$' + tv.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
                     </div>
                     <div class="trader-stat-box">
                         <div class="trader-stat-label">P&amp;L</div>
-                        <div class="trader-stat-value ${gainLoss >= 0 ? 'up' : 'down'}">${gainSign}$${Math.abs(gainLoss).toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
+                        <div class="trader-stat-value ${isLoading ? '' : (gainLoss >= 0 ? 'up' : 'down')}">${isLoading ? '—' : `${gainSign}$${Math.abs(gainLoss).toLocaleString('en-US', { maximumFractionDigits: 0 })}`}</div>
                     </div>
                     <div class="trader-stat-box">
-                        <div class="trader-stat-label">Starting Capital</div>
-                        <div class="trader-stat-value">$${startVal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
+                        <div class="trader-stat-label">Trades</div>
+                        <div class="trader-stat-value">${tradeCount != null ? tradeCount.toLocaleString() : '—'}</div>
                     </div>
+                    ${mainAsset ? `<div class="trader-stat-box trader-stat-wide">
+                        <div class="trader-stat-label">Most Traded</div>
+                        <div class="trader-stat-value">${escapeHtml(mainAsset)}</div>
+                    </div>` : ''}
                 </div>
                 <div class="trader-profile-activity">
                     <div class="trader-activity-label">Recent Activity</div>
@@ -1448,28 +1515,43 @@ async function openTraderProfile(username, returnPct, totalValue, rank) {
                 </div>
                 <button id="trader-profile-follow-btn"
                     class="trader-profile-follow-btn${followed ? ' following' : ''}"
-                    onclick="toggleFollowTrader('${escapeHtml(username)}', ${rp}, ${tv})">
+                    onclick="toggleFollowTrader('${escapeHtml(username)}', ${rp || 0}, ${tv || 0})">
                     ${followed ? '★ Following' : '☆ Follow Trader'}
                 </button>
             </div>`;
     };
 
-    modal.innerHTML = _buildCard(returnPct, totalValue);
+    modal.innerHTML = _buildCard(
+        hasPrecomputed ? returnPct : null,
+        hasPrecomputed ? totalValue : null,
+        rank,
+        null
+    );
     _loadTraderProfileTrades(username);
     modal.classList.add('active');
     document.body.style.overflow = 'hidden';
 
-    const [liveProfile, profileData] = await Promise.all([
+    const [liveProfile, profileData, tradeSummary] = await Promise.all([
         apiFetchTraderProfile(username),
-        apiLookupUserByUsername(username)
+        apiLookupUserByUsername(username),
+        _fetchTraderSummary(username)
     ]);
 
     if (liveProfile) {
-        returnPct = liveProfile.return_pct || returnPct;
-        totalValue = liveProfile.total_value || totalValue;
-        modal.innerHTML = _buildCard(returnPct, totalValue);
-        _loadTraderProfileTrades(username);
+        returnPct = liveProfile.return_pct ?? returnPct;
+        totalValue = liveProfile.total_value ?? totalValue;
+        rank = liveProfile.rank ?? rank;
     }
+
+    const meta = {
+        display_name: profileData?.data?.username || username,
+        created_at: profileData?.data?.created_at || null,
+        _tradeCount: tradeSummary?.count ?? null,
+        _mainAsset: tradeSummary?.topAsset ?? null,
+    };
+
+    modal.innerHTML = _buildCard(returnPct, totalValue, rank, meta);
+    _loadTraderProfileTrades(username);
 
     if (profileData?.data?.id) _refreshFollowCounts(profileData.data.id);
 }
@@ -1562,14 +1644,16 @@ function renderFinancialTab() {
         const absQty = Math.abs(pos.quantity);
         const curVal = absQty * tea.current_price;
         const cost = absQty * pos.avg_entry_price;
+        const spread = (Number(tea.base_spread) || 0.01) * (Number(tea.volatility_multiplier) || 1.0);
+        const exitPx = isShort ? tea.current_price * (1 + spread / 2) : tea.current_price * (1 - spread / 2);
         const pnl = isShort
-            ? (pos.avg_entry_price - tea.current_price) * absQty
-            : (tea.current_price - pos.avg_entry_price) * absQty;
-        const pnlPct = cost > 0 ? (pnl / cost * 100).toFixed(1) : '0.0';
-        holdingsValue += curVal;
-        totalPnl += pnl;
+            ? (pos.avg_entry_price - exitPx) * absQty
+            : (exitPx - pos.avg_entry_price) * absQty;
         const lev = Number(pos.leverage) || 1;
         const marginUsed = Number(pos.margin_used) || (cost / lev);
+        const pnlPct = marginUsed > 0 ? (pnl / marginUsed * 100).toFixed(1) : '0.0';
+        holdingsValue += curVal;
+        totalPnl += pnl;
         totalUsedMargin += marginUsed;
         const shortBadge = isShort ? ' <span style="color:var(--accent-red);font-size:10px;font-weight:700">SHORT</span>' : '';
         const levBadge = (pos.leverage && pos.leverage > 1) ? ` <span style="color:var(--accent-orange);font-size:10px;font-weight:700">${pos.leverage}x</span>` : '';
@@ -1591,14 +1675,16 @@ function renderFinancialTab() {
         const absQty = Math.abs(pos.quantity);
         const curVal = absQty * idx.price;
         const cost = absQty * pos.avg_entry_price;
+        const idxSpread = 0.01;
+        const exitPx = isShort ? idx.price * (1 + idxSpread / 2) : idx.price * (1 - idxSpread / 2);
         const pnl = isShort
-            ? (pos.avg_entry_price - idx.price) * absQty
-            : (idx.price - pos.avg_entry_price) * absQty;
-        const pnlPct = cost > 0 ? (pnl / cost * 100).toFixed(1) : '0.0';
-        holdingsValue += curVal;
-        totalPnl += pnl;
+            ? (pos.avg_entry_price - exitPx) * absQty
+            : (exitPx - pos.avg_entry_price) * absQty;
         const idxLev = Number(pos.leverage) || 1;
         const idxMarginUsed = Number(pos.margin_used) || (cost / idxLev);
+        const pnlPct = idxMarginUsed > 0 ? (pnl / idxMarginUsed * 100).toFixed(1) : '0.0';
+        holdingsValue += curVal;
+        totalPnl += pnl;
         totalUsedMargin += idxMarginUsed;
         const shortBadge = isShort ? ' <span style="color:var(--accent-red);font-size:10px;font-weight:700">SHORT</span>' : '';
         const levBadge = (pos.leverage && pos.leverage > 1) ? ` <span style="color:var(--accent-orange);font-size:10px;font-weight:700">${pos.leverage}x</span>` : '';
@@ -1621,20 +1707,19 @@ function renderFinancialTab() {
     const posCount = positions.length + Object.values(indexPositionsData).filter(p => p && p.quantity !== 0).length;
 
     // Position Health: what % of invested margin remains after P&L?
-    // 100% = break-even, 40% = margin call, 5% = stop-out, 0% = wiped out
     const posHealth = totalUsedMargin > 0
         ? ((totalUsedMargin + totalPnl) / totalUsedMargin * 100)
         : (posCount > 0 ? 0 : Infinity);
-    const phColor = posHealth <= 5 ? 'var(--accent-red)' : posHealth <= 40 ? 'var(--accent-orange)' : posHealth <= 70 ? '#f59e0b' : 'var(--accent-green)';
+    const phColor = posHealth <= 2 ? 'var(--accent-red)' : posHealth <= 15 ? 'var(--accent-orange)' : posHealth <= 50 ? '#f59e0b' : 'var(--accent-green)';
 
     let barStatus, barStatusColor;
     if (equity < 0) {
         barStatus = 'LIQUIDATION'; barStatusColor = 'var(--accent-red)';
-    } else if (posCount > 0 && posHealth <= 5) {
+    } else if (posCount > 0 && posHealth <= 2) {
         barStatus = 'STOP OUT'; barStatusColor = 'var(--accent-red)';
-    } else if (posCount > 0 && posHealth <= 40) {
+    } else if (posCount > 0 && posHealth <= 15) {
         barStatus = 'MARGIN CALL'; barStatusColor = 'var(--accent-orange)';
-    } else if (posCount > 0 && posHealth <= 70) {
+    } else if (posCount > 0 && posHealth <= 50) {
         barStatus = 'CAUTION'; barStatusColor = '#f59e0b';
     } else {
         barStatus = 'HEALTHY'; barStatusColor = 'var(--accent-green)';
@@ -1655,9 +1740,8 @@ function renderFinancialTab() {
     }
 
     const showMarkers = totalUsedMargin > 0 && posCount > 0 && posHealth > 0;
-    // Position markers on the bar: how much loss it takes to reach 40% / 5%
-    const marginCallLine = showMarkers ? Math.min(100 - 40, 99) : 0;  // 60% from left
-    const stopOutLine = showMarkers ? Math.min(100 - 5, 99) : 0;      // 95% from left
+    const marginCallLine = showMarkers ? Math.min(100 - 15, 99) : 0;  // 85% from left
+    const stopOutLine = showMarkers ? Math.min(100 - 2, 99) : 0;      // 98% from left
 
     const phDisplay = posHealth === Infinity
         ? (posCount > 0 ? '∞' : '—')
@@ -1684,11 +1768,11 @@ function renderFinancialTab() {
                 ${showMarkers ? `
                 <div class="pf-margin-bar-marker pf-margin-marker-call" style="left:${marginCallLine.toFixed(1)}%">
                     <div class="pf-margin-marker-line"></div>
-                    <div class="pf-margin-marker-label">WARNING (40%)</div>
+                    <div class="pf-margin-marker-label">WARNING (15%)</div>
                 </div>
                 <div class="pf-margin-bar-marker pf-margin-marker-stop" style="left:${stopOutLine.toFixed(1)}%">
                     <div class="pf-margin-marker-line"></div>
-                    <div class="pf-margin-marker-label">CLOSE OUT (5%)</div>
+                    <div class="pf-margin-marker-label">CLOSE OUT (2%)</div>
                 </div>` : ''}
             </div>
             <div class="pf-margin-bar-legend">
@@ -2185,6 +2269,34 @@ function _loadFollowedTraderTrades(username) {
 
 function _loadTraderProfileTrades(username) {
     _renderTradesIntoFeed('trader-profile-trade-feed', username, 10);
+}
+
+async function _fetchTraderSummary(username) {
+    try {
+        const { data: profile } = await supabaseClient
+            .from('profiles').select('id').ilike('username', username).maybeSingle();
+        if (!profile?.id) return null;
+
+        const { data: trades, count } = await supabaseClient
+            .from('trades')
+            .select('tea_id, index_symbol', { count: 'exact', head: false })
+            .eq('user_id', profile.id)
+            .limit(500);
+
+        const teaMap = {};
+        (state.teas || []).forEach(t => { teaMap[t.id] = t.symbol; });
+
+        const freq = {};
+        (trades || []).forEach(t => {
+            const sym = t.index_symbol || teaMap[t.tea_id] || null;
+            if (sym) freq[sym] = (freq[sym] || 0) + 1;
+        });
+
+        const topAsset = Object.entries(freq).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+        return { count: count ?? (trades || []).length, topAsset };
+    } catch (_) {
+        return null;
+    }
 }
 
 function _timeAgo(date) {

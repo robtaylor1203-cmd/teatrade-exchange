@@ -84,7 +84,6 @@ function updateAuctionTable() {
     const tbody = document.getElementById('auction-table-body');
     if (!tbody || !state.teas.length) return;
 
-    const SPREAD_PCT = 0.01;
     const wl = getTeaWatchlist();
 
     let items = state.teas.map(tea => {
@@ -123,25 +122,39 @@ function updateAuctionTable() {
         const flashClass = changedTeas[tea.symbol] ? `flash-${changedTeas[tea.symbol]}` : '';
         const volume = Number(tea.volume_24h) || 0;
         const volStr = volume >= 1000 ? `${Math.round(volume / 1000)}K` : String(volume);
-        const askPrice = price * (1 + SPREAD_PCT / 2);
-        const bidPrice = price * (1 - SPREAD_PCT / 2);
+
+        // Dynamic spread from risk management columns
+        const bSpread = Number(tea.base_spread) || 0.01;
+        const vMult = Number(tea.volatility_multiplier) || 1.0;
+        const dynSpread = bSpread * vMult;
+        const askPrice = price * (1 + dynSpread / 2);
+        const bidPrice = price * (1 - dynSpread / 2);
         const spreadVal = askPrice - bidPrice;
+        const spreadElevated = vMult > 1.05;
+
+        // Trading mode badge
+        const tMode = tea.trading_mode || 'FULL';
+        let modeBadge = '';
+        if (tMode === 'HALTED')     modeBadge = '<span class="mode-badge mode-halted" title="Circuit breaker active">HALTED</span>';
+        else if (tMode === 'CLOSE_ONLY') modeBadge = '<span class="mode-badge mode-close-only" title="Close-only mode">CLOSE ONLY</span>';
+
         const isStarred = wl.includes(tea.symbol);
         const parts = tea.symbol.split('-');
         const shortSym = parts[1] || tea.symbol;
         const prefix = parts[0];
 
         return `
-            <tr onclick="openHubForSymbol('${escapeHtml(tea.symbol)}')" style="cursor:pointer;">
+            <tr onclick="openHubForSymbol('${escapeHtml(tea.symbol)}')" style="cursor:pointer;" class="${tMode === 'HALTED' ? 'row-halted' : ''}">
                 <td style="font-family:'JetBrains Mono',monospace;font-weight:600;white-space:nowrap;">
                     <span style="color:var(--text-muted);font-size:10px;vertical-align:baseline;">${escapeHtml(prefix)}-</span>${escapeHtml(shortSym)}
+                    ${modeBadge}
                 </td>
                 <td>${escapeHtml(tea.name || tea.symbol)}</td>
                 <td class="auction-center">${escapeHtml(origin)}</td>
                 <td class="price-cell ${changeClass} ${flashClass}" data-tea="${escapeHtml(tea.symbol)}">$${price.toFixed(2)}</td>
                 <td class="${changeClass}">${changeStr}</td>
                 <td style="color:var(--text-muted);">${volStr}</td>
-                <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);">$${spreadVal.toFixed(3)}</td>
+                <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:${spreadElevated ? 'var(--accent-orange)' : 'var(--text-muted)'};">$${spreadVal.toFixed(3)}${spreadElevated ? ' (' + vMult.toFixed(1) + 'x)' : ''}</td>
                 <td style="text-align:center;">
                     <button class="watchlist-star-btn ${isStarred ? 'starred' : ''}" onclick="event.stopPropagation(); toggleTeaWatchlist('${escapeHtml(tea.symbol)}')" title="${isStarred ? 'Remove from watchlist' : 'Add to watchlist'}">
                         ${isStarred ? '\u2605' : '\u2606'}

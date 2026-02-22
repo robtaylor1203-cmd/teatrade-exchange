@@ -227,6 +227,22 @@ ALTER TABLE teas ADD COLUMN IF NOT EXISTS beta            NUMERIC DEFAULT 1.0;
 ALTER TABLE teas ADD COLUMN IF NOT EXISTS last_update     TIMESTAMPTZ;
 ALTER TABLE teas ADD COLUMN IF NOT EXISTS currency_pair   TEXT DEFAULT 'usd_kes';
 
+-- 6b. RISK MANAGEMENT COLUMNS (FCA-compliant house protection)
+ALTER TABLE teas ADD COLUMN IF NOT EXISTS trading_mode          TEXT    DEFAULT 'FULL';
+ALTER TABLE teas ADD COLUMN IF NOT EXISTS max_exposure          NUMERIC DEFAULT 500000;
+ALTER TABLE teas ADD COLUMN IF NOT EXISTS current_long_volume   NUMERIC DEFAULT 0;
+ALTER TABLE teas ADD COLUMN IF NOT EXISTS current_short_volume  NUMERIC DEFAULT 0;
+ALTER TABLE teas ADD COLUMN IF NOT EXISTS base_spread           NUMERIC DEFAULT 0.01;
+ALTER TABLE teas ADD COLUMN IF NOT EXISTS volatility_multiplier NUMERIC DEFAULT 1.0;
+ALTER TABLE teas ADD COLUMN IF NOT EXISTS halt_until            TIMESTAMPTZ;
+
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'teas_trading_mode_valid') THEN
+        ALTER TABLE teas ADD CONSTRAINT teas_trading_mode_valid
+            CHECK (trading_mode IN ('FULL', 'CLOSE_ONLY', 'HALTED'));
+    END IF;
+END $$;
+
 -- Backfill data safely
 UPDATE teas
 SET anchor_price    = current_price,
@@ -300,7 +316,8 @@ END $$;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users read own profile" ON profiles;
-CREATE POLICY "Users read own profile" ON profiles FOR SELECT USING (auth.uid() = id);
+DROP POLICY IF EXISTS "profiles_public_read" ON profiles;
+CREATE POLICY "profiles_public_read" ON profiles FOR SELECT TO authenticated USING (true);
 
 -- C1 FIX: Users can update display fields (username, avatar, etc.) but NOT cash_balance.
 -- The column-level REVOKE below prevents cash_balance manipulation from the client.
@@ -406,13 +423,20 @@ DO $$ BEGIN
 END $$;
 
 
--- 11. ATOMIC TRADE FUNCTION
--- Uses subqueries for tea_id to avoid type mismatch (int vs uuid) between tables
+-- 11. ATOMIC TRADE FUNCTION (with Risk Management)
+-- Uses subqueries for tea_id to avoid type mismatch (int vs uuid) between tables.
+-- Enforces: HALTED check, CLOSE_ONLY gating, exposure caps, symmetric spread,
+-- and volume tracking for FCA-compliant house protection.
+DROP FUNCTION IF EXISTS execute_trade(UUID, TEXT, TEXT, NUMERIC);
+DROP FUNCTION IF EXISTS execute_trade(UUID, TEXT, TEXT, NUMERIC, TEXT, NUMERIC);
+
 CREATE OR REPLACE FUNCTION execute_trade(
     p_user_id    UUID,
     p_tea_symbol TEXT,
     p_side       TEXT,
-    p_quantity   NUMERIC
+    p_quantity   NUMERIC,
+    p_mode       TEXT DEFAULT 'VIRTUAL',
+    p_leverage   NUMERIC DEFAULT 1
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -429,6 +453,10 @@ DECLARE
     v_new_balance NUMERIC;
     v_new_qty     NUMERIC;
     v_new_avg     NUMERIC;
+    v_is_closing  BOOLEAN;
+    v_spread      NUMERIC;
+    v_exec_price  NUMERIC;
+    v_spread_cost NUMERIC;
 BEGIN
     IF p_side NOT IN ('BUY', 'SELL') THEN
         RETURN jsonb_build_object('success', false, 'error', 'Invalid side: must be BUY or SELL');
@@ -443,12 +471,49 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'error', 'Tea not found: ' || p_tea_symbol);
     END IF;
 
+    -- ── RISK CHECK: Trading mode ──────────────────────────────────────
+    IF v_tea.trading_mode = 'HALTED' THEN
+        IF v_tea.halt_until IS NOT NULL AND v_tea.halt_until <= NOW() THEN
+            UPDATE teas SET trading_mode = 'FULL', halt_until = NULL WHERE id = v_tea.id;
+            v_tea.trading_mode := 'FULL';
+            v_tea.halt_until := NULL;
+        ELSE
+            RETURN jsonb_build_object('success', false, 'error',
+                'Market halted for ' || p_tea_symbol || ' due to extreme volatility. Please wait.');
+        END IF;
+    END IF;
+
+    v_is_closing := false;
+    IF p_side = 'SELL' THEN
+        v_is_closing := true;
+    END IF;
+
+    IF v_tea.trading_mode = 'CLOSE_ONLY' AND NOT v_is_closing THEN
+        RETURN jsonb_build_object('success', false, 'error',
+            'Maximum platform exposure reached for ' || p_tea_symbol || '. Only closing trades are allowed.');
+    END IF;
+
+    IF p_side = 'BUY'
+       AND (COALESCE(v_tea.current_long_volume, 0) + p_quantity) > COALESCE(v_tea.max_exposure, 500000) THEN
+        RETURN jsonb_build_object('success', false, 'error',
+            'Maximum platform exposure reached for ' || p_tea_symbol || '. Only closing trades are allowed.');
+    END IF;
+
+    -- ── PRICE + SPREAD ────────────────────────────────────────────────
     v_price := v_tea.current_price;
     IF v_price IS NULL OR v_price <= 0 THEN
         RETURN jsonb_build_object('success', false, 'error', 'No valid market price');
     END IF;
 
-    v_total := v_price * p_quantity;
+    v_spread := COALESCE(v_tea.base_spread, 0.01) * COALESCE(v_tea.volatility_multiplier, 1.0);
+    IF p_side = 'BUY' THEN
+        v_exec_price := v_price * (1.0 + v_spread / 2.0);
+    ELSE
+        v_exec_price := v_price * (1.0 - v_spread / 2.0);
+    END IF;
+    v_spread_cost := ABS(v_exec_price - v_price) * p_quantity;
+
+    v_total := v_exec_price * p_quantity;
 
     SELECT * INTO v_profile FROM profiles WHERE id = p_user_id FOR UPDATE;
     IF NOT FOUND THEN
@@ -465,7 +530,6 @@ BEGIN
         v_new_balance := v_profile.cash_balance - v_total;
         UPDATE profiles SET cash_balance = v_new_balance WHERE id = p_user_id;
 
-        -- Use subquery so Postgres resolves the type of teas.id automatically
         SELECT * INTO v_position FROM positions
             WHERE user_id = p_user_id
               AND tea_id = (SELECT id FROM teas WHERE symbol = p_tea_symbol)
@@ -473,7 +537,7 @@ BEGIN
 
         IF FOUND THEN
             v_new_qty := v_position.quantity + p_quantity;
-            v_new_avg := ((v_position.avg_entry_price * v_position.quantity) + (v_price * p_quantity)) / v_new_qty;
+            v_new_avg := ((v_position.avg_entry_price * v_position.quantity) + (v_exec_price * p_quantity)) / v_new_qty;
             UPDATE positions
                 SET quantity = v_new_qty, avg_entry_price = v_new_avg, updated_at = NOW()
                 WHERE id = v_position.id;
@@ -481,8 +545,11 @@ BEGIN
             INSERT INTO positions (user_id, tea_id, quantity, avg_entry_price)
                 VALUES (p_user_id,
                         (SELECT id FROM teas WHERE symbol = p_tea_symbol),
-                        p_quantity, v_price);
+                        p_quantity, v_exec_price);
         END IF;
+
+        UPDATE teas SET current_long_volume = COALESCE(current_long_volume, 0) + p_quantity
+        WHERE symbol = p_tea_symbol;
 
     -- ── SELL ────────────────────────────────────────────────────────
     ELSIF p_side = 'SELL' THEN
@@ -507,31 +574,38 @@ BEGIN
                 SET quantity = v_new_qty, updated_at = NOW()
                 WHERE id = v_position.id;
         END IF;
+
+        UPDATE teas SET current_long_volume = GREATEST(0, COALESCE(current_long_volume, 0) - p_quantity)
+        WHERE symbol = p_tea_symbol;
     END IF;
 
     -- ── RECORD TRADE (immutable audit trail) ────────────────────────
     INSERT INTO trades (user_id, tea_id, side, quantity, price, total_value)
         VALUES (p_user_id,
                 (SELECT id FROM teas WHERE symbol = p_tea_symbol),
-                p_side, p_quantity, v_price, v_total)
+                p_side, p_quantity, v_exec_price, v_total)
         RETURNING * INTO v_trade;
 
     RETURN jsonb_build_object(
-        'success',     true,
-        'trade_id',    v_trade.id::TEXT,
-        'side',        p_side,
-        'symbol',      p_tea_symbol,
-        'quantity',    p_quantity,
-        'price',       v_price,
-        'total',       v_total,
-        'new_balance', v_new_balance
+        'success',        true,
+        'trade_id',       v_trade.id::TEXT,
+        'side',           p_side,
+        'symbol',         p_tea_symbol,
+        'quantity',       p_quantity,
+        'price',          v_exec_price,
+        'mid_price',      v_price,
+        'spread',         v_spread,
+        'spread_cost',    v_spread_cost,
+        'total',          v_total,
+        'new_balance',    v_new_balance,
+        'execution_price', v_exec_price
     );
 END;
 $$;
 
 
 -- 12. ATOMIC INDEX TRADE FUNCTION (C4 FIX)
--- The server provides the price — clients cannot manipulate it.
+-- The server provides the mid price — spread is applied server-side.
 CREATE OR REPLACE FUNCTION execute_index_trade(
     p_user_id      UUID,
     p_index_symbol TEXT,
@@ -548,6 +622,9 @@ DECLARE
     v_profile      RECORD;
     v_position     RECORD;
     v_trade        RECORD;
+    v_spread       NUMERIC;
+    v_exec_price   NUMERIC;
+    v_spread_cost  NUMERIC;
     v_total        NUMERIC;
     v_new_balance  NUMERIC;
     v_new_qty      NUMERIC;
@@ -568,7 +645,16 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'error', 'Index not found: ' || p_index_symbol);
     END IF;
 
-    v_total := p_price * p_quantity;
+    -- Symmetric spread (1% default, same as tea base_spread)
+    v_spread := 0.01;
+    IF p_side = 'BUY' THEN
+        v_exec_price := p_price * (1.0 + v_spread / 2.0);
+    ELSE
+        v_exec_price := p_price * (1.0 - v_spread / 2.0);
+    END IF;
+    v_spread_cost := ABS(v_exec_price - p_price) * p_quantity;
+
+    v_total := v_exec_price * p_quantity;
 
     -- Lock user profile
     SELECT * INTO v_profile FROM profiles WHERE id = p_user_id FOR UPDATE;
@@ -592,13 +678,13 @@ BEGIN
 
         IF FOUND THEN
             v_new_qty := v_position.quantity + p_quantity;
-            v_new_avg := ((v_position.avg_entry_price * v_position.quantity) + (p_price * p_quantity)) / v_new_qty;
+            v_new_avg := ((v_position.avg_entry_price * v_position.quantity) + (v_exec_price * p_quantity)) / v_new_qty;
             UPDATE index_positions
                 SET quantity = v_new_qty, avg_entry_price = v_new_avg, updated_at = NOW()
                 WHERE id = v_position.id;
         ELSE
             INSERT INTO index_positions (user_id, index_symbol, quantity, avg_entry_price)
-                VALUES (p_user_id, p_index_symbol, p_quantity, p_price);
+                VALUES (p_user_id, p_index_symbol, p_quantity, v_exec_price);
         END IF;
 
     -- ── SELL ────────────────────────────────────────────────────────
@@ -627,18 +713,22 @@ BEGIN
 
     -- ── RECORD TRADE ────────────────────────────────────────────────
     INSERT INTO trades (user_id, tea_id, index_symbol, side, quantity, price, total_value)
-        VALUES (p_user_id, NULL, p_index_symbol, p_side, p_quantity, p_price, v_total)
+        VALUES (p_user_id, NULL, p_index_symbol, p_side, p_quantity, v_exec_price, v_total)
         RETURNING * INTO v_trade;
 
     RETURN jsonb_build_object(
-        'success',     true,
-        'trade_id',    v_trade.id::TEXT,
-        'side',        p_side,
-        'symbol',      p_index_symbol,
-        'quantity',    p_quantity,
-        'price',       p_price,
-        'total',       v_total,
-        'new_balance', v_new_balance
+        'success',          true,
+        'trade_id',         v_trade.id::TEXT,
+        'side',             p_side,
+        'symbol',           p_index_symbol,
+        'quantity',         p_quantity,
+        'price',            v_exec_price,
+        'mid_price',        p_price,
+        'spread',           v_spread,
+        'spread_cost',      v_spread_cost,
+        'total',            v_total,
+        'new_balance',      v_new_balance,
+        'execution_price',  v_exec_price
     );
 END;
 $$;
@@ -1823,3 +1913,228 @@ ALTER TABLE trades ALTER COLUMN tea_id DROP NOT NULL;
 ALTER TABLE trades DROP CONSTRAINT IF EXISTS trades_must_have_symbol;
 ALTER TABLE trades ADD CONSTRAINT trades_must_have_symbol
     CHECK (tea_id IS NOT NULL OR index_symbol IS NOT NULL);
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- CHECK_STOP_OUTS — Equity-Based Liquidation (2% buffer)
+--
+-- Liquidation formula:  equity / total_used_margin <= 0.02
+--   where equity = cash_balance + unrealized_pnl (all open positions)
+--
+-- This ensures account balance never goes negative by closing out
+-- when only 2% of margin remains as equity backing.
+--
+-- Margin call at equity/margin <= 0.15 (15%).
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION check_stop_outs()
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_user            RECORD;
+    v_stop_level      NUMERIC;
+    v_call_level      NUMERIC;
+    v_bal             NUMERIC;
+    v_used_margin     NUMERIC;
+    v_unrealized_tea  NUMERIC;
+    v_unrealized_idx  NUMERIC;
+    v_total_pnl       NUMERIC;
+    v_equity          NUMERIC;
+    v_margin_level    NUMERIC;
+    v_pos             RECORD;
+    v_close_pnl       NUMERIC;
+    v_spread          NUMERIC;
+    v_liquidated      INT := 0;
+    v_margin_calls    INT := 0;
+    v_already_warned  BOOLEAN;
+    v_idx_price       NUMERIC;
+BEGIN
+    SELECT value INTO v_stop_level FROM platform_config WHERE key = 'stop_out_level';
+    v_stop_level := COALESCE(v_stop_level, 0.02);
+
+    SELECT value INTO v_call_level FROM platform_config WHERE key = 'margin_call_level';
+    v_call_level := COALESCE(v_call_level, 0.15);
+
+    SELECT value INTO v_spread FROM platform_config WHERE key = 'spread_pct';
+    v_spread := COALESCE(v_spread, 0.01);
+
+    FOR v_user IN
+        SELECT DISTINCT user_id, trading_mode FROM (
+            SELECT user_id, trading_mode FROM positions WHERE quantity != 0
+            UNION
+            SELECT user_id, trading_mode FROM index_positions WHERE quantity != 0
+        ) AS active_users
+    LOOP
+        SELECT CASE WHEN v_user.trading_mode = 'REAL' THEN real_balance ELSE virtual_balance END
+            INTO v_bal FROM profiles WHERE id = v_user.user_id;
+
+        SELECT COALESCE(SUM(margin_used), 0) INTO v_used_margin
+            FROM (
+                SELECT margin_used FROM positions
+                    WHERE user_id = v_user.user_id AND trading_mode = v_user.trading_mode AND quantity != 0
+                UNION ALL
+                SELECT margin_used FROM index_positions
+                    WHERE user_id = v_user.user_id AND trading_mode = v_user.trading_mode AND quantity != 0
+            ) AS margins;
+
+        IF v_used_margin <= 0 THEN CONTINUE; END IF;
+
+        -- Unrealized P&L: tea positions
+        SELECT COALESCE(SUM(
+            CASE WHEN p.quantity > 0
+                THEN (t.current_price * (1 - v_spread/2) - p.avg_entry_price) * p.quantity
+                ELSE (p.avg_entry_price - t.current_price * (1 + v_spread/2)) * ABS(p.quantity)
+            END
+        ), 0) INTO v_unrealized_tea
+        FROM positions p JOIN teas t ON t.id = p.tea_id
+        WHERE p.user_id = v_user.user_id AND p.trading_mode = v_user.trading_mode AND p.quantity != 0;
+
+        -- Unrealized P&L: index positions
+        v_unrealized_idx := 0;
+        FOR v_pos IN
+            SELECT ip.*, i.teas AS idx_teas, i.multiplier
+            FROM index_positions ip
+            JOIN indexes i ON i.symbol = ip.index_symbol
+            WHERE ip.user_id = v_user.user_id AND ip.trading_mode = v_user.trading_mode AND ip.quantity != 0
+        LOOP
+            SELECT AVG(t.current_price) * COALESCE(v_pos.multiplier, 1)
+                INTO v_idx_price
+            FROM teas t
+            WHERE t.symbol = ANY(v_pos.idx_teas)
+              AND t.current_price > 0;
+
+            IF v_idx_price IS NOT NULL THEN
+                IF v_pos.quantity > 0 THEN
+                    v_unrealized_idx := v_unrealized_idx +
+                        (v_idx_price * (1 - v_spread/2) - v_pos.avg_entry_price) * v_pos.quantity;
+                ELSE
+                    v_unrealized_idx := v_unrealized_idx +
+                        (v_pos.avg_entry_price - v_idx_price * (1 + v_spread/2)) * ABS(v_pos.quantity);
+                END IF;
+            END IF;
+        END LOOP;
+
+        v_total_pnl := v_unrealized_tea + v_unrealized_idx;
+        v_equity    := v_bal + v_total_pnl;
+
+        -- Equity / Used Margin ratio — the core liquidation metric.
+        -- At 100% the account is fully covered; at 2% the 2% buffer triggers close-out.
+        v_margin_level := v_equity / v_used_margin;
+
+        -- Hard floor: if equity is already negative, always liquidate
+        IF v_equity <= 0 THEN
+            v_margin_level := 0;
+        END IF;
+
+        -- ── STOP-OUT (equity/margin <= 2%) ─────────────────────────────
+        IF v_margin_level <= v_stop_level THEN
+            -- Liquidate all tea positions
+            FOR v_pos IN
+                SELECT p.*, t.current_price, t.symbol AS tea_symbol
+                FROM positions p JOIN teas t ON t.id = p.tea_id
+                WHERE p.user_id = v_user.user_id AND p.trading_mode = v_user.trading_mode AND p.quantity != 0
+            LOOP
+                IF v_pos.quantity > 0 THEN
+                    v_close_pnl := (v_pos.current_price * (1 - v_spread/2) - v_pos.avg_entry_price) * v_pos.quantity;
+                ELSE
+                    v_close_pnl := (v_pos.avg_entry_price - v_pos.current_price * (1 + v_spread/2)) * ABS(v_pos.quantity);
+                END IF;
+
+                v_bal := v_bal + v_pos.margin_used + v_close_pnl;
+
+                INSERT INTO trades (user_id, tea_id, side, quantity, price, total_value, trading_mode)
+                    VALUES (v_pos.user_id, v_pos.tea_id,
+                            CASE WHEN v_pos.quantity > 0 THEN 'SELL' ELSE 'BUY' END,
+                            ABS(v_pos.quantity), v_pos.current_price,
+                            ABS(v_pos.quantity) * v_pos.current_price, v_user.trading_mode);
+
+                INSERT INTO platform_revenue (revenue_type, user_id, amount, symbol)
+                    VALUES ('stop_out', v_pos.user_id, GREATEST(-v_close_pnl, 0), v_pos.tea_symbol);
+
+                DELETE FROM positions WHERE id = v_pos.id;
+            END LOOP;
+
+            -- Liquidate all index positions
+            FOR v_pos IN
+                SELECT ip.*, i.teas AS idx_teas, i.multiplier
+                FROM index_positions ip
+                JOIN indexes i ON i.symbol = ip.index_symbol
+                WHERE ip.user_id = v_user.user_id AND ip.trading_mode = v_user.trading_mode AND ip.quantity != 0
+            LOOP
+                SELECT AVG(t.current_price) * COALESCE(v_pos.multiplier, 1)
+                    INTO v_idx_price
+                FROM teas t
+                WHERE t.symbol = ANY(v_pos.idx_teas)
+                  AND t.current_price > 0;
+
+                v_idx_price := COALESCE(v_idx_price, v_pos.avg_entry_price);
+
+                IF v_pos.quantity > 0 THEN
+                    v_close_pnl := (v_idx_price * (1 - v_spread/2) - v_pos.avg_entry_price) * v_pos.quantity;
+                ELSE
+                    v_close_pnl := (v_pos.avg_entry_price - v_idx_price * (1 + v_spread/2)) * ABS(v_pos.quantity);
+                END IF;
+
+                v_bal := v_bal + v_pos.margin_used + v_close_pnl;
+
+                INSERT INTO trades (user_id, tea_id, index_symbol, side, quantity, price, total_value, trading_mode)
+                    VALUES (v_pos.user_id, NULL, v_pos.index_symbol,
+                            CASE WHEN v_pos.quantity > 0 THEN 'SELL' ELSE 'BUY' END,
+                            ABS(v_pos.quantity), v_idx_price,
+                            ABS(v_pos.quantity) * v_idx_price, v_user.trading_mode);
+
+                INSERT INTO platform_revenue (revenue_type, user_id, amount, symbol)
+                    VALUES ('stop_out', v_pos.user_id, GREATEST(-v_close_pnl, 0), v_pos.index_symbol);
+
+                DELETE FROM index_positions WHERE id = v_pos.id;
+            END LOOP;
+
+            v_bal := GREATEST(v_bal, 0);
+
+            IF v_user.trading_mode = 'REAL' THEN
+                UPDATE profiles SET real_balance = v_bal WHERE id = v_user.user_id;
+            ELSE
+                UPDATE profiles SET virtual_balance = v_bal WHERE id = v_user.user_id;
+            END IF;
+
+            INSERT INTO margin_notifications (user_id, type, trading_mode, equity, used_margin, margin_level, message)
+                VALUES (v_user.user_id, 'STOP_OUT', v_user.trading_mode,
+                        v_equity, v_used_margin, v_margin_level * 100,
+                        'All positions liquidated — equity fell to '
+                        || ROUND(v_margin_level * 100, 1) || '% of used margin (threshold: '
+                        || ROUND(v_stop_level * 100) || '%).');
+
+            v_liquidated := v_liquidated + 1;
+
+        -- ── MARGIN CALL (equity/margin <= 15%) ─────────────────────────
+        ELSIF v_margin_level <= v_call_level THEN
+            SELECT EXISTS (
+                SELECT 1 FROM margin_notifications
+                WHERE user_id = v_user.user_id
+                  AND trading_mode = v_user.trading_mode
+                  AND type = 'MARGIN_CALL'
+                  AND created_at > NOW() - INTERVAL '1 hour'
+            ) INTO v_already_warned;
+
+            IF NOT v_already_warned THEN
+                INSERT INTO margin_notifications (user_id, type, trading_mode, equity, used_margin, margin_level, message)
+                    VALUES (v_user.user_id, 'MARGIN_CALL', v_user.trading_mode,
+                            v_equity, v_used_margin, v_margin_level * 100,
+                            'Equity at ' || ROUND(v_margin_level * 100, 1)
+                            || '% of used margin. Close positions or deposit funds to avoid '
+                            || 'liquidation at ' || ROUND(v_stop_level * 100) || '%.');
+
+                v_margin_calls := v_margin_calls + 1;
+            END IF;
+        END IF;
+    END LOOP;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'users_liquidated', v_liquidated,
+        'margin_calls_sent', v_margin_calls
+    );
+END;
+$$;

@@ -320,9 +320,22 @@ async function apiInsertChatMessage(data) {
 async function apiLookupUserByUsername(username) {
     return supabaseClient
         .from('profiles')
-        .select('id, username, email, cash_balance, virtual_balance, real_balance, follower_count, following_count')
+        .select('id, username, email, cash_balance, virtual_balance, real_balance, follower_count, following_count, created_at')
         .ilike('username', username)
         .single();
+}
+
+/**
+ * Search profiles by partial username match (for the universal search bar).
+ * Returns up to `limit` profiles whose username contains the query substring.
+ */
+async function apiSearchUsers(query, limit = 4) {
+    return supabaseClient
+        .from('profiles')
+        .select('id, username, created_at, follower_count, following_count')
+        .ilike('username', `%${query}%`)
+        .order('follower_count', { ascending: false })
+        .limit(limit);
 }
 
 // =============================================

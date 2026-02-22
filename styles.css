@@ -1625,6 +1625,25 @@ body {
     color: white;
 }
 
+.search-user-row {
+    align-items: center;
+}
+
+.search-user-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+    letter-spacing: 0.5px;
+}
+
 .command-suggestion-cmd {
     font-family: 'JetBrains Mono', monospace;
     color: var(--accent-blue);
@@ -7299,6 +7318,51 @@ select.trade-input {
     background: #1557b0;
 }
 
+/* Risk Management — Halted / Close-Only button states */
+.trade-execute-btn.btn-halted {
+    background: #dc2626 !important;
+    animation: pulseHalted 1.5s ease-in-out infinite;
+    cursor: not-allowed;
+}
+.trade-execute-btn.btn-close-only {
+    background: #d97706 !important;
+    cursor: not-allowed;
+}
+@keyframes pulseHalted {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* Risk Management — Auction table badges */
+.mode-badge {
+    display: inline-block;
+    font-size: 8px;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-left: 4px;
+    letter-spacing: 0.5px;
+}
+.mode-badge.mode-halted {
+    background: #dc2626;
+    color: #fff;
+    animation: pulseHalted 1.5s ease-in-out infinite;
+}
+.mode-badge.mode-close-only {
+    background: #d97706;
+    color: #fff;
+}
+tr.row-halted {
+    opacity: 0.6;
+}
+
+/* Elevated spread indicator */
+.spread-elevated {
+    color: var(--accent-orange) !important;
+    font-weight: 600;
+}
+
 /* Portfolio Section */
 .portfolio-section {
     padding: 16px;
@@ -8249,6 +8313,7 @@ select.trade-input {
     font-weight: 700;
     color: var(--text-primary);
 }
+.trader-stat-wide { grid-column: 1 / -1; }
 .trader-stat-value.up   { color: var(--accent-green); }
 .trader-stat-value.down { color: var(--accent-red); }
 .trader-profile-activity {

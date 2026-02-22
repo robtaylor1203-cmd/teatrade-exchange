@@ -333,6 +333,7 @@ function setActiveBalance(newBalance) {
         state.userProfile.cash_balance = newBalance;
     }
     updateBalanceDisplay();
+    if (typeof updatePortfolioDisplay === 'function') updatePortfolioDisplay();
 }
 
 /**
@@ -364,6 +365,10 @@ function switchTradingMode(mode) {
 }
 
 function updateBalanceDisplay() {
+    const bal = getActiveBalance();
+    const formatted = '$' + bal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const el = document.getElementById('user-balance');
-    if (el) el.textContent = '$' + getActiveBalance().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (el) el.textContent = formatted;
+    const tradeBal = document.getElementById('trade-balance');
+    if (tradeBal) tradeBal.textContent = formatted;
 }

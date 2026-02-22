@@ -332,7 +332,10 @@ serve(async (req) => {
     ]);
 
     // 5. Compute new prices for all teas
-    const updates = [];
+    const updates: Array<{
+      symbol: string; current_price: number; last_update: string;
+      trading_mode?: string; halt_until?: string | null; volatility_multiplier?: number;
+    }> = [];
     const timestamp = new Date().toISOString();
 
     for (const tea of teas) {
@@ -419,17 +422,77 @@ serve(async (req) => {
         console.log(`   ${tea.symbol}: flow ${netFlowKg >= 0 ? '+' : ''}${netFlowKg.toFixed(0)}kg → impact ${(flowEffect * 100).toFixed(3)}%`);
       }
 
-      updates.push({
+      // ── RISK ENGINE: Circuit Breaker, Dynamic Spread, Close-Only ──────
+      const prevPrice = Number(tea.current_price) || finalPrice;
+      const tickChange = prevPrice > 0 ? Math.abs(finalPrice - prevPrice) / prevPrice : 0;
+      const currentMode: string = tea.trading_mode || 'FULL';
+      const currentMult: number = Number(tea.volatility_multiplier) || 1.0;
+      const maxExp: number = Number(tea.max_exposure) || 500_000;
+      const longVol: number = Number(tea.current_long_volume) || 0;
+      const shortVol: number = Number(tea.current_short_volume) || 0;
+
+      const updateObj: typeof updates[number] = {
         symbol: tea.symbol,
         current_price: finalPrice,
-        last_update: timestamp
-      });
+        last_update: timestamp,
+      };
+
+      // --- Circuit breaker: >10% single-tick move → HALT for 5 minutes ---
+      if (tickChange > 0.10 && currentMode !== 'HALTED') {
+        updateObj.trading_mode = 'HALTED';
+        updateObj.halt_until = new Date(Date.now() + 5 * 60_000).toISOString();
+        updateObj.volatility_multiplier = 3.0;
+        console.log(`🛑 CIRCUIT BREAKER: ${tea.symbol} halted (${(tickChange * 100).toFixed(1)}% move)`);
+
+      } else if (currentMode === 'HALTED') {
+        // Check if halt period expired → restore to FULL
+        const haltUntil = tea.halt_until ? new Date(tea.halt_until).getTime() : 0;
+        if (haltUntil > 0 && Date.now() >= haltUntil) {
+          updateObj.trading_mode = 'FULL';
+          updateObj.halt_until = null;
+          updateObj.volatility_multiplier = Math.max(1.0, currentMult * 0.7);
+          console.log(`✅ UN-HALT: ${tea.symbol} restored to FULL trading`);
+        }
+        // While halted, keep existing mode (don't overwrite)
+
+      } else {
+        // --- Dynamic symmetric spread via volatility_multiplier ---
+        if (tickChange > 0.03) {
+          // High volatility (3-10%) → widen spread up to 3x
+          updateObj.volatility_multiplier = Math.min(3.0, 1.0 + (tickChange / 0.03));
+        } else if (currentMult > 1.0) {
+          // Low volatility → decay multiplier back toward 1.0
+          updateObj.volatility_multiplier = Math.max(1.0, currentMult * 0.95);
+        }
+
+        // --- Close-Only trigger at 95% exposure ---
+        if (longVol >= maxExp * 0.95 || shortVol >= maxExp * 0.95) {
+          if (currentMode !== 'CLOSE_ONLY') {
+            updateObj.trading_mode = 'CLOSE_ONLY';
+            console.log(`⚠️  CLOSE_ONLY: ${tea.symbol} (long:${longVol.toFixed(0)} short:${shortVol.toFixed(0)} / max:${maxExp})`);
+          }
+        } else if (currentMode === 'CLOSE_ONLY' && longVol < maxExp * 0.90 && shortVol < maxExp * 0.90) {
+          // Exposure dropped below 90% → restore full trading
+          updateObj.trading_mode = 'FULL';
+          console.log(`✅ FULL restored: ${tea.symbol} (exposure eased)`);
+        }
+      }
+
+      updates.push(updateObj);
     }
 
-    // 6. Commit price updates
+    // 6. Commit price + risk updates
     for (const update of updates) {
+      const payload: Record<string, unknown> = {
+        current_price: update.current_price,
+        last_update: update.last_update,
+      };
+      if (update.trading_mode !== undefined) payload.trading_mode = update.trading_mode;
+      if (update.halt_until !== undefined)   payload.halt_until = update.halt_until;
+      if (update.volatility_multiplier !== undefined) payload.volatility_multiplier = update.volatility_multiplier;
+
       await supabase.from('teas')
-        .update({ current_price: update.current_price, last_update: update.last_update })
+        .update(payload)
         .eq('symbol', update.symbol);
     }
 

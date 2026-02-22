@@ -12,13 +12,14 @@
  * Globals used from hub.js        : openHubForSymbol
  * Globals used from trading.js    : setTradeType, updateTradeSummary
  * Globals used from ui.js         : selectTeaForTrading, switchWatchlistTab
- * Globals used from portfolio.js  : switchPortfolioTab
+ * Globals used from portfolio.js  : switchPortfolioTab, openTraderProfile
  * Globals used from hub.js        : toggleMaximize
  * Globals used from auth.js       : openAuthModal
  * Globals used from utils.js      : showToast
+ * Globals used from api.js        : apiSearchUsers
  *
  * Functions called from other files (available at runtime as globals):
- *   openPairsModal
+ *   openPairsModal, openUserProfileFromSearch
  */
 
 // =============================================
@@ -46,6 +47,9 @@ function initCommandLine() {
     const suggestions = document.getElementById('command-suggestions');
 
     if (!input) return;
+
+    let _userSearchTimer = null;
+    let _userSearchSeq = 0;
 
     // --- Input handler: build live search results ---
     input.addEventListener('input', (e) => {
@@ -173,6 +177,58 @@ function initCommandLine() {
             suggestions.innerHTML = '<div class="search-category">No results found</div>';
             suggestions.classList.add('active');
         }
+
+        // Async user search (debounced, appended after local results)
+        clearTimeout(_userSearchTimer);
+        if (val.length >= 2 && typeof apiSearchUsers === 'function') {
+            const seq = ++_userSearchSeq;
+            _userSearchTimer = setTimeout(async () => {
+                try {
+                    const { data: users } = await apiSearchUsers(val, 3);
+                    if (seq !== _userSearchSeq) return;
+                    if (!users || users.length === 0) return;
+                    if (input.value.trim() !== val) return;
+
+                    const ownId = state.currentUser?.id;
+                    const filtered = users.filter(u => u.id !== ownId);
+                    if (filtered.length === 0) return;
+
+                    let userHtml = '<div class="search-category">Traders</div>';
+                    filtered.forEach(u => {
+                        const initials = (u.username || '??').slice(0, 2).toUpperCase();
+                        const joined = u.created_at
+                            ? new Date(u.created_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+                            : '';
+                        const followers = Number(u.follower_count) || 0;
+
+                        userHtml += `
+                            <div class="command-suggestion search-user-row" data-type="user" data-username="${escapeHtml(u.username)}">
+                                <div class="search-user-avatar">${initials}</div>
+                                <div class="search-result-info">
+                                    <span class="search-result-symbol">@${escapeHtml(u.username)}</span>
+                                    <span class="search-result-name">${joined ? 'Joined ' + joined : ''}${joined && followers > 0 ? ' · ' : ''}${followers > 0 ? followers + ' follower' + (followers !== 1 ? 's' : '') : ''}</span>
+                                </div>
+                                <div class="search-result-actions">
+                                    <button class="search-action-btn chart" onclick="event.stopPropagation(); openUserProfileFromSearch('${escapeHtml(u.username)}')">Profile</button>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    const existingUsers = suggestions.querySelector('.search-users-block');
+                    if (existingUsers) existingUsers.remove();
+
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'search-users-block';
+                    wrapper.innerHTML = userHtml;
+                    suggestions.appendChild(wrapper);
+
+                    if (!suggestions.classList.contains('active')) {
+                        suggestions.classList.add('active');
+                    }
+                } catch (_) {}
+            }, 250);
+        }
     });
 
     // --- Enter / Escape ---
@@ -191,6 +247,11 @@ function initCommandLine() {
         }
     });
 
+    // --- Prevent blur when clicking inside dropdown ---
+    suggestions.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+    });
+
     // --- Click on suggestion ---
     suggestions.addEventListener('click', (e) => {
         const item = e.target.closest('.command-suggestion');
@@ -198,6 +259,7 @@ function initCommandLine() {
             handleSearchResult(item);
             input.value = '';
             suggestions.classList.remove('active');
+            input.blur();
         }
     });
 
@@ -241,6 +303,9 @@ function handleSearchResult(item) {
             break;
         case 'pair':
             openPairsModal(item.dataset.id, 'LONG');
+            break;
+        case 'user':
+            openUserProfileFromSearch(item.dataset.username);
             break;
         case 'command':
             executeCommand(item.dataset.cmd);
@@ -312,6 +377,16 @@ function switchToTea(symbol) {
 
 function openIndexChart(indexSymbol) {
     openHubForSymbol(indexSymbol);
+}
+
+// =============================================
+// OPEN USER PROFILE FROM SEARCH
+// =============================================
+
+function openUserProfileFromSearch(username) {
+    if (typeof openTraderProfile === 'function') {
+        openTraderProfile(username, null, null, null);
+    }
 }
 
 // =============================================
