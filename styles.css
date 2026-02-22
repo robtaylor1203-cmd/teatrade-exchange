@@ -9211,3 +9211,110 @@ tr.row-halted {
     from { transform: translateX(-50%) translateY(-20px); opacity: 0; }
     to   { transform: translateX(-50%) translateY(0); opacity: 1; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   MONETIZATION — Account Locked Modal
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.account-locked-modal { display: none; position: fixed; inset: 0; z-index: 10000; }
+.account-locked-modal.active { display: flex; align-items: center; justify-content: center; }
+.locked-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(6px); }
+.locked-card {
+    position: relative; z-index: 1;
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-radius: 16px; padding: 40px 36px 32px; max-width: 480px; width: 90%;
+    text-align: center; animation: lockedSlideIn 0.3s ease-out;
+}
+@keyframes lockedSlideIn { from { opacity: 0; transform: scale(0.92) translateY(20px); } to { opacity: 1; transform: none; } }
+.locked-icon { font-size: 48px; margin-bottom: 12px; }
+.locked-title { font-size: 22px; font-weight: 700; color: var(--accent-red); margin: 0 0 8px; }
+.locked-subtitle { color: var(--text-muted); font-size: 13px; margin: 0 0 24px; line-height: 1.5; }
+.locked-options { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.locked-option {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 16px; position: relative;
+}
+.locked-option-paid { border-color: var(--accent-green); }
+.locked-option-badge {
+    position: absolute; top: -10px; right: 12px;
+    background: var(--accent-green); color: #000; font-size: 9px; font-weight: 700;
+    padding: 3px 8px; border-radius: 10px; letter-spacing: 0.5px;
+}
+.locked-option-label { font-size: 10px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.locked-option-amount { font-family: 'JetBrains Mono', monospace; font-size: 24px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+.locked-option-detail { font-size: 11px; color: var(--text-muted); margin-bottom: 14px; }
+.locked-btn {
+    width: 100%; padding: 10px; border: none; border-radius: 8px;
+    font-size: 12px; font-weight: 600; cursor: pointer; transition: opacity 0.2s;
+}
+.locked-btn:hover:not(:disabled) { opacity: 0.85; }
+.locked-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.locked-btn-free { background: var(--bg-tertiary); color: var(--text-primary); }
+.locked-btn-paid { background: var(--accent-green); color: #000; }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   MONETIZATION — Combine Challenge Banner
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.combine-banner {
+    display: none; align-items: center; justify-content: center; gap: 16px;
+    background: linear-gradient(90deg, rgba(234,179,8,0.12), rgba(234,179,8,0.04));
+    border: 1px solid rgba(234,179,8,0.3); border-radius: 8px;
+    padding: 8px 16px; margin: 8px 16px 0; font-size: 12px; color: var(--text-primary);
+}
+.combine-banner.active { display: flex; }
+.combine-banner-label { font-weight: 700; color: #eab308; text-transform: uppercase; letter-spacing: 0.5px; font-size: 11px; }
+.combine-stat { text-align: center; }
+.combine-stat-value { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 13px; }
+.combine-stat-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   MONETIZATION — PRO / Funded Badges
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.badge-pro {
+    display: inline-block; background: linear-gradient(135deg, #eab308, #f59e0b);
+    color: #000; font-size: 8px; font-weight: 800; padding: 2px 5px;
+    border-radius: 3px; letter-spacing: 0.5px; margin-left: 4px; vertical-align: middle;
+}
+.badge-funded {
+    display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #000; font-size: 8px; font-weight: 800; padding: 2px 5px;
+    border-radius: 3px; letter-spacing: 0.5px; margin-left: 4px; vertical-align: middle;
+}
+.chat-sender.pro { color: #eab308; }
+
+/* PRO upgrade prompt in portfolio */
+.pro-upgrade-card {
+    background: linear-gradient(135deg, rgba(234,179,8,0.1), rgba(245,158,11,0.05));
+    border: 1px solid rgba(234,179,8,0.3); border-radius: 10px;
+    padding: 16px; text-align: center; margin: 12px 0;
+}
+.pro-upgrade-title { font-size: 14px; font-weight: 700; color: #eab308; margin-bottom: 4px; }
+.pro-upgrade-desc { font-size: 11px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5; }
+.pro-upgrade-btn {
+    background: linear-gradient(135deg, #eab308, #f59e0b); color: #000;
+    border: none; padding: 10px 24px; border-radius: 8px;
+    font-size: 13px; font-weight: 700; cursor: pointer; transition: opacity 0.2s;
+}
+.pro-upgrade-btn:hover { opacity: 0.85; }
+
+/* Combine entry card */
+.combine-entry-card {
+    background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(99,102,241,0.05));
+    border: 1px solid rgba(99,102,241,0.3); border-radius: 10px;
+    padding: 16px; text-align: center; margin: 12px 0;
+}
+.combine-entry-title { font-size: 14px; font-weight: 700; color: #818cf8; margin-bottom: 4px; }
+.combine-entry-desc { font-size: 11px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5; }
+.combine-entry-btn {
+    background: linear-gradient(135deg, #6366f1, #818cf8); color: #fff;
+    border: none; padding: 10px 24px; border-radius: 8px;
+    font-size: 13px; font-weight: 700; cursor: pointer; transition: opacity 0.2s;
+}
+.combine-entry-btn:hover { opacity: 0.85; }
+
+@media (max-width: 480px) {
+    .locked-options { grid-template-columns: 1fr; }
+    .locked-card { padding: 28px 20px 24px; }
+}

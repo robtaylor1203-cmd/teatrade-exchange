@@ -572,6 +572,46 @@ serve(async (req) => {
     if (stopOutErr) console.error('check_stop_outs error:', stopOutErr.message);
     else if (stopOutResult?.users_liquidated > 0) console.log(`🛑 Stop-out: liquidated ${stopOutResult.users_liquidated} user(s)`);
 
+    // 11. Combine challenge monitoring — check active combines for drawdown/victory/expiry
+    try {
+      const { data: activeCombines } = await supabase
+        .from('combine_challenges')
+        .select('id, user_id')
+        .eq('status', 'ACTIVE');
+
+      if (activeCombines && activeCombines.length > 0) {
+        let passed = 0, failed = 0;
+        for (const c of activeCombines) {
+          const { data: result } = await supabase.rpc('check_combine_rules', { p_user_id: c.user_id });
+          if (result && !result.active) {
+            if (result.result === 'PASSED') passed++;
+            else if (result.result === 'FAILED' || result.result === 'EXPIRED') failed++;
+          }
+        }
+        if (passed > 0 || failed > 0) {
+          console.log(`🏆 Combines: ${passed} passed, ${failed} failed/expired`);
+        }
+
+        // Daily equity reset: if a new UTC day has started, update daily_start_equity
+        const utcHour = new Date().getUTCHours();
+        const utcMinute = new Date().getUTCMinutes();
+        if (utcHour === 0 && utcMinute < 5) {
+          for (const c of activeCombines) {
+            const { data: rules } = await supabase.rpc('check_combine_rules', { p_user_id: c.user_id });
+            if (rules?.active && rules?.equity) {
+              await supabase
+                .from('combine_challenges')
+                .update({ daily_start_equity: rules.equity })
+                .eq('id', c.id);
+            }
+          }
+          console.log(`📅 Reset daily_start_equity for ${activeCombines.length} active combines`);
+        }
+      }
+    } catch (combineErr) {
+      console.error('Combine monitoring error:', (combineErr as Error).message);
+    }
+
     return new Response(JSON.stringify({
       success: true,
       source: sourceStatus,

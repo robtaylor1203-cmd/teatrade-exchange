@@ -531,6 +531,10 @@
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
                             My Portfolio
                         </button>
+                        <button class="user-dropdown-item" onclick="openPortfolioModal(); switchPortfolioModalTab('store'); closeUserDropdown();">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+                            Store
+                        </button>
                         <button class="user-dropdown-item" onclick="openMfaSetupModal(); closeUserDropdown();">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                             Security (2FA)
@@ -577,6 +581,15 @@
             <div class="market-card-value" id="card-value-3">$3,847</div>
             <div class="market-card-change up" id="card-change-3">&#9650; +0.7%</div>
         </div>
+    </div>
+
+    <!-- Combine Challenge Banner -->
+    <div class="combine-banner" id="combine-banner">
+        <span class="combine-banner-label">COMBINE ACTIVE</span>
+        <div class="combine-stat"><div class="combine-stat-value" id="combine-equity">$50,000</div><div class="combine-stat-label">Equity</div></div>
+        <div class="combine-stat"><div class="combine-stat-value" id="combine-target">$54,000</div><div class="combine-stat-label">Target</div></div>
+        <div class="combine-stat"><div class="combine-stat-value" id="combine-dd-floor">$47,500</div><div class="combine-stat-label">DD Floor</div></div>
+        <div class="combine-stat"><div class="combine-stat-value" id="combine-days">30</div><div class="combine-stat-label">Days Left</div></div>
     </div>
 
     <!-- Main Grid -->
@@ -1762,6 +1775,37 @@
     <div id="weather-popout-overlay" onclick="closeWeatherPopout()" style="display:none;position:fixed;inset:0;z-index:899;"></div>
     <div id="weather-popout" class="weather-popout" style="display:none;" role="dialog" aria-label="Weather detail"></div>
 
+    <!-- Account Locked Modal -->
+    <div id="account-locked-modal" class="account-locked-modal" role="dialog" aria-modal="true" aria-label="Account Locked">
+        <div class="locked-overlay"></div>
+        <div class="locked-card">
+            <div class="locked-icon">&#128163;</div>
+            <h2 class="locked-title">Account Blown</h2>
+            <p class="locked-subtitle">Your equity hit zero. Choose how to get back in the game:</p>
+            <div class="locked-options">
+                <div class="locked-option locked-option-free">
+                    <div class="locked-option-label">FREE BAILOUT</div>
+                    <div class="locked-option-amount">$1,000</div>
+                    <div class="locked-option-detail" id="locked-bailout-timer">Available 1st of next month</div>
+                    <button class="locked-btn locked-btn-free" id="locked-bailout-btn" disabled onclick="claimFreeBailout()">
+                        Wait for Bailout
+                    </button>
+                </div>
+                <div class="locked-option locked-option-paid">
+                    <div class="locked-option-badge">INSTANT</div>
+                    <div class="locked-option-label">FULL RESET</div>
+                    <div class="locked-option-amount">$10,000</div>
+                    <div class="locked-option-detail">&pound;4.99 one-time</div>
+                    <button class="locked-btn locked-btn-paid" onclick="purchaseAccountReset()">
+                        Reset Now &mdash; &pound;4.99
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Combine Challenge Banner (injected into top bar when active) -->
+
     <!-- Trader Profile Modal -->
     <div id="trader-profile-modal" class="trader-profile-modal" role="dialog" aria-modal="true" aria-label="Trader Profile"></div>
 
@@ -1791,6 +1835,10 @@
                     Social
                     <span class="portfolio-wl-count" id="portfolio-wl-count">0</span>
                 </button>
+                <button class="portfolio-tab" data-tab="store" onclick="switchPortfolioModalTab('store')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+                    Store
+                </button>
             </div>
             <div class="portfolio-modal-body">
                 <div id="portfolio-tab-financial" class="portfolio-tab-content" style="display:block;">
@@ -1810,6 +1858,9 @@
                     <div class="portfolio-detail-col">
                         <div id="portfolio-stats-panel"></div>
                     </div>
+                </div>
+                <div id="portfolio-tab-store" class="portfolio-tab-content" style="display:none;">
+                    <div id="store-panel"></div>
                 </div>
             </div>
         </div>
@@ -1919,23 +1970,23 @@
 
     <!-- Scripts -->
     <script src="js/monitoring.js?v=20260218g"></script>
-    <script src="js/config.js?v=20260220a"></script>
+    <script src="js/config.js?v=20260222m"></script>
     <script src="js/utils.js?v=20260218"></script>
-    <script src="js/api.js?v=20260220a"></script>
-    <script src="js/auth.js?v=20260218i"></script>
+    <script src="js/api.js?v=20260222m"></script>
+    <script src="js/auth.js?v=20260222m"></script>
     <script src="js/market.js?v=20260220a"></script>
     <script src="js/charts.js?v=20260220a"></script>
-    <script src="js/trading.js?v=20260220a"></script>
-    <script src="js/portfolio.js?v=20260220a"></script>
+    <script src="js/trading.js?v=20260222m"></script>
+    <script src="js/portfolio.js?v=20260222m"></script>
     <script src="js/ui.js?v=20260219u"></script>
     <script src="js/hub.js?v=20260220a"></script>
     <script src="js/quoteModal.js?v=20260220a"></script>
     <script src="js/multiChart.js?v=20260218"></script>
     <script src="js/weather.js?v=20260219d"></script>
     <script src="js/macro-popout.js?v=20260219t"></script>
-    <script src="js/chat.js?v=20260218"></script>
+    <script src="js/chat.js?v=20260222m"></script>
     <script src="js/pairs.js?v=20260218"></script>
     <script src="js/search.js?v=20260221u"></script>
-    <script src="js/app.js?v=20260219s"></script>
+    <script src="js/app.js?v=20260222m"></script>
 </body>
 </html>

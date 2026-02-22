@@ -143,6 +143,15 @@ function updateTradeButton() {
 
     btn.classList.remove('signin-prompt');
 
+    // ── Account locked / combine enforcement ──────────────────────
+    const acctStatus = state.userProfile?.account_status;
+    if (acctStatus === 'LOCKED') {
+        btn.textContent = 'ACCOUNT LOCKED';
+        btn.disabled = true;
+        btn.classList.add('btn-halted');
+        return;
+    }
+
     if (!select.value) {
         btn.textContent = 'Select a Tea';
         btn.disabled = true;

@@ -12,6 +12,30 @@
  */
 
 // =============================================
+// CHAT TIER / BADGE CACHE
+// =============================================
+
+const _chatTierCache = {};
+const _chatFundedCache = {};
+
+async function _populateChatTierCache(messages) {
+    const emails = [...new Set(messages.map(m => m.sender_email).filter(Boolean))];
+    if (emails.length === 0) return;
+    try {
+        const { data } = await supabaseClient
+            .from('profiles')
+            .select('email, tier, combine_badge')
+            .in('email', emails);
+        if (data) {
+            data.forEach(p => {
+                _chatTierCache[p.email] = p.tier || 'FREE';
+                _chatFundedCache[p.email] = p.combine_badge === true;
+            });
+        }
+    } catch (_) {}
+}
+
+// =============================================
 // VISIBILITY & NOTIFICATIONS
 // =============================================
 
@@ -83,8 +107,13 @@ function scrollToChatSection() {
 // =============================================
 
 async function initChat() {
-    // Guard against double-init (would create duplicate Realtime subscriptions)
     if (state.chatSubscription) return;
+
+    // Seed own tier into chat cache
+    if (state.currentUser?.email && state.userProfile) {
+        _chatTierCache[state.currentUser.email] = state.userProfile.tier || 'FREE';
+        _chatFundedCache[state.currentUser.email] = state.userProfile.combine_badge === true;
+    }
 
     await loadChatMessages();
     setupChatSubscription();
@@ -144,6 +173,7 @@ async function loadChatMessages() {
         }
 
         state.chatMessages = data || [];
+        await _populateChatTierCache(state.chatMessages);
         renderChatMessages();
     } catch (err) {
         console.error('Error loading chat:', err);
@@ -205,8 +235,16 @@ function renderChatMessages() {
         let senderClass = 'chat-sender';
         if (isSystem) senderClass += ' system';
 
+        const senderTier = msg.sender_tier || _chatTierCache[msg.sender_email] || '';
+        const senderFunded = msg.sender_funded || _chatFundedCache[msg.sender_email] || false;
+        if (senderTier === 'PRO') senderClass += ' pro';
+
         const time = formatChatTime(msg.created_at);
         const senderDisplay = isOwn ? 'YOU' : (msg.sender_name || 'ANON').toUpperCase();
+
+        let badgeHtml = '';
+        if (senderTier === 'PRO') badgeHtml += '<span class="badge-pro">PRO</span>';
+        if (senderFunded) badgeHtml += '<span class="badge-funded">FUNDED</span>';
 
         let recipientTag = '';
         if (isPrivate && (msg.recipient_email || msg.recipient_name)) {
@@ -219,7 +257,7 @@ function renderChatMessages() {
         return `
             <div class="${msgClass}">
                 <div class="chat-message-header">
-                    <span class="${senderClass}">${escapeHtml(senderDisplay)}${recipientTag}</span>
+                    <span class="${senderClass}">${escapeHtml(senderDisplay)}${badgeHtml}${recipientTag}</span>
                     <span class="chat-time">${escapeHtml(time)}</span>
                 </div>
                 <div class="chat-text">${lockIcon}${escapeHtml(msg.message)}</div>

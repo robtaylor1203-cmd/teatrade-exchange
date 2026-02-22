@@ -237,6 +237,9 @@ async function loadUserProfile() {
         await loadPositions();
         await loadIndexPositions();
         _syncLocalFollowsToDb();
+
+        if (typeof checkAccountStatus === 'function') checkAccountStatus();
+        if (typeof updateCombineBanner === 'function') updateCombineBanner();
     } catch (error) {
         console.error('Profile load error:', error);
     }

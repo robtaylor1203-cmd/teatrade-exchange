@@ -969,6 +969,12 @@ function updateLeaderboardDisplay(leaders) {
     const listEl = document.getElementById('leaderboard-list');
     let html = '';
 
+    // Cache ranks for PRO gating
+    state._leaderboardRanks = {};
+    leaders.forEach((user, i) => {
+        state._leaderboardRanks[user.username.toLowerCase()] = i + 1;
+    });
+
     leaders.forEach((user, index) => {
         const rank = index + 1;
         let rankClass = '';
@@ -983,10 +989,15 @@ function updateLeaderboardDisplay(leaders) {
         const isFollowed = isTraderFollowed(user.username);
         const followIcon = isFollowed ? '★' : '☆';
 
+        const userTier = user.tier || 'FREE';
+        const hasFundedBadge = user.combine_badge === true;
+        const badgeHtml = (userTier === 'PRO' ? '<span class="badge-pro">PRO</span>' : '')
+                        + (hasFundedBadge ? '<span class="badge-funded">FUNDED</span>' : '');
+
         html += `
             <div class="leaderboard-item leaderboard-item-clickable" onclick="openTraderProfile('${user.username}', ${returnPct}, ${totalValue}, ${rank})">
                 <div class="leaderboard-rank ${rankClass}">${rank}</div>
-                <div class="leaderboard-name">${escapeHtml(user.username)}</div>
+                <div class="leaderboard-name">${escapeHtml(user.username)}${badgeHtml}</div>
                 <div class="leaderboard-return ${returnClass}">${returnSign}${returnPct.toFixed(1)}%</div>
                 <div class="leaderboard-follow-star ${isFollowed ? 'followed' : ''}" title="${isFollowed ? 'Following' : 'Follow'}">${followIcon}</div>
             </div>
@@ -1125,6 +1136,15 @@ async function toggleFollowTrader(username, returnPct, totalValue) {
     let list = getTraderWatchlist();
     const idx = list.findIndex(t => t.username === username);
     const isFollow = idx === -1;
+
+    // PRO gating: free users cannot follow Top 5 leaderboard traders
+    if (isFollow && state._leaderboardRanks) {
+        const rank = state._leaderboardRanks[username.toLowerCase()];
+        if (rank && rank <= 5 && (state.userProfile?.tier || 'FREE') !== 'PRO') {
+            showToast('PRO Required', `Following Top 5 traders requires TeaTrade PRO (£14.99/mo)`, true);
+            return;
+        }
+    }
 
     if (isFollow) {
         list.push({ username, returnPct, totalValue, followedAt: new Date().toISOString() });
@@ -1383,6 +1403,11 @@ async function _showTradeNotification(trade) {
         stack.removeChild(stack.firstChild);
     }
 
+    // Auto-copy: if PRO and this trader is in auto-copy list, execute immediately
+    if ((state.userProfile?.tier === 'PRO') && _isAutoCopyEnabled(trade.user_id)) {
+        _executeAutoCopy(sym, side, trade.quantity, isIndex, trade.price, cardId);
+    }
+
     setTimeout(() => _dismissFollowNotify(cardId), 15000);
 }
 
@@ -1412,6 +1437,56 @@ function _copyFollowTrade(selectVal, side, quantity, cardId) {
 
     _dismissFollowNotify(cardId);
     showToast('Trade Copied', `${side} ${Number(quantity).toLocaleString()} kg ready — review and execute`);
+}
+
+// =============================================
+// AUTO-COPY (PRO feature)
+// =============================================
+
+const AUTOCOPY_KEY = 'tt_autocopy_users';
+
+function _getAutoCopyList() {
+    try { return JSON.parse(localStorage.getItem(AUTOCOPY_KEY) || '[]'); }
+    catch { return []; }
+}
+
+function _isAutoCopyEnabled(userId) {
+    return _getAutoCopyList().includes(userId);
+}
+
+function toggleAutoCopy(userId) {
+    if ((state.userProfile?.tier || 'FREE') !== 'PRO') {
+        showToast('PRO Required', 'Auto-copy requires TeaTrade PRO (£14.99/mo)', true);
+        return;
+    }
+    let list = _getAutoCopyList();
+    const idx = list.indexOf(userId);
+    if (idx === -1) {
+        list.push(userId);
+        showToast('Auto-Copy On', 'Trades from this trader will be mirrored automatically');
+    } else {
+        list.splice(idx, 1);
+        showToast('Auto-Copy Off', 'Auto-copy disabled for this trader');
+    }
+    localStorage.setItem(AUTOCOPY_KEY, JSON.stringify(list));
+}
+
+async function _executeAutoCopy(sym, side, quantity, isIndex, price, cardId) {
+    try {
+        let result;
+        if (isIndex) {
+            result = await apiExecuteIndexTrade(sym, side, quantity, price, 1);
+        } else {
+            result = await apiExecuteTrade(sym, side, quantity, 1);
+        }
+        if (result?.success) {
+            showToast('Auto-Copied', `${side} ${Number(quantity).toLocaleString()} kg of ${sym}`);
+            setActiveBalance(result.new_balance);
+        }
+        _dismissFollowNotify(cardId);
+    } catch (e) {
+        console.warn('Auto-copy failed:', e.message);
+    }
 }
 
 const _tradeNotifyProfileCache = {};
@@ -1617,9 +1692,12 @@ function switchPortfolioModalTab(tab) {
     document.getElementById('portfolio-tab-financial').style.display = tab === 'financial' ? 'block' : 'none';
     document.getElementById('portfolio-tab-history').style.display   = tab === 'history'   ? 'block' : 'none';
     document.getElementById('portfolio-tab-social').style.display    = tab === 'social'    ? 'flex'  : 'none';
+    const storeTab = document.getElementById('portfolio-tab-store');
+    if (storeTab) storeTab.style.display = tab === 'store' ? 'block' : 'none';
     if (tab === 'financial') renderFinancialTab();
     if (tab === 'history') renderHistoryTab();
     if (tab === 'social') renderPortfolioModal();
+    if (tab === 'store') renderStoreTab();
 }
 
 function renderFinancialTab() {
@@ -2307,4 +2385,95 @@ function _timeAgo(date) {
     const h = Math.floor(m / 60);
     if (h < 24) return `${h}h ago`;
     return `${Math.floor(h / 24)}d ago`;
+}
+
+// =============================================
+// STORE TAB (Monetization)
+// =============================================
+
+function renderStoreTab() {
+    const panel = document.getElementById('store-panel');
+    if (!panel) return;
+
+    const tier = state.userProfile?.tier || 'FREE';
+    const isPro = tier === 'PRO';
+    const hasBadge = state.userProfile?.combine_badge === true;
+    const inCombine = state.userProfile?.account_status === 'COMBINE';
+
+    panel.innerHTML = `
+        <div class="combine-entry-card">
+            <div class="combine-entry-title">${hasBadge ? 'Funded Trader' : 'TeaTrade Combine'}</div>
+            <div class="combine-entry-desc">
+                ${hasBadge
+                    ? 'You passed the Combine and earned the Funded Trader badge. Enter again to prove your skills.'
+                    : 'Prove you are an elite trader. Get a $50,000 challenge account. Make 8% profit in 30 days without a 5% daily drawdown to earn the Funded Trader badge.'}
+            </div>
+            <button class="combine-entry-btn" onclick="purchaseCombineEntry()" ${inCombine ? 'disabled' : ''}>
+                ${inCombine ? 'Challenge In Progress' : 'Enter Combine &mdash; &pound;49.00'}
+            </button>
+        </div>
+
+        <div class="pro-upgrade-card">
+            <div class="pro-upgrade-title">${isPro ? 'TeaTrade PRO (Active)' : 'TeaTrade PRO'}</div>
+            <div class="pro-upgrade-desc">
+                ${isPro
+                    ? 'You have PRO access. Copy the Top 5 traders, auto-copy mode, premium indicators, and gold chat badge.'
+                    : 'Follow and auto-copy the Top 5 leaderboard traders. Premium chart indicators and a gold username in chat.'}
+            </div>
+            <button class="pro-upgrade-btn" onclick="purchaseProSubscription()" ${isPro ? 'disabled' : ''}>
+                ${isPro ? 'Already PRO' : 'Upgrade to PRO &mdash; &pound;14.99/mo'}
+            </button>
+        </div>
+    `;
+}
+
+// =============================================
+// COMBINE BANNER UPDATE
+// =============================================
+
+async function updateCombineBanner() {
+    const banner = document.getElementById('combine-banner');
+    if (!banner) return;
+
+    if (state.userProfile?.account_status !== 'COMBINE') {
+        banner.classList.remove('active');
+        return;
+    }
+
+    try {
+        const { data } = await apiFetchCombineRules();
+        if (!data?.active) {
+            banner.classList.remove('active');
+            if (data?.result === 'PASSED') {
+                showToast('COMBINE PASSED!', 'Congratulations! You earned the Funded Trader badge!');
+                state.userProfile.combine_badge = true;
+                state.userProfile.account_status = 'ACTIVE';
+            } else if (data?.result === 'FAILED') {
+                showToast('Combine Failed', 'Your challenge ended due to ' + (data.reason === 'daily_drawdown' ? 'daily drawdown breach' : 'expiry') + '. Account reset to $10,000.', true);
+                state.userProfile.account_status = 'ACTIVE';
+                setActiveBalance(10000);
+            } else if (data?.result === 'EXPIRED') {
+                showToast('Combine Expired', 'Your 30-day challenge period ended. Account reset to $10,000.', true);
+                state.userProfile.account_status = 'ACTIVE';
+                setActiveBalance(10000);
+            }
+            return;
+        }
+
+        const fmt = (v) => '$' + Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 });
+
+        const eqEl = document.getElementById('combine-equity');
+        const tgEl = document.getElementById('combine-target');
+        const ddEl = document.getElementById('combine-dd-floor');
+        const dayEl = document.getElementById('combine-days');
+
+        if (eqEl) eqEl.textContent = fmt(data.equity);
+        if (tgEl) tgEl.textContent = fmt(data.target);
+        if (ddEl) ddEl.textContent = fmt(data.dd_floor);
+        if (dayEl) dayEl.textContent = Math.max(0, Math.floor(data.days_remaining));
+
+        banner.classList.add('active');
+    } catch (_) {
+        banner.classList.remove('active');
+    }
 }

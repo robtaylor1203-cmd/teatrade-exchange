@@ -822,35 +822,58 @@ $$;
 
 
 -- 14. ACCOUNT RESET FUNCTION (SECURITY DEFINER)
--- Replaces client-side apiUpdateBalance + apiDeleteAll* calls.
+-- Supports paid reset, free bailout, and combine start via p_source parameter.
 CREATE OR REPLACE FUNCTION reset_account(
-    p_user_id       UUID,
-    p_default_balance NUMERIC DEFAULT 10000
+    p_user_id         UUID,
+    p_default_balance NUMERIC DEFAULT 10000,
+    p_mode            TEXT DEFAULT 'VIRTUAL',
+    p_source          TEXT DEFAULT 'PAID_RESET'
 )
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+    v_new_balance NUMERIC;
+    v_new_status  TEXT;
 BEGIN
-    -- Verify user owns this profile
     IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_user_id) THEN
         RETURN jsonb_build_object('success', false, 'error', 'Profile not found');
     END IF;
 
-    -- Delete all positions
-    DELETE FROM positions WHERE user_id = p_user_id;
-    DELETE FROM index_positions WHERE user_id = p_user_id;
+    CASE p_source
+        WHEN 'FREE_BAILOUT' THEN
+            v_new_balance := 1000;
+            v_new_status  := 'ACTIVE';
+        WHEN 'PAID_RESET' THEN
+            v_new_balance := COALESCE(p_default_balance, 10000);
+            v_new_status  := 'ACTIVE';
+        WHEN 'COMBINE_START' THEN
+            v_new_balance := 50000;
+            v_new_status  := 'COMBINE';
+        ELSE
+            v_new_balance := COALESCE(p_default_balance, 10000);
+            v_new_status  := 'ACTIVE';
+    END CASE;
 
-    -- Delete all trades
-    DELETE FROM trades WHERE user_id = p_user_id;
+    DELETE FROM positions WHERE user_id = p_user_id AND trading_mode = p_mode;
+    DELETE FROM index_positions WHERE user_id = p_user_id AND trading_mode = p_mode;
+    DELETE FROM trades WHERE user_id = p_user_id AND trading_mode = p_mode;
 
-    -- Reset balance
-    UPDATE profiles SET cash_balance = p_default_balance WHERE id = p_user_id;
+    IF p_mode = 'REAL' THEN
+        UPDATE profiles
+        SET real_balance = v_new_balance, account_status = v_new_status, next_free_reset_at = NULL
+        WHERE id = p_user_id;
+    ELSE
+        UPDATE profiles
+        SET virtual_balance = v_new_balance, account_status = v_new_status, next_free_reset_at = NULL
+        WHERE id = p_user_id;
+    END IF;
 
     RETURN jsonb_build_object(
-        'success', true,
-        'new_balance', p_default_balance
+        'success', true, 'new_balance', v_new_balance,
+        'mode', p_mode, 'source', p_source, 'status', v_new_status
     );
 END;
 $$;
@@ -2097,6 +2120,14 @@ BEGIN
                 UPDATE profiles SET real_balance = v_bal WHERE id = v_user.user_id;
             ELSE
                 UPDATE profiles SET virtual_balance = v_bal WHERE id = v_user.user_id;
+            END IF;
+
+            -- Lock account if balance is effectively zero
+            IF v_bal < 1 THEN
+                UPDATE profiles
+                SET account_status = 'LOCKED',
+                    next_free_reset_at = date_trunc('month', NOW() + INTERVAL '1 month')
+                WHERE id = v_user.user_id AND account_status != 'COMBINE';
             END IF;
 
             INSERT INTO margin_notifications (user_id, type, trading_mode, equity, used_margin, margin_level, message)

@@ -861,6 +861,40 @@ async function apiResetAccount() {
 }
 
 // =============================================
+// MONETIZATION / STRIPE
+// =============================================
+
+async function apiCreateCheckout(product) {
+    return _invokeEdgeFunction('stripe-checkout', { product });
+}
+
+async function apiClaimFreeBailout() {
+    return supabaseClient.rpc('reset_account', {
+        p_user_id: state.currentUser?.id,
+        p_default_balance: 1000,
+        p_mode: state.tradingMode || 'VIRTUAL',
+        p_source: 'FREE_BAILOUT',
+    });
+}
+
+async function apiFetchActiveCombine() {
+    return supabaseClient
+        .from('combine_challenges')
+        .select('*')
+        .eq('user_id', state.currentUser?.id)
+        .eq('status', 'ACTIVE')
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+}
+
+async function apiFetchCombineRules() {
+    return supabaseClient.rpc('check_combine_rules', {
+        p_user_id: state.currentUser?.id,
+    });
+}
+
+// =============================================
 // LIMIT / STOP ORDERS (Phase 4-16)
 // =============================================
 

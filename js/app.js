@@ -145,6 +145,9 @@ async function loadOrigins() {
 // =============================================
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Handle Stripe checkout return before anything else
+    if (typeof handleCheckoutReturn === 'function') handleCheckoutReturn();
+
     // Auth first
     await checkAuthState();
 
@@ -242,6 +245,7 @@ setInterval(async () => {
     if (state.currentUser) {
         await loadPositions();
         updatePortfolioDisplay();
+        if (typeof updateCombineBanner === 'function') updateCombineBanner();
     }
     await loadLeaderboard();
     loadTopTraders();

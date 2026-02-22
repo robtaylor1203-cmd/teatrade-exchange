@@ -372,3 +372,125 @@ function updateBalanceDisplay() {
     const tradeBal = document.getElementById('trade-balance');
     if (tradeBal) tradeBal.textContent = formatted;
 }
+
+// Stripe publishable key (safe for client-side)
+const STRIPE_PUBLIC_KEY = 'pk_live_51T3irl4HRHSKpIgeZU3YMgZZW7RhueKvuQe1i49QVnDI2LXIlAbvg4brtursEJ0MkFxQOgyL4qqg1jVcISrmEZmq00g13ycKfH';
+
+// =============================================
+// ACCOUNT LOCKED / MONETIZATION HELPERS
+// =============================================
+
+function checkAccountStatus() {
+    if (!state.userProfile) return;
+    const status = state.userProfile.account_status;
+    if (status === 'LOCKED') {
+        showAccountLockedModal();
+    }
+}
+
+function showAccountLockedModal() {
+    const modal = document.getElementById('account-locked-modal');
+    if (!modal) return;
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+
+    const resetAt = state.userProfile?.next_free_reset_at;
+    const timerEl = document.getElementById('locked-bailout-timer');
+    const btnEl   = document.getElementById('locked-bailout-btn');
+
+    if (resetAt && new Date(resetAt) <= new Date()) {
+        if (timerEl) timerEl.textContent = 'Available now!';
+        if (btnEl) { btnEl.disabled = false; btnEl.textContent = 'Claim $1,000 Bailout'; }
+    } else if (resetAt) {
+        const d = new Date(resetAt);
+        const label = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+        if (timerEl) timerEl.textContent = `Available ${label}`;
+        if (btnEl) { btnEl.disabled = true; btnEl.textContent = `Wait until ${label}`; }
+    }
+}
+
+function closeAccountLockedModal() {
+    const modal = document.getElementById('account-locked-modal');
+    if (modal) { modal.classList.remove('active'); document.body.style.overflow = ''; }
+}
+
+async function purchaseAccountReset() {
+    try {
+        const result = await apiCreateCheckout('ACCOUNT_RESET');
+        if (result?.url) {
+            window.location.href = result.url;
+        } else if (result?.error) {
+            showToast('Checkout Error', result.error, true);
+        }
+    } catch (e) {
+        showToast('Error', 'Could not start checkout', true);
+    }
+}
+
+async function claimFreeBailout() {
+    const resetAt = state.userProfile?.next_free_reset_at;
+    if (resetAt && new Date(resetAt) > new Date()) {
+        showToast('Not yet', 'Free bailout is not available yet', true);
+        return;
+    }
+    try {
+        const { data, error } = await apiClaimFreeBailout();
+        if (error) { showToast('Error', error.message, true); return; }
+        if (data?.success) {
+            setActiveBalance(data.new_balance);
+            state.userProfile.account_status = 'ACTIVE';
+            closeAccountLockedModal();
+            showToast('Bailout Claimed', 'You received $1,000. Trade wisely this time!');
+        }
+    } catch (e) {
+        showToast('Error', 'Bailout failed', true);
+    }
+}
+
+async function purchaseCombineEntry() {
+    try {
+        const result = await apiCreateCheckout('COMBINE_ENTRY');
+        if (result?.url) {
+            window.location.href = result.url;
+        } else if (result?.error) {
+            showToast('Checkout Error', result.error, true);
+        }
+    } catch (e) {
+        showToast('Error', 'Could not start checkout', true);
+    }
+}
+
+async function purchaseProSubscription() {
+    try {
+        const result = await apiCreateCheckout('PRO_SUBSCRIPTION');
+        if (result?.url) {
+            window.location.href = result.url;
+        } else if (result?.error) {
+            showToast('Checkout Error', result.error, true);
+        }
+    } catch (e) {
+        showToast('Error', 'Could not start checkout', true);
+    }
+}
+
+function handleCheckoutReturn() {
+    const params = new URLSearchParams(window.location.search);
+    const checkout = params.get('checkout');
+    const product = params.get('product');
+    if (!checkout) return;
+
+    window.history.replaceState({}, '', window.location.pathname);
+
+    if (checkout === 'success') {
+        const msgs = {
+            ACCOUNT_RESET: ['Account Reset!', 'Your balance has been restored to $10,000'],
+            COMBINE_ENTRY: ['Combine Started!', 'Your $50,000 challenge account is live. Good luck!'],
+            PRO_SUBSCRIPTION: ['Welcome to PRO!', 'You now have access to all premium features'],
+        };
+        const [title, msg] = msgs[product] || ['Payment Complete', 'Thank you!'];
+        showToast(title, msg);
+        setTimeout(() => location.reload(), 1500);
+    } else if (checkout === 'cancelled') {
+        showToast('Cancelled', 'Checkout was cancelled', true);
+    }
+}
