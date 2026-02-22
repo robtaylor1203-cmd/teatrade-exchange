@@ -2401,26 +2401,28 @@ function renderStoreTab() {
     const inCombine = state.userProfile?.account_status === 'COMBINE';
 
     panel.innerHTML = `
-        <div class="combine-entry-card">
-            <div class="combine-entry-title">${hasBadge ? 'Funded Trader' : 'TeaTrade Combine'}</div>
-            <div class="combine-entry-desc">
+        <div class="combine-entry-card store-card">
+            <span class="store-card-icon">${hasBadge ? '&#127942;' : '&#9876;&#65039;'}</span>
+            <div class="store-card-title">${hasBadge ? 'Funded Trader' : 'TeaTrade Combine'}</div>
+            <div class="store-card-desc">
                 ${hasBadge
                     ? 'You passed the Combine and earned the Funded Trader badge. Enter again to prove your skills.'
                     : 'Prove you are an elite trader. Get a $50,000 challenge account. Make 8% profit in 30 days without a 5% daily drawdown to earn the Funded Trader badge.'}
             </div>
-            <button class="combine-entry-btn" onclick="purchaseCombineEntry()" ${inCombine ? 'disabled' : ''}>
+            <button class="store-card-btn" onclick="purchaseCombineEntry()" ${inCombine ? 'disabled' : ''}>
                 ${inCombine ? 'Challenge In Progress' : 'Enter Combine &mdash; &pound;49.00'}
             </button>
         </div>
 
-        <div class="pro-upgrade-card">
-            <div class="pro-upgrade-title">${isPro ? 'TeaTrade PRO (Active)' : 'TeaTrade PRO'}</div>
-            <div class="pro-upgrade-desc">
+        <div class="pro-upgrade-card store-card">
+            <span class="store-card-icon">&#11088;</span>
+            <div class="store-card-title">${isPro ? 'TeaTrade PRO (Active)' : 'TeaTrade PRO'}</div>
+            <div class="store-card-desc">
                 ${isPro
                     ? 'You have PRO access. Copy the Top 5 traders, auto-copy mode, premium indicators, and gold chat badge.'
                     : 'Follow and auto-copy the Top 5 leaderboard traders. Premium chart indicators and a gold username in chat.'}
             </div>
-            <button class="pro-upgrade-btn" onclick="purchaseProSubscription()" ${isPro ? 'disabled' : ''}>
+            <button class="store-card-btn" onclick="purchaseProSubscription()" ${isPro ? 'disabled' : ''}>
                 ${isPro ? 'Already PRO' : 'Upgrade to PRO &mdash; &pound;14.99/mo'}
             </button>
         </div>

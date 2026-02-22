@@ -9284,35 +9284,146 @@ tr.row-halted {
 }
 .chat-sender.pro { color: #eab308; }
 
-/* PRO upgrade prompt in portfolio */
-.pro-upgrade-card {
-    background: linear-gradient(135deg, rgba(234,179,8,0.1), rgba(245,158,11,0.05));
-    border: 1px solid rgba(234,179,8,0.3); border-radius: 10px;
-    padding: 16px; text-align: center; margin: 12px 0;
+/* Store tab layout */
+#store-panel {
+    padding: 20px 16px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
-.pro-upgrade-title { font-size: 14px; font-weight: 700; color: #eab308; margin-bottom: 4px; }
-.pro-upgrade-desc { font-size: 11px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5; }
-.pro-upgrade-btn {
-    background: linear-gradient(135deg, #eab308, #f59e0b); color: #000;
-    border: none; padding: 10px 24px; border-radius: 8px;
-    font-size: 13px; font-weight: 700; cursor: pointer; transition: opacity 0.2s;
-}
-.pro-upgrade-btn:hover { opacity: 0.85; }
 
-/* Combine entry card */
+/* Shared store card base */
+.store-card {
+    border-radius: 14px;
+    padding: 28px 24px 24px;
+    text-align: center;
+    border: none;
+    position: relative;
+    overflow: hidden;
+}
+.store-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 14px;
+    padding: 1px;
+    pointer-events: none;
+}
+.store-card-icon {
+    font-size: 28px;
+    margin-bottom: 10px;
+    display: block;
+}
+.store-card-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    letter-spacing: 0.01em;
+}
+.store-card-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 18px;
+    line-height: 1.6;
+    max-width: 380px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.store-card-btn {
+    border: none;
+    padding: 12px 32px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    letter-spacing: 0.02em;
+}
+.store-card-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+.store-card-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+.store-card-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Combine card */
 .combine-entry-card {
-    background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(99,102,241,0.05));
-    border: 1px solid rgba(99,102,241,0.3); border-radius: 10px;
-    padding: 16px; text-align: center; margin: 12px 0;
+    background: linear-gradient(160deg, rgba(99,102,241,0.12) 0%, rgba(55,48,107,0.18) 100%);
+    box-shadow: 0 2px 16px rgba(99,102,241,0.08), inset 0 1px 0 rgba(255,255,255,0.04);
 }
-.combine-entry-title { font-size: 14px; font-weight: 700; color: #818cf8; margin-bottom: 4px; }
-.combine-entry-desc { font-size: 11px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5; }
-.combine-entry-btn {
-    background: linear-gradient(135deg, #6366f1, #818cf8); color: #fff;
-    border: none; padding: 10px 24px; border-radius: 8px;
-    font-size: 13px; font-weight: 700; cursor: pointer; transition: opacity 0.2s;
+.combine-entry-card .store-card-title { color: #a5b4fc; }
+.combine-entry-card .store-card-btn {
+    background: linear-gradient(135deg, #6366f1, #818cf8);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(99,102,241,0.35);
 }
-.combine-entry-btn:hover { opacity: 0.85; }
+.combine-entry-card .store-card-btn:hover:not(:disabled) {
+    box-shadow: 0 6px 20px rgba(99,102,241,0.45);
+}
+
+/* PRO card */
+.pro-upgrade-card {
+    background: linear-gradient(160deg, rgba(234,179,8,0.10) 0%, rgba(120,80,0,0.14) 100%);
+    box-shadow: 0 2px 16px rgba(234,179,8,0.06), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.pro-upgrade-card .store-card-title { color: #fbbf24; }
+.pro-upgrade-card .store-card-btn {
+    background: linear-gradient(135deg, #eab308, #f59e0b);
+    color: #000;
+    box-shadow: 0 4px 14px rgba(234,179,8,0.3);
+}
+.pro-upgrade-card .store-card-btn:hover:not(:disabled) {
+    box-shadow: 0 6px 20px rgba(234,179,8,0.4);
+}
+
+/* Checkout redirect overlay */
+.checkout-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: checkoutFadeIn 0.15s ease-out;
+}
+@keyframes checkoutFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+.checkout-overlay-content {
+    text-align: center;
+    padding: 40px;
+}
+.checkout-spinner {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 20px;
+    border: 3px solid rgba(255, 255, 255, 0.15);
+    border-top-color: #818cf8;
+    border-radius: 50%;
+    animation: checkoutSpin 0.7s linear infinite;
+}
+@keyframes checkoutSpin {
+    to { transform: rotate(360deg); }
+}
+.checkout-overlay-text {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    margin: 0 0 6px;
+    letter-spacing: 0.01em;
+}
+.checkout-overlay-sub {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+    margin: 0;
+}
 
 @media (max-width: 480px) {
     .locked-options { grid-template-columns: 1fr; }

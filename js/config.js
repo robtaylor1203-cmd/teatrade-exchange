@@ -414,15 +414,27 @@ function closeAccountLockedModal() {
     if (modal) { modal.classList.remove('active'); document.body.style.overflow = ''; }
 }
 
+function _showCheckoutOverlay() {
+    const el = document.getElementById('checkout-overlay');
+    if (el) el.style.display = '';
+}
+function _hideCheckoutOverlay() {
+    const el = document.getElementById('checkout-overlay');
+    if (el) el.style.display = 'none';
+}
+
 async function purchaseAccountReset() {
+    _showCheckoutOverlay();
     try {
         const result = await apiCreateCheckout('ACCOUNT_RESET');
         if (result?.url) {
             window.location.href = result.url;
-        } else if (result?.error) {
-            showToast('Checkout Error', result.error, true);
+            return;
         }
+        _hideCheckoutOverlay();
+        if (result?.error) showToast('Checkout Error', result.error, true);
     } catch (e) {
+        _hideCheckoutOverlay();
         showToast('Error', 'Could not start checkout', true);
     }
 }
@@ -448,27 +460,33 @@ async function claimFreeBailout() {
 }
 
 async function purchaseCombineEntry() {
+    _showCheckoutOverlay();
     try {
         const result = await apiCreateCheckout('COMBINE_ENTRY');
         if (result?.url) {
             window.location.href = result.url;
-        } else if (result?.error) {
-            showToast('Checkout Error', result.error, true);
+            return;
         }
+        _hideCheckoutOverlay();
+        if (result?.error) showToast('Checkout Error', result.error, true);
     } catch (e) {
+        _hideCheckoutOverlay();
         showToast('Error', 'Could not start checkout', true);
     }
 }
 
 async function purchaseProSubscription() {
+    _showCheckoutOverlay();
     try {
         const result = await apiCreateCheckout('PRO_SUBSCRIPTION');
         if (result?.url) {
             window.location.href = result.url;
-        } else if (result?.error) {
-            showToast('Checkout Error', result.error, true);
+            return;
         }
+        _hideCheckoutOverlay();
+        if (result?.error) showToast('Checkout Error', result.error, true);
     } catch (e) {
+        _hideCheckoutOverlay();
         showToast('Error', 'Could not start checkout', true);
     }
 }
