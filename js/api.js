@@ -318,11 +318,20 @@ async function apiInsertChatMessage(data) {
  * @returns {Promise<{data: object|null, error: object|null}>}
  */
 async function apiLookupUserByUsername(username) {
-    return supabaseClient
+    const result = await supabaseClient
         .from('profiles')
-        .select('id, username, email, cash_balance, virtual_balance, real_balance, follower_count, following_count, created_at')
+        .select('id, username, email, cash_balance, virtual_balance, real_balance, follower_count, following_count, created_at, badges, tier, combine_badge, showcase_badge')
         .ilike('username', username)
         .single();
+
+    if (result.error && !result.data) {
+        return supabaseClient
+            .from('profiles')
+            .select('id, username, email, cash_balance, virtual_balance, real_balance, follower_count, following_count, created_at, tier, combine_badge')
+            .ilike('username', username)
+            .single();
+    }
+    return result;
 }
 
 /**

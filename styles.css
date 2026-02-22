@@ -9379,6 +9379,286 @@ tr.row-halted {
     box-shadow: 0 6px 20px rgba(234,179,8,0.4);
 }
 
+/* Badges cabinet */
+.badges-cabinet {
+    padding: 20px 16px 24px;
+}
+.badges-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.badges-header-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+}
+.badges-header-count {
+    font-size: 12px;
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.05);
+    padding: 4px 10px;
+    border-radius: 12px;
+}
+.badges-category {
+    margin-bottom: 20px;
+}
+.badges-category-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 10px;
+}
+.badges-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+}
+.badge-card {
+    border-radius: 12px;
+    padding: 16px 10px 14px;
+    text-align: center;
+    transition: transform 0.15s, box-shadow 0.15s;
+    position: relative;
+    cursor: default;
+}
+.badge-card.unlocked {
+    box-shadow: 0 1px 10px var(--badge-glow, rgba(99,102,241,0.12));
+}
+.badge-card.locked {
+    background: rgba(255,255,255,0.02);
+    opacity: 0.35;
+    filter: grayscale(1);
+}
+.badge-card.unlocked:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px var(--badge-glow, rgba(99,102,241,0.25));
+}
+.badge-card-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 8px;
+}
+.badge-card-icon svg {
+    width: 18px;
+    height: 18px;
+}
+.badge-card-name {
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 3px;
+}
+.badge-card-desc {
+    font-size: 9px;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+.badge-card.unlocked .badge-card-name {
+    color: var(--badge-color, #a5b4fc);
+}
+.badge-card.unlocked {
+    cursor: pointer;
+}
+.badge-card.showcase {
+    outline: 2px solid var(--badge-color, #a5b4fc);
+    outline-offset: -2px;
+}
+.badge-showcase-tag {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    font-size: 7px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: var(--badge-color, #a5b4fc);
+    background: rgba(0,0,0,0.3);
+    padding: 2px 5px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+.badges-showcase-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 16px;
+    font-size: 12px;
+}
+.showcase-label {
+    font-weight: 600;
+    color: var(--text-muted);
+}
+.showcase-current {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: #fff;
+    font-weight: 600;
+}
+.showcase-hint {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+.badges-empty {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+/* Inline badge icon (chat, leaderboard) */
+.badge-icon-inline {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    margin-left: 2px;
+    position: relative;
+    cursor: default;
+}
+.badge-icon-inline svg {
+    width: 10px;
+    height: 10px;
+}
+.badge-icon-inline .badge-tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-primary, #1a1a2e);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 6px 10px;
+    white-space: nowrap;
+    font-size: 10px;
+    color: #fff;
+    z-index: 1000;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.badge-icon-inline .badge-tooltip-desc {
+    display: block;
+    color: var(--text-muted);
+    font-size: 9px;
+    margin-top: 2px;
+}
+.badge-icon-inline:hover .badge-tooltip {
+    display: block;
+}
+
+/* Trader profile badges section */
+.trader-profile-badges-section {
+    padding: 14px 0 8px;
+}
+.trader-profile-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+    margin-bottom: 16px;
+}
+.trader-badge-pill {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+.profile-badge-circle {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: default;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+.profile-badge-circle svg {
+    width: 24px;
+    height: 24px;
+}
+.profile-badge-circle:hover {
+    transform: scale(1.12);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+.profile-badge-circle .badge-tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-primary, #1a1a2e);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 6px 10px;
+    white-space: nowrap;
+    font-size: 10px;
+    color: #fff;
+    z-index: 1000;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.profile-badge-circle .badge-tooltip .badge-tooltip-desc {
+    display: block;
+    color: var(--text-muted);
+    font-size: 9px;
+    margin-top: 2px;
+}
+.profile-badge-circle:hover .badge-tooltip {
+    display: block;
+}
+
+/* Badge avatar (showcase) */
+.trader-profile-avatar.badge-avatar {
+    background: none;
+    position: relative;
+}
+.trader-profile-avatar.badge-avatar .avatar-badge-bg {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.trader-profile-avatar.badge-avatar svg {
+    width: 24px;
+    height: 24px;
+}
+
+/* Leaderboard badge icons */
+.leaderboard-badges {
+    display: inline-flex;
+    gap: 2px;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
+/* Chat badge icons */
+.chat-badge-icons {
+    display: inline-flex;
+    gap: 1px;
+    margin-left: 3px;
+    vertical-align: middle;
+}
+
 /* Checkout redirect overlay */
 .checkout-overlay {
     position: fixed;

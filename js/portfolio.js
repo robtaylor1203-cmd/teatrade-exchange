@@ -991,8 +991,21 @@ function updateLeaderboardDisplay(leaders) {
 
         const userTier = user.tier || 'FREE';
         const hasFundedBadge = user.combine_badge === true;
-        const badgeHtml = (userTier === 'PRO' ? '<span class="badge-pro">PRO</span>' : '')
-                        + (hasFundedBadge ? '<span class="badge-funded">FUNDED</span>' : '');
+        let badgeHtml = (userTier === 'PRO' ? '<span class="badge-pro">PRO</span>' : '')
+                      + (hasFundedBadge ? '<span class="badge-funded">FUNDED</span>' : '');
+
+        let userBadges = user.badges;
+        if (typeof userBadges === 'string') { try { userBadges = JSON.parse(userBadges); } catch { userBadges = []; } }
+        if (Array.isArray(userBadges) && userBadges.length > 0 && typeof BADGE_DEFINITIONS !== 'undefined' && typeof BADGE_PRIORITY !== 'undefined') {
+            const topIcons = BADGE_PRIORITY.filter(id => userBadges.includes(id)).slice(0, 3);
+            if (topIcons.length > 0) {
+                badgeHtml += '<span class="leaderboard-badges">' + topIcons.map(id => {
+                    const d = BADGE_DEFINITIONS[id];
+                    if (!d) return '';
+                    return `<span class="badge-icon-inline" style="background:${d.bg};color:${d.color}"><span class="badge-tooltip">${d.name}<span class="badge-tooltip-desc">${d.desc}</span></span>${d.svg}</span>`;
+                }).join('') + '</span>';
+            }
+        }
 
         html += `
             <div class="leaderboard-item leaderboard-item-clickable" onclick="openTraderProfile('${user.username}', ${returnPct}, ${totalValue}, ${rank})">
@@ -1544,12 +1557,22 @@ async function openTraderProfile(username, returnPct, totalValue, rank) {
         const tradeCount = profileMeta?._tradeCount;
         const mainAsset = profileMeta?._mainAsset;
 
+        let avatarHtml = `<div class="trader-profile-avatar">${initials}</div>`;
+        const _badges = profileMeta?._badges;
+        if (Array.isArray(_badges) && _badges.length > 0 && typeof BADGE_DEFINITIONS !== 'undefined') {
+            const showcase = profileMeta?._showcase || BADGE_PRIORITY.find(id => _badges.includes(id)) || _badges[0];
+            const def = BADGE_DEFINITIONS[showcase];
+            if (def) {
+                avatarHtml = `<div class="trader-profile-avatar badge-avatar"><div class="avatar-badge-bg" style="background:${def.bg};color:${def.color}">${def.svg}</div></div>`;
+            }
+        }
+
         return `
             <div class="trader-profile-overlay" onclick="closeTraderProfile()"></div>
             <div class="trader-profile-card">
                 <button class="trader-profile-close" onclick="closeTraderProfile()">✕</button>
                 <div class="trader-profile-header">
-                    <div class="trader-profile-avatar">${initials}</div>
+                    ${avatarHtml}
                     <div class="trader-profile-info">
                         <div class="trader-profile-name">${escapeHtml(profileMeta?.display_name || username)}</div>
                         <div class="trader-profile-rank">${subtitle}</div>
@@ -1581,6 +1604,12 @@ async function openTraderProfile(username, returnPct, totalValue, rank) {
                         <div class="trader-stat-label">Most Traded</div>
                         <div class="trader-stat-value">${escapeHtml(mainAsset)}</div>
                     </div>` : ''}
+                </div>
+                <div class="trader-profile-badges-section">
+                    <div class="trader-activity-label">Badges</div>
+                    <div id="trader-profile-badges-row" class="trader-profile-badges">
+                        <span class="trader-badge-pill" style="color:var(--text-muted);">Loading...</span>
+                    </div>
                 </div>
                 <div class="trader-profile-activity">
                     <div class="trader-activity-label">Recent Activity</div>
@@ -1618,17 +1647,39 @@ async function openTraderProfile(username, returnPct, totalValue, rank) {
         rank = liveProfile.rank ?? rank;
     }
 
+    let _profileBadges = profileData?.data?.badges;
+    if (typeof _profileBadges === 'string') { try { _profileBadges = JSON.parse(_profileBadges); } catch { _profileBadges = []; } }
+    if (!Array.isArray(_profileBadges)) _profileBadges = [];
+
     const meta = {
         display_name: profileData?.data?.username || username,
         created_at: profileData?.data?.created_at || null,
         _tradeCount: tradeSummary?.count ?? null,
         _mainAsset: tradeSummary?.topAsset ?? null,
+        _badges: _profileBadges,
+        _showcase: profileData?.data?.showcase_badge || null,
     };
 
     modal.innerHTML = _buildCard(returnPct, totalValue, rank, meta);
     _loadTraderProfileTrades(username);
 
     if (profileData?.data?.id) _refreshFollowCounts(profileData.data.id);
+
+    const traderBadges = profileData?.data?.badges;
+    const badgesArr = Array.isArray(traderBadges) ? traderBadges
+        : (typeof traderBadges === 'string' ? (function() { try { return JSON.parse(traderBadges); } catch { return []; } })() : []);
+    const badgesRow = document.getElementById('trader-profile-badges-row');
+    if (badgesRow) {
+        if (badgesArr.length === 0) {
+            badgesRow.innerHTML = '<span class="trader-badge-pill">No badges yet</span>';
+        } else {
+            badgesRow.innerHTML = badgesArr.map(id => {
+                const def = BADGE_DEFINITIONS[id];
+                if (!def) return '';
+                return `<span class="profile-badge-circle" style="background:${def.bg};color:${def.color}"><span class="badge-tooltip">${def.name}<span class="badge-tooltip-desc">${def.desc}</span></span>${def.svg}</span>`;
+            }).join('');
+        }
+    }
 }
 
 function closeTraderProfile() {
@@ -1692,11 +1743,14 @@ function switchPortfolioModalTab(tab) {
     document.getElementById('portfolio-tab-financial').style.display = tab === 'financial' ? 'block' : 'none';
     document.getElementById('portfolio-tab-history').style.display   = tab === 'history'   ? 'block' : 'none';
     document.getElementById('portfolio-tab-social').style.display    = tab === 'social'    ? 'flex'  : 'none';
+    const badgesTab = document.getElementById('portfolio-tab-badges');
+    if (badgesTab) badgesTab.style.display = tab === 'badges' ? 'block' : 'none';
     const storeTab = document.getElementById('portfolio-tab-store');
     if (storeTab) storeTab.style.display = tab === 'store' ? 'block' : 'none';
     if (tab === 'financial') renderFinancialTab();
     if (tab === 'history') renderHistoryTab();
     if (tab === 'social') renderPortfolioModal();
+    if (tab === 'badges') renderBadgesTab();
     if (tab === 'store') renderStoreTab();
 }
 
@@ -2385,6 +2439,112 @@ function _timeAgo(date) {
     const h = Math.floor(m / 60);
     if (h < 24) return `${h}h ago`;
     return `${Math.floor(h / 24)}d ago`;
+}
+
+// =============================================
+// BADGES TAB (Trophy Cabinet)
+// =============================================
+
+function _getUserBadges() {
+    const raw = state.userProfile?.badges;
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string') { try { return JSON.parse(raw); } catch { return []; } }
+    return [];
+}
+
+function _getTopBadges(badgesArr, limit = 2) {
+    if (!badgesArr || !badgesArr.length) return [];
+    return BADGE_PRIORITY.filter(id => badgesArr.includes(id)).slice(0, limit);
+}
+
+function renderBadgesTab() {
+    const panel = document.getElementById('badges-panel');
+    if (!panel) return;
+
+    const earned = _getUserBadges();
+    const earnedCount = Object.keys(BADGE_DEFINITIONS).filter(id => earned.includes(id)).length;
+    const totalCount = Object.keys(BADGE_DEFINITIONS).length;
+    const currentShowcase = state.userProfile?.showcase_badge || null;
+
+    const categories = {};
+    for (const [id, def] of Object.entries(BADGE_DEFINITIONS)) {
+        if (!categories[def.cat]) categories[def.cat] = [];
+        categories[def.cat].push({ id, ...def, unlocked: earned.includes(id) });
+    }
+
+    let html = `<div class="badges-cabinet">
+        <div class="badges-header">
+            <div class="badges-header-title">Trophy Cabinet</div>
+            <div class="badges-header-count">${earnedCount} / ${totalCount} unlocked</div>
+        </div>`;
+
+    if (earnedCount > 0) {
+        const showcaseDef = currentShowcase && BADGE_DEFINITIONS[currentShowcase];
+        const showcaseLabel = showcaseDef ? showcaseDef.name : 'Auto (Top Badge)';
+        html += `<div class="badges-showcase-bar">
+            <span class="showcase-label">Profile Avatar:</span>
+            <span class="showcase-current">${showcaseDef ? `<span class="badge-icon-inline" style="background:${showcaseDef.bg};color:${showcaseDef.color}">${showcaseDef.svg}</span>` : ''} ${showcaseLabel}</span>
+            <span class="showcase-hint">Click an unlocked badge to showcase it</span>
+        </div>`;
+    }
+
+    for (const [cat, badges] of Object.entries(categories)) {
+        const catLabel = cat === 'Respect' ? 'Respect Badges (Performance)'
+                       : cat === 'Whale' ? 'Whale Badges (Volume)'
+                       : cat === 'Lore' ? 'Lore Badges (Redemption)'
+                       : 'Status Badges (Monetization)';
+
+        html += `<div class="badges-category">
+            <div class="badges-category-label">${catLabel}</div>
+            <div class="badges-grid">`;
+
+        for (const b of badges) {
+            const isShowcase = currentShowcase === b.id;
+            html += `
+                <div class="badge-card ${b.unlocked ? 'unlocked' : 'locked'}${isShowcase ? ' showcase' : ''}" style="${b.unlocked ? `--badge-color:${b.color};--badge-glow:${b.bg};background:${b.bg}` : ''}" ${b.unlocked ? `onclick="setShowcaseBadge('${b.id}')"` : ''}>
+                    ${isShowcase ? '<div class="badge-showcase-tag">SHOWCASE</div>' : ''}
+                    <div class="badge-card-icon" style="background:${b.bg};color:${b.color}">${b.svg}</div>
+                    <div class="badge-card-name">${b.name}</div>
+                    <div class="badge-card-desc">${b.unlocked ? b.desc : b.unlock}</div>
+                </div>`;
+        }
+
+        html += `</div></div>`;
+    }
+
+    html += `</div>`;
+    panel.innerHTML = html;
+}
+
+async function setShowcaseBadge(badgeId) {
+    if (!state.userId) return;
+    const current = state.userProfile?.showcase_badge;
+    const newVal = (current === badgeId) ? null : badgeId;
+    try {
+        await supabaseClient.from('profiles').update({ showcase_badge: newVal }).eq('id', state.userId);
+        if (state.userProfile) state.userProfile.showcase_badge = newVal;
+        renderBadgesTab();
+        const def = newVal ? BADGE_DEFINITIONS[newVal] : null;
+        showToast(def ? `${def.name} set as your profile badge` : 'Showcase badge cleared', 'success');
+    } catch (e) {
+        showToast('Could not update showcase badge', 'error');
+    }
+}
+
+function renderBadgeCabinet(badgesArr, containerId) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+
+    if (!badgesArr || badgesArr.length === 0) {
+        el.innerHTML = '<div class="badges-empty">No badges earned yet</div>';
+        return;
+    }
+
+    el.innerHTML = badgesArr.map(id => {
+        const def = BADGE_DEFINITIONS[id];
+        if (!def) return '';
+        return `<span class="badge-icon-inline" style="background:${def.bg};color:${def.color}" title="${def.name}: ${def.desc}"><span class="badge-tooltip">${def.name}<span class="badge-tooltip-desc">${def.desc}</span></span>${def.svg}</span>`;
+    }).join('');
 }
 
 // =============================================

@@ -2169,3 +2169,10 @@ BEGIN
     );
 END;
 $$;
+
+-- ============================================================
+-- BADGES SYSTEM
+-- ============================================================
+
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS badges JSONB NOT NULL DEFAULT '[]'::JSONB;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS showcase_badge TEXT DEFAULT NULL;

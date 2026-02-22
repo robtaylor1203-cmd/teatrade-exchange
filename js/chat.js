@@ -17,6 +17,7 @@
 
 const _chatTierCache = {};
 const _chatFundedCache = {};
+const _chatBadgesCache = {};
 
 async function _populateChatTierCache(messages) {
     const emails = [...new Set(messages.map(m => m.sender_email).filter(Boolean))];
@@ -24,12 +25,15 @@ async function _populateChatTierCache(messages) {
     try {
         const { data } = await supabaseClient
             .from('profiles')
-            .select('email, tier, combine_badge')
+            .select('email, tier, combine_badge, badges')
             .in('email', emails);
         if (data) {
             data.forEach(p => {
                 _chatTierCache[p.email] = p.tier || 'FREE';
                 _chatFundedCache[p.email] = p.combine_badge === true;
+                let b = p.badges;
+                if (typeof b === 'string') { try { b = JSON.parse(b); } catch { b = []; } }
+                _chatBadgesCache[p.email] = Array.isArray(b) ? b : [];
             });
         }
     } catch (_) {}
@@ -245,6 +249,18 @@ function renderChatMessages() {
         let badgeHtml = '';
         if (senderTier === 'PRO') badgeHtml += '<span class="badge-pro">PRO</span>';
         if (senderFunded) badgeHtml += '<span class="badge-funded">FUNDED</span>';
+
+        const senderBadgesArr = _chatBadgesCache[msg.sender_email] || [];
+        if (senderBadgesArr.length > 0 && typeof BADGE_DEFINITIONS !== 'undefined' && typeof BADGE_PRIORITY !== 'undefined') {
+            const topTwo = BADGE_PRIORITY.filter(id => senderBadgesArr.includes(id)).slice(0, 2);
+            if (topTwo.length > 0) {
+                badgeHtml += '<span class="chat-badge-icons">' + topTwo.map(id => {
+                    const d = BADGE_DEFINITIONS[id];
+                    if (!d) return '';
+                    return `<span class="badge-icon-inline" style="background:${d.bg};color:${d.color}"><span class="badge-tooltip">${d.name}</span>${d.svg}</span>`;
+                }).join('') + '</span>';
+            }
+        }
 
         let recipientTag = '';
         if (isPrivate && (msg.recipient_email || msg.recipient_name)) {
