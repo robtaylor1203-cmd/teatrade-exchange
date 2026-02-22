@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="index, follow">
+    <title>Contact Us | TeaTrade Exchange</title>
+    <meta name="description" content="Get in touch with the TeaTrade Exchange team. Questions, feedback, or partnership enquiries — we'd love to hear from you.">
+    <link rel="canonical" href="https://teatrade.exchange/contact.html" />
+    <link rel="icon" type="image/png" href="images/favicon-nb.png">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7CQLXXEKCE"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-7CQLXXEKCE');
+    </script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111827;
+            --bg-card: #1a1f2e;
+            --text-primary: #e5e7eb;
+            --text-muted: #6b7280;
+            --accent-blue: #1a73e8;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+        }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.7;
+            min-height: 100vh;
+        }
+        .page-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 32px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            background: var(--bg-secondary);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .page-nav-logo {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            font-weight: 700;
+            color: #fff;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .page-nav-logo span { color: var(--accent-green); }
+        .page-nav-links { display: flex; gap: 24px; }
+        .page-nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            transition: color 0.15s;
+        }
+        .page-nav-links a:hover, .page-nav-links a.active { color: #fff; }
+        .page-container {
+            max-width: 620px;
+            margin: 0 auto;
+            padding: 48px 24px 80px;
+        }
+        .page-badge {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--accent-blue);
+            background: rgba(26,115,232,0.1);
+            padding: 4px 12px;
+            border-radius: 20px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+        h1 {
+            font-size: 32px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 12px;
+            line-height: 1.2;
+        }
+        .page-lead {
+            font-size: 15px;
+            color: var(--text-muted);
+            margin-bottom: 36px;
+            line-height: 1.7;
+        }
+        .contact-form { display: flex; flex-direction: column; gap: 18px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .form-input, .form-textarea {
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px;
+            padding: 12px 14px;
+            color: #fff;
+            font-family: inherit;
+            font-size: 14px;
+            transition: border-color 0.15s;
+            outline: none;
+        }
+        .form-input:focus, .form-textarea:focus {
+            border-color: var(--accent-blue);
+        }
+        .form-input::placeholder, .form-textarea::placeholder {
+            color: var(--text-muted);
+            opacity: 0.6;
+        }
+        .form-textarea { resize: vertical; min-height: 140px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .form-submit {
+            background: var(--accent-blue);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 14px 24px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.15s, transform 0.1s;
+            margin-top: 4px;
+        }
+        .form-submit:hover { opacity: 0.9; }
+        .form-submit:active { transform: scale(0.98); }
+        .form-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+        .form-success {
+            text-align: center;
+            padding: 32px 0;
+        }
+        .form-success-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: rgba(16,185,129,0.12);
+            color: var(--accent-green);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+        }
+        .form-success h2 { font-size: 20px; margin-bottom: 8px; }
+        .form-success p { color: var(--text-muted); font-size: 14px; }
+        .form-error {
+            font-size: 12px;
+            color: var(--accent-red);
+            margin-top: 4px;
+            display: none;
+        }
+        .form-error.visible { display: block; }
+        .contact-alt {
+            margin-top: 36px;
+            padding-top: 24px;
+            border-top: 1px solid rgba(255,255,255,0.06);
+            text-align: center;
+        }
+        .contact-alt p { font-size: 13px; color: var(--text-muted); }
+        .contact-alt a { color: var(--accent-blue); text-decoration: none; }
+        .contact-alt a:hover { text-decoration: underline; }
+        .page-footer {
+            border-top: 1px solid rgba(255,255,255,0.06);
+            padding: 24px 32px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .page-footer a { color: var(--text-muted); margin: 0 8px; text-decoration: none; }
+        .page-footer a:hover { color: #fff; }
+        @media (max-width: 600px) {
+            .page-nav { padding: 14px 16px; }
+            .page-container { padding: 32px 16px 60px; }
+            h1 { font-size: 24px; }
+            .form-row { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="page-nav">
+        <a href="/" class="page-nav-logo">Tea<span>Trade</span> Exchange</a>
+        <div class="page-nav-links">
+            <a href="about.html">About</a>
+            <a href="contact.html" class="active">Contact</a>
+            <a href="privacy.html">Privacy</a>
+            <a href="/">Terminal</a>
+        </div>
+    </nav>
+
+    <main class="page-container">
+        <span class="page-badge">Get in Touch</span>
+        <h1>Contact Us</h1>
+        <p class="page-lead">Have a question, found a bug, or want to discuss a partnership? We'd love to hear from you. Fill out the form below and we'll get back to you as soon as possible.</p>
+
+        <div id="contact-form-wrapper">
+            <form class="contact-form" id="contact-form" onsubmit="handleContactSubmit(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="contact-name">Your Name</label>
+                        <input class="form-input" type="text" id="contact-name" name="name" placeholder="John Smith" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="contact-email">Email Address</label>
+                        <input class="form-input" type="email" id="contact-email" name="email" placeholder="john@example.com" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="contact-subject">Subject</label>
+                    <input class="form-input" type="text" id="contact-subject" name="subject" placeholder="What is this regarding?" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="contact-message">Message</label>
+                    <textarea class="form-textarea" id="contact-message" name="message" placeholder="Tell us more..." required></textarea>
+                </div>
+                <div class="form-error" id="contact-error"></div>
+                <button type="submit" class="form-submit" id="contact-submit">Send Message</button>
+            </form>
+        </div>
+
+        <div id="contact-success" class="form-success" style="display:none;">
+            <div class="form-success-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <h2>Message Sent</h2>
+            <p>Thank you for reaching out. We'll respond to your enquiry at the email address provided.</p>
+        </div>
+
+        <div class="contact-alt">
+            <p>Prefer email? Reach us directly at <a href="mailto:contact@teatrade.co.uk">contact@teatrade.co.uk</a></p>
+        </div>
+    </main>
+
+    <footer class="page-footer">
+        <p>&copy; 2026 TeaTrade Exchange. All rights reserved.</p>
+        <p>
+            <a href="about.html">About</a>
+            <a href="contact.html">Contact</a>
+            <a href="privacy.html">Privacy Policy</a>
+            <a href="/">Back to Terminal</a>
+        </p>
+    </footer>
+
+    <script>
+    async function handleContactSubmit(e) {
+        e.preventDefault();
+        const btn = document.getElementById('contact-submit');
+        const errEl = document.getElementById('contact-error');
+        errEl.classList.remove('visible');
+        btn.disabled = true;
+        btn.textContent = 'Sending...';
+
+        const name = document.getElementById('contact-name').value.trim();
+        const email = document.getElementById('contact-email').value.trim();
+        const subject = document.getElementById('contact-subject').value.trim();
+        const message = document.getElementById('contact-message').value.trim();
+
+        try {
+            const res = await fetch('https://uznxzyuknigzlxecjgtb.supabase.co/functions/v1/contact-form', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email, subject, message })
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || 'Failed to send message');
+            }
+            document.getElementById('contact-form-wrapper').style.display = 'none';
+            document.getElementById('contact-success').style.display = 'block';
+        } catch (err) {
+            errEl.textContent = err.message || 'Something went wrong. Please email us directly.';
+            errEl.classList.add('visible');
+            btn.disabled = false;
+            btn.textContent = 'Send Message';
+        }
+    }
+    </script>
+</body>
+</html>

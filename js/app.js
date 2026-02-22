@@ -243,7 +243,7 @@ setInterval(updateQuoteBoard, 5000);
 setInterval(async () => {
     await loadTeas();
     if (state.currentUser) {
-        await loadPositions();
+        await Promise.all([loadPositions(), loadUserProfile()]);
         updatePortfolioDisplay();
         if (typeof updateCombineBanner === 'function') updateCombineBanner();
     }

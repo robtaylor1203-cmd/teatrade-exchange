@@ -7875,6 +7875,15 @@ tr.row-halted {
 .user-dropdown-logout:hover {
     color: var(--accent-red);
 }
+.user-dropdown-divider {
+    height: 1px;
+    background: rgba(255,255,255,0.06);
+    margin: 4px 0;
+}
+a.user-dropdown-item {
+    text-decoration: none;
+    color: inherit;
+}
 
 /* =============================================
    MFA / 2FA MODALS

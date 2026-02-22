@@ -335,8 +335,7 @@ async function executeTrade() {
         btn.disabled = false;
 
         // Refresh data from server (source of truth)
-        await loadPositions();
-        await loadUserTrades();
+        await Promise.all([loadPositions(), loadUserTrades(), loadUserProfile()]);
         updateUIForLoggedInUser();
 
         // Hold the success state for a moment, then reset form
