@@ -3720,7 +3720,7 @@ body.modal-open {
 }
 
 .auction-table-wrapper {
-    max-height: 600px;
+    max-height: 1155px;
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: var(--border-light) var(--bg-tertiary);

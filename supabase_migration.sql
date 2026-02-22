@@ -611,7 +611,9 @@ CREATE OR REPLACE FUNCTION execute_index_trade(
     p_index_symbol TEXT,
     p_side         TEXT,
     p_quantity     NUMERIC,
-    p_price        NUMERIC
+    p_price        NUMERIC,
+    p_mode         TEXT DEFAULT 'VIRTUAL',
+    p_leverage     NUMERIC DEFAULT 1
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -626,9 +628,11 @@ DECLARE
     v_exec_price   NUMERIC;
     v_spread_cost  NUMERIC;
     v_total        NUMERIC;
+    v_margin       NUMERIC;
     v_new_balance  NUMERIC;
     v_new_qty      NUMERIC;
     v_new_avg      NUMERIC;
+    v_lev          NUMERIC;
 BEGIN
     IF p_side NOT IN ('BUY', 'SELL') THEN
         RETURN jsonb_build_object('success', false, 'error', 'Invalid side: must be BUY or SELL');
@@ -640,12 +644,13 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'error', 'Invalid price');
     END IF;
 
-    -- Verify the index exists
     IF NOT EXISTS (SELECT 1 FROM indexes WHERE symbol = p_index_symbol) THEN
         RETURN jsonb_build_object('success', false, 'error', 'Index not found: ' || p_index_symbol);
     END IF;
 
-    -- Symmetric spread (1% default, same as tea base_spread)
+    v_lev := GREATEST(1, LEAST(25, COALESCE(p_leverage, 1)));
+
+    -- Symmetric spread (1% default)
     v_spread := 0.01;
     IF p_side = 'BUY' THEN
         v_exec_price := p_price * (1.0 + v_spread / 2.0);
@@ -654,7 +659,8 @@ BEGIN
     END IF;
     v_spread_cost := ABS(v_exec_price - p_price) * p_quantity;
 
-    v_total := v_exec_price * p_quantity;
+    v_total  := v_exec_price * p_quantity;
+    v_margin := v_total / v_lev;
 
     -- Lock user profile
     SELECT * INTO v_profile FROM profiles WHERE id = p_user_id FOR UPDATE;
@@ -664,12 +670,12 @@ BEGIN
 
     -- ── BUY ─────────────────────────────────────────────────────────
     IF p_side = 'BUY' THEN
-        IF v_profile.cash_balance < v_total THEN
+        IF v_profile.cash_balance < v_margin THEN
             RETURN jsonb_build_object('success', false, 'error',
-                'Insufficient balance. Need $' || ROUND(v_total, 2));
+                'Insufficient balance. Need $' || ROUND(v_margin, 2) || ' margin (' || v_lev || 'x leverage)');
         END IF;
 
-        v_new_balance := v_profile.cash_balance - v_total;
+        v_new_balance := v_profile.cash_balance - v_margin;
         UPDATE profiles SET cash_balance = v_new_balance WHERE id = p_user_id;
 
         SELECT * INTO v_position FROM index_positions
@@ -712,8 +718,8 @@ BEGIN
     END IF;
 
     -- ── RECORD TRADE ────────────────────────────────────────────────
-    INSERT INTO trades (user_id, tea_id, index_symbol, side, quantity, price, total_value)
-        VALUES (p_user_id, NULL, p_index_symbol, p_side, p_quantity, v_exec_price, v_total)
+    INSERT INTO trades (user_id, tea_id, index_symbol, side, quantity, price, total_value, leverage)
+        VALUES (p_user_id, NULL, p_index_symbol, p_side, p_quantity, v_exec_price, v_total, v_lev)
         RETURNING * INTO v_trade;
 
     RETURN jsonb_build_object(
@@ -727,6 +733,8 @@ BEGIN
         'spread',           v_spread,
         'spread_cost',      v_spread_cost,
         'total',            v_total,
+        'margin',           v_margin,
+        'leverage',         v_lev,
         'new_balance',      v_new_balance,
         'execution_price',  v_exec_price
     );
@@ -889,7 +897,8 @@ CREATE OR REPLACE FUNCTION open_pair_trade(
     p_leverage      NUMERIC,
     p_pair_id       TEXT,
     p_tea_id        INT,
-    p_index_symbol  TEXT
+    p_index_symbol  TEXT,
+    p_mode          TEXT DEFAULT 'VIRTUAL'
 )
 RETURNS JSONB
 LANGUAGE plpgsql
