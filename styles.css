@@ -5542,6 +5542,15 @@ body.modal-open {
 .bottom-stat span {
     color: var(--text-secondary);
 }
+.footer-link {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: inherit;
+    transition: color 0.15s;
+}
+.footer-link:hover {
+    color: #fff;
+}
 
 /* Responsive */
 
