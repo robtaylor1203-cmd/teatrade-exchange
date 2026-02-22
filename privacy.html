@@ -13,8 +13,12 @@
     <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
+    gtag('consent', 'default', { analytics_storage: 'denied' });
     gtag('js', new Date());
     gtag('config', 'G-7CQLXXEKCE');
+    if (localStorage.getItem('tt_cookie_consent') === 'accepted') {
+        gtag('consent', 'update', { analytics_storage: 'granted' });
+    }
     </script>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -152,6 +156,7 @@
             <a href="about.html">About</a>
             <a href="contact.html">Contact</a>
             <a href="privacy.html" class="active">Privacy</a>
+            <a href="terms.html">Terms</a>
             <a href="/">Terminal</a>
         </div>
     </nav>
@@ -278,6 +283,7 @@
             <a href="about.html">About</a>
             <a href="contact.html">Contact</a>
             <a href="privacy.html">Privacy Policy</a>
+            <a href="terms.html">Terms of Service</a>
             <a href="/">Back to Terminal</a>
         </p>
     </footer>

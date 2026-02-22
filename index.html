@@ -21,14 +21,14 @@
     <meta property="og:title" content="TeaTrade Exchange | Live Tea Prices, Trading & Market Data">
     <meta property="og:description" content="The world's first real-time tea trading terminal. Live auction data, price indices, and 25x leveraged paper trading across global tea markets.">
     <meta property="og:url" content="https://teatrade.exchange/">
-    <meta property="og:image" content="https://teatrade.exchange/images/og-preview.png">
+    <meta property="og:image" content="https://teatrade.exchange/images/preview.png">
     <meta property="og:locale" content="en_GB">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="TeaTrade Exchange | Live Tea Prices & Trading">
     <meta name="twitter:description" content="Trade tea like a commodity. Live auction prices, indices, and leveraged paper trading across Mombasa, Kolkata, Colombo and more.">
-    <meta name="twitter:image" content="https://teatrade.exchange/images/og-preview.png">
+    <meta name="twitter:image" content="https://teatrade.exchange/images/preview.png">
 
     <!-- Structured Data -->
     <script type="application/ld+json">
@@ -54,13 +54,17 @@
     }
     </script>
 
-    <!-- Google Analytics (GA4) -->
+    <!-- Google Analytics (GA4) — consent-aware -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-7CQLXXEKCE"></script>
     <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
+    gtag('consent', 'default', { analytics_storage: 'denied' });
     gtag('js', new Date());
     gtag('config', 'G-7CQLXXEKCE');
+    if (localStorage.getItem('tt_cookie_consent') === 'accepted') {
+        gtag('consent', 'update', { analytics_storage: 'granted' });
+    }
     </script>
 
     <!-- Grow.me -->
@@ -73,27 +77,6 @@
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
-    <!-- Early Access Modal -->
-    <div class="early-access-modal" id="early-access-modal">
-        <div class="early-access-backdrop"></div>
-        <div class="early-access-content">
-            <span class="early-access-badge">Early Access</span>
-            <h2 class="early-access-title">TeaTrade Exchange</h2>
-            <p class="early-access-subtitle">The world's first real-time tea market terminal. Get priority access to auction data, price indices, and institutional-grade analytics.</p>
-            <ul class="early-access-features">
-                <li>Live auction data from Mombasa, Kolkata, Colombo & more</li>
-                <li>Real-time price indices by grade, origin & buyer</li>
-                <li>Historical trade analytics & trend forecasting</li>
-                <li>Buyer & seller intelligence reports</li>
-            </ul>
-            <form class="early-access-form" id="early-access-form" onsubmit="submitEarlyAccess(event)">
-                <input type="text" id="early-access-email" name="email_address" placeholder="Enter your email address">
-                <button type="submit" id="early-access-btn">Get Early Access</button>
-            </form>
-            <p class="early-access-privacy">Your email is stored securely and used only to notify you when TeaTrade Exchange launches. We never share your data. <a href="/privacy.html" target="_blank">Privacy Policy</a></p>
-        </div>
-    </div>
-
     <!-- Auth Modal -->
     <div class="auth-modal" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
         <div class="auth-backdrop" onclick="closeAuthModal()"></div>
@@ -2072,5 +2055,31 @@
     <script src="js/pairs.js?v=20260218"></script>
     <script src="js/search.js?v=20260221u"></script>
     <script src="js/app.js?v=20260222m"></script>
+
+    <!-- Cookie Consent Banner -->
+    <div id="cookie-banner" class="cookie-banner" style="display:none;">
+        <div class="cookie-banner-inner">
+            <p class="cookie-banner-text">We use cookies to analyse site traffic and improve your experience. Essential cookies are required for the platform to function. Analytics cookies help us understand usage. <a href="privacy.html">Learn more</a></p>
+            <div class="cookie-banner-actions">
+                <button class="cookie-btn cookie-btn-reject" onclick="handleCookieConsent('rejected')">Reject Non-Essential</button>
+                <button class="cookie-btn cookie-btn-accept" onclick="handleCookieConsent('accepted')">Accept All</button>
+            </div>
+        </div>
+    </div>
+    <script>
+    (function() {
+        var consent = localStorage.getItem('tt_cookie_consent');
+        if (!consent) {
+            document.getElementById('cookie-banner').style.display = 'flex';
+        }
+    })();
+    function handleCookieConsent(choice) {
+        localStorage.setItem('tt_cookie_consent', choice);
+        document.getElementById('cookie-banner').style.display = 'none';
+        if (choice === 'accepted' && typeof gtag === 'function') {
+            gtag('consent', 'update', { analytics_storage: 'granted' });
+        }
+    }
+    </script>
 </body>
 </html>

@@ -341,6 +341,14 @@ function setActiveBalance(newBalance) {
  */
 function switchTradingMode(mode) {
     if (mode !== 'VIRTUAL' && mode !== 'REAL') return;
+
+    if (mode === 'REAL') {
+        const toggle = document.getElementById('mode-toggle');
+        if (toggle) toggle.checked = false;
+        showRealMoneyComingSoon();
+        return;
+    }
+
     state.tradingMode = mode;
     localStorage.setItem('teatrade_trading_mode', mode);
 
@@ -390,6 +398,40 @@ const BADGE_DEFINITIONS = {
     FUNDED_TRADER:  { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>', color: '#eab308', bg: 'rgba(234,179,8,0.15)', name: 'Funded Trader',    cat: 'Status',     desc: 'Passed the TeaTrade Combine Challenge',                unlock: 'Pass the Combine' },
 };
 const BADGE_PRIORITY = ['FUNDED_TRADER','PRO_MEMBER','WHALE','SNIPER','TEN_BAGGER','SHEPHERD','DIAMOND_HANDS','IRON_CLAD','PHOENIX','SURVIVOR','BOTTOM_CATCHER'];
+
+// =============================================
+// REAL MONEY COMING SOON
+// =============================================
+
+function showRealMoneyComingSoon() {
+    let modal = document.getElementById('real-money-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'real-money-modal';
+        modal.className = 'real-money-modal';
+        modal.innerHTML = `
+            <div class="real-money-backdrop" onclick="closeRealMoneyModal()"></div>
+            <div class="real-money-card">
+                <button class="real-money-close" onclick="closeRealMoneyModal()">&times;</button>
+                <div class="real-money-icon">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="1.5"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M2 10h2M20 10h2M2 14h2M20 14h2"/></svg>
+                </div>
+                <h3 class="real-money-title">Real Money Trading</h3>
+                <p class="real-money-subtitle">Coming Soon</p>
+                <p class="real-money-body">We are currently in the process of obtaining the necessary regulatory approvals from financial governing bodies to enable live, real-money trading on TeaTrade Exchange.</p>
+                <p class="real-money-body">In the meantime, you can trade with your virtual portfolio using all the same tools, data, and market conditions. When real-money trading launches, you'll be the first to know.</p>
+                <button class="real-money-btn" onclick="closeRealMoneyModal()">Continue with Virtual Trading</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+    modal.style.display = 'flex';
+}
+
+function closeRealMoneyModal() {
+    const modal = document.getElementById('real-money-modal');
+    if (modal) modal.style.display = 'none';
+}
 
 // =============================================
 // ACCOUNT LOCKED / MONETIZATION HELPERS
