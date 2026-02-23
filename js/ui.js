@@ -623,8 +623,26 @@ function updateDataSourceIndicator() {
 }
 
 // =============================================
-// GLOBAL TICKER TAPE (Scrolling Forex + Oil)
+// GLOBAL TICKER TAPE (JS-driven seamless scroll)
 // =============================================
+
+const _ticker = { offset: 0, halfWidth: 0, lastHtml: '', animId: null, speed: 0.5 };
+
+function _startTickerScroll() {
+    const track = document.getElementById('global-ticker-track');
+    if (!track || _ticker.animId) return;
+    _ticker.halfWidth = track.scrollWidth / 2;
+
+    function tick() {
+        _ticker.offset += _ticker.speed;
+        if (_ticker.halfWidth > 0 && _ticker.offset >= _ticker.halfWidth) {
+            _ticker.offset -= _ticker.halfWidth;
+        }
+        track.style.transform = 'translateX(-' + _ticker.offset + 'px)';
+        _ticker.animId = requestAnimationFrame(tick);
+    }
+    _ticker.animId = requestAnimationFrame(tick);
+}
 
 function updateGlobalTicker() {
     const track = document.getElementById('global-ticker-track');
@@ -646,7 +664,9 @@ function updateGlobalTicker() {
     });
 
     if (!hasData && (!state.teas || state.teas.length === 0)) {
-        track.innerHTML = '<div class="ticker-item ticker-loading"><span class="ticker-symbol">Waiting for market data...</span></div>';
+        if (!_ticker.lastHtml) {
+            track.innerHTML = '<div class="ticker-item ticker-loading"><span class="ticker-symbol">Waiting for market data...</span></div>';
+        }
         return;
     }
 
@@ -728,7 +748,17 @@ function updateGlobalTicker() {
     const teas = buildTeaItems();
 
     const onePass = macro + sep + indexes + sep + teas;
+
+    if (onePass === _ticker.lastHtml) return;
+    _ticker.lastHtml = onePass;
+
+    const pctDone = _ticker.halfWidth > 0 ? _ticker.offset / _ticker.halfWidth : 0;
+
     track.innerHTML = onePass + onePass;
+    _ticker.halfWidth = track.scrollWidth / 2;
+    _ticker.offset = pctDone * _ticker.halfWidth;
+
+    if (!_ticker.animId) _startTickerScroll();
 }
 
 // =============================================
