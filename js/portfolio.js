@@ -186,23 +186,19 @@ function updatePortfolioDisplay() {
     const equity = balance + totalUnrealizedPnl;
     const freeMargin = equity - totalUsedMargin;
 
-    // Position Health: what % of invested margin remains after P&L?
-    // 100% = break-even, 0% = margin fully consumed by losses
-    const positionHealth = totalUsedMargin > 0
-        ? ((totalUsedMargin + totalUnrealizedPnl) / totalUsedMargin * 100)
-        : Infinity;
+    const startBal = state.tradingMode === 'REAL' ? 0 : 10000;
+    const equityPct = startBal > 0 ? (equity / startBal * 100) : 100;
 
     valueEl.textContent = '$' + equity.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
-    const startBal = state.tradingMode === 'REAL' ? 0 : 10000;
     const totalPnl = equity - startBal;
     const totalPnlPct = startBal > 0 ? (totalPnl / startBal * 100).toFixed(2) : '0.00';
     pnlEl.textContent = `${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)} (${totalPnlPct}%)`;
     pnlEl.className = 'portfolio-pnl ' + (totalPnl >= 0 ? 'up' : 'down');
 
-    // Client-side position-health warnings (supplements server-side checks)
-    if (totalUsedMargin > 0 && positionHealth !== Infinity) {
-        _checkClientMarginLevel(positionHealth, equity, totalUsedMargin);
+    // Client-side equity-floor warnings (supplements server-side checks)
+    if (totalUsedMargin > 0) {
+        _checkClientMarginLevel(equityPct, equity, totalUsedMargin);
     }
 
     // Render margin summary below positions list
@@ -213,38 +209,36 @@ function updatePortfolioDisplay() {
         marginHtml.style.cssText = 'padding:8px 12px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);';
         listEl.parentNode.insertBefore(marginHtml, listEl.nextSibling);
     }
-    const phColor = positionHealth <= 2 ? 'var(--accent-red)' : positionHealth <= 15 ? 'var(--accent-orange)' : positionHealth <= 50 ? '#f59e0b' : 'var(--accent-green)';
-    const phDisplay = positionHealth === Infinity ? '—' : positionHealth.toFixed(1) + '%';
+    const phColor = equity <= 50 ? 'var(--accent-red)' : equity <= 500 ? 'var(--accent-orange)' : equity <= 2000 ? '#f59e0b' : 'var(--accent-green)';
+    const phDisplay = '$' + equity.toFixed(2);
     marginHtml.innerHTML = totalUsedMargin > 0
         ? `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Balance</span><span>$${balance.toFixed(2)}</span></div>` +
           `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Equity</span><span style="font-weight:600;">$${equity.toFixed(2)}</span></div>` +
           `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Invested</span><span>$${totalUsedMargin.toFixed(2)}</span></div>` +
           `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Free Funds</span><span>$${freeMargin.toFixed(2)}</span></div>` +
-          `<div style="display:flex;justify-content:space-between;"><span>Position Health</span><span style="color:${phColor};font-weight:600;">${phDisplay}</span></div>`
+          `<div style="display:flex;justify-content:space-between;"><span>Account Health</span><span style="color:${phColor};font-weight:600;">${phDisplay}</span></div>`
         : '';
 }
 
 let _lastMarginWarningTime = 0;
 const _MARGIN_WARN_COOLDOWN_MS = 60_000;
 
-function _checkClientMarginLevel(positionHealth, equity, usedMargin) {
+function _checkClientMarginLevel(equityPct, equity, usedMargin) {
     const now = Date.now();
     if (now - _lastMarginWarningTime < _MARGIN_WARN_COOLDOWN_MS) return;
 
-    const lostPct = Math.max(0, 100 - positionHealth).toFixed(0);
-
-    if (positionHealth <= 2) {
+    if (equity <= 50) {
         _lastMarginWarningTime = now;
         if (typeof _showMarginAlert === 'function') {
-            _showMarginAlert('CRITICAL — Approaching Stop-Out',
-                `Positions have lost ${lostPct}% of invested capital. Auto-liquidation triggers at 98% loss. Close positions now!`,
+            _showMarginAlert('CRITICAL — Account Depleted',
+                `Account equity at $${equity.toFixed(2)}. All positions will be liquidated. Close positions now!`,
                 'stop_out');
         }
-    } else if (positionHealth <= 15) {
+    } else if (equity <= 500) {
         _lastMarginWarningTime = now;
         if (typeof _showMarginAlert === 'function') {
-            _showMarginAlert('Margin Call Warning',
-                `Positions have lost ${lostPct}% of invested capital. Close positions or deposit funds to avoid liquidation.`,
+            _showMarginAlert('Low Equity Warning',
+                `Account equity at $${equity.toFixed(2)}. Close losing positions to avoid total liquidation.`,
                 'margin_call');
         }
     }
@@ -1838,46 +1832,41 @@ function renderFinancialTab() {
     const overallPct = startBal > 0 ? (overallReturn / startBal * 100).toFixed(2) : '0.00';
     const posCount = positions.length + Object.values(indexPositionsData).filter(p => p && p.quantity !== 0).length;
 
-    // Position Health: what % of invested margin remains after P&L?
-    const posHealth = totalUsedMargin > 0
-        ? ((totalUsedMargin + totalPnl) / totalUsedMargin * 100)
-        : (posCount > 0 ? 0 : Infinity);
-    const phColor = posHealth <= 2 ? 'var(--accent-red)' : posHealth <= 15 ? 'var(--accent-orange)' : posHealth <= 50 ? '#f59e0b' : 'var(--accent-green)';
+    // Account health: equity as % of starting balance (for bar visualisation only)
+    const equityPct = startBal > 0 ? (equity / startBal * 100) : (posCount > 0 ? 0 : 100);
+    const phColor = equity <= 50 ? 'var(--accent-red)' : equity <= 500 ? 'var(--accent-orange)' : equity <= 2000 ? '#f59e0b' : 'var(--accent-green)';
 
     let barStatus, barStatusColor;
-    if (equity < 0) {
+    if (equity <= 0) {
         barStatus = 'LIQUIDATION'; barStatusColor = 'var(--accent-red)';
-    } else if (posCount > 0 && posHealth <= 2) {
+    } else if (posCount > 0 && equity <= 50) {
         barStatus = 'STOP OUT'; barStatusColor = 'var(--accent-red)';
-    } else if (posCount > 0 && posHealth <= 15) {
-        barStatus = 'MARGIN CALL'; barStatusColor = 'var(--accent-orange)';
-    } else if (posCount > 0 && posHealth <= 50) {
+    } else if (posCount > 0 && equity <= 500) {
+        barStatus = 'LOW EQUITY'; barStatusColor = 'var(--accent-orange)';
+    } else if (posCount > 0 && equity <= 2000) {
         barStatus = 'CAUTION'; barStatusColor = '#f59e0b';
     } else {
         barStatus = 'HEALTHY'; barStatusColor = 'var(--accent-green)';
     }
 
-    // Bar visualises position health as a fill (100% = full green, 0% = full red)
-    const healthPct = Math.max(0, Math.min(posHealth, 100));
+    const healthPct = Math.max(0, Math.min(equityPct, 100));
     let barUsedPct, barFreePct;
     if (posCount === 0 || totalUsedMargin <= 0) {
         barUsedPct = 0;
         barFreePct = 100;
-    } else if (equity <= 0 || posHealth <= 0) {
+    } else if (equity <= 0) {
         barUsedPct = 100;
         barFreePct = 0;
     } else {
-        barUsedPct = Math.max(0, 100 - healthPct);
-        barFreePct = healthPct;
+        barFreePct = Math.min(healthPct, 100);
+        barUsedPct = 100 - barFreePct;
     }
 
-    const showMarkers = totalUsedMargin > 0 && posCount > 0 && posHealth > 0;
-    const marginCallLine = showMarkers ? Math.min(100 - 15, 99) : 0;  // 85% from left
-    const stopOutLine = showMarkers ? Math.min(100 - 2, 99) : 0;      // 98% from left
+    const showMarkers = totalUsedMargin > 0 && posCount > 0;
+    const marginCallLine = showMarkers ? 5 : 0;    // 5% from left ($500)
+    const stopOutLine = showMarkers ? 0.5 : 0;     // 0.5% from left (~$50)
 
-    const phDisplay = posHealth === Infinity
-        ? (posCount > 0 ? '∞' : '—')
-        : posHealth.toFixed(1) + '%';
+    const phDisplay = '$' + equity.toFixed(2);
 
     panel.innerHTML = `
         <div class="pf-summary-grid">
@@ -1890,21 +1879,21 @@ function renderFinancialTab() {
 
         <div class="pf-margin-bar-container">
             <div class="pf-margin-bar-header">
-                <span class="pf-margin-bar-title">Position Health</span>
+                <span class="pf-margin-bar-title">Account Health</span>
                 <span class="pf-margin-bar-status" style="color:${barStatusColor}">${barStatus}</span>
-                <span class="pf-margin-bar-level" style="color:${phColor}">Capital Remaining: ${phDisplay}</span>
+                <span class="pf-margin-bar-level" style="color:${phColor}">Equity: ${phDisplay}</span>
             </div>
-            <div class="pf-margin-bar-track ${equity < 0 ? 'pf-bar-danger' : ''}">
+            <div class="pf-margin-bar-track ${equity <= 0 ? 'pf-bar-danger' : ''}">
                 <div class="pf-margin-bar-used" style="width:${barUsedPct.toFixed(1)}%"></div>
                 <div class="pf-margin-bar-free" style="width:${barFreePct.toFixed(1)}%;left:${barUsedPct.toFixed(1)}%"></div>
                 ${showMarkers ? `
-                <div class="pf-margin-bar-marker pf-margin-marker-call" style="left:${marginCallLine.toFixed(1)}%">
+                <div class="pf-margin-bar-marker pf-margin-marker-call" style="left:${marginCallLine}%">
                     <div class="pf-margin-marker-line"></div>
-                    <div class="pf-margin-marker-label">WARNING (15%)</div>
+                    <div class="pf-margin-marker-label">WARNING ($500)</div>
                 </div>
-                <div class="pf-margin-bar-marker pf-margin-marker-stop" style="left:${stopOutLine.toFixed(1)}%">
+                <div class="pf-margin-bar-marker pf-margin-marker-stop" style="left:${stopOutLine}%">
                     <div class="pf-margin-marker-line"></div>
-                    <div class="pf-margin-marker-label">CLOSE OUT (2%)</div>
+                    <div class="pf-margin-marker-label">CLOSE OUT ($0)</div>
                 </div>` : ''}
             </div>
             <div class="pf-margin-bar-legend">
@@ -1914,7 +1903,7 @@ function renderFinancialTab() {
                 </div>
                 <div class="pf-margin-legend-item">
                     <span class="pf-margin-legend-dot" style="background:var(--accent-green)"></span>
-                    <span>Remaining: $${Math.max(totalUsedMargin + totalPnl, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span>Equity: $${Math.max(equity, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 <div class="pf-margin-legend-item">
                     <span class="pf-margin-legend-dot" style="background:${totalPnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}"></span>

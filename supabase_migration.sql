@@ -444,51 +444,60 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-    v_tea         RECORD;
-    v_profile     RECORD;
-    v_position    RECORD;
-    v_trade       RECORD;
-    v_price       NUMERIC;
-    v_total       NUMERIC;
-    v_new_balance NUMERIC;
-    v_new_qty     NUMERIC;
-    v_new_avg     NUMERIC;
-    v_is_closing  BOOLEAN;
-    v_spread      NUMERIC;
-    v_exec_price  NUMERIC;
-    v_spread_cost NUMERIC;
+    v_tea          RECORD;
+    v_profile      RECORD;
+    v_position     RECORD;
+    v_trade        RECORD;
+    v_price        NUMERIC;
+    v_spread       NUMERIC;
+    v_exec_price   NUMERIC;
+    v_notional     NUMERIC;
+    v_margin_req   NUMERIC;
+    v_spread_cost  NUMERIC;
+    v_bal          NUMERIC;
+    v_new_balance  NUMERIC;
+    v_new_qty      NUMERIC;
+    v_new_avg      NUMERIC;
+    v_new_margin   NUMERIC;
+    v_new_leverage NUMERIC;
+    v_existing_qty NUMERIC;
+    v_close_qty    NUMERIC;
+    v_open_qty     NUMERIC;
+    v_close_pnl    NUMERIC;
+    v_close_margin NUMERIC;
+    v_tea_id       INT;
 BEGIN
+    IF p_mode NOT IN ('VIRTUAL', 'REAL') THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Invalid trading mode');
+    END IF;
     IF p_side NOT IN ('BUY', 'SELL') THEN
         RETURN jsonb_build_object('success', false, 'error', 'Invalid side: must be BUY or SELL');
     END IF;
     IF p_quantity <= 0 THEN
         RETURN jsonb_build_object('success', false, 'error', 'Quantity must be greater than zero');
     END IF;
+    IF p_leverage < 1 OR p_leverage > 25 THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Leverage must be between 1 and 25');
+    END IF;
 
-    -- Lock and fetch the tea row (looked up by symbol, not id)
     SELECT * INTO v_tea FROM teas WHERE symbol = p_tea_symbol FOR UPDATE;
     IF NOT FOUND THEN
         RETURN jsonb_build_object('success', false, 'error', 'Tea not found: ' || p_tea_symbol);
     END IF;
+    v_tea_id := v_tea.id;
 
-    -- ── RISK CHECK: Trading mode ──────────────────────────────────────
+    -- ── RISK CHECKS ──────────────────────────────────────────────────
     IF v_tea.trading_mode = 'HALTED' THEN
         IF v_tea.halt_until IS NOT NULL AND v_tea.halt_until <= NOW() THEN
             UPDATE teas SET trading_mode = 'FULL', halt_until = NULL WHERE id = v_tea.id;
             v_tea.trading_mode := 'FULL';
-            v_tea.halt_until := NULL;
         ELSE
             RETURN jsonb_build_object('success', false, 'error',
                 'Market halted for ' || p_tea_symbol || ' due to extreme volatility. Please wait.');
         END IF;
     END IF;
 
-    v_is_closing := false;
-    IF p_side = 'SELL' THEN
-        v_is_closing := true;
-    END IF;
-
-    IF v_tea.trading_mode = 'CLOSE_ONLY' AND NOT v_is_closing THEN
+    IF v_tea.trading_mode = 'CLOSE_ONLY' AND p_side = 'BUY' THEN
         RETURN jsonb_build_object('success', false, 'error',
             'Maximum platform exposure reached for ' || p_tea_symbol || '. Only closing trades are allowed.');
     END IF;
@@ -506,99 +515,176 @@ BEGIN
     END IF;
 
     v_spread := COALESCE(v_tea.base_spread, 0.01) * COALESCE(v_tea.volatility_multiplier, 1.0);
-    IF p_side = 'BUY' THEN
-        v_exec_price := v_price * (1.0 + v_spread / 2.0);
-    ELSE
-        v_exec_price := v_price * (1.0 - v_spread / 2.0);
-    END IF;
-    v_spread_cost := ABS(v_exec_price - v_price) * p_quantity;
-
-    v_total := v_exec_price * p_quantity;
 
     SELECT * INTO v_profile FROM profiles WHERE id = p_user_id FOR UPDATE;
     IF NOT FOUND THEN
         RETURN jsonb_build_object('success', false, 'error', 'User profile not found');
     END IF;
+    v_bal := CASE WHEN p_mode = 'REAL' THEN v_profile.real_balance ELSE v_profile.virtual_balance END;
 
-    -- ── BUY ─────────────────────────────────────────────────────────
+    SELECT * INTO v_position FROM positions
+        WHERE user_id = p_user_id AND tea_id = v_tea_id AND trading_mode = p_mode
+        FOR UPDATE;
+
+    v_existing_qty := COALESCE(v_position.quantity, 0);
+
+    -- ── BUY ──────────────────────────────────────────────────────────
     IF p_side = 'BUY' THEN
-        IF v_profile.cash_balance < v_total THEN
-            RETURN jsonb_build_object('success', false, 'error',
-                'Insufficient balance. Need $' || ROUND(v_total, 2));
-        END IF;
+        IF v_existing_qty >= 0 THEN
+            v_exec_price := v_price * (1 + v_spread / 2);
+            v_notional   := v_exec_price * p_quantity;
+            v_margin_req := v_notional / p_leverage;
+            v_spread_cost := (v_exec_price - v_price) * p_quantity;
 
-        v_new_balance := v_profile.cash_balance - v_total;
-        UPDATE profiles SET cash_balance = v_new_balance WHERE id = p_user_id;
+            IF v_bal < v_margin_req THEN
+                RETURN jsonb_build_object('success', false, 'error',
+                    'Insufficient margin. Need $' || ROUND(v_margin_req, 2) || ' (have $' || ROUND(v_bal, 2) || ')');
+            END IF;
+            v_new_balance := v_bal - v_margin_req;
 
-        SELECT * INTO v_position FROM positions
-            WHERE user_id = p_user_id
-              AND tea_id = (SELECT id FROM teas WHERE symbol = p_tea_symbol)
-            FOR UPDATE;
+            IF FOUND THEN
+                v_new_qty    := v_existing_qty + p_quantity;
+                v_new_avg    := ((v_position.avg_entry_price * v_existing_qty) + (v_exec_price * p_quantity)) / v_new_qty;
+                v_new_margin := COALESCE(v_position.margin_used, 0) + v_margin_req;
+                v_new_leverage := v_new_qty * v_new_avg / NULLIF(v_new_margin, 0);
+                UPDATE positions SET quantity = v_new_qty, avg_entry_price = v_new_avg,
+                    margin_used = v_new_margin, leverage = COALESCE(v_new_leverage, 1), updated_at = NOW()
+                    WHERE id = v_position.id;
+            ELSE
+                INSERT INTO positions (user_id, tea_id, quantity, avg_entry_price, leverage, margin_used, trading_mode)
+                    VALUES (p_user_id, v_tea_id, p_quantity, v_exec_price, p_leverage, v_margin_req, p_mode);
+            END IF;
 
-        IF FOUND THEN
-            v_new_qty := v_position.quantity + p_quantity;
-            v_new_avg := ((v_position.avg_entry_price * v_position.quantity) + (v_exec_price * p_quantity)) / v_new_qty;
-            UPDATE positions
-                SET quantity = v_new_qty, avg_entry_price = v_new_avg, updated_at = NOW()
-                WHERE id = v_position.id;
+            UPDATE teas SET current_long_volume = COALESCE(current_long_volume, 0) + p_quantity
+                WHERE id = v_tea_id;
+
         ELSE
-            INSERT INTO positions (user_id, tea_id, quantity, avg_entry_price)
-                VALUES (p_user_id,
-                        (SELECT id FROM teas WHERE symbol = p_tea_symbol),
-                        p_quantity, v_exec_price);
+            v_exec_price := v_price * (1 + v_spread / 2);
+            v_spread_cost := (v_exec_price - v_price) * p_quantity;
+            v_close_qty := LEAST(p_quantity, ABS(v_existing_qty));
+            v_open_qty  := p_quantity - v_close_qty;
+            v_close_pnl    := (v_position.avg_entry_price - v_exec_price) * v_close_qty;
+            v_close_margin := COALESCE(v_position.margin_used, 0) * (v_close_qty / ABS(v_existing_qty));
+            v_new_balance  := v_bal + v_close_margin + v_close_pnl;
+            IF v_open_qty > 0 THEN
+                v_margin_req := v_exec_price * v_open_qty / p_leverage;
+                v_new_balance := v_new_balance - v_margin_req;
+            END IF;
+            IF v_new_balance < 0 THEN
+                RETURN jsonb_build_object('success', false, 'error', 'Insufficient balance to complete this trade');
+            END IF;
+            v_new_qty := v_existing_qty + p_quantity;
+            IF v_new_qty = 0 THEN
+                DELETE FROM positions WHERE id = v_position.id;
+            ELSIF v_new_qty > 0 THEN
+                UPDATE positions SET quantity = v_new_qty, avg_entry_price = v_exec_price,
+                    leverage = p_leverage, margin_used = v_exec_price * v_new_qty / p_leverage, updated_at = NOW()
+                    WHERE id = v_position.id;
+            ELSE
+                UPDATE positions SET quantity = v_new_qty,
+                    margin_used = COALESCE(v_position.margin_used, 0) - v_close_margin, updated_at = NOW()
+                    WHERE id = v_position.id;
+            END IF;
+
+            UPDATE teas SET current_short_volume = GREATEST(0, COALESCE(current_short_volume, 0) - v_close_qty)
+                WHERE id = v_tea_id;
         END IF;
 
-        UPDATE teas SET current_long_volume = COALESCE(current_long_volume, 0) + p_quantity
-        WHERE symbol = p_tea_symbol;
-
-    -- ── SELL ────────────────────────────────────────────────────────
+    -- ── SELL ─────────────────────────────────────────────────────────
     ELSIF p_side = 'SELL' THEN
-        SELECT * INTO v_position FROM positions
-            WHERE user_id = p_user_id
-              AND tea_id = (SELECT id FROM teas WHERE symbol = p_tea_symbol)
-            FOR UPDATE;
+        IF v_existing_qty <= 0 THEN
+            v_exec_price := v_price * (1 - v_spread / 2);
+            v_notional   := v_exec_price * p_quantity;
+            v_margin_req := v_notional / p_leverage;
+            v_spread_cost := (v_price - v_exec_price) * p_quantity;
 
-        IF NOT FOUND OR v_position.quantity < p_quantity THEN
-            RETURN jsonb_build_object('success', false, 'error',
-                'Insufficient holdings. Have ' || COALESCE(v_position.quantity, 0) || ' kg');
-        END IF;
+            IF v_bal < v_margin_req THEN
+                RETURN jsonb_build_object('success', false, 'error',
+                    'Insufficient margin. Need $' || ROUND(v_margin_req, 2) || ' (have $' || ROUND(v_bal, 2) || ')');
+            END IF;
+            v_new_balance := v_bal - v_margin_req;
 
-        v_new_balance := v_profile.cash_balance + v_total;
-        UPDATE profiles SET cash_balance = v_new_balance WHERE id = p_user_id;
+            IF FOUND THEN
+                v_new_qty    := v_existing_qty - p_quantity;
+                v_new_avg    := ((v_position.avg_entry_price * ABS(v_existing_qty)) + (v_exec_price * p_quantity)) / ABS(v_new_qty);
+                v_new_margin := COALESCE(v_position.margin_used, 0) + v_margin_req;
+                v_new_leverage := ABS(v_new_qty) * v_new_avg / NULLIF(v_new_margin, 0);
+                UPDATE positions SET quantity = v_new_qty, avg_entry_price = v_new_avg,
+                    margin_used = v_new_margin, leverage = COALESCE(v_new_leverage, 1), updated_at = NOW()
+                    WHERE id = v_position.id;
+            ELSE
+                INSERT INTO positions (user_id, tea_id, quantity, avg_entry_price, leverage, margin_used, trading_mode)
+                    VALUES (p_user_id, v_tea_id, -p_quantity, v_exec_price, p_leverage, v_margin_req, p_mode);
+            END IF;
 
-        v_new_qty := v_position.quantity - p_quantity;
-        IF v_new_qty <= 0 THEN
-            DELETE FROM positions WHERE id = v_position.id;
+            UPDATE teas SET current_short_volume = COALESCE(current_short_volume, 0) + p_quantity
+                WHERE id = v_tea_id;
+
         ELSE
-            UPDATE positions
-                SET quantity = v_new_qty, updated_at = NOW()
-                WHERE id = v_position.id;
-        END IF;
+            v_exec_price := v_price * (1 - v_spread / 2);
+            v_spread_cost := (v_price - v_exec_price) * p_quantity;
+            v_close_qty := LEAST(p_quantity, v_existing_qty);
+            v_open_qty  := p_quantity - v_close_qty;
+            v_close_pnl    := (v_exec_price - v_position.avg_entry_price) * v_close_qty;
+            v_close_margin := COALESCE(v_position.margin_used, 0) * (v_close_qty / v_existing_qty);
+            v_new_balance  := v_bal + v_close_margin + v_close_pnl;
+            IF v_open_qty > 0 THEN
+                v_margin_req := v_exec_price * v_open_qty / p_leverage;
+                v_new_balance := v_new_balance - v_margin_req;
+            END IF;
+            IF v_new_balance < 0 THEN
+                RETURN jsonb_build_object('success', false, 'error', 'Insufficient balance to complete this trade');
+            END IF;
+            v_new_qty := v_existing_qty - p_quantity;
+            IF v_new_qty = 0 THEN
+                DELETE FROM positions WHERE id = v_position.id;
+            ELSIF v_new_qty > 0 THEN
+                UPDATE positions SET quantity = v_new_qty,
+                    margin_used = COALESCE(v_position.margin_used, 0) - v_close_margin, updated_at = NOW()
+                    WHERE id = v_position.id;
+            ELSE
+                UPDATE positions SET quantity = v_new_qty, avg_entry_price = v_exec_price,
+                    leverage = p_leverage, margin_used = v_exec_price * ABS(v_new_qty) / p_leverage, updated_at = NOW()
+                    WHERE id = v_position.id;
+            END IF;
 
-        UPDATE teas SET current_long_volume = GREATEST(0, COALESCE(current_long_volume, 0) - p_quantity)
-        WHERE symbol = p_tea_symbol;
+            UPDATE teas SET current_long_volume = GREATEST(0, COALESCE(current_long_volume, 0) - v_close_qty)
+                WHERE id = v_tea_id;
+        END IF;
     END IF;
 
-    -- ── RECORD TRADE (immutable audit trail) ────────────────────────
-    INSERT INTO trades (user_id, tea_id, side, quantity, price, total_value)
-        VALUES (p_user_id,
-                (SELECT id FROM teas WHERE symbol = p_tea_symbol),
-                p_side, p_quantity, v_exec_price, v_total)
+    IF p_mode = 'REAL' THEN
+        UPDATE profiles SET real_balance = v_new_balance WHERE id = p_user_id;
+    ELSE
+        UPDATE profiles SET virtual_balance = v_new_balance, cash_balance = v_new_balance WHERE id = p_user_id;
+    END IF;
+
+    INSERT INTO trades (user_id, tea_id, side, quantity, price, total_value, leverage, trading_mode)
+        VALUES (p_user_id, v_tea_id, p_side, p_quantity, v_exec_price,
+                v_exec_price * p_quantity, p_leverage, p_mode)
         RETURNING * INTO v_trade;
 
+    v_spread_cost := COALESCE(v_spread_cost, 0);
+    IF v_spread_cost > 0 THEN
+        INSERT INTO platform_revenue (revenue_type, trade_id, user_id, amount, symbol)
+            VALUES ('spread', v_trade.id, p_user_id, v_spread_cost, p_tea_symbol);
+    END IF;
+
     RETURN jsonb_build_object(
-        'success',        true,
-        'trade_id',       v_trade.id::TEXT,
-        'side',           p_side,
-        'symbol',         p_tea_symbol,
-        'quantity',       p_quantity,
-        'price',          v_exec_price,
-        'mid_price',      v_price,
-        'spread',         v_spread,
-        'spread_cost',    v_spread_cost,
-        'total',          v_total,
-        'new_balance',    v_new_balance,
-        'execution_price', v_exec_price
+        'success', true,
+        'trade_id', v_trade.id::TEXT,
+        'side', p_side,
+        'symbol', p_tea_symbol,
+        'quantity', p_quantity,
+        'market_price', v_price,
+        'execution_price', v_exec_price,
+        'price', v_exec_price,
+        'total', v_exec_price * p_quantity,
+        'spread_cost', v_spread_cost,
+        'margin_used', COALESCE(v_margin_req, v_close_margin),
+        'leverage', p_leverage,
+        'new_balance', v_new_balance,
+        'mode', p_mode
     );
 END;
 $$;
@@ -606,6 +692,8 @@ $$;
 
 -- 12. ATOMIC INDEX TRADE FUNCTION (C4 FIX)
 -- The server provides the mid price — spread is applied server-side.
+-- Supports full netting: longs can close shorts and vice versa.
+-- Tracks margin_used on index_positions for proper stop-out calculations.
 CREATE OR REPLACE FUNCTION execute_index_trade(
     p_user_id      UUID,
     p_index_symbol TEXT,
@@ -626,14 +714,24 @@ DECLARE
     v_trade        RECORD;
     v_spread       NUMERIC;
     v_exec_price   NUMERIC;
+    v_notional     NUMERIC;
+    v_margin_req   NUMERIC;
     v_spread_cost  NUMERIC;
-    v_total        NUMERIC;
-    v_margin       NUMERIC;
+    v_bal          NUMERIC;
     v_new_balance  NUMERIC;
     v_new_qty      NUMERIC;
     v_new_avg      NUMERIC;
-    v_lev          NUMERIC;
+    v_new_margin   NUMERIC;
+    v_new_leverage NUMERIC;
+    v_existing_qty NUMERIC;
+    v_close_qty    NUMERIC;
+    v_open_qty     NUMERIC;
+    v_close_pnl    NUMERIC;
+    v_close_margin NUMERIC;
 BEGIN
+    IF p_mode NOT IN ('VIRTUAL', 'REAL') THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Invalid trading mode');
+    END IF;
     IF p_side NOT IN ('BUY', 'SELL') THEN
         RETURN jsonb_build_object('success', false, 'error', 'Invalid side: must be BUY or SELL');
     END IF;
@@ -643,100 +741,173 @@ BEGIN
     IF p_price IS NULL OR p_price <= 0 OR p_price != p_price OR p_price > 1e15 THEN
         RETURN jsonb_build_object('success', false, 'error', 'Invalid price');
     END IF;
-
+    IF p_leverage < 1 OR p_leverage > 25 THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Leverage must be between 1 and 25');
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM indexes WHERE symbol = p_index_symbol) THEN
         RETURN jsonb_build_object('success', false, 'error', 'Index not found: ' || p_index_symbol);
     END IF;
 
-    v_lev := GREATEST(1, LEAST(25, COALESCE(p_leverage, 1)));
+    SELECT value INTO v_spread FROM platform_config WHERE key = 'spread_pct';
+    v_spread := COALESCE(v_spread, 0.01);
 
-    -- Symmetric spread (1% default)
-    v_spread := 0.01;
-    IF p_side = 'BUY' THEN
-        v_exec_price := p_price * (1.0 + v_spread / 2.0);
-    ELSE
-        v_exec_price := p_price * (1.0 - v_spread / 2.0);
-    END IF;
-    v_spread_cost := ABS(v_exec_price - p_price) * p_quantity;
-
-    v_total  := v_exec_price * p_quantity;
-    v_margin := v_total / v_lev;
-
-    -- Lock user profile
     SELECT * INTO v_profile FROM profiles WHERE id = p_user_id FOR UPDATE;
     IF NOT FOUND THEN
         RETURN jsonb_build_object('success', false, 'error', 'User profile not found');
     END IF;
+    v_bal := CASE WHEN p_mode = 'REAL' THEN v_profile.real_balance ELSE v_profile.virtual_balance END;
 
-    -- ── BUY ─────────────────────────────────────────────────────────
+    SELECT * INTO v_position FROM index_positions
+        WHERE user_id = p_user_id AND index_symbol = p_index_symbol AND trading_mode = p_mode
+        FOR UPDATE;
+
+    v_existing_qty := COALESCE(v_position.quantity, 0);
+
+    -- ── BUY ──────────────────────────────────────────────────────────
     IF p_side = 'BUY' THEN
-        IF v_profile.cash_balance < v_margin THEN
-            RETURN jsonb_build_object('success', false, 'error',
-                'Insufficient balance. Need $' || ROUND(v_margin, 2) || ' margin (' || v_lev || 'x leverage)');
-        END IF;
+        IF v_existing_qty >= 0 THEN
+            v_exec_price := p_price * (1 + v_spread / 2);
+            v_notional   := v_exec_price * p_quantity;
+            v_margin_req := v_notional / p_leverage;
+            v_spread_cost := (v_exec_price - p_price) * p_quantity;
 
-        v_new_balance := v_profile.cash_balance - v_margin;
-        UPDATE profiles SET cash_balance = v_new_balance WHERE id = p_user_id;
+            IF v_bal < v_margin_req THEN
+                RETURN jsonb_build_object('success', false, 'error',
+                    'Insufficient margin. Need $' || ROUND(v_margin_req, 2) || ' (have $' || ROUND(v_bal, 2) || ')');
+            END IF;
+            v_new_balance := v_bal - v_margin_req;
 
-        SELECT * INTO v_position FROM index_positions
-            WHERE user_id = p_user_id AND index_symbol = p_index_symbol
-            FOR UPDATE;
+            IF FOUND THEN
+                v_new_qty    := v_existing_qty + p_quantity;
+                v_new_avg    := ((v_position.avg_entry_price * v_existing_qty) + (v_exec_price * p_quantity)) / v_new_qty;
+                v_new_margin := v_position.margin_used + v_margin_req;
+                v_new_leverage := v_new_qty * v_new_avg / NULLIF(v_new_margin, 0);
+                UPDATE index_positions SET quantity = v_new_qty, avg_entry_price = v_new_avg,
+                    margin_used = v_new_margin, leverage = COALESCE(v_new_leverage, 1), updated_at = NOW()
+                    WHERE id = v_position.id;
+            ELSE
+                INSERT INTO index_positions (user_id, index_symbol, quantity, avg_entry_price, leverage, margin_used, trading_mode)
+                    VALUES (p_user_id, p_index_symbol, p_quantity, v_exec_price, p_leverage, v_margin_req, p_mode);
+            END IF;
 
-        IF FOUND THEN
-            v_new_qty := v_position.quantity + p_quantity;
-            v_new_avg := ((v_position.avg_entry_price * v_position.quantity) + (v_exec_price * p_quantity)) / v_new_qty;
-            UPDATE index_positions
-                SET quantity = v_new_qty, avg_entry_price = v_new_avg, updated_at = NOW()
-                WHERE id = v_position.id;
         ELSE
-            INSERT INTO index_positions (user_id, index_symbol, quantity, avg_entry_price)
-                VALUES (p_user_id, p_index_symbol, p_quantity, v_exec_price);
+            v_exec_price := p_price * (1 + v_spread / 2);
+            v_spread_cost := (v_exec_price - p_price) * p_quantity;
+            v_close_qty := LEAST(p_quantity, ABS(v_existing_qty));
+            v_open_qty  := p_quantity - v_close_qty;
+            v_close_pnl    := (v_position.avg_entry_price - v_exec_price) * v_close_qty;
+            v_close_margin := v_position.margin_used * (v_close_qty / ABS(v_existing_qty));
+            v_new_balance  := v_bal + v_close_margin + v_close_pnl;
+            IF v_open_qty > 0 THEN
+                v_margin_req := v_exec_price * v_open_qty / p_leverage;
+                v_new_balance := v_new_balance - v_margin_req;
+            END IF;
+            IF v_new_balance < 0 THEN
+                RETURN jsonb_build_object('success', false, 'error', 'Insufficient balance to complete this trade');
+            END IF;
+            v_new_qty := v_existing_qty + p_quantity;
+            IF v_new_qty = 0 THEN
+                DELETE FROM index_positions WHERE id = v_position.id;
+            ELSIF v_new_qty > 0 THEN
+                UPDATE index_positions SET quantity = v_new_qty, avg_entry_price = v_exec_price,
+                    leverage = p_leverage, margin_used = v_exec_price * v_new_qty / p_leverage, updated_at = NOW()
+                    WHERE id = v_position.id;
+            ELSE
+                UPDATE index_positions SET quantity = v_new_qty,
+                    margin_used = v_position.margin_used - v_close_margin, updated_at = NOW()
+                    WHERE id = v_position.id;
+            END IF;
         END IF;
 
-    -- ── SELL ────────────────────────────────────────────────────────
+    -- ── SELL ─────────────────────────────────────────────────────────
     ELSIF p_side = 'SELL' THEN
-        SELECT * INTO v_position FROM index_positions
-            WHERE user_id = p_user_id AND index_symbol = p_index_symbol
-            FOR UPDATE;
+        IF v_existing_qty <= 0 THEN
+            v_exec_price := p_price * (1 - v_spread / 2);
+            v_notional   := v_exec_price * p_quantity;
+            v_margin_req := v_notional / p_leverage;
+            v_spread_cost := (p_price - v_exec_price) * p_quantity;
 
-        IF NOT FOUND OR v_position.quantity < p_quantity THEN
-            RETURN jsonb_build_object('success', false, 'error',
-                'Insufficient index holdings. Have ' || COALESCE(v_position.quantity, 0) || ' kg');
-        END IF;
+            IF v_bal < v_margin_req THEN
+                RETURN jsonb_build_object('success', false, 'error',
+                    'Insufficient margin. Need $' || ROUND(v_margin_req, 2) || ' (have $' || ROUND(v_bal, 2) || ')');
+            END IF;
+            v_new_balance := v_bal - v_margin_req;
 
-        v_new_balance := v_profile.cash_balance + v_total;
-        UPDATE profiles SET cash_balance = v_new_balance WHERE id = p_user_id;
+            IF FOUND THEN
+                v_new_qty    := v_existing_qty - p_quantity;
+                v_new_avg    := ((v_position.avg_entry_price * ABS(v_existing_qty)) + (v_exec_price * p_quantity)) / ABS(v_new_qty);
+                v_new_margin := v_position.margin_used + v_margin_req;
+                v_new_leverage := ABS(v_new_qty) * v_new_avg / NULLIF(v_new_margin, 0);
+                UPDATE index_positions SET quantity = v_new_qty, avg_entry_price = v_new_avg,
+                    margin_used = v_new_margin, leverage = COALESCE(v_new_leverage, 1), updated_at = NOW()
+                    WHERE id = v_position.id;
+            ELSE
+                INSERT INTO index_positions (user_id, index_symbol, quantity, avg_entry_price, leverage, margin_used, trading_mode)
+                    VALUES (p_user_id, p_index_symbol, -p_quantity, v_exec_price, p_leverage, v_margin_req, p_mode);
+            END IF;
 
-        v_new_qty := v_position.quantity - p_quantity;
-        IF v_new_qty <= 0 THEN
-            DELETE FROM index_positions WHERE id = v_position.id;
         ELSE
-            UPDATE index_positions
-                SET quantity = v_new_qty, updated_at = NOW()
-                WHERE id = v_position.id;
+            v_exec_price := p_price * (1 - v_spread / 2);
+            v_spread_cost := (p_price - v_exec_price) * p_quantity;
+            v_close_qty := LEAST(p_quantity, v_existing_qty);
+            v_open_qty  := p_quantity - v_close_qty;
+            v_close_pnl    := (v_exec_price - v_position.avg_entry_price) * v_close_qty;
+            v_close_margin := v_position.margin_used * (v_close_qty / v_existing_qty);
+            v_new_balance  := v_bal + v_close_margin + v_close_pnl;
+            IF v_open_qty > 0 THEN
+                v_margin_req := v_exec_price * v_open_qty / p_leverage;
+                v_new_balance := v_new_balance - v_margin_req;
+            END IF;
+            IF v_new_balance < 0 THEN
+                RETURN jsonb_build_object('success', false, 'error', 'Insufficient balance to complete this trade');
+            END IF;
+            v_new_qty := v_existing_qty - p_quantity;
+            IF v_new_qty = 0 THEN
+                DELETE FROM index_positions WHERE id = v_position.id;
+            ELSIF v_new_qty > 0 THEN
+                UPDATE index_positions SET quantity = v_new_qty,
+                    margin_used = v_position.margin_used - v_close_margin, updated_at = NOW()
+                    WHERE id = v_position.id;
+            ELSE
+                UPDATE index_positions SET quantity = v_new_qty, avg_entry_price = v_exec_price,
+                    leverage = p_leverage, margin_used = v_exec_price * ABS(v_new_qty) / p_leverage, updated_at = NOW()
+                    WHERE id = v_position.id;
+            END IF;
         END IF;
     END IF;
 
-    -- ── RECORD TRADE ────────────────────────────────────────────────
-    INSERT INTO trades (user_id, tea_id, index_symbol, side, quantity, price, total_value, leverage)
-        VALUES (p_user_id, NULL, p_index_symbol, p_side, p_quantity, v_exec_price, v_total, v_lev)
+    IF p_mode = 'REAL' THEN
+        UPDATE profiles SET real_balance = v_new_balance WHERE id = p_user_id;
+    ELSE
+        UPDATE profiles SET virtual_balance = v_new_balance, cash_balance = v_new_balance WHERE id = p_user_id;
+    END IF;
+
+    INSERT INTO trades (user_id, tea_id, index_symbol, side, quantity, price, total_value, leverage, trading_mode)
+        VALUES (p_user_id, NULL, p_index_symbol, p_side, p_quantity, v_exec_price,
+                v_exec_price * p_quantity, p_leverage, p_mode)
         RETURNING * INTO v_trade;
 
+    v_spread_cost := COALESCE(v_spread_cost, 0);
+    IF v_spread_cost > 0 THEN
+        INSERT INTO platform_revenue (revenue_type, trade_id, user_id, amount, symbol)
+            VALUES ('spread', v_trade.id, p_user_id, v_spread_cost, p_index_symbol);
+    END IF;
+
     RETURN jsonb_build_object(
-        'success',          true,
-        'trade_id',         v_trade.id::TEXT,
-        'side',             p_side,
-        'symbol',           p_index_symbol,
-        'quantity',         p_quantity,
-        'price',            v_exec_price,
-        'mid_price',        p_price,
-        'spread',           v_spread,
-        'spread_cost',      v_spread_cost,
-        'total',            v_total,
-        'margin',           v_margin,
-        'leverage',         v_lev,
-        'new_balance',      v_new_balance,
-        'execution_price',  v_exec_price
+        'success', true,
+        'trade_id', v_trade.id::TEXT,
+        'side', p_side,
+        'symbol', p_index_symbol,
+        'quantity', p_quantity,
+        'market_price', p_price,
+        'execution_price', v_exec_price,
+        'price', v_exec_price,
+        'total', v_exec_price * p_quantity,
+        'spread_cost', v_spread_cost,
+        'margin_used', COALESCE(v_margin_req, v_close_margin),
+        'leverage', p_leverage,
+        'new_balance', v_new_balance,
+        'mode', p_mode
     );
 END;
 $$;
@@ -1947,15 +2118,14 @@ ALTER TABLE trades ADD CONSTRAINT trades_must_have_symbol
     CHECK (tea_id IS NOT NULL OR index_symbol IS NOT NULL);
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- CHECK_STOP_OUTS — Equity-Based Liquidation (2% buffer)
+-- CHECK_STOP_OUTS — Equity-Floor Liquidation
 --
--- Liquidation formula:  equity / total_used_margin <= 0.02
+-- Liquidation formula:  equity <= starting_balance * 5%
 --   where equity = cash_balance + unrealized_pnl (all open positions)
 --
--- This ensures account balance never goes negative by closing out
--- when only 2% of margin remains as equity backing.
---
--- Margin call at equity/margin <= 0.15 (15%).
+-- Users can ride positions down to near-zero. Liquidation fires only when
+-- total account equity drops to 5% of the default starting balance ($500
+-- for a $10,000 virtual account). Margin call warning at 15% ($1,500).
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 CREATE OR REPLACE FUNCTION check_stop_outs()
@@ -1966,15 +2136,16 @@ SET search_path = public
 AS $$
 DECLARE
     v_user            RECORD;
-    v_stop_level      NUMERIC;
-    v_call_level      NUMERIC;
+    v_default_bal     NUMERIC;
+    v_stop_floor      NUMERIC;
+    v_call_floor      NUMERIC;
     v_bal             NUMERIC;
     v_used_margin     NUMERIC;
     v_unrealized_tea  NUMERIC;
     v_unrealized_idx  NUMERIC;
     v_total_pnl       NUMERIC;
     v_equity          NUMERIC;
-    v_margin_level    NUMERIC;
+    v_equity_pct      NUMERIC;
     v_pos             RECORD;
     v_close_pnl       NUMERIC;
     v_spread          NUMERIC;
@@ -1983,11 +2154,9 @@ DECLARE
     v_already_warned  BOOLEAN;
     v_idx_price       NUMERIC;
 BEGIN
-    SELECT value INTO v_stop_level FROM platform_config WHERE key = 'stop_out_level';
-    v_stop_level := COALESCE(v_stop_level, 0.02);
-
-    SELECT value INTO v_call_level FROM platform_config WHERE key = 'margin_call_level';
-    v_call_level := COALESCE(v_call_level, 0.15);
+    v_default_bal := 10000;
+    v_stop_floor  := 50;    -- $50: liquidate when equity is essentially zero
+    v_call_floor  := 500;   -- $500: warn when account is critically low
 
     SELECT value INTO v_spread FROM platform_config WHERE key = 'spread_pct';
     v_spread := COALESCE(v_spread, 0.01);
@@ -2050,18 +2219,10 @@ BEGIN
 
         v_total_pnl := v_unrealized_tea + v_unrealized_idx;
         v_equity    := v_bal + v_total_pnl;
+        v_equity_pct := CASE WHEN v_default_bal > 0 THEN (v_equity / v_default_bal) * 100 ELSE 0 END;
 
-        -- Equity / Used Margin ratio — the core liquidation metric.
-        -- At 100% the account is fully covered; at 2% the 2% buffer triggers close-out.
-        v_margin_level := v_equity / v_used_margin;
-
-        -- Hard floor: if equity is already negative, always liquidate
-        IF v_equity <= 0 THEN
-            v_margin_level := 0;
-        END IF;
-
-        -- ── STOP-OUT (equity/margin <= 2%) ─────────────────────────────
-        IF v_margin_level <= v_stop_level THEN
+        -- ── STOP-OUT (equity near $0) ────────────────────────────────────
+        IF v_equity <= v_stop_floor THEN
             -- Liquidate all tea positions
             FOR v_pos IN
                 SELECT p.*, t.current_price, t.symbol AS tea_symbol
@@ -2141,15 +2302,14 @@ BEGIN
 
             INSERT INTO margin_notifications (user_id, type, trading_mode, equity, used_margin, margin_level, message)
                 VALUES (v_user.user_id, 'STOP_OUT', v_user.trading_mode,
-                        v_equity, v_used_margin, v_margin_level * 100,
-                        'All positions liquidated — equity fell to '
-                        || ROUND(v_margin_level * 100, 1) || '% of used margin (threshold: '
-                        || ROUND(v_stop_level * 100) || '%).');
+                        v_equity, v_used_margin, v_equity_pct,
+                        'All positions liquidated — equity fell to $'
+                        || ROUND(v_equity, 2) || '. Account depleted.');
 
             v_liquidated := v_liquidated + 1;
 
-        -- ── MARGIN CALL (equity/margin <= 15%) ─────────────────────────
-        ELSIF v_margin_level <= v_call_level THEN
+        -- ── LOW EQUITY WARNING (equity <= $500) ──────────────────────────
+        ELSIF v_equity <= v_call_floor THEN
             SELECT EXISTS (
                 SELECT 1 FROM margin_notifications
                 WHERE user_id = v_user.user_id
@@ -2161,10 +2321,9 @@ BEGIN
             IF NOT v_already_warned THEN
                 INSERT INTO margin_notifications (user_id, type, trading_mode, equity, used_margin, margin_level, message)
                     VALUES (v_user.user_id, 'MARGIN_CALL', v_user.trading_mode,
-                            v_equity, v_used_margin, v_margin_level * 100,
-                            'Equity at ' || ROUND(v_margin_level * 100, 1)
-                            || '% of used margin. Close positions or deposit funds to avoid '
-                            || 'liquidation at ' || ROUND(v_stop_level * 100) || '%.');
+                            v_equity, v_used_margin, v_equity_pct,
+                            'Account equity at $' || ROUND(v_equity, 2)
+                            || '. Close positions to avoid total liquidation.');
 
                 v_margin_calls := v_margin_calls + 1;
             END IF;

@@ -388,7 +388,7 @@ async function executeSlTpClose(teaId, order, currentPrice, triggerType) {
         delete state.pendingSlTpOrders[teaId];
 
         setActiveBalance(result.new_balance);
-        await loadPositions();
+        await Promise.all([loadPositions(), loadUserProfile()]);
         updateUIForLoggedInUser();
 
         showToast(`${triggerType} Triggered!`, `${order.symbol} closed at $${result.price.toFixed(2)} (${pnlText})`);
@@ -452,7 +452,7 @@ async function closePosition(teaId, quantity, teaSymbol) {
             type: isShort ? 'short' : 'long'
         }, result.price);
 
-        await loadPositions();
+        await Promise.all([loadPositions(), loadUserProfile()]);
         await new Promise(r => setTimeout(r, 400));
         await loadUserTrades();
         updateUIForLoggedInUser();
@@ -513,8 +513,7 @@ async function closeIndexPosition(indexSymbol, quantity, tradeId) {
         const action = isShort ? 'Covered' : 'Sold';
         showToast('Position Closed!', `${action} ${closeQty.toLocaleString()} kg of ${indexSymbol} Index. ${pnlText}`);
 
-        await loadPositions();
-        await loadIndexPositions();
+        await Promise.all([loadPositions(), loadIndexPositions(), loadUserProfile()]);
         await new Promise(r => setTimeout(r, 400));
         await loadUserTrades();
         updateUIForLoggedInUser();
@@ -624,8 +623,7 @@ async function closePairPosition(tradeId) {
             created_at: trade.created_at
         }, currentRatio);
 
-        await loadPositions();
-        await loadIndexPositions();
+        await Promise.all([loadPositions(), loadIndexPositions(), loadUserProfile()]);
         await new Promise(r => setTimeout(r, 400));
         await loadUserTrades();
         updateUIForLoggedInUser();
