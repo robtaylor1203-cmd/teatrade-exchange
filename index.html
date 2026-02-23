@@ -591,6 +591,10 @@
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                             Contact Us
                         </a>
+                        <button class="user-dropdown-item user-dropdown-admin" id="admin-dropdown-btn" style="display:none;" onclick="openAdminPanel(); closeUserDropdown();">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+                            Admin Dashboard
+                        </button>
                         <button class="user-dropdown-item user-dropdown-logout" onclick="handleLogout(); closeUserDropdown();">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                             Log Out
@@ -2059,6 +2063,7 @@
     <script src="js/chat.js?v=20260222m"></script>
     <script src="js/pairs.js?v=20260218"></script>
     <script src="js/search.js?v=20260221u"></script>
+    <script src="js/admin.js?v=20260223a"></script>
     <script src="js/app.js?v=20260222m"></script>
 
     <!-- Cookie Consent Banner -->
@@ -2086,5 +2091,26 @@
         }
     }
     </script>
+
+    <!-- Admin Analytics Dashboard Modal -->
+    <div class="admin-modal" id="admin-modal" role="dialog" aria-modal="true" aria-label="Admin Dashboard">
+        <div class="admin-backdrop" onclick="closeAdminPanel()"></div>
+        <div class="admin-content">
+            <div class="admin-header">
+                <div class="admin-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+                    Admin Dashboard
+                </div>
+                <div class="admin-header-actions">
+                    <button class="admin-refresh-btn" onclick="loadAdminData()" title="Refresh data">&#8635;</button>
+                    <button class="admin-close" onclick="closeAdminPanel()">&times;</button>
+                </div>
+            </div>
+            <div class="admin-timestamp" id="admin-timestamp"></div>
+            <div class="admin-body" id="admin-body">
+                <div class="admin-loading">Loading analytics...</div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

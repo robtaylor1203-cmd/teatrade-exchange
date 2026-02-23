@@ -653,6 +653,8 @@ function updateUIForLoggedInUser() {
     document.getElementById('logged-in-ui').style.display = 'flex';
     document.getElementById('portfolio-section').style.display = 'block';
 
+    if (typeof showAdminButton === 'function') showAdminButton();
+
     const balance = getActiveBalance();
     const formatted = '$' + balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     document.getElementById('user-balance').textContent = formatted;
