@@ -57,12 +57,60 @@ function renderAdminDashboard(container, data) {
     const u = data.users;
     const t = data.trades;
     const r = data.revenue;
+    const p = data.pnl || {};
     const top = data.top_traders || [];
+
+    const netPnl = Number(p.net_pnl || 0);
+    const counterparty = Number(p.counterparty_pnl || 0);
+    const netPnlClass = netPnl >= 0 ? 'admin-buy' : 'admin-sell';
+    const counterpartyClass = counterparty >= 0 ? 'admin-buy' : 'admin-sell';
 
     const emailApiUrl = `${SUPABASE_URL}/functions/v1/admin-emails`;
 
     container.innerHTML = `
         <div class="admin-grid">
+            <!-- PLATFORM NET P&L CARD — the real bottom line -->
+            <div class="admin-card admin-card-highlight">
+                <div class="admin-card-header">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="10"/></svg>
+                    Platform Net P&L
+                </div>
+                <div class="admin-stat-big ${netPnlClass}">${_fmtUsd(netPnl)}</div>
+                <div class="admin-stat-label">True bottom line (fees + counterparty)</div>
+                <div class="admin-stat-row">
+                    <div class="admin-stat-item">
+                        <span class="admin-stat-value">${_fmtUsd(p.fee_revenue)}</span>
+                        <span class="admin-stat-sub">Fee revenue</span>
+                    </div>
+                    <div class="admin-stat-item">
+                        <span class="admin-stat-value ${counterpartyClass}">${_fmtUsd(counterparty)}</span>
+                        <span class="admin-stat-sub">Counterparty P&L</span>
+                    </div>
+                </div>
+                <div class="admin-divider"></div>
+                <div class="admin-stat-row">
+                    <div class="admin-stat-item">
+                        <span class="admin-stat-value">${_fmtUsd(p.starting_capital)}</span>
+                        <span class="admin-stat-sub">Capital issued</span>
+                    </div>
+                    <div class="admin-stat-item">
+                        <span class="admin-stat-value">${_fmtUsd(p.total_user_equity)}</span>
+                        <span class="admin-stat-sub">User equity now</span>
+                    </div>
+                </div>
+                <div class="admin-stat-row">
+                    <div class="admin-stat-item">
+                        <span class="admin-stat-value">${_fmtUsd(p.open_tea_pnl)}</span>
+                        <span class="admin-stat-sub">Open tea P&L</span>
+                    </div>
+                    <div class="admin-stat-item">
+                        <span class="admin-stat-value">${_fmtUsd(p.open_index_pnl)}</span>
+                        <span class="admin-stat-sub">Open index P&L</span>
+                    </div>
+                </div>
+                <div class="admin-pnl-note">Counterparty = what traders collectively lost (positive = you profit). Excludes resets &amp; top-ups.</div>
+            </div>
+
             <!-- USERS CARD -->
             <div class="admin-card">
                 <div class="admin-card-header">
@@ -163,14 +211,14 @@ function renderAdminDashboard(container, data) {
                 </div>
             </div>
 
-            <!-- REVENUE / P&L CARD -->
+            <!-- FEE REVENUE CARD -->
             <div class="admin-card">
                 <div class="admin-card-header">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
-                    Platform Revenue
+                    Fee Revenue (Gross)
                 </div>
                 <div class="admin-stat-big admin-revenue">${_fmtUsd(r.total)}</div>
-                <div class="admin-stat-label">Total platform revenue</div>
+                <div class="admin-stat-label">Spreads + swaps + stop-out fees</div>
                 <div class="admin-stat-row">
                     <div class="admin-stat-item">
                         <span class="admin-stat-value">${_fmtUsd(r.today)}</span>
