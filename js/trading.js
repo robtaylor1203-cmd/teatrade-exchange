@@ -270,6 +270,10 @@ async function executeTrade() {
         productName = tea.name || tea.symbol;
     }
 
+    // Re-read the live price from state right before execution so the form
+    // reflects the most recent Realtime tick (avoids stale-form entry).
+    updateTradeSummary();
+
     btn.disabled = true;
     btn.textContent = 'Executing...';
 
@@ -291,8 +295,8 @@ async function executeTrade() {
             setActiveBalance(result.new_balance);
 
             const idxSideLabel = state.tradeType === 'BUY' ? 'Bought' : 'Shorted';
-            const _sc = result.spread_cost ? ` — Spread: $${Number(result.spread_cost).toFixed(2)}` : '';
-            showToast('Trade Executed!', `${idxSideLabel} ${qty.toLocaleString()} kg of ${productName} at $${(result.execution_price || executionPrice).toFixed(2)}/kg (${leverage}x)${_sc}`);
+            const _sc = result.spread_cost ? ` — Spread: $${Number(result.spread_cost).toFixed(4)}` : '';
+            showToast('Trade Executed!', `${idxSideLabel} ${qty.toLocaleString()} kg of ${productName} at $${(result.execution_price || executionPrice).toFixed(4)}/kg (${leverage}x)${_sc}`);
 
             await loadIndexPositions();
 
@@ -310,9 +314,9 @@ async function executeTrade() {
             const serverTotal = result.total;
 
             const sideLabel = state.tradeType === 'BUY' ? 'Bought' : 'Shorted';
-            const _sc = result.spread_cost ? ` — Spread: $${Number(result.spread_cost).toFixed(2)}` : '';
+            const _sc = result.spread_cost ? ` — Spread: $${Number(result.spread_cost).toFixed(4)}` : '';
             showToast('Trade Executed!',
-                `${sideLabel} ${qty.toLocaleString()} kg of ${tea.symbol} at $${serverPrice.toFixed(2)}/kg (${leverage}x)${_sc}`);
+                `${sideLabel} ${qty.toLocaleString()} kg of ${tea.symbol} at $${serverPrice.toFixed(4)}/kg (${leverage}x)${_sc}`);
 
             if (stopLoss || takeProfit) {
                 state.pendingSlTpOrders[tea.id] = {

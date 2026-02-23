@@ -79,7 +79,8 @@ function updatePortfolioDisplay() {
         const lev = Number(pos.leverage) || 1;
         const margin = costBasis / lev;
         const pnlPct = margin > 0 ? (pnl / margin * 100).toFixed(1) : '0.0';
-        holdingsValue += currentValue;
+        const returnValue = margin + pnl;
+        holdingsValue += returnValue;
 
         const badge = isShort
             ? ' <span style="color: var(--accent-red); font-size: 10px; font-weight: 700;">SHORT</span>'
@@ -87,16 +88,15 @@ function updatePortfolioDisplay() {
         const levBadge = (pos.leverage && pos.leverage > 1)
             ? ` <span style="color: var(--accent-orange); font-size: 10px; font-weight: 700;">${pos.leverage}x</span>`
             : '';
-        const marginInfo = pos.margin_used ? `Margin: $${Number(pos.margin_used).toFixed(2)}` : '';
 
         html += `
             <div class="position-item">
                 <div>
                     <div class="position-tea">${escapeHtml(tea.symbol)}${badge}${levBadge}</div>
-                    <div class="position-qty">${absQty.toLocaleString()} kg @ $${pos.avg_entry_price.toFixed(2)} ${marginInfo ? '· ' + marginInfo : ''}</div>
+                    <div class="position-qty">${absQty.toLocaleString()} kg @ $${pos.avg_entry_price.toFixed(4)} · Invested: $${margin.toFixed(2)}</div>
                 </div>
                 <div class="position-value">
-                    <div class="position-current">$${currentValue.toFixed(2)}</div>
+                    <div class="position-current">$${returnValue.toFixed(2)}</div>
                     <div class="position-pnl ${pnl >= 0 ? 'up' : 'down'}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} (${pnlPct}%)</div>
                 </div>
             </div>
@@ -122,7 +122,8 @@ function updatePortfolioDisplay() {
         const lev = Number(pos.leverage) || 1;
         const margin = costBasis / lev;
         const pnlPct = margin > 0 ? (pnl / margin * 100).toFixed(1) : '0.0';
-        holdingsValue += currentValue;
+        const idxReturnValue = margin + pnl;
+        holdingsValue += idxReturnValue;
 
         const dirBadge = isShort
             ? '<span style="color: var(--accent-red); font-size: 10px; font-weight: 700;">SHORT</span>'
@@ -130,16 +131,15 @@ function updatePortfolioDisplay() {
         const idxLevBadge = (pos.leverage && pos.leverage > 1)
             ? ` <span style="color: var(--accent-orange); font-size: 10px; font-weight: 700;">${pos.leverage}x</span>`
             : '';
-        const idxMarginInfo = pos.margin_used ? `Margin: $${Number(pos.margin_used).toFixed(2)}` : '';
 
         html += `
             <div class="position-item">
                 <div>
                     <div class="position-tea">${escapeHtml(symbol)} <span style="color: var(--accent-purple); font-size: 10px;">IDX</span> ${dirBadge}${idxLevBadge}</div>
-                    <div class="position-qty">${absQty.toLocaleString()} kg @ $${pos.avg_entry_price.toFixed(2)} ${idxMarginInfo ? '· ' + idxMarginInfo : ''}</div>
+                    <div class="position-qty">${absQty.toLocaleString()} kg @ $${pos.avg_entry_price.toFixed(4)} · Invested: $${margin.toFixed(2)}</div>
                 </div>
                 <div class="position-value">
-                    <div class="position-current">$${currentValue.toFixed(2)}</div>
+                    <div class="position-current">$${idxReturnValue.toFixed(2)}</div>
                     <div class="position-pnl ${pnl >= 0 ? 'up' : 'down'}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} (${pnlPct}%)</div>
                 </div>
             </div>
@@ -209,7 +209,7 @@ function updatePortfolioDisplay() {
         marginHtml.style.cssText = 'padding:8px 12px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);';
         listEl.parentNode.insertBefore(marginHtml, listEl.nextSibling);
     }
-    const phColor = equity <= 50 ? 'var(--accent-red)' : equity <= 500 ? 'var(--accent-orange)' : equity <= 2000 ? '#f59e0b' : 'var(--accent-green)';
+    const phColor = equity <= 1 ? 'var(--accent-red)' : equity <= 200 ? 'var(--accent-orange)' : equity <= 1000 ? '#f59e0b' : 'var(--accent-green)';
     const phDisplay = '$' + equity.toFixed(2);
     marginHtml.innerHTML = totalUsedMargin > 0
         ? `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Balance</span><span>$${balance.toFixed(2)}</span></div>` +
@@ -227,14 +227,14 @@ function _checkClientMarginLevel(equityPct, equity, usedMargin) {
     const now = Date.now();
     if (now - _lastMarginWarningTime < _MARGIN_WARN_COOLDOWN_MS) return;
 
-    if (equity <= 50) {
+    if (equity <= 1) {
         _lastMarginWarningTime = now;
         if (typeof _showMarginAlert === 'function') {
             _showMarginAlert('CRITICAL — Account Depleted',
-                `Account equity at $${equity.toFixed(2)}. All positions will be liquidated. Close positions now!`,
+                `Account equity at $${equity.toFixed(2)}. All positions will be liquidated.`,
                 'stop_out');
         }
-    } else if (equity <= 500) {
+    } else if (equity <= 200) {
         _lastMarginWarningTime = now;
         if (typeof _showMarginAlert === 'function') {
             _showMarginAlert('Low Equity Warning',
@@ -511,9 +511,9 @@ function displayUserTrades(trades) {
             }
         } else if (isIndexTrade) {
             teaSymbol = trade.index_symbol + ' IDX';
-            total = trade.quantity * trade.price;
+            const idxNotional = trade.quantity * trade.price;
+            total = idxNotional / leverage;
             const isShortIdx = trade.side === 'SELL';
-            const idxMargin = total / leverage;
 
             if (isClosed && closing) {
                 const closePrice = closing.sellPrice ?? closing.coverPrice;
@@ -522,7 +522,7 @@ function displayUserTrades(trades) {
                 } else {
                     pnl = (closePrice - trade.price) * trade.quantity;
                 }
-                pnlPct = idxMargin > 0 ? (pnl / idxMargin * 100) : 0;
+                pnlPct = total > 0 ? (pnl / total * 100) : 0;
             } else {
                 const idxList = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
                 const index = idxList.find(idx => idx.symbol === trade.index_symbol);
@@ -535,7 +535,7 @@ function displayUserTrades(trades) {
                     } else {
                         pnl = (idxExit - trade.price) * trade.quantity;
                     }
-                    pnlPct = idxMargin > 0 ? (pnl / idxMargin * 100) : 0;
+                    pnlPct = total > 0 ? (pnl / total * 100) : 0;
                 } else {
                     pnl = 0;
                     pnlPct = 0;
@@ -544,9 +544,9 @@ function displayUserTrades(trades) {
         } else {
             // Regular single tea trade (long or short)
             teaSymbol = tea?.symbol || 'Unknown';
-            total = trade.quantity * trade.price;
+            const teaNotional = trade.quantity * trade.price;
+            total = teaNotional / leverage;
             const isShortTrade = trade.side === 'SELL';
-            const teaMargin = total / leverage;
 
             if (isClosed && closing) {
                 const closePrice = closing.sellPrice ?? closing.coverPrice;
@@ -555,7 +555,7 @@ function displayUserTrades(trades) {
                 } else {
                     pnl = (closePrice - trade.price) * trade.quantity;
                 }
-                pnlPct = teaMargin > 0 ? (pnl / teaMargin * 100) : 0;
+                pnlPct = total > 0 ? (pnl / total * 100) : 0;
             } else if (tea) {
                 const tsp = (Number(tea.base_spread) || 0.01) * (Number(tea.volatility_multiplier) || 1.0);
                 const teaExit = isShortTrade ? tea.current_price * (1 + tsp / 2) : tea.current_price * (1 - tsp / 2);
@@ -564,7 +564,7 @@ function displayUserTrades(trades) {
                 } else {
                     pnl = (teaExit - trade.price) * trade.quantity;
                 }
-                pnlPct = teaMargin > 0 ? (pnl / teaMargin * 100) : 0;
+                pnlPct = total > 0 ? (pnl / total * 100) : 0;
             } else {
                 pnl = 0;
                 pnlPct = 0;
@@ -661,9 +661,11 @@ function displayUserTrades(trades) {
             const isBuySide = trade.side === 'BUY';
             sideLabel = isBuySide ? 'BUY' : 'SHORT';
             sideClass = isBuySide ? 'buy-side' : 'sell-side';
-            entryDisplay = '$' + trade.price.toFixed(2);
+            entryDisplay = '$' + trade.price.toFixed(4);
             qtyDisplay = trade.quantity.toLocaleString();
         }
+
+        const returnVal = total + pnl;
 
         html += `
             <tr>
@@ -675,6 +677,7 @@ function displayUserTrades(trades) {
                 <td class="order-price">${entryDisplay}</td>
                 <td class="order-price">$${parseFloat(total.toFixed(2)).toLocaleString()}</td>
                 <td class="${pnlClass}">${pnlSign}$${pnl.toFixed(2)} (${pnlPct.toFixed(1)}%)</td>
+                <td class="order-price ${pnlClass}">$${returnVal.toFixed(2)}</td>
                 <td><span class="order-status ${statusClass}">${status}</span></td>
                 <td>${actionBtn}</td>
             </tr>
@@ -1768,7 +1771,6 @@ function renderFinancialTab() {
         if (!tea) return;
         const isShort = pos.quantity < 0;
         const absQty = Math.abs(pos.quantity);
-        const curVal = absQty * tea.current_price;
         const cost = absQty * pos.avg_entry_price;
         const spread = (Number(tea.base_spread) || 0.01) * (Number(tea.volatility_multiplier) || 1.0);
         const exitPx = isShort ? tea.current_price * (1 + spread / 2) : tea.current_price * (1 - spread / 2);
@@ -1778,7 +1780,8 @@ function renderFinancialTab() {
         const lev = Number(pos.leverage) || 1;
         const marginUsed = Number(pos.margin_used) || (cost / lev);
         const pnlPct = marginUsed > 0 ? (pnl / marginUsed * 100).toFixed(1) : '0.0';
-        holdingsValue += curVal;
+        const returnVal = marginUsed + pnl;
+        holdingsValue += returnVal;
         totalPnl += pnl;
         totalUsedMargin += marginUsed;
         const shortBadge = isShort ? ' <span style="color:var(--accent-red);font-size:10px;font-weight:700">SHORT</span>' : '';
@@ -1787,9 +1790,9 @@ function renderFinancialTab() {
             <div class="pf-pos-row">
                 <div class="pf-pos-symbol">${escapeHtml(tea.symbol)}${shortBadge}${levBadge}</div>
                 <div class="pf-pos-qty">${absQty.toLocaleString()} kg</div>
-                <div class="pf-pos-avg">$${pos.avg_entry_price.toFixed(2)}</div>
-                <div class="pf-pos-cur">$${tea.current_price.toFixed(2)}</div>
-                <div class="pf-pos-val">$${curVal.toFixed(2)}</div>
+                <div class="pf-pos-avg">$${pos.avg_entry_price.toFixed(4)}</div>
+                <div class="pf-pos-cur">$${tea.current_price.toFixed(4)}</div>
+                <div class="pf-pos-val">$${returnVal.toFixed(2)}</div>
                 <div class="pf-pos-pnl ${pnl >= 0 ? 'up' : 'down'}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} (${pnlPct}%)</div>
             </div>`;
     });
@@ -1799,7 +1802,6 @@ function renderFinancialTab() {
         if (!idx || !pos || pos.quantity === 0) return;
         const isShort = pos.quantity < 0;
         const absQty = Math.abs(pos.quantity);
-        const curVal = absQty * idx.price;
         const cost = absQty * pos.avg_entry_price;
         const idxSpread = 0.01;
         const exitPx = isShort ? idx.price * (1 + idxSpread / 2) : idx.price * (1 - idxSpread / 2);
@@ -1809,7 +1811,8 @@ function renderFinancialTab() {
         const idxLev = Number(pos.leverage) || 1;
         const idxMarginUsed = Number(pos.margin_used) || (cost / idxLev);
         const pnlPct = idxMarginUsed > 0 ? (pnl / idxMarginUsed * 100).toFixed(1) : '0.0';
-        holdingsValue += curVal;
+        const idxReturnVal = idxMarginUsed + pnl;
+        holdingsValue += idxReturnVal;
         totalPnl += pnl;
         totalUsedMargin += idxMarginUsed;
         const shortBadge = isShort ? ' <span style="color:var(--accent-red);font-size:10px;font-weight:700">SHORT</span>' : '';
@@ -1818,9 +1821,9 @@ function renderFinancialTab() {
             <div class="pf-pos-row">
                 <div class="pf-pos-symbol">${escapeHtml(symbol)} <span class="pf-idx-badge">IDX</span>${shortBadge}${levBadge}</div>
                 <div class="pf-pos-qty">${absQty.toLocaleString()} kg</div>
-                <div class="pf-pos-avg">$${pos.avg_entry_price.toFixed(2)}</div>
-                <div class="pf-pos-cur">$${idx.price.toFixed(2)}</div>
-                <div class="pf-pos-val">$${curVal.toFixed(2)}</div>
+                <div class="pf-pos-avg">$${pos.avg_entry_price.toFixed(4)}</div>
+                <div class="pf-pos-cur">$${idx.price.toFixed(4)}</div>
+                <div class="pf-pos-val">$${idxReturnVal.toFixed(2)}</div>
                 <div class="pf-pos-pnl ${pnl >= 0 ? 'up' : 'down'}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} (${pnlPct}%)</div>
             </div>`;
     });
@@ -1834,16 +1837,16 @@ function renderFinancialTab() {
 
     // Account health: equity as % of starting balance (for bar visualisation only)
     const equityPct = startBal > 0 ? (equity / startBal * 100) : (posCount > 0 ? 0 : 100);
-    const phColor = equity <= 50 ? 'var(--accent-red)' : equity <= 500 ? 'var(--accent-orange)' : equity <= 2000 ? '#f59e0b' : 'var(--accent-green)';
+    const phColor = equity <= 1 ? 'var(--accent-red)' : equity <= 200 ? 'var(--accent-orange)' : equity <= 1000 ? '#f59e0b' : 'var(--accent-green)';
 
     let barStatus, barStatusColor;
     if (equity <= 0) {
         barStatus = 'LIQUIDATION'; barStatusColor = 'var(--accent-red)';
-    } else if (posCount > 0 && equity <= 50) {
-        barStatus = 'STOP OUT'; barStatusColor = 'var(--accent-red)';
-    } else if (posCount > 0 && equity <= 500) {
+    } else if (posCount > 0 && equity <= 1) {
+        barStatus = 'CLOSE OUT'; barStatusColor = 'var(--accent-red)';
+    } else if (posCount > 0 && equity <= 200) {
         barStatus = 'LOW EQUITY'; barStatusColor = 'var(--accent-orange)';
-    } else if (posCount > 0 && equity <= 2000) {
+    } else if (posCount > 0 && equity <= 1000) {
         barStatus = 'CAUTION'; barStatusColor = '#f59e0b';
     } else {
         barStatus = 'HEALTHY'; barStatusColor = 'var(--accent-green)';
@@ -1863,8 +1866,8 @@ function renderFinancialTab() {
     }
 
     const showMarkers = totalUsedMargin > 0 && posCount > 0;
-    const marginCallLine = showMarkers ? 5 : 0;    // 5% from left ($500)
-    const stopOutLine = showMarkers ? 0.5 : 0;     // 0.5% from left (~$50)
+    const marginCallLine = showMarkers ? 2 : 0;    // 2% from left ($200)
+    const stopOutLine = showMarkers ? 0.01 : 0;    // near 0% from left ($1)
 
     const phDisplay = '$' + equity.toFixed(2);
 
@@ -1889,7 +1892,7 @@ function renderFinancialTab() {
                 ${showMarkers ? `
                 <div class="pf-margin-bar-marker pf-margin-marker-call" style="left:${marginCallLine}%">
                     <div class="pf-margin-marker-line"></div>
-                    <div class="pf-margin-marker-label">WARNING ($500)</div>
+                    <div class="pf-margin-marker-label">WARNING ($200)</div>
                 </div>
                 <div class="pf-margin-bar-marker pf-margin-marker-stop" style="left:${stopOutLine}%">
                     <div class="pf-margin-marker-line"></div>
@@ -1936,7 +1939,7 @@ function renderFinancialTab() {
                 ? '<div class="pf-empty">No open positions. Start trading to build your portfolio.</div>'
                 : `<div class="pf-positions-table">
                     <div class="pf-pos-header">
-                        <div>Symbol</div><div>Qty</div><div>Avg Entry</div><div>Current</div><div>Value</div><div>P&amp;L</div>
+                        <div>Symbol</div><div>Qty</div><div>Avg Entry</div><div>Current</div><div>Return</div><div>P&amp;L</div>
                     </div>
                     ${positionsHtml}
                    </div>`}

@@ -466,6 +466,7 @@ DECLARE
     v_close_pnl    NUMERIC;
     v_close_margin NUMERIC;
     v_tea_id       INT;
+    v_is_closing   BOOLEAN;
 BEGIN
     IF p_mode NOT IN ('VIRTUAL', 'REAL') THEN
         RETURN jsonb_build_object('success', false, 'error', 'Invalid trading mode');
@@ -486,36 +487,7 @@ BEGIN
     END IF;
     v_tea_id := v_tea.id;
 
-    -- ── RISK CHECKS ──────────────────────────────────────────────────
-    IF v_tea.trading_mode = 'HALTED' THEN
-        IF v_tea.halt_until IS NOT NULL AND v_tea.halt_until <= NOW() THEN
-            UPDATE teas SET trading_mode = 'FULL', halt_until = NULL WHERE id = v_tea.id;
-            v_tea.trading_mode := 'FULL';
-        ELSE
-            RETURN jsonb_build_object('success', false, 'error',
-                'Market halted for ' || p_tea_symbol || ' due to extreme volatility. Please wait.');
-        END IF;
-    END IF;
-
-    IF v_tea.trading_mode = 'CLOSE_ONLY' AND p_side = 'BUY' THEN
-        RETURN jsonb_build_object('success', false, 'error',
-            'Maximum platform exposure reached for ' || p_tea_symbol || '. Only closing trades are allowed.');
-    END IF;
-
-    IF p_side = 'BUY'
-       AND (COALESCE(v_tea.current_long_volume, 0) + p_quantity) > COALESCE(v_tea.max_exposure, 500000) THEN
-        RETURN jsonb_build_object('success', false, 'error',
-            'Maximum platform exposure reached for ' || p_tea_symbol || '. Only closing trades are allowed.');
-    END IF;
-
-    -- ── PRICE + SPREAD ────────────────────────────────────────────────
-    v_price := v_tea.current_price;
-    IF v_price IS NULL OR v_price <= 0 THEN
-        RETURN jsonb_build_object('success', false, 'error', 'No valid market price');
-    END IF;
-
-    v_spread := COALESCE(v_tea.base_spread, 0.01) * COALESCE(v_tea.volatility_multiplier, 1.0);
-
+    -- Look up user position FIRST so we know if this trade is a close
     SELECT * INTO v_profile FROM profiles WHERE id = p_user_id FOR UPDATE;
     IF NOT FOUND THEN
         RETURN jsonb_build_object('success', false, 'error', 'User profile not found');
@@ -527,6 +499,50 @@ BEGIN
         FOR UPDATE;
 
     v_existing_qty := COALESCE(v_position.quantity, 0);
+
+    -- A trade is "closing" if it reduces an existing opposite-side position
+    -- BUY closing a SHORT (qty < 0), or SELL closing a LONG (qty > 0)
+    -- Closing trades must NEVER be blocked — FCA consumer protection requirement
+    v_is_closing := (p_side = 'BUY' AND v_existing_qty < 0)
+                 OR (p_side = 'SELL' AND v_existing_qty > 0);
+
+    -- ── RISK CHECKS (only apply to trades that OPEN or INCREASE exposure) ──
+    IF NOT v_is_closing THEN
+        IF v_tea.trading_mode = 'HALTED' THEN
+            IF v_tea.halt_until IS NOT NULL AND v_tea.halt_until <= NOW() THEN
+                UPDATE teas SET trading_mode = 'FULL', halt_until = NULL WHERE id = v_tea.id;
+                v_tea.trading_mode := 'FULL';
+            ELSE
+                RETURN jsonb_build_object('success', false, 'error',
+                    'Market halted for ' || p_tea_symbol || ' due to extreme volatility. Please wait.');
+            END IF;
+        END IF;
+
+        IF v_tea.trading_mode = 'CLOSE_ONLY' THEN
+            RETURN jsonb_build_object('success', false, 'error',
+                'Maximum platform exposure reached for ' || p_tea_symbol || '. Only closing trades are allowed.');
+        END IF;
+
+        IF p_side = 'BUY'
+           AND (COALESCE(v_tea.current_long_volume, 0) + p_quantity) > COALESCE(v_tea.max_exposure, 500000) THEN
+            RETURN jsonb_build_object('success', false, 'error',
+                'Maximum platform exposure reached for ' || p_tea_symbol || '. Only closing trades are allowed.');
+        END IF;
+    ELSE
+        -- Even for closing trades, auto-unhalt if halt has expired
+        IF v_tea.trading_mode = 'HALTED' AND v_tea.halt_until IS NOT NULL AND v_tea.halt_until <= NOW() THEN
+            UPDATE teas SET trading_mode = 'FULL', halt_until = NULL WHERE id = v_tea.id;
+            v_tea.trading_mode := 'FULL';
+        END IF;
+    END IF;
+
+    -- ── PRICE + SPREAD ────────────────────────────────────────────────
+    v_price := v_tea.current_price;
+    IF v_price IS NULL OR v_price <= 0 THEN
+        RETURN jsonb_build_object('success', false, 'error', 'No valid market price');
+    END IF;
+
+    v_spread := COALESCE(v_tea.base_spread, 0.01) * COALESCE(v_tea.volatility_multiplier, 1.0);
 
     -- ── BUY ──────────────────────────────────────────────────────────
     IF p_side = 'BUY' THEN
@@ -1040,13 +1056,22 @@ BEGIN
     DELETE FROM index_positions WHERE user_id = p_user_id AND trading_mode = p_mode;
     DELETE FROM trades WHERE user_id = p_user_id AND trading_mode = p_mode;
 
+    UPDATE pending_orders
+       SET status = 'CANCELLED'
+     WHERE user_id = p_user_id AND status = 'PENDING';
+
     IF p_mode = 'REAL' THEN
         UPDATE profiles
-        SET real_balance = v_new_balance, account_status = v_new_status, next_free_reset_at = NULL
+        SET real_balance       = v_new_balance,
+            account_status     = v_new_status,
+            next_free_reset_at = NULL
         WHERE id = p_user_id;
     ELSE
         UPDATE profiles
-        SET virtual_balance = v_new_balance, account_status = v_new_status, next_free_reset_at = NULL
+        SET virtual_balance    = v_new_balance,
+            cash_balance       = v_new_balance,
+            account_status     = v_new_status,
+            next_free_reset_at = NULL
         WHERE id = p_user_id;
     END IF;
 
@@ -2155,8 +2180,8 @@ DECLARE
     v_idx_price       NUMERIC;
 BEGIN
     v_default_bal := 10000;
-    v_stop_floor  := 50;    -- $50: liquidate when equity is essentially zero
-    v_call_floor  := 500;   -- $500: warn when account is critically low
+    v_stop_floor  := 1;     -- $1: liquidate when account is completely depleted
+    v_call_floor  := 200;   -- $200: warn when equity is critically low
 
     SELECT value INTO v_spread FROM platform_config WHERE key = 'spread_pct';
     v_spread := COALESCE(v_spread, 0.01);

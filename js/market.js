@@ -894,6 +894,10 @@ function onTickerBatchComplete() {
     // Global ticker tape (includes tea prices)
     if (typeof updateGlobalTicker === 'function') updateGlobalTicker();
 
+    // Keep the trade form's Ask/Bid price in sync with latest market price
+    if (typeof updateTradeSummary === 'function') updateTradeSummary();
+    if (typeof updateHubOrderPreview === 'function') updateHubOrderPreview();
+
     // Check SL/TP and price alerts
     if (state.currentUser) {
         checkSlTpOrders();
