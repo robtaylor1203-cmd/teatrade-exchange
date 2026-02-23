@@ -195,11 +195,11 @@ serve(async (req) => {
     const botNames = BOT_TRADERS.map(b => b.name)
     const { data: existingProfiles } = await supabase
       .from('profiles')
-      .select('id, username, cash_balance')
+      .select('id, username, cash_balance, virtual_balance')
       .in('username', botNames)
 
-    const profileMap = new Map<string, { id: string; username: string }>()
-    ;(existingProfiles || []).forEach(p => profileMap.set(p.username, p))
+    const profileMap = new Map<string, { id: string; username: string; virtual_balance: number }>()
+    ;(existingProfiles || []).forEach(p => profileMap.set(p.username, { id: p.id, username: p.username, virtual_balance: p.virtual_balance ?? 10000 }))
 
     // 2. Create missing bots (up to BOTS_PER_TICK per invocation)
     const missingBots = BOT_TRADERS.filter(b => !profileMap.has(b.name))
@@ -221,14 +221,15 @@ serve(async (req) => {
           continue
         }
 
-        const startBalance = Math.round(randBetween(50_000, 200_000) * 100) / 100
+        const startBalance = Math.round(randBetween(8_000, 15_000) * 100) / 100
         await supabase.from('profiles').upsert({
           id: authData.user.id,
           username: bot.name,
           cash_balance: startBalance,
+          virtual_balance: startBalance,
         }, { onConflict: 'id' })
 
-        profileMap.set(bot.name, { id: authData.user.id, username: bot.name })
+        profileMap.set(bot.name, { id: authData.user.id, username: bot.name, virtual_balance: startBalance })
         botsCreated++
       } catch (e) {
         console.warn(`Bot create error (${bot.name}):`, (e as Error).message)
@@ -325,6 +326,16 @@ serve(async (req) => {
       if (!error) {
         tradesPlaced++
         tradeLog.push(`${bot.username} ${side} ${qty}kg ${symbol} @$${execPrice.toFixed(4)}`)
+
+        // Adjust bot virtual_balance with a small random P&L so the leaderboard stays dynamic
+        const curBal = bot.virtual_balance || 10000
+        const pnlSwing = (Math.random() - 0.45) * total * 0.08
+        const newBal = Math.max(2000, Math.round((curBal + pnlSwing) * 100) / 100)
+        await supabase
+          .from('profiles')
+          .update({ virtual_balance: newBal })
+          .eq('id', bot.id)
+        bot.virtual_balance = newBal
       }
     }
 
