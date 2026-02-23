@@ -1,5 +1,5 @@
--- Enhance admin_analytics() with true Platform Net P&L
--- = Fee Revenue + Counterparty P&L (platform gains when traders lose)
+-- Fix: i.multiplier must be in GROUP BY or aggregate
+-- Wraps multiplier in MAX() since there's only one index row per symbol anyway.
 
 CREATE OR REPLACE FUNCTION admin_analytics()
 RETURNS JSONB
@@ -19,18 +19,15 @@ DECLARE
     v_total_cash NUMERIC;
     v_tea_unrealized NUMERIC;
     v_idx_unrealized NUMERIC;
-    v_pair_unrealized NUMERIC;
     v_total_equity NUMERIC;
     v_starting_capital NUMERIC;
     v_counterparty NUMERIC;
-    v_spread NUMERIC;
 BEGIN
     SELECT email INTO v_email FROM auth.users WHERE id = auth.uid();
     IF v_email IS DISTINCT FROM 'contact@teatrade.co.uk' THEN
         RETURN jsonb_build_object('success', false, 'error', 'Unauthorized');
     END IF;
 
-    -- User statistics
     SELECT jsonb_build_object(
         'total',       COUNT(*),
         'last_7d',     COUNT(*) FILTER (WHERE au.created_at >= NOW() - INTERVAL '7 days'),
@@ -46,7 +43,6 @@ BEGIN
     FROM profiles p
     JOIN auth.users au ON au.id = p.id;
 
-    -- Trade statistics
     SELECT jsonb_build_object(
         'total_count',       COUNT(*),
         'total_notional',    COALESCE(SUM(total_value), 0),
@@ -63,7 +59,6 @@ BEGIN
     ) INTO v_trades
     FROM trades;
 
-    -- Platform fee revenue (spreads, swaps, stop-outs)
     SELECT jsonb_build_object(
         'total',       COALESCE(SUM(amount), 0),
         'spread',      COALESCE(SUM(amount) FILTER (WHERE revenue_type = 'spread'), 0),
@@ -78,14 +73,12 @@ BEGIN
     SELECT COALESCE(SUM(amount), 0) INTO v_fee_total FROM platform_revenue;
 
     -- ── PLATFORM NET P&L ──────────────────────────────────────────────
-    -- Total user cash (not tied up in positions)
     SELECT COUNT(*), COALESCE(SUM(virtual_balance), 0)
         INTO v_user_count, v_total_cash
     FROM profiles;
 
     v_starting_capital := v_user_count * 10000.0;
 
-    -- Unrealized P&L on open tea positions (mark-to-market)
     SELECT COALESCE(SUM(
         CASE WHEN pos.quantity > 0
              THEN (t.current_price - pos.avg_entry_price) * pos.quantity
@@ -95,7 +88,6 @@ BEGIN
     FROM positions pos
     JOIN teas t ON t.id = pos.tea_id;
 
-    -- Unrealized P&L on open index positions (mark-to-market)
     SELECT COALESCE(SUM(
         CASE WHEN ip.quantity > 0
              THEN (idx_price.price - ip.avg_entry_price) * ip.quantity
@@ -110,14 +102,10 @@ BEGIN
         WHERE i.symbol = ip.index_symbol AND t.current_price > 0
     ) idx_price;
 
-    -- Total user equity = cash + margin in positions + unrealized P&L
-    -- virtual_balance already has margin deducted, so equity = cash + margin_back + unrealized
-    -- Simpler: equity = cash + SUM(margin_used) + unrealized P&L
     v_total_equity := v_total_cash + v_tea_unrealized + v_idx_unrealized
         + COALESCE((SELECT SUM(margin_used) FROM positions), 0)
         + COALESCE((SELECT SUM(margin_used) FROM index_positions), 0);
 
-    -- Counterparty P&L: platform gains when traders lose
     v_counterparty := v_starting_capital - v_total_equity;
 
     v_pnl := jsonb_build_object(
@@ -131,7 +119,6 @@ BEGIN
         'open_index_pnl',    ROUND(v_idx_unrealized, 2)
     );
 
-    -- Top 5 traders by net balance
     SELECT COALESCE(jsonb_agg(row_to_json(t)), '[]'::jsonb)
     INTO v_top_traders
     FROM (
