@@ -591,22 +591,7 @@ serve(async (req) => {
         if (passed > 0 || failed > 0) {
           console.log(`🏆 Combines: ${passed} passed, ${failed} failed/expired`);
         }
-
-        // Daily equity reset: if a new UTC day has started, update daily_start_equity
-        const utcHour = new Date().getUTCHours();
-        const utcMinute = new Date().getUTCMinutes();
-        if (utcHour === 0 && utcMinute < 5) {
-          for (const c of activeCombines) {
-            const { data: rules } = await supabase.rpc('check_combine_rules', { p_user_id: c.user_id });
-            if (rules?.active && rules?.equity) {
-              await supabase
-                .from('combine_challenges')
-                .update({ daily_start_equity: rules.equity })
-                .eq('id', c.id);
-            }
-          }
-          console.log(`📅 Reset daily_start_equity for ${activeCombines.length} active combines`);
-        }
+        // Daily equity reset is handled inside check_combine_rules() via last_equity_reset_date
       }
     } catch (combineErr) {
       console.error('Combine monitoring error:', (combineErr as Error).message);

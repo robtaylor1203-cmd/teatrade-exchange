@@ -8581,6 +8581,26 @@ a.user-dropdown-item {
 #portfolio-tab-history::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
 #portfolio-tab-history::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 #portfolio-tab-social { display: flex; flex-direction: row; }
+#portfolio-tab-badges {
+    overflow-y: auto;
+    padding: 20px 22px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-light) var(--bg-tertiary);
+}
+#portfolio-tab-badges::-webkit-scrollbar { width: 6px; }
+#portfolio-tab-badges::-webkit-scrollbar-track { background: var(--bg-tertiary); border-radius: 3px; }
+#portfolio-tab-badges::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+#portfolio-tab-badges::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+#portfolio-tab-store {
+    overflow-y: auto;
+    padding: 20px 22px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-light) var(--bg-tertiary);
+}
+#portfolio-tab-store::-webkit-scrollbar { width: 6px; }
+#portfolio-tab-store::-webkit-scrollbar-track { background: var(--bg-tertiary); border-radius: 3px; }
+#portfolio-tab-store::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+#portfolio-tab-store::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 .portfolio-modal-body {
     display: flex;

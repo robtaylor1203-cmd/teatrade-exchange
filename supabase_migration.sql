@@ -2369,3 +2369,152 @@ $$;
 
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS badges JSONB NOT NULL DEFAULT '[]'::JSONB;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS showcase_badge TEXT DEFAULT NULL;
+
+-- ============================================================
+-- 16. COMBINE CHALLENGE RULES (hardened — 50% target, date-based daily reset)
+-- ============================================================
+
+ALTER TABLE combine_challenges
+    ADD COLUMN IF NOT EXISTS last_equity_reset_date DATE;
+
+CREATE OR REPLACE FUNCTION check_combine_rules(p_user_id UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_challenge    RECORD;
+    v_bal          NUMERIC;
+    v_unrealized   NUMERIC;
+    v_equity       NUMERIC;
+    v_spread       NUMERIC := 0.01;
+    v_pos          RECORD;
+    v_idx_price    NUMERIC;
+    v_target       NUMERIC;
+    v_dd_floor     NUMERIC;
+    v_today        DATE := CURRENT_DATE;
+BEGIN
+    SELECT * INTO v_challenge FROM combine_challenges
+        WHERE user_id = p_user_id AND status = 'ACTIVE'
+        ORDER BY started_at DESC LIMIT 1;
+
+    IF v_challenge IS NULL THEN
+        RETURN jsonb_build_object('active', false);
+    END IF;
+
+    IF NOW() > v_challenge.expires_at THEN
+        UPDATE combine_challenges SET status = 'EXPIRED', completed_at = NOW() WHERE id = v_challenge.id;
+        UPDATE profiles
+        SET account_status = 'ACTIVE',
+            virtual_balance = 10000,
+            cash_balance = 10000
+        WHERE id = p_user_id;
+        DELETE FROM positions WHERE user_id = p_user_id AND trading_mode = 'VIRTUAL';
+        DELETE FROM index_positions WHERE user_id = p_user_id AND trading_mode = 'VIRTUAL';
+        RETURN jsonb_build_object('active', false, 'result', 'EXPIRED');
+    END IF;
+
+    SELECT virtual_balance INTO v_bal FROM profiles WHERE id = p_user_id;
+
+    SELECT COALESCE(SUM(
+        CASE WHEN p.quantity > 0
+            THEN (t.current_price * (1 - v_spread/2) - p.avg_entry_price) * p.quantity
+            ELSE (p.avg_entry_price - t.current_price * (1 + v_spread/2)) * ABS(p.quantity)
+        END
+    ), 0) INTO v_unrealized
+    FROM positions p JOIN teas t ON t.id = p.tea_id
+    WHERE p.user_id = p_user_id AND p.trading_mode = 'VIRTUAL' AND p.quantity != 0;
+
+    FOR v_pos IN
+        SELECT ip.*, i.teas AS idx_teas, i.multiplier
+        FROM index_positions ip JOIN indexes i ON i.symbol = ip.index_symbol
+        WHERE ip.user_id = p_user_id AND ip.trading_mode = 'VIRTUAL' AND ip.quantity != 0
+    LOOP
+        SELECT AVG(t.current_price) * COALESCE(v_pos.multiplier, 1)
+            INTO v_idx_price FROM teas t
+            WHERE t.symbol = ANY(v_pos.idx_teas) AND t.current_price > 0;
+        IF v_idx_price IS NOT NULL THEN
+            IF v_pos.quantity > 0 THEN
+                v_unrealized := v_unrealized + (v_idx_price * (1 - v_spread/2) - v_pos.avg_entry_price) * v_pos.quantity;
+            ELSE
+                v_unrealized := v_unrealized + (v_pos.avg_entry_price - v_idx_price * (1 + v_spread/2)) * ABS(v_pos.quantity);
+            END IF;
+        END IF;
+    END LOOP;
+
+    v_equity := v_bal + v_unrealized;
+
+    IF v_challenge.last_equity_reset_date IS NULL OR v_challenge.last_equity_reset_date < v_today THEN
+        UPDATE combine_challenges
+        SET daily_start_equity = v_equity,
+            last_equity_reset_date = v_today
+        WHERE id = v_challenge.id;
+        v_challenge.daily_start_equity := v_equity;
+    END IF;
+
+    IF v_equity > v_challenge.peak_equity THEN
+        UPDATE combine_challenges SET peak_equity = v_equity WHERE id = v_challenge.id;
+    END IF;
+
+    v_target   := v_challenge.start_balance * (1 + v_challenge.target_profit_pct / 100);
+    v_dd_floor := v_challenge.daily_start_equity * (1 - v_challenge.max_daily_drawdown_pct / 100);
+
+    IF v_equity < v_dd_floor THEN
+        UPDATE combine_challenges SET status = 'FAILED', completed_at = NOW() WHERE id = v_challenge.id;
+        UPDATE profiles
+        SET account_status = 'ACTIVE',
+            virtual_balance = 10000,
+            cash_balance = 10000
+        WHERE id = p_user_id;
+        DELETE FROM positions WHERE user_id = p_user_id AND trading_mode = 'VIRTUAL';
+        DELETE FROM index_positions WHERE user_id = p_user_id AND trading_mode = 'VIRTUAL';
+        RETURN jsonb_build_object('active', false, 'result', 'FAILED', 'reason', 'daily_drawdown');
+    END IF;
+
+    IF v_equity >= v_target THEN
+        UPDATE combine_challenges SET status = 'PASSED', completed_at = NOW() WHERE id = v_challenge.id;
+        UPDATE profiles SET account_status = 'ACTIVE', combine_badge = TRUE WHERE id = p_user_id;
+        RETURN jsonb_build_object('active', false, 'result', 'PASSED', 'equity', v_equity);
+    END IF;
+
+    RETURN jsonb_build_object(
+        'active',             true,
+        'equity',             v_equity,
+        'target',             v_target,
+        'daily_start_equity', v_challenge.daily_start_equity,
+        'dd_floor',           v_dd_floor,
+        'days_remaining',     EXTRACT(DAY FROM v_challenge.expires_at - NOW()),
+        'peak_equity',        GREATEST(v_challenge.peak_equity, v_equity)
+    );
+END;
+$$;
+
+-- ============================================================
+-- 17. MONTHLY $1,000 BAILOUT FOR LOCKED ACCOUNTS
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION grant_monthly_bailout()
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_count INT := 0;
+BEGIN
+    UPDATE profiles
+    SET virtual_balance = virtual_balance + 1000,
+        cash_balance    = cash_balance + 1000,
+        account_status  = 'ACTIVE'
+    WHERE account_status = 'LOCKED'
+      AND next_free_reset_at IS NOT NULL
+      AND next_free_reset_at <= NOW();
+
+    GET DIAGNOSTICS v_count = ROW_COUNT;
+
+    IF v_count > 0 THEN
+        RAISE LOG 'grant_monthly_bailout: credited $1,000 to % locked accounts', v_count;
+    END IF;
+END;
+$$;

@@ -90,23 +90,45 @@ serve(async (req) => {
         }
 
         case 'COMBINE_ENTRY': {
-          // Reset account to combine mode
+          // Cancel any existing active combine so we don't get duplicates
+          await supabaseAdmin
+            .from('combine_challenges')
+            .update({ status: 'FAILED', completed_at: new Date().toISOString() })
+            .eq('user_id', userId)
+            .eq('status', 'ACTIVE')
+
           const { error: resetErr } = await supabaseAdmin.rpc('reset_account', {
             p_user_id: userId,
             p_default_balance: 50000,
             p_mode: 'VIRTUAL',
             p_source: 'COMBINE_START',
           })
-          if (resetErr) console.error('reset_account (COMBINE_START) error:', resetErr.message)
+          if (resetErr) {
+            console.error('reset_account (COMBINE_START) error:', resetErr.message)
+            break
+          }
 
-          // Create combine challenge record
-          await supabaseAdmin.from('combine_challenges').insert({
-            user_id: userId,
-            start_balance: 50000,
-            daily_start_equity: 50000,
-            peak_equity: 50000,
-            status: 'ACTIVE',
-          })
+          const { error: insertErr } = await supabaseAdmin
+            .from('combine_challenges')
+            .insert({
+              user_id: userId,
+              start_balance: 50000,
+              target_profit_pct: 50.0,
+              daily_start_equity: 50000,
+              peak_equity: 50000,
+              last_equity_reset_date: new Date().toISOString().slice(0, 10),
+              status: 'ACTIVE',
+            })
+          if (insertErr) {
+            console.error('combine_challenges insert error:', insertErr.message)
+            // Roll back to standard account since challenge creation failed
+            await supabaseAdmin.rpc('reset_account', {
+              p_user_id: userId,
+              p_default_balance: 10000,
+              p_mode: 'VIRTUAL',
+              p_source: 'PAID_RESET',
+            })
+          }
           break
         }
 

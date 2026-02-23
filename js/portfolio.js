@@ -2559,7 +2559,7 @@ function renderStoreTab() {
             <div class="store-card-desc">
                 ${hasBadge
                     ? 'You passed the Combine and earned the Funded Trader badge. Enter again to prove your skills.'
-                    : 'Prove you are an elite trader. Get a $50,000 challenge account. Make 8% profit in 30 days without a 5% daily drawdown to earn the Funded Trader badge.'}
+                    : 'Prove you are an elite trader. Get a $50,000 challenge account. Make 50% profit in 30 days without a 5% daily drawdown to earn the Funded Trader badge.'}
             </div>
             <button class="store-card-btn" onclick="purchaseCombineEntry()" ${inCombine ? 'disabled' : ''}>
                 ${inCombine ? 'Challenge In Progress' : 'Enter Combine &mdash; &pound;49.00'}
@@ -2600,16 +2600,15 @@ async function updateCombineBanner() {
             banner.classList.remove('active');
             if (data?.result === 'PASSED') {
                 showToast('COMBINE PASSED!', 'Congratulations! You earned the Funded Trader badge!');
-                state.userProfile.combine_badge = true;
-                state.userProfile.account_status = 'ACTIVE';
             } else if (data?.result === 'FAILED') {
                 showToast('Combine Failed', 'Your challenge ended due to ' + (data.reason === 'daily_drawdown' ? 'daily drawdown breach' : 'expiry') + '. Account reset to $10,000.', true);
-                state.userProfile.account_status = 'ACTIVE';
-                setActiveBalance(10000);
             } else if (data?.result === 'EXPIRED') {
                 showToast('Combine Expired', 'Your 30-day challenge period ended. Account reset to $10,000.', true);
-                state.userProfile.account_status = 'ACTIVE';
-                setActiveBalance(10000);
+            }
+            if (data?.result) {
+                await loadUserProfile();
+                updatePortfolioDisplay();
+                updateUIForLoggedInUser();
             }
             return;
         }
