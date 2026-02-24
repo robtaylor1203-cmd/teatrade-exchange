@@ -236,6 +236,7 @@ ALTER TABLE teas ADD COLUMN IF NOT EXISTS current_short_volume  NUMERIC DEFAULT 
 ALTER TABLE teas ADD COLUMN IF NOT EXISTS base_spread           NUMERIC DEFAULT 0.01;
 ALTER TABLE teas ADD COLUMN IF NOT EXISTS volatility_multiplier NUMERIC DEFAULT 1.0;
 ALTER TABLE teas ADD COLUMN IF NOT EXISTS halt_until            TIMESTAMPTZ;
+ALTER TABLE teas ADD COLUMN IF NOT EXISTS volume_24h            NUMERIC DEFAULT 0;
 
 DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'teas_trading_mode_valid') THEN
