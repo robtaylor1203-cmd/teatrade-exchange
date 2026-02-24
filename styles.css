@@ -6871,9 +6871,11 @@ body.modal-open {
     letter-spacing: 0.5px;
 }
 .mobile-account-balance-amount {
-    font-weight: 600;
+    font-size: 24px;
+    font-weight: 700;
     color: var(--accent-green);
     font-family: 'JetBrains Mono', monospace;
+    letter-spacing: -0.5px;
 }
 
 @media (max-width: 1200px) {
