@@ -4876,7 +4876,7 @@ body.modal-open {
    ============================================= */
 .weather-popout {
     position: fixed;
-    z-index: 900;
+    z-index: 20000;
     width: 300px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-light);
@@ -5152,7 +5152,7 @@ body.modal-open {
    ============================================= */
 .macro-popout {
     position: fixed;
-    z-index: 900;
+    z-index: 20000;
     width: 320px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-light);
@@ -5769,20 +5769,27 @@ body.modal-open {
 
 .mobile-sidebar-tab {
     flex: 1;
-    padding: 8px 0;
+    padding: 10px 0 8px;
     border: none;
     background: transparent;
-    color: var(--text-secondary);
-    font-size: 13px;
+    color: var(--text-muted);
+    font-size: 15px;
     font-weight: 600;
+    letter-spacing: 0.3px;
     cursor: pointer;
     border-bottom: 2px solid transparent;
     transition: color 0.2s, border-color 0.2s;
+    border-radius: 0;
+    outline: none;
 }
 
 .mobile-sidebar-tab.active {
-    color: var(--accent);
+    color: var(--text-primary);
     border-bottom-color: var(--accent);
+}
+
+.mobile-sidebar-tab:not(.active):hover {
+    color: var(--text-secondary);
 }
 
 .mobile-tab-panel {
@@ -6770,7 +6777,7 @@ body.modal-open {
         display: flex;
     }
 }
-@media (max-width: 768px) and (orientation: landscape) {
+@media (max-height: 500px) and (orientation: landscape) {
     body.chart-fullscreen-active .rotate-prompt {
         display: none;
     }

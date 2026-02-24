@@ -861,10 +861,7 @@
                 </div>
             </div>
             
-            </div><!-- /mobile-panel-menu -->
-
-            <div class="mobile-tab-panel" id="mobile-panel-account" style="display:none;">
-            <!-- Mobile Leaderboard (hidden on desktop, visible on mobile) -->
+            <!-- Mobile Leaderboard (visible by default in menu panel) -->
             <div class="mobile-leaderboard-section" id="mobile-leaderboard-section">
                 <div class="mobile-leaderboard-header">
                     <div class="mobile-leaderboard-title">Leaderboard</div>
@@ -873,7 +870,10 @@
                 <div id="mobile-leaderboard-list"></div>
             </div>
 
-            <!-- Mobile Account Options (hidden on desktop, visible on mobile) -->
+            </div><!-- /mobile-panel-menu -->
+
+            <div class="mobile-tab-panel" id="mobile-panel-account" style="display:none;">
+            <!-- Mobile Account Options (hidden until Account tab clicked) -->
             <div class="mobile-account-section" id="mobile-account-section">
                 <div class="mobile-account-header">Account</div>
                 <div class="mobile-account-balance" id="mobile-account-balance" style="display:none;">
@@ -1888,7 +1888,7 @@
 
     <!-- Chat Notification Badge (fixed position - must be outside main-grid) -->
     <!-- Weather detail popout -->
-    <div id="weather-popout-overlay" onclick="event.stopPropagation(); closeWeatherPopout();" style="display:none;position:fixed;inset:0;z-index:899;"></div>
+    <div id="weather-popout-overlay" onclick="event.stopPropagation(); closeWeatherPopout();" style="display:none;position:fixed;inset:0;z-index:19999;background:transparent;"></div>
     <div id="weather-popout" class="weather-popout" style="display:none;" role="dialog" aria-label="Weather detail"></div>
 
     <!-- Account Locked Modal -->
@@ -1990,7 +1990,7 @@
     </div>
 
     <!-- Macro indicator detail popout -->
-    <div id="macro-popout-overlay" onclick="event.stopPropagation(); closeMacroPopout();" style="display:none;position:fixed;inset:0;z-index:899;"></div>
+    <div id="macro-popout-overlay" onclick="event.stopPropagation(); closeMacroPopout();" style="display:none;position:fixed;inset:0;z-index:19999;background:transparent;"></div>
     <div id="macro-popout" class="macro-popout" style="display:none;" role="dialog" aria-label="Macro indicator detail"></div>
 
     <div class="chat-notification-badge" id="chat-notification-badge" onclick="scrollToChatSection()">
