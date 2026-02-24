@@ -2756,3 +2756,142 @@ function copyBadgeShareText(name, desc) {
         showToast('Copy failed', 'Please copy manually', true);
     });
 }
+
+// =============================================
+// SHARE PROMPT (after every N trades)
+// =============================================
+
+const _SHARE_TRADE_KEY = 'teatrade_trade_count';
+const _SHARE_FIRST_TRIGGER = 5;
+const _SHARE_REPEAT_INTERVAL = 20;
+
+function _getSessionTradeCount() {
+    return parseInt(localStorage.getItem(_SHARE_TRADE_KEY) || '0', 10);
+}
+
+function _incrementTradeCount() {
+    const count = _getSessionTradeCount() + 1;
+    localStorage.setItem(_SHARE_TRADE_KEY, String(count));
+    return count;
+}
+
+function checkSharePrompt() {
+    const count = _incrementTradeCount();
+    if (count === _SHARE_FIRST_TRIGGER ||
+        (count > _SHARE_FIRST_TRIGGER && (count - _SHARE_FIRST_TRIGGER) % _SHARE_REPEAT_INTERVAL === 0)) {
+        setTimeout(() => _showSharePrompt(), 2000);
+    }
+}
+
+function _getTradeStats() {
+    const profile = state.userProfile;
+    if (!profile) return null;
+    const bal = Number(profile.virtual_balance) || 10000;
+    const returnPct = ((bal - 10000) / 10000 * 100).toFixed(1);
+    const trades = state.userTrades?.length || 0;
+    const wins = (state.userTrades || []).filter(t => t.closing_pnl > 0).length;
+    const winRate = trades > 0 ? ((wins / trades) * 100).toFixed(0) : '0';
+    return { balance: bal, returnPct, trades, wins, winRate, username: profile.username || 'Trader' };
+}
+
+function _showSharePrompt() {
+    if (document.getElementById('badge-celebration-modal')?.style.display === 'flex') return;
+
+    let modal = document.getElementById('share-prompt-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'share-prompt-modal';
+        document.body.appendChild(modal);
+    }
+
+    const stats = _getTradeStats();
+    const siteUrl = 'https://exchange.teatrade.co.uk';
+    const defaultText = 'I\'m trading tea futures on TeaTrade Exchange — a virtual commodities platform with real auction data. Check it out:';
+
+    const statsBlock = stats ? `
+        <div class="share-prompt-stats" id="share-prompt-stats" style="display:none;">
+            <div class="share-stat"><span class="share-stat-val">${stats.trades}</span><span class="share-stat-label">Trades</span></div>
+            <div class="share-stat"><span class="share-stat-val ${Number(stats.returnPct) >= 0 ? 'up' : 'down'}">${Number(stats.returnPct) >= 0 ? '+' : ''}${stats.returnPct}%</span><span class="share-stat-label">Return</span></div>
+            <div class="share-stat"><span class="share-stat-val">${stats.winRate}%</span><span class="share-stat-label">Win Rate</span></div>
+        </div>
+        <label class="share-toggle-row" for="share-stats-toggle">
+            <input type="checkbox" id="share-stats-toggle" onchange="toggleShareStats(this.checked)">
+            <span>Include my trading stats</span>
+        </label>
+    ` : '';
+
+    modal.innerHTML = `
+        <div class="share-prompt-backdrop" onclick="closeSharePrompt()"></div>
+        <div class="share-prompt-card">
+            <button class="badge-celeb-close" onclick="closeSharePrompt()">&times;</button>
+            <div class="share-prompt-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            </div>
+            <div class="share-prompt-title">Enjoying TeaTrade?</div>
+            <div class="share-prompt-sub">Share with friends and help grow the community</div>
+            ${statsBlock}
+            <div class="share-prompt-share-row">
+                <a href="https://twitter.com/intent/tweet?text=${encodeURIComponent(defaultText)}&url=${encodeURIComponent(siteUrl)}" target="_blank" rel="noopener" class="badge-share-btn badge-share-x" title="Share on X" onclick="closeSharePrompt()">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                </a>
+                <a href="https://wa.me/?text=${encodeURIComponent(defaultText + ' ' + siteUrl)}" target="_blank" rel="noopener" class="badge-share-btn badge-share-wa" title="Share on WhatsApp" onclick="closeSharePrompt()">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                </a>
+                <a href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(siteUrl)}" target="_blank" rel="noopener" class="badge-share-btn badge-share-fb" title="Share on Facebook" onclick="closeSharePrompt()">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                </a>
+                <button class="badge-share-btn badge-share-copy" title="Copy link" onclick="copyShareLink()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                </button>
+            </div>
+            <button class="share-prompt-dismiss" onclick="closeSharePrompt()">Maybe later</button>
+        </div>`;
+
+    modal.style.display = 'flex';
+    requestAnimationFrame(() => modal.classList.add('active'));
+}
+
+function toggleShareStats(show) {
+    const el = document.getElementById('share-prompt-stats');
+    if (el) el.style.display = show ? 'flex' : 'none';
+
+    const stats = _getTradeStats();
+    if (!stats) return;
+    const siteUrl = 'https://exchange.teatrade.co.uk';
+    const text = show
+        ? `I've placed ${stats.trades} trades on TeaTrade Exchange with a ${stats.returnPct}% return and ${stats.winRate}% win rate! Trade tea like a pro:`
+        : 'I\'m trading tea futures on TeaTrade Exchange — a virtual commodities platform with real auction data. Check it out:';
+
+    const modal = document.getElementById('share-prompt-modal');
+    if (!modal) return;
+    const xLink = modal.querySelector('.badge-share-x');
+    const waLink = modal.querySelector('.badge-share-wa');
+    if (xLink) xLink.href = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(siteUrl)}`;
+    if (waLink) waLink.href = `https://wa.me/?text=${encodeURIComponent(text + ' ' + siteUrl)}`;
+}
+
+function closeSharePrompt() {
+    const modal = document.getElementById('share-prompt-modal');
+    if (modal) {
+        modal.classList.remove('active');
+        setTimeout(() => { modal.style.display = 'none'; }, 250);
+    }
+}
+
+function copyShareLink() {
+    const statsToggle = document.getElementById('share-stats-toggle');
+    const stats = _getTradeStats();
+    const siteUrl = 'https://exchange.teatrade.co.uk';
+    let text;
+    if (statsToggle?.checked && stats) {
+        text = `I've placed ${stats.trades} trades on TeaTrade Exchange with a ${stats.returnPct}% return and ${stats.winRate}% win rate! Trade tea like a pro: ${siteUrl}`;
+    } else {
+        text = `I'm trading tea futures on TeaTrade Exchange — a virtual commodities platform with real auction data. Check it out: ${siteUrl}`;
+    }
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('Copied!', 'Share text copied to clipboard');
+    }).catch(() => {
+        showToast('Copy failed', 'Please copy manually', true);
+    });
+    closeSharePrompt();
+}

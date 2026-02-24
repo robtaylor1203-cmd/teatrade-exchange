@@ -8331,6 +8331,129 @@ a.user-dropdown-item {
 .badge-share-fb:hover { background: #1877F2; color: #fff; border-color: #1877F2; }
 .badge-share-copy:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   SHARE PROMPT (triggered after N trades)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#share-prompt-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 50000;
+    align-items: center;
+    justify-content: center;
+}
+#share-prompt-modal.active .share-prompt-card {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+.share-prompt-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(3px);
+}
+.share-prompt-card {
+    position: relative;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px 28px 24px;
+    max-width: 360px;
+    width: 90vw;
+    text-align: center;
+    opacity: 0;
+    transform: scale(0.9) translateY(16px);
+    transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.share-prompt-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(26, 115, 232, 0.1);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 14px;
+}
+.share-prompt-icon svg { width: 28px; height: 28px; }
+.share-prompt-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+.share-prompt-sub {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 18px;
+    line-height: 1.4;
+}
+.share-prompt-stats {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 14px;
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
+.share-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 60px;
+}
+.share-stat-val {
+    font-size: 18px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-primary);
+}
+.share-stat-val.up { color: var(--accent-green); }
+.share-stat-val.down { color: var(--accent-red); }
+.share-stat-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+}
+.share-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+    cursor: pointer;
+    user-select: none;
+}
+.share-toggle-row input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+}
+.share-prompt-share-row {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 14px;
+}
+.share-prompt-dismiss {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 6px 12px;
+    transition: color 0.15s;
+}
+.share-prompt-dismiss:hover { color: var(--text-secondary); }
+
 /* Real Money Coming Soon Modal */
 .real-money-modal {
     display: none;

@@ -344,6 +344,7 @@ async function executeTrade() {
 
         // Check for newly earned badges after trade
         if (typeof checkAndNotifyNewBadges === 'function') checkAndNotifyNewBadges();
+        if (typeof checkSharePrompt === 'function') checkSharePrompt();
 
         // Hold the success state for a moment, then reset form
         await new Promise(r => setTimeout(r, 1500));
@@ -464,6 +465,7 @@ async function closePosition(teaId, quantity, teaSymbol) {
         await loadUserTrades();
         updateUIForLoggedInUser();
         if (typeof checkAndNotifyNewBadges === 'function') checkAndNotifyNewBadges();
+        if (typeof checkSharePrompt === 'function') checkSharePrompt();
 
     } catch (error) {
         console.error('Close position error:', error);
@@ -526,6 +528,7 @@ async function closeIndexPosition(indexSymbol, quantity, tradeId) {
         await loadUserTrades();
         updateUIForLoggedInUser();
         if (typeof checkAndNotifyNewBadges === 'function') checkAndNotifyNewBadges();
+        if (typeof checkSharePrompt === 'function') checkSharePrompt();
 
     } catch (error) {
         console.error('Close index position error:', error);
@@ -637,6 +640,7 @@ async function closePairPosition(tradeId) {
         await loadUserTrades();
         updateUIForLoggedInUser();
         if (typeof checkAndNotifyNewBadges === 'function') checkAndNotifyNewBadges();
+        if (typeof checkSharePrompt === 'function') checkSharePrompt();
 
     } catch (error) {
         console.error('Close pair position error:', error);
