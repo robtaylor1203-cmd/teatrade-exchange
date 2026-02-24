@@ -655,15 +655,19 @@
     <div class="main-grid">
         <!-- Left Sidebar -->
         <div class="sidebar" id="mobile-sidebar">
-            <!-- Mobile sidebar header (hidden on desktop) -->
+            <!-- Mobile sidebar header with tabs (hidden on desktop) -->
             <div class="mobile-sidebar-header">
-                <span style="font-weight: 600; color: var(--text-primary);">Menu</span>
+                <div class="mobile-sidebar-tabs">
+                    <button class="mobile-sidebar-tab active" data-panel="menu" onclick="switchMobileSidebarTab('menu')">Menu</button>
+                    <button class="mobile-sidebar-tab" data-panel="account" onclick="switchMobileSidebarTab('account')">Account</button>
+                </div>
                 <button class="mobile-close-btn" onclick="closeMobileMenu()" aria-label="Close menu">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M18 6L6 18M6 6l12 12"/>
                     </svg>
                 </button>
             </div>
+            <div class="mobile-tab-panel" id="mobile-panel-menu">
             <div class="sidebar-section">
                 <div class="sidebar-title">Watchlist</div>
                 <div class="watchlist-tabs">
@@ -857,6 +861,9 @@
                 </div>
             </div>
             
+            </div><!-- /mobile-panel-menu -->
+
+            <div class="mobile-tab-panel" id="mobile-panel-account" style="display:none;">
             <!-- Mobile Leaderboard (hidden on desktop, visible on mobile) -->
             <div class="mobile-leaderboard-section" id="mobile-leaderboard-section">
                 <div class="mobile-leaderboard-header">
@@ -900,6 +907,7 @@
                     Log Out
                 </button>
             </div>
+            </div><!-- /mobile-panel-account -->
 
             <!-- IB Chat Section -->
             <div class="sidebar-section chat-section" id="chat-section-sidebar">
@@ -1880,7 +1888,7 @@
 
     <!-- Chat Notification Badge (fixed position - must be outside main-grid) -->
     <!-- Weather detail popout -->
-    <div id="weather-popout-overlay" onclick="closeWeatherPopout()" style="display:none;position:fixed;inset:0;z-index:899;"></div>
+    <div id="weather-popout-overlay" onclick="event.stopPropagation(); closeWeatherPopout();" style="display:none;position:fixed;inset:0;z-index:899;"></div>
     <div id="weather-popout" class="weather-popout" style="display:none;" role="dialog" aria-label="Weather detail"></div>
 
     <!-- Account Locked Modal -->
@@ -1982,7 +1990,7 @@
     </div>
 
     <!-- Macro indicator detail popout -->
-    <div id="macro-popout-overlay" onclick="closeMacroPopout()" style="display:none;position:fixed;inset:0;z-index:899;"></div>
+    <div id="macro-popout-overlay" onclick="event.stopPropagation(); closeMacroPopout();" style="display:none;position:fixed;inset:0;z-index:899;"></div>
     <div id="macro-popout" class="macro-popout" style="display:none;" role="dialog" aria-label="Macro indicator detail"></div>
 
     <div class="chat-notification-badge" id="chat-notification-badge" onclick="scrollToChatSection()">

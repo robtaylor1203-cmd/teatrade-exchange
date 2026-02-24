@@ -5760,6 +5760,41 @@ body.modal-open {
     padding: 4px;
 }
 
+/* ── Mobile sidebar tabs (Menu / Account) ── */
+.mobile-sidebar-tabs {
+    display: flex;
+    gap: 0;
+    flex: 1;
+}
+
+.mobile-sidebar-tab {
+    flex: 1;
+    padding: 8px 0;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.mobile-sidebar-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.mobile-tab-panel {
+    display: block;
+}
+
+@media (min-width: 1201px) {
+    .mobile-sidebar-tabs { display: none; }
+    #mobile-panel-account { display: none !important; }
+    #mobile-panel-menu { display: block !important; }
+}
+
 /* Mobile Styles */
 @media (max-width: 768px) {
     /* Prevent any overflow */
@@ -6648,8 +6683,8 @@ body.modal-open {
    MOBILE OVERHAUL — Popups, fullscreen, account menu, leaderboard
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ── 1. Weather & macro popouts: center overlay on mobile ──────────────── */
-@media (max-width: 768px) {
+/* ── 1. Weather & macro popouts: center overlay on mobile, ABOVE sidebar ── */
+@media (max-width: 1200px) {
     .weather-popout,
     .macro-popout {
         position: fixed !important;
@@ -6662,7 +6697,12 @@ body.modal-open {
         overflow-y: auto !important;
         -webkit-overflow-scrolling: touch;
         border-radius: 14px !important;
+        z-index: 20000 !important;
         animation: mobile-popup-in 0.2s ease !important;
+    }
+    #weather-popout-overlay,
+    #macro-popout-overlay {
+        z-index: 19999 !important;
     }
     @keyframes mobile-popup-in {
         from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
@@ -6733,6 +6773,36 @@ body.modal-open {
 @media (max-width: 768px) and (orientation: landscape) {
     body.chart-fullscreen-active .rotate-prompt {
         display: none;
+    }
+    body.chart-fullscreen-active.modal-open {
+        position: static !important;
+        overflow: hidden !important;
+    }
+    .panel-maximized {
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch;
+    }
+    .panel-maximized .trading-hub-container {
+        flex-direction: column !important;
+        height: auto !important;
+        min-height: auto !important;
+        overflow: visible !important;
+    }
+    .panel-maximized .trading-hub-main {
+        height: auto !important;
+        min-height: auto !important;
+        overflow: visible !important;
+    }
+    .panel-maximized .chart-container {
+        height: 55vw !important;
+        min-height: 250px !important;
+    }
+    .panel-maximized .trading-hub-sidebar {
+        width: 100% !important;
+        max-width: 100% !important;
+        border-left: none !important;
+        border-top: 1px solid var(--border) !important;
     }
 }
 
@@ -8790,6 +8860,20 @@ a.user-dropdown-item {
 }
 .portfolio-tab-bar .portfolio-tab svg { opacity: 0.7; }
 .portfolio-tab-bar .portfolio-tab.active svg { opacity: 1; }
+
+@media (max-width: 768px) {
+    .portfolio-tab-bar {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        flex-wrap: nowrap;
+        scrollbar-width: none;
+    }
+    .portfolio-tab-bar::-webkit-scrollbar { display: none; }
+    .portfolio-tab-bar .portfolio-tab {
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+}
 
 /* Tab content panels */
 .portfolio-tab-content { flex: 1; overflow: hidden; }

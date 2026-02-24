@@ -843,6 +843,16 @@ function closeMobileMenu() {
     document.body.style.overflow = '';
 }
 
+function switchMobileSidebarTab(panel) {
+    document.querySelectorAll('.mobile-sidebar-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.panel === panel);
+    });
+    const menuPanel = document.getElementById('mobile-panel-menu');
+    const acctPanel = document.getElementById('mobile-panel-account');
+    if (menuPanel) menuPanel.style.display = panel === 'menu' ? 'block' : 'none';
+    if (acctPanel) acctPanel.style.display = panel === 'account' ? 'block' : 'none';
+}
+
 // Close mobile menu on window resize to desktop
 window.addEventListener('resize', () => {
     if (window.innerWidth > 1200) {
