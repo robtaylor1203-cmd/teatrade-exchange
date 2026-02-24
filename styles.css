@@ -6644,6 +6644,244 @@ body.modal-open {
     }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE OVERHAUL — Popups, fullscreen, account menu, leaderboard
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Weather & macro popouts: center overlay on mobile ──────────────── */
+@media (max-width: 768px) {
+    .weather-popout,
+    .macro-popout {
+        position: fixed !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        width: calc(100vw - 32px) !important;
+        max-width: 360px !important;
+        max-height: 85vh !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 14px !important;
+        animation: mobile-popup-in 0.2s ease !important;
+    }
+    @keyframes mobile-popup-in {
+        from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
+        to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    }
+}
+
+/* ── 2. Fullscreen charts: mobile landscape fix + rotate prompt ────────── */
+@media (max-width: 768px) {
+    .panel-maximized {
+        overflow: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+    .panel-maximized .trading-hub-container {
+        flex-direction: column !important;
+        overflow: auto !important;
+        height: auto !important;
+        min-height: 100vh;
+    }
+    .panel-maximized .trading-hub-main {
+        overflow: visible !important;
+        height: auto !important;
+        min-height: 60vh;
+    }
+    .panel-maximized .trading-hub-sidebar {
+        width: 100% !important;
+        max-width: 100% !important;
+        border-left: none !important;
+        border-top: 1px solid var(--border) !important;
+    }
+}
+
+/* Rotate prompt overlay */
+.rotate-prompt {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 99999;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    font-size: 15px;
+    text-align: center;
+    padding: 20px;
+}
+.rotate-prompt svg {
+    opacity: 0.6;
+    animation: rotate-hint 2s ease-in-out infinite;
+}
+@keyframes rotate-hint {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(90deg); }
+}
+.rotate-prompt-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: -8px;
+}
+
+@media (max-width: 768px) and (orientation: portrait) {
+    body.chart-fullscreen-active .rotate-prompt {
+        display: flex;
+    }
+}
+@media (max-width: 768px) and (orientation: landscape) {
+    body.chart-fullscreen-active .rotate-prompt {
+        display: none;
+    }
+}
+
+/* ── 3. Account options in mobile sidebar ──────────────────────────────── */
+.mobile-account-section {
+    display: none;
+    border-top: 1px solid var(--border);
+    padding: 12px 14px 8px;
+}
+.mobile-account-header {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+.mobile-account-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 8px;
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+    text-decoration: none;
+    transition: background 0.15s;
+}
+.mobile-account-item:hover,
+.mobile-account-item:active {
+    background: var(--bg-hover);
+}
+.mobile-account-item svg {
+    opacity: 0.6;
+    flex-shrink: 0;
+}
+.mobile-account-item.logout-item {
+    color: var(--accent-red);
+}
+.mobile-account-balance {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    font-size: 12px;
+}
+.mobile-account-balance-label {
+    color: var(--text-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.mobile-account-balance-amount {
+    font-weight: 600;
+    color: var(--accent-green);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+@media (max-width: 1200px) {
+    .mobile-account-section {
+        display: block;
+    }
+}
+
+/* ── 4. Leaderboard in mobile sidebar ──────────────────────────────────── */
+.mobile-leaderboard-section {
+    display: none;
+    border-top: 1px solid var(--border);
+    padding: 12px 14px 8px;
+}
+.mobile-leaderboard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+.mobile-leaderboard-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+.mobile-leaderboard-date {
+    font-size: 10px;
+    color: var(--accent-orange);
+}
+.mobile-lb-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.mobile-lb-item:hover,
+.mobile-lb-item:active {
+    background: var(--bg-hover);
+}
+.mobile-lb-rank {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+.mobile-lb-rank.gold   { background: #f59e0b22; color: #f59e0b; }
+.mobile-lb-rank.silver { background: #94a3b822; color: #94a3b8; }
+.mobile-lb-rank.bronze { background: #d9764422; color: #d97644; }
+.mobile-lb-name {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.mobile-lb-return {
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+}
+.mobile-lb-return.up { color: var(--accent-green); }
+.mobile-lb-return.down { color: var(--accent-red); }
+
+@media (max-width: 1200px) {
+    .mobile-leaderboard-section {
+        display: block;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
 @media (max-width: 400px) {
     .market-card {
         min-width: 120px;

@@ -911,3 +911,78 @@ async function loadTopTraders() {
 
 // Run on page load
 adjustViewportScale();
+
+// =============================================
+// MOBILE: Populate leaderboard in sidebar
+// =============================================
+
+function updateMobileLeaderboard(leaders) {
+    const container = document.getElementById('mobile-leaderboard-list');
+    const dateEl = document.getElementById('mobile-lb-date');
+    if (!container) return;
+
+    if (dateEl) {
+        const now = new Date();
+        dateEl.textContent = now.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }).toUpperCase();
+    }
+
+    if (!leaders || leaders.length === 0) {
+        container.innerHTML = '<div style="padding:12px 0;color:var(--text-muted);text-align:center;font-size:12px;">No traders yet</div>';
+        return;
+    }
+
+    container.innerHTML = leaders.slice(0, 10).map((user, i) => {
+        const rank = i + 1;
+        let rankClass = '';
+        if (rank === 1) rankClass = 'gold';
+        else if (rank === 2) rankClass = 'silver';
+        else if (rank === 3) rankClass = 'bronze';
+        const pct = user.return_pct || 0;
+        const pctClass = pct >= 0 ? 'up' : 'down';
+        const sign = pct >= 0 ? '+' : '';
+        return `<div class="mobile-lb-item" onclick="openTraderProfile('${user.username}', ${pct}, ${user.total_value || 0}, ${rank}); closeMobileMenu();">
+            <div class="mobile-lb-rank ${rankClass}">${rank}</div>
+            <div class="mobile-lb-name">${escapeHtml(user.username)}</div>
+            <div class="mobile-lb-return ${pctClass}">${sign}${pct.toFixed(1)}%</div>
+        </div>`;
+    }).join('');
+}
+
+// =============================================
+// MOBILE: Account section state management
+// =============================================
+
+function updateMobileAccountSection() {
+    const balEl = document.getElementById('mobile-account-balance');
+    const amtEl = document.getElementById('mobile-balance-amount');
+    const logoutBtn = document.getElementById('mobile-logout-btn');
+    const isLoggedIn = !!state.currentUser;
+
+    if (balEl) balEl.style.display = isLoggedIn ? 'flex' : 'none';
+    if (logoutBtn) logoutBtn.style.display = isLoggedIn ? 'flex' : 'none';
+
+    if (isLoggedIn && amtEl) {
+        const bal = getActiveBalance();
+        amtEl.textContent = '$' + bal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+}
+
+// =============================================
+// MOBILE: Chart fullscreen rotate prompt
+// =============================================
+
+const _origToggleMaximize = typeof toggleMaximize === 'function' ? toggleMaximize : null;
+
+function _mobileChartFullscreenWatch() {
+    const isMaximized = !!state.maximizedPanel;
+    const isMobile = window.innerWidth <= 768;
+
+    if (isMaximized && isMobile) {
+        document.body.classList.add('chart-fullscreen-active');
+    } else {
+        document.body.classList.remove('chart-fullscreen-active');
+    }
+}
+
+window.addEventListener('resize', _mobileChartFullscreenWatch);
+window.addEventListener('orientationchange', _mobileChartFullscreenWatch);

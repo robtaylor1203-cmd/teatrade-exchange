@@ -176,6 +176,9 @@ function toggleMaximize(panelId) {
         }
     }
 
+    // Mobile rotate prompt management
+    if (typeof _mobileChartFullscreenWatch === 'function') _mobileChartFullscreenWatch();
+
     // Trigger resize for chart redraw with increased delays for layout computation
     setTimeout(() => {
         window.dispatchEvent(new Event('resize'));

@@ -956,6 +956,7 @@ async function loadLeaderboard() {
 
         if (data && data.length > 0) {
             updateLeaderboardDisplay(data);
+            if (typeof updateMobileLeaderboard === 'function') updateMobileLeaderboard(data);
         }
     } catch (error) {
         console.error('Failed to load leaderboard:', error);

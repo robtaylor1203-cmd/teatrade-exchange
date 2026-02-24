@@ -654,6 +654,7 @@ function updateUIForLoggedInUser() {
     document.getElementById('portfolio-section').style.display = 'block';
 
     if (typeof showAdminButton === 'function') showAdminButton();
+    if (typeof updateMobileAccountSection === 'function') updateMobileAccountSection();
 
     const balance = getActiveBalance();
     const formatted = '$' + balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
