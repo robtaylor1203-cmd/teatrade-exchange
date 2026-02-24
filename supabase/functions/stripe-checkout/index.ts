@@ -14,7 +14,7 @@ import Stripe from "https://esm.sh/stripe@14.14.0?target=deno"
 
 const ALLOWED_ORIGIN = Deno.env.get('ALLOWED_ORIGIN') || '*'
 const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY') ?? ''
-const SITE_URL = Deno.env.get('SITE_URL') || 'https://teatrade.exchange'
+const SITE_URL = Deno.env.get('SITE_URL') || 'https://exchange.teatrade.co.uk'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': ALLOWED_ORIGIN,

@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /supabase/
 
-Sitemap: https://teatrade.exchange/sitemap.xml
+Sitemap: https://exchange.teatrade.co.uk/sitemap.xml
