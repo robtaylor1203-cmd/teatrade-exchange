@@ -240,6 +240,7 @@ async function loadUserProfile() {
 
         if (typeof checkAccountStatus === 'function') checkAccountStatus();
         if (typeof updateCombineBanner === 'function') updateCombineBanner();
+        if (typeof syncKnownBadgesFromProfile === 'function') syncKnownBadgesFromProfile();
     } catch (error) {
         console.error('Profile load error:', error);
     }

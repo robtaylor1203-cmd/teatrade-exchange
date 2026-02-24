@@ -342,6 +342,9 @@ async function executeTrade() {
         await Promise.all([loadPositions(), loadUserTrades(), loadUserProfile()]);
         updateUIForLoggedInUser();
 
+        // Check for newly earned badges after trade
+        if (typeof checkAndNotifyNewBadges === 'function') checkAndNotifyNewBadges();
+
         // Hold the success state for a moment, then reset form
         await new Promise(r => setTimeout(r, 1500));
         btn.classList.remove('trade-success');
@@ -460,6 +463,7 @@ async function closePosition(teaId, quantity, teaSymbol) {
         await new Promise(r => setTimeout(r, 400));
         await loadUserTrades();
         updateUIForLoggedInUser();
+        if (typeof checkAndNotifyNewBadges === 'function') checkAndNotifyNewBadges();
 
     } catch (error) {
         console.error('Close position error:', error);
@@ -521,6 +525,7 @@ async function closeIndexPosition(indexSymbol, quantity, tradeId) {
         await new Promise(r => setTimeout(r, 400));
         await loadUserTrades();
         updateUIForLoggedInUser();
+        if (typeof checkAndNotifyNewBadges === 'function') checkAndNotifyNewBadges();
 
     } catch (error) {
         console.error('Close index position error:', error);
@@ -631,6 +636,7 @@ async function closePairPosition(tradeId) {
         await new Promise(r => setTimeout(r, 400));
         await loadUserTrades();
         updateUIForLoggedInUser();
+        if (typeof checkAndNotifyNewBadges === 'function') checkAndNotifyNewBadges();
 
     } catch (error) {
         console.error('Close pair position error:', error);
