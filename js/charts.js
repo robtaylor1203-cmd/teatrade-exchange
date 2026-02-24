@@ -382,8 +382,8 @@ function calculateRSI(data, period = 14) {
         } else if (i === period) {
             const avgGain = gains.reduce((a, b) => a + b, 0) / period;
             const avgLoss = losses.reduce((a, b) => a + b, 0) / period;
-            const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-            const val = 100 - (100 / (1 + rs));
+            const rs = (avgGain === 0 && avgLoss === 0) ? 0 : (avgLoss === 0 ? 100 : avgGain / avgLoss);
+            const val = (avgGain === 0 && avgLoss === 0) ? 50 : 100 - (100 / (1 + rs));
             if (firstValue === null) firstValue = val;
             rsi.push(val);
         } else {
@@ -392,8 +392,8 @@ function calculateRSI(data, period = 14) {
             const prevAvgLoss = losses.slice(-period - 1, -1).reduce((a, b) => a + b, 0) / period;
             const avgGain = (prevAvgGain * (period - 1) + gain) / period;
             const avgLoss = (prevAvgLoss * (period - 1) + loss) / period;
-            const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-            rsi.push(100 - (100 / (1 + rs)));
+            const rs = (avgGain === 0 && avgLoss === 0) ? 0 : (avgLoss === 0 ? 100 : avgGain / avgLoss);
+            rsi.push((avgGain === 0 && avgLoss === 0) ? 50 : 100 - (100 / (1 + rs)));
         }
     }
 

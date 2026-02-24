@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS anchor_price_audit (
 ALTER TABLE anchor_price_audit ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Anchor audit read" ON anchor_price_audit;
-CREATE POLICY "Anchor audit read" ON anchor_price_audit FOR SELECT USING (true);
+CREATE POLICY "Anchor audit read" ON anchor_price_audit
+    FOR SELECT TO authenticated USING (true);
 
 DROP POLICY IF EXISTS "Anchor audit insert" ON anchor_price_audit;
 DROP POLICY IF EXISTS "Anchor audit update" ON anchor_price_audit;
@@ -754,15 +755,27 @@ BEGIN
     IF p_quantity <= 0 THEN
         RETURN jsonb_build_object('success', false, 'error', 'Quantity must be greater than zero');
     END IF;
-    IF p_price IS NULL OR p_price <= 0 OR p_price != p_price OR p_price > 1e15 THEN
-        RETURN jsonb_build_object('success', false, 'error', 'Invalid price');
-    END IF;
     IF p_leverage < 1 OR p_leverage > 25 THEN
         RETURN jsonb_build_object('success', false, 'error', 'Leverage must be between 1 and 25');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM indexes WHERE symbol = p_index_symbol) THEN
         RETURN jsonb_build_object('success', false, 'error', 'Index not found: ' || p_index_symbol);
     END IF;
+
+    -- SERVER-SIDE PRICE: always calculate from component teas, never trust client
+    DECLARE v_server_price NUMERIC;
+    BEGIN
+        SELECT AVG(t.current_price) * COALESCE(MAX(i.multiplier), 1)
+            INTO v_server_price
+        FROM indexes i, unnest(i.teas) AS tea_sym
+        JOIN teas t ON t.symbol = tea_sym
+        WHERE i.symbol = p_index_symbol AND t.current_price > 0;
+
+        IF v_server_price IS NULL OR v_server_price <= 0 THEN
+            RETURN jsonb_build_object('success', false, 'error', 'Cannot determine index price');
+        END IF;
+        p_price := v_server_price;
+    END;
 
     SELECT value INTO v_spread FROM platform_config WHERE key = 'spread_pct';
     v_spread := COALESCE(v_spread, 0.01);
@@ -1355,9 +1368,9 @@ BEGIN
             WHERE id = v_order.id;
             v_filled_count := v_filled_count + 1;
         ELSE
-            -- Fill failed (e.g. insufficient holdings for SELL) — refund margin for BUY that was restored then failed
+            -- Trade failed: re-reserve the margin that was refunded above
             IF v_order.side = 'BUY' AND v_order.margin_reserved > 0 AND NOT v_order.is_index THEN
-                UPDATE profiles SET cash_balance = cash_balance - v_order.margin_reserved + v_order.margin_reserved WHERE id = v_order.user_id;
+                UPDATE profiles SET cash_balance = cash_balance - v_order.margin_reserved WHERE id = v_order.user_id;
             END IF;
         END IF;
     END LOOP;
