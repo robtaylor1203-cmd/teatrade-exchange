@@ -870,6 +870,24 @@
                 <div id="mobile-leaderboard-list"></div>
             </div>
 
+            <!-- IB Chat Section -->
+            <div class="sidebar-section chat-section" id="chat-section-sidebar">
+                <div class="chat-header">
+                    <div class="chat-title">
+                        TT Messenger
+                        <span class="chat-online" id="chat-online-count">0 online</span>
+                    </div>
+                </div>
+                <div class="chat-messages" id="chat-messages">
+                    <!-- Messages will be populated dynamically -->
+                </div>
+                <div class="chat-input-container">
+                    <input type="text" class="chat-input" id="chat-input" placeholder="Type a message... (@user for DM)">
+                    <button class="chat-send" id="chat-send-btn" onclick="sendChatMessage()">Send</button>
+                    <button class="chat-blast" title="BLAST" onclick="sendBlastMessage()"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg></button>
+                </div>
+            </div>
+
             </div><!-- /mobile-panel-menu -->
 
             <div class="mobile-tab-panel" id="mobile-panel-account" style="display:none;">
@@ -909,23 +927,6 @@
             </div>
             </div><!-- /mobile-panel-account -->
 
-            <!-- IB Chat Section -->
-            <div class="sidebar-section chat-section" id="chat-section-sidebar">
-                <div class="chat-header">
-                    <div class="chat-title">
-                        TT Messenger
-                        <span class="chat-online" id="chat-online-count">0 online</span>
-                    </div>
-                </div>
-                <div class="chat-messages" id="chat-messages">
-                    <!-- Messages will be populated dynamically -->
-                </div>
-                <div class="chat-input-container">
-                    <input type="text" class="chat-input" id="chat-input" placeholder="Type a message... (@user for DM)">
-                    <button class="chat-send" id="chat-send-btn" onclick="sendChatMessage()">Send</button>
-                    <button class="chat-blast" title="BLAST" onclick="sendBlastMessage()"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg></button>
-                </div>
-            </div>
         </div>
 
         <!-- Center Content -->
