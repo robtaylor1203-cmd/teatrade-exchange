@@ -114,19 +114,23 @@ function invalidatePriceCacheForCurrentChart() {
     const selectedSymbol = select?.value;
     const selectedTea = state.teas && state.teas.find(t => t.symbol === selectedSymbol);
 
-    let cacheKey;
+    let baseKey;
     if (selectedTea) {
-        cacheKey = selectedTea.symbol;
+        baseKey = selectedTea.symbol;
     } else {
         const indexSymbol = state.mainChartData?.symbol || 'KENYA';
-        cacheKey = `INDEX_${indexSymbol}`;
+        baseKey = `INDEX_${indexSymbol}`;
     }
 
-    // Reset the cache entry so getPriceHistory re-fetches
+    // Clear all timeframe variants of this symbol's cache
     if (state.priceDataCache) {
-        delete state.priceDataCache.data[cacheKey];
-        delete state.priceDataCache.lastUpdate[cacheKey];
-        delete state.priceDataCache.loaded[cacheKey];
+        Object.keys(state.priceDataCache.data || {}).forEach(k => {
+            if (k === baseKey || k.startsWith(baseKey + '_')) {
+                delete state.priceDataCache.data[k];
+                delete state.priceDataCache.lastUpdate[k];
+                delete state.priceDataCache.loaded[k];
+            }
+        });
     }
 
     // Also clear the cached timeframe so drawChart regenerates chart data

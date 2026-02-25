@@ -122,10 +122,14 @@ function openHubForSymbol(teaOrSymbol) {
     // Invalidate price cache for this symbol so the hub chart loads fresh
     // data from DB rather than serving stale entries from a previous session.
     if (state.priceDataCache) {
-        const _ck = isIndex ? `INDEX_${symbol}` : symbol;
-        delete state.priceDataCache.loaded[_ck];
-        delete state.priceDataCache.data[_ck];
-        delete state.priceDataCache.lastUpdate[_ck];
+        const _base = isIndex ? `INDEX_${symbol}` : symbol;
+        Object.keys(state.priceDataCache.data || {}).forEach(k => {
+            if (k === _base || k.startsWith(_base + '_')) {
+                delete state.priceDataCache.data[k];
+                delete state.priceDataCache.lastUpdate[k];
+                delete state.priceDataCache.loaded[k];
+            }
+        });
     }
 
     // Clear main chart data so it doesn't flash stale data from previous symbol
@@ -564,7 +568,8 @@ function generateInitialChartData(symbol) {
 
         // Store in cache but with lastUpdate=0 so getPriceHistory still
         // triggers a DB load to replace this synthetic data with real data.
-        const cacheKey = symbolType === 'index' ? `INDEX_${lookupSymbol}` : lookupSymbol;
+        const _tf = state.currentTimeframe || '1D';
+        const cacheKey = (symbolType === 'index' ? `INDEX_${lookupSymbol}` : lookupSymbol) + `_${_tf}`;
         state.priceDataCache.data[cacheKey] = data;
         state.priceDataCache.lastUpdate[cacheKey] = 0;
     }
@@ -672,12 +677,16 @@ function syncHubChartToTradeSymbol(selectId) {
         priceEl.className = 'chart-stat-value up';
     }
 
-    // Invalidate cache for fresh load
+    // Invalidate cache for fresh load (all timeframes)
     if (state.priceDataCache) {
-        const _ck = isIdx ? `INDEX_${lookupSymbol}` : lookupSymbol;
-        delete state.priceDataCache.loaded[_ck];
-        delete state.priceDataCache.data[_ck];
-        delete state.priceDataCache.lastUpdate[_ck];
+        const _base = isIdx ? `INDEX_${lookupSymbol}` : lookupSymbol;
+        Object.keys(state.priceDataCache.data || {}).forEach(k => {
+            if (k === _base || k.startsWith(_base + '_')) {
+                delete state.priceDataCache.data[k];
+                delete state.priceDataCache.lastUpdate[k];
+                delete state.priceDataCache.loaded[k];
+            }
+        });
     }
 
     // Reset main chart state so drawChart() regenerates from the new symbol
@@ -755,10 +764,14 @@ function syncChartToTradeSelect() {
     }
 
     if (state.priceDataCache) {
-        const _ck = isIdx ? `INDEX_${symbol}` : symbol;
-        delete state.priceDataCache.loaded[_ck];
-        delete state.priceDataCache.data[_ck];
-        delete state.priceDataCache.lastUpdate[_ck];
+        const _base = isIdx ? `INDEX_${symbol}` : symbol;
+        Object.keys(state.priceDataCache.data || {}).forEach(k => {
+            if (k === _base || k.startsWith(_base + '_')) {
+                delete state.priceDataCache.data[k];
+                delete state.priceDataCache.lastUpdate[k];
+                delete state.priceDataCache.loaded[k];
+            }
+        });
     }
 
     state.chartData = [];
@@ -1415,7 +1428,8 @@ function setHubTimeframe(tf) {
             if (currentRaw && currentSym !== snapshotSymbol) return;
 
             // Populate the shared cache so live-tick updates can append to it
-            const cacheKey = symbolType === 'index' ? `INDEX_${symbol}` : symbol;
+            const _tfKey = state.currentTimeframe || '1D';
+            const cacheKey = (symbolType === 'index' ? `INDEX_${symbol}` : symbol) + `_${_tfKey}`;
             if (state.priceDataCache) {
                 state.priceDataCache.data[cacheKey]       = data;
                 state.priceDataCache.lastUpdate[cacheKey] = Date.now();

@@ -105,8 +105,12 @@ function openQuickQuoteModal(tea) {
     // Invalidate cache and force a fresh fetch for this tea's / index's data
     const openSymbolType = (tea.isIndex || isIndexSymbol(tea.symbol)) ? 'index' : 'tea';
     if (state.priceDataCache) {
-        delete state.priceDataCache.lastUpdate[tea.symbol];
-        delete state.priceDataCache.lastUpdate[`INDEX_${tea.symbol}`];
+        const _bases = [tea.symbol, `INDEX_${tea.symbol}`];
+        Object.keys(state.priceDataCache.lastUpdate || {}).forEach(k => {
+            if (_bases.some(b => k === b || k.startsWith(b + '_'))) {
+                delete state.priceDataCache.lastUpdate[k];
+            }
+        });
     }
     // Trigger async re-fetch; redraw QQ chart when data arrives
     getPriceHistory(tea.symbol, openSymbolType).then(data => {
@@ -615,8 +619,9 @@ function setQQTimeframe(tf) {
                 if (state.qqCurrentTea?.symbol !== snapshotSymbol) return;
 
                 // Populate the shared cache so live-tick updates append to it
-                const cacheKey = symbolType === 'index'
-                    ? `INDEX_${tea.symbol}` : tea.symbol;
+                const _tfk = state.currentTimeframe || '1D';
+                const cacheKey = (symbolType === 'index'
+                    ? `INDEX_${tea.symbol}` : tea.symbol) + `_${_tfk}`;
                 if (state.priceDataCache) {
                     state.priceDataCache.data[cacheKey]       = data;
                     state.priceDataCache.lastUpdate[cacheKey] = Date.now();

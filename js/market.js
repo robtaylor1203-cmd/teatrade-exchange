@@ -29,7 +29,8 @@
 // =============================================
 
 async function getPriceHistory(symbol, symbolType = 'tea') {
-    const cacheKey = symbolType === 'index' ? `INDEX_${symbol}` : symbol;
+    const tf = state.currentTimeframe || '1D';
+    const cacheKey = (symbolType === 'index' ? `INDEX_${symbol}` : symbol) + `_${tf}`;
 
     // Return cached data if available and recently updated (within 60s)
     if (state.priceDataCache.data[cacheKey] && state.priceDataCache.data[cacheKey].length > 0) {
@@ -57,9 +58,6 @@ async function getPriceHistory(symbol, symbolType = 'tea') {
                 return dbData;
             }
 
-            // Database empty or too sparse — store [] but with lastUpdate=0
-            // so the very next call triggers a fresh DB fetch instead of
-            // serving cached emptiness for 60 seconds.
             console.log(`Insufficient price history for ${cacheKey} (${dbData ? dbData.length : 0} candles) — will retry on next request`);
             state.priceDataCache.data[cacheKey] = [];
             state.priceDataCache.loaded[cacheKey] = false;
@@ -75,7 +73,8 @@ async function getPriceHistory(symbol, symbolType = 'tea') {
 
 // Synchronous version — returns cached data or empty array
 function getPriceHistorySync(symbol, symbolType = 'tea') {
-    const cacheKey = symbolType === 'index' ? `INDEX_${symbol}` : symbol;
+    const tf = state.currentTimeframe || '1D';
+    const cacheKey = (symbolType === 'index' ? `INDEX_${symbol}` : symbol) + `_${tf}`;
 
     if (state.priceDataCache.data[cacheKey] && state.priceDataCache.data[cacheKey].length > 0) {
         return state.priceDataCache.data[cacheKey];
@@ -89,7 +88,8 @@ function getPriceHistorySync(symbol, symbolType = 'tea') {
 
 // Update the unified cache with a new price tick (called when prices change)
 function updatePriceCache(symbol, newPrice, symbolType = 'tea') {
-    const cacheKey = symbolType === 'index' ? `INDEX_${symbol}` : symbol;
+    const tf = state.currentTimeframe || '1D';
+    const cacheKey = (symbolType === 'index' ? `INDEX_${symbol}` : symbol) + `_${tf}`;
 
     // Ensure the cache array exists
     if (!state.priceDataCache.data[cacheKey]) {
@@ -393,10 +393,22 @@ function _fillCandleGaps(candles, intervalMs) {
         const currTime = candles[i].date.getTime();
         const gap = currTime - prevTime;
         if (gap > intervalMs) {
-            const lastClose = candles[i - 1].close;
-            let count = 0;
-            for (let t = prevTime + intervalMs; t < currTime && count < MAX_FILL_PER_GAP; t += intervalMs, count++) {
-                filled.push({ date: new Date(t), open: lastClose, high: lastClose, low: lastClose, close: lastClose, volume: 0 });
+            const startPrice = candles[i - 1].close;
+            const endPrice   = candles[i].open;
+            const steps = Math.min(Math.round(gap / intervalMs) - 1, MAX_FILL_PER_GAP);
+            for (let s = 1; s <= steps; s++) {
+                const frac = s / (steps + 1);
+                const p = startPrice + (endPrice - startPrice) * frac;
+                const jitter = p * 0.001 * (Math.sin(s * 7.3) * 0.5 + Math.cos(s * 3.1) * 0.5);
+                const high = p + Math.abs(jitter);
+                const low  = p - Math.abs(jitter);
+                filled.push({
+                    date: new Date(prevTime + s * intervalMs),
+                    open: p - jitter * 0.3,
+                    high, low,
+                    close: p + jitter * 0.3,
+                    volume: 0
+                });
             }
         }
         filled.push(candles[i]);
@@ -625,12 +637,16 @@ function swapChartIndex(cardIndex) {
         // Clear Y-axis cache so the new instrument rescales from its own data
         if (window.mainYAxisCache) window.mainYAxisCache = {};
 
-        // Invalidate price cache for the new symbol to force fresh DB load
+        // Invalidate price cache for the new symbol (all timeframes)
         if (state.priceDataCache) {
-            const _ck = `INDEX_${state.mainChartData.symbol}`;
-            delete state.priceDataCache.loaded[_ck];
-            delete state.priceDataCache.data[_ck];
-            delete state.priceDataCache.lastUpdate[_ck];
+            const _base = `INDEX_${state.mainChartData.symbol}`;
+            Object.keys(state.priceDataCache.data || {}).forEach(k => {
+                if (k === _base || k.startsWith(_base + '_')) {
+                    delete state.priceDataCache.data[k];
+                    delete state.priceDataCache.lastUpdate[k];
+                    delete state.priceDataCache.loaded[k];
+                }
+            });
         }
 
         drawChart();
@@ -872,9 +888,10 @@ function _pushPriceToActiveCharts(symbol, newPrice) {
         }
 
         if (qqPrice && qqPrice > 0) {
-            const cacheKey = qqIsIdx ? `INDEX_${qqSym}` : qqSym;
-            if (state.priceDataCache?.data?.[cacheKey]?.length > 0) {
-                appendPriceToChart(state.priceDataCache.data[cacheKey], qqPrice);
+            const _tf = state.currentTimeframe || '1D';
+            const _qqCk = (qqIsIdx ? `INDEX_${qqSym}` : qqSym) + `_${_tf}`;
+            if (state.priceDataCache?.data?.[_qqCk]?.length > 0) {
+                appendPriceToChart(state.priceDataCache.data[_qqCk], qqPrice);
             }
             state.qqCurrentTea = { ...state.qqCurrentTea, current_price: qqPrice };
         }
