@@ -437,23 +437,23 @@ function _fillCandleGaps(candles, intervalMs) {
     if (candles.length < 2) return candles;
     const MAX_FILL_PER_GAP = 500;
 
-    // Measure volatility from real candles to calibrate synthetic ones.
-    // Use the average absolute candle body as a % of price.
+    // Measure volatility from real candles that have genuine movement.
+    // Use the high-low range as % of price (more stable than body size).
     let volSum = 0, volN = 0;
     for (const c of candles) {
-        if (c.close > 0) {
-            volSum += Math.abs(c.close - c.open) / c.close;
+        if (c.close > 0 && c.high > c.low) {
+            volSum += (c.high - c.low) / c.close;
             volN++;
         }
     }
-    const baseVol = volN > 0 ? Math.max(volSum / volN, 0.003) : 0.008;
+    // Floor at 1.5% — realistic minimum for commodity auction prices.
+    const baseVol = volN > 0 ? Math.max(volSum / volN, 0.015) : 0.02;
 
     // Deterministic pseudo-random based on seed (keeps chart stable across redraws)
     const _hash = (n) => {
         let x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
         return x - Math.floor(x);
     };
-    // Box-Muller-ish from hash: returns roughly normal(0,1)
     const _norm = (seed) => {
         const u1 = Math.max(0.0001, _hash(seed));
         const u2 = _hash(seed + 0.5);
@@ -471,32 +471,30 @@ function _fillCandleGaps(candles, intervalMs) {
             const steps = Math.min(Math.round(gap / intervalMs) - 1, MAX_FILL_PER_GAP);
             if (steps < 1) { filled.push(candles[i]); continue; }
 
-            // Brownian bridge: random walk from startPrice → endPrice
-            // Generate raw random walk, then pin the endpoint.
-            const drift = (endPrice - startPrice) / steps;
-            const sigma = startPrice * baseVol * 1.5;
+            // Brownian bridge: random walk from startPrice → endPrice.
+            // sigma scaled so the walk visibly moves ~2-4% across the gap.
+            const sigma = startPrice * baseVol * 0.6;
             let price = startPrice;
 
             for (let s = 1; s <= steps; s++) {
                 const remaining = steps - s;
-                // Pull toward endPrice so we arrive there at the last step
                 const pull = remaining > 0
                     ? (endPrice - price) / (remaining + 1)
                     : (endPrice - price);
                 const noise = sigma * _norm(prevTime / 1e6 + s * 13.37 + i * 7.7);
-                price += pull + noise * 0.4;
-                // Keep price positive and within reasonable bounds
+                price += pull + noise;
                 price = Math.max(price, startPrice * 0.7);
 
-                const wick = Math.abs(noise) * 0.3;
-                const open  = price - noise * 0.15;
-                const close = price + noise * 0.15;
-                const high  = Math.max(open, close) + wick;
-                const low   = Math.max(0.01, Math.min(open, close) - wick);
+                const wick = Math.abs(sigma * 0.5 * _hash(prevTime / 1e6 + s * 5.1));
+                const bodyHalf = Math.abs(noise) * 0.4;
+                const o = price - bodyHalf;
+                const c = price + bodyHalf;
+                const h = Math.max(o, c) + wick;
+                const l = Math.max(0.01, Math.min(o, c) - wick);
 
                 filled.push({
                     date: new Date(prevTime + s * intervalMs),
-                    open, high, low, close: price,
+                    open: o, high: h, low: l, close: price,
                     volume: 0
                 });
             }
