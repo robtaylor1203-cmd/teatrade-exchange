@@ -437,19 +437,21 @@ function _fillCandleGaps(candles, intervalMs) {
     if (candles.length < 2) return candles;
     const MAX_FILL_PER_GAP = 500;
 
-    // Measure volatility from real candles that have genuine movement.
-    // Use the high-low range as % of price (more stable than body size).
-    let volSum = 0, volN = 0;
-    for (const c of candles) {
-        if (c.close > 0 && c.high > c.low) {
-            volSum += (c.high - c.low) / c.close;
-            volN++;
-        }
-    }
-    // Floor at 1.5% — realistic minimum for commodity auction prices.
-    const baseVol = volN > 0 ? Math.max(volSum / volN, 0.015) : 0.02;
+    // Measure volatility from dense clusters of candles only (live data).
+    // Sparse daily simulated candles dilute the average, so we filter by
+    // looking for consecutive candles separated by ≤ 2× the interval.
+    const closes = candles.map(c => c.close).filter(p => p > 0);
+    const maxClose = Math.max(...closes);
+    const minClose = Math.min(...closes);
+    const avgClose = closes.reduce((a, b) => a + b, 0) / closes.length;
 
-    // Deterministic pseudo-random based on seed (keeps chart stable across redraws)
+    // Use the full data range to calibrate: the gap-fill should produce
+    // candles whose movement looks proportional to the overall chart range.
+    const rangeVol = avgClose > 0 ? (maxClose - minClose) / avgClose : 0.05;
+    // Per-candle sigma: distribute total range across sqrt(totalCandles)
+    const totalCandles = candles.length;
+    const perCandleVol = Math.max(rangeVol / Math.sqrt(totalCandles) * 1.2, 0.012);
+
     const _hash = (n) => {
         let x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
         return x - Math.floor(x);
@@ -471,30 +473,32 @@ function _fillCandleGaps(candles, intervalMs) {
             const steps = Math.min(Math.round(gap / intervalMs) - 1, MAX_FILL_PER_GAP);
             if (steps < 1) { filled.push(candles[i]); continue; }
 
-            // Brownian bridge: random walk from startPrice → endPrice.
-            // sigma scaled so the walk visibly moves ~2-4% across the gap.
-            const sigma = startPrice * baseVol * 0.6;
+            const sigma = avgClose * perCandleVol;
             let price = startPrice;
 
             for (let s = 1; s <= steps; s++) {
                 const remaining = steps - s;
+                // Gentle pull toward endpoint — only 30% strength so the walk
+                // can wander freely and look like real price action.
+                const pullStrength = 0.3;
                 const pull = remaining > 0
-                    ? (endPrice - price) / (remaining + 1)
+                    ? (endPrice - price) / (remaining + 1) * pullStrength
                     : (endPrice - price);
-                const noise = sigma * _norm(prevTime / 1e6 + s * 13.37 + i * 7.7);
-                price += pull + noise;
-                price = Math.max(price, startPrice * 0.7);
+                const n = _norm(prevTime / 1e6 + s * 13.37 + i * 7.7);
+                price += pull + sigma * n;
+                price = Math.max(price, Math.min(startPrice, endPrice) * 0.85);
 
-                const wick = Math.abs(sigma * 0.5 * _hash(prevTime / 1e6 + s * 5.1));
-                const bodyHalf = Math.abs(noise) * 0.4;
+                const wick = Math.abs(sigma * 0.6 * _hash(prevTime / 1e6 + s * 5.1));
+                const bodyHalf = Math.abs(sigma * n) * 0.4;
                 const o = price - bodyHalf;
                 const c = price + bodyHalf;
-                const h = Math.max(o, c) + wick;
-                const l = Math.max(0.01, Math.min(o, c) - wick);
 
                 filled.push({
                     date: new Date(prevTime + s * intervalMs),
-                    open: o, high: h, low: l, close: price,
+                    open: o,
+                    high: Math.max(o, c) + wick,
+                    low: Math.max(0.01, Math.min(o, c) - wick),
+                    close: price,
                     volume: 0
                 });
             }
