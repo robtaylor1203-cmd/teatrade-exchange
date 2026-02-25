@@ -2779,6 +2779,7 @@ function _incrementTradeCount() {
 }
 
 function checkSharePrompt() {
+    if ((state.userProfile?.tier || 'FREE') === 'PRO') return;
     const count = _incrementTradeCount();
     if (count === _SHARE_FIRST_TRIGGER ||
         (count > _SHARE_FIRST_TRIGGER && (count - _SHARE_FIRST_TRIGGER) % _SHARE_REPEAT_INTERVAL === 0)) {
@@ -2852,6 +2853,7 @@ function _showSharePrompt() {
                 </button>
             </div>
             <button class="share-prompt-dismiss" onclick="closeSharePrompt()">Maybe later</button>
+            <div class="share-prompt-pro-note" onclick="closeSharePrompt(); if(typeof renderStoreTab==='function'){document.getElementById('portfolio-modal').style.display='flex'; switchPortfolioTab('store');}">*Upgrade to <strong>Pro</strong> to remove these prompts</div>
         </div>`;
 
     modal.style.display = 'flex';

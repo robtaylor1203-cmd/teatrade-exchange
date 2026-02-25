@@ -8478,6 +8478,16 @@ a.user-dropdown-item {
     transition: color 0.15s;
 }
 .share-prompt-dismiss:hover { color: var(--text-secondary); }
+.share-prompt-pro-note {
+    font-size: 10px;
+    font-style: italic;
+    color: var(--text-muted);
+    margin-top: 6px;
+    cursor: pointer;
+    transition: color 0.15s;
+}
+.share-prompt-pro-note:hover { color: var(--accent); }
+.share-prompt-pro-note strong { font-weight: 600; }
 
 /* Real Money Coming Soon Modal */
 .real-money-modal {
