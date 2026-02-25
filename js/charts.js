@@ -527,38 +527,51 @@ function drawChart() {
 
     const yData = visibleData.length > 0 ? visibleData : displayData;
 
-    // SMART Y-AXIS: percentile-based range ignores extreme outlier spikes
-    const sortedCloses = yData.map(d => Number(d.close) || 0).filter(p => p > 0).sort((a, b) => a - b);
-    if (sortedCloses.length === 0) return;
+    // Y-AXIS: use actual min/max of ALL visible candle data (highs & lows)
+    // so no data point ever clips off the chart.
+    const allHighs = yData.map(d => Math.max(Number(d.high) || 0, Number(d.close) || 0)).filter(p => p > 0);
+    const allLows  = yData.map(d => {
+        const l = Math.min(Number(d.low) || Infinity, Number(d.close) || Infinity);
+        return l > 0 && isFinite(l) ? l : null;
+    }).filter(p => p !== null);
+    if (allHighs.length === 0) return;
 
-    const p2Idx  = Math.floor(sortedCloses.length * 0.02);
-    const p98Idx = Math.min(Math.ceil(sortedCloses.length * 0.98), sortedCloses.length - 1);
-    const minClose = sortedCloses[p2Idx];
-    const maxClose = sortedCloses[p98Idx];
+    const dataMax = Math.max(...allHighs);
+    const dataMin = allLows.length > 0 ? Math.min(...allLows) : dataMax * 0.9;
 
-    // Dynamic proportional padding — no absolute integer floors
-    let rawSpan = maxClose - minClose;
-    if (rawSpan === 0) rawSpan = minClose * 0.01 || 0.1;
-    const pad = rawSpan * 0.1;
+    let rawSpan = dataMax - dataMin;
+    if (rawSpan === 0) rawSpan = dataMin * 0.02 || 0.1;
+    const padTop    = rawSpan * 0.15;
+    const padBottom = rawSpan * 0.10;
 
-    let minPrice = Math.max(0, minClose - pad);
-    let maxPrice = maxClose + pad;
+    let minPrice = Math.max(0, dataMin - padBottom);
+    let maxPrice = dataMax + padTop;
 
-    // Light EMA smoothing to avoid axis jumping between refreshes.
+    // Ratchet: axis only EXPANDS to fit new data, never shrinks, so labels
+    // stay stable. Resets on symbol/timeframe change (cache cleared elsewhere).
     const chartedSymbol = state.mainChartData?.symbol || 'MAIN';
     const cacheKey = `main_${chartedSymbol}_${state.currentTimeframe}`;
     if (!window.mainYAxisCache) window.mainYAxisCache = {};
     const prev = window.mainYAxisCache[cacheKey];
     if (prev) {
-        const prevRange  = prev.max - prev.min;
-        const newRange   = maxPrice - minPrice;
+        const prevRange = prev.max - prev.min;
+        const newRange  = maxPrice - minPrice;
         const ratio = prevRange / newRange;
-        if (ratio > 2 || ratio < 0.5) {
-            // Snap immediately for large scale changes (symbol switch, currency change)
+        if (ratio > 3 || ratio < 0.33) {
+            // Snap immediately for large scale changes (symbol switch, currency)
         } else {
-            const α = 0.55;
-            minPrice = prev.min * (1 - α) + minPrice * α;
-            maxPrice = prev.max * (1 - α) + maxPrice * α;
+            // Ratchet: take the wider of previous and new bounds
+            minPrice = Math.min(prev.min, minPrice);
+            maxPrice = Math.max(prev.max, maxPrice);
+            // Slowly release if data has contracted significantly (>20% smaller)
+            const currentRange = maxPrice - minPrice;
+            const targetRange  = (dataMax + padTop) - Math.max(0, dataMin - padBottom);
+            if (targetRange < currentRange * 0.8) {
+                const ease = 0.02;
+                minPrice = prev.min + ((dataMin - padBottom) - prev.min) * ease;
+                maxPrice = prev.max + ((dataMax + padTop)    - prev.max) * ease;
+                minPrice = Math.max(0, minPrice);
+            }
         }
     }
     window.mainYAxisCache[cacheKey] = { min: minPrice, max: maxPrice };
