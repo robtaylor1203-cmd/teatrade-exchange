@@ -211,14 +211,16 @@ async function apiFetchPriceHistory(symbol, limit, since) {
 
     if (since && supabaseClient.from) {
         try {
-            // Split the live data window in half to work around the 1000-row
-            // PostgREST default cap. Each half fetches up to 1000 rows ASC,
-            // giving ~2000 live rows total (~7 days at 5-min density).
+            // Split live data into 3 time segments to stay within PostgREST's
+            // 1000-row default cap per request. 3 × 1000 = 3000 live rows,
+            // covering ~10 days at 5-min density.
             const sinceMs = new Date(since).getTime();
-            const midpoint = new Date((sinceMs + Date.now()) / 2).toISOString();
+            const nowMs = Date.now();
+            const third = (nowMs - sinceMs) / 3;
+            const cut1 = new Date(sinceMs + third).toISOString();
+            const cut2 = new Date(sinceMs + third * 2).toISOString();
 
-            const [histResult, liveOldResult, liveNewResult] = await Promise.all([
-                // A: every simulated row in the window
+            const [histResult, live1, live2, live3] = await Promise.all([
                 supabaseClient
                     .from('price_history')
                     .select('price, recorded_at, volume')
@@ -227,34 +229,41 @@ async function apiFetchPriceHistory(symbol, limit, since) {
                     .gte('recorded_at', since)
                     .order('recorded_at', { ascending: true })
                     .limit(5000),
-                // B: live rows from older half of window (ASC)
                 supabaseClient
                     .from('price_history')
                     .select('price, recorded_at, volume')
                     .eq('symbol', symbol)
                     .eq('is_simulated', false)
                     .gte('recorded_at', since)
-                    .lt('recorded_at', midpoint)
+                    .lt('recorded_at', cut1)
                     .order('recorded_at', { ascending: true })
                     .limit(1000),
-                // C: live rows from newer half of window (ASC)
                 supabaseClient
                     .from('price_history')
                     .select('price, recorded_at, volume')
                     .eq('symbol', symbol)
                     .eq('is_simulated', false)
-                    .gte('recorded_at', midpoint)
+                    .gte('recorded_at', cut1)
+                    .lt('recorded_at', cut2)
+                    .order('recorded_at', { ascending: true })
+                    .limit(1000),
+                supabaseClient
+                    .from('price_history')
+                    .select('price, recorded_at, volume')
+                    .eq('symbol', symbol)
+                    .eq('is_simulated', false)
+                    .gte('recorded_at', cut2)
                     .order('recorded_at', { ascending: true })
                     .limit(1000),
             ]);
 
-            if (!histResult.error || !liveOldResult.error || !liveNewResult.error) {
-                const hist = histResult.data || [];
-                const liveOld = liveOldResult.data || [];
-                const liveNew = liveNewResult.data || [];
-                const merged = [...hist, ...liveOld, ...liveNew].sort(
-                    (a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
-                );
+            if (!histResult.error || !live1.error || !live2.error || !live3.error) {
+                const merged = [
+                    ...(histResult.data || []),
+                    ...(live1.data || []),
+                    ...(live2.data || []),
+                    ...(live3.data || []),
+                ].sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime());
                 return { data: merged, error: null };
             }
         } catch (_) {

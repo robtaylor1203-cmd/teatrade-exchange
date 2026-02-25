@@ -224,19 +224,39 @@ async function loadChartDataFromHistory(symbol, symbolType = 'tea', timeframeOve
         windows.push(null);                                   // all-time fallback
     }
 
+    let result = null;
     for (const win of windows) {
         if (idxDef?.teas?.length) {
             const compositeCandles = await _loadCompositeIndexOHLC(idxDef.teas, cfg, win);
-            if (compositeCandles && compositeCandles.length >= 1) return compositeCandles;
+            if (compositeCandles && compositeCandles.length >= 1) { result = compositeCandles; break; }
         }
 
         const rawData = await loadPriceHistory(symbol, cfg.limit, win);
         if (rawData && rawData.length >= 2) {
-            return convertToOHLC(rawData, cfg.interval);
+            result = convertToOHLC(rawData, cfg.interval);
+            break;
         }
     }
 
-    return null;
+    if (!result || result.length === 0) return null;
+
+    // Extend to "now" so the chart's right edge always has a candle.
+    const lastCandle = result[result.length - 1];
+    const lastTime = lastCandle.date instanceof Date ? lastCandle.date.getTime() : new Date(lastCandle.date).getTime();
+    const intervalMs = cfg.interval * 60000;
+    const now = Date.now();
+    if (now - lastTime > intervalMs * 1.5) {
+        const price = lastCandle.close;
+        for (let t = lastTime + intervalMs; t <= now; t += intervalMs) {
+            result.push({
+                date: new Date(t),
+                open: price, high: price, low: price, close: price,
+                volume: 0
+            });
+        }
+    }
+
+    return result;
 }
 
 async function _loadCompositeIndexOHLC(teaSymbols, cfg, since) {
@@ -387,26 +407,67 @@ function convertToOHLC(priceData, intervalMinutes = 60) {
 function _fillCandleGaps(candles, intervalMs) {
     if (candles.length < 2) return candles;
     const MAX_FILL_PER_GAP = 500;
+
+    // Measure volatility from real candles to calibrate synthetic ones.
+    // Use the average absolute candle body as a % of price.
+    let volSum = 0, volN = 0;
+    for (const c of candles) {
+        if (c.close > 0) {
+            volSum += Math.abs(c.close - c.open) / c.close;
+            volN++;
+        }
+    }
+    const baseVol = volN > 0 ? Math.max(volSum / volN, 0.003) : 0.008;
+
+    // Deterministic pseudo-random based on seed (keeps chart stable across redraws)
+    const _hash = (n) => {
+        let x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+        return x - Math.floor(x);
+    };
+    // Box-Muller-ish from hash: returns roughly normal(0,1)
+    const _norm = (seed) => {
+        const u1 = Math.max(0.0001, _hash(seed));
+        const u2 = _hash(seed + 0.5);
+        return Math.sqrt(-2 * Math.log(u1)) * Math.cos(6.2832 * u2);
+    };
+
     const filled = [candles[0]];
     for (let i = 1; i < candles.length; i++) {
         const prevTime = candles[i - 1].date.getTime();
         const currTime = candles[i].date.getTime();
         const gap = currTime - prevTime;
-        if (gap > intervalMs) {
+        if (gap > intervalMs * 1.5) {
             const startPrice = candles[i - 1].close;
             const endPrice   = candles[i].open;
             const steps = Math.min(Math.round(gap / intervalMs) - 1, MAX_FILL_PER_GAP);
+            if (steps < 1) { filled.push(candles[i]); continue; }
+
+            // Brownian bridge: random walk from startPrice → endPrice
+            // Generate raw random walk, then pin the endpoint.
+            const drift = (endPrice - startPrice) / steps;
+            const sigma = startPrice * baseVol * 1.5;
+            let price = startPrice;
+
             for (let s = 1; s <= steps; s++) {
-                const frac = s / (steps + 1);
-                const p = startPrice + (endPrice - startPrice) * frac;
-                const jitter = p * 0.001 * (Math.sin(s * 7.3) * 0.5 + Math.cos(s * 3.1) * 0.5);
-                const high = p + Math.abs(jitter);
-                const low  = p - Math.abs(jitter);
+                const remaining = steps - s;
+                // Pull toward endPrice so we arrive there at the last step
+                const pull = remaining > 0
+                    ? (endPrice - price) / (remaining + 1)
+                    : (endPrice - price);
+                const noise = sigma * _norm(prevTime / 1e6 + s * 13.37 + i * 7.7);
+                price += pull + noise * 0.4;
+                // Keep price positive and within reasonable bounds
+                price = Math.max(price, startPrice * 0.7);
+
+                const wick = Math.abs(noise) * 0.3;
+                const open  = price - noise * 0.15;
+                const close = price + noise * 0.15;
+                const high  = Math.max(open, close) + wick;
+                const low   = Math.max(0.01, Math.min(open, close) - wick);
+
                 filled.push({
                     date: new Date(prevTime + s * intervalMs),
-                    open: p - jitter * 0.3,
-                    high, low,
-                    close: p + jitter * 0.3,
+                    open, high, low, close: price,
                     volume: 0
                 });
             }
