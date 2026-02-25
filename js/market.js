@@ -314,7 +314,8 @@ async function _loadCompositeIndexOHLC(teaSymbols, cfg, since) {
         }
     }
 
-    return candles.length >= 1 ? candles : null;
+    if (candles.length < 1) return null;
+    return _fillCandleGaps(candles, intervalMs);
 }
 
 // Load historical price data from database
@@ -380,7 +381,27 @@ function convertToOHLC(priceData, intervalMinutes = 60) {
         });
     }
 
-    return candles;
+    return _fillCandleGaps(candles, intervalMs);
+}
+
+function _fillCandleGaps(candles, intervalMs) {
+    if (candles.length < 2) return candles;
+    const MAX_FILL_PER_GAP = 500;
+    const filled = [candles[0]];
+    for (let i = 1; i < candles.length; i++) {
+        const prevTime = candles[i - 1].date.getTime();
+        const currTime = candles[i].date.getTime();
+        const gap = currTime - prevTime;
+        if (gap > intervalMs) {
+            const lastClose = candles[i - 1].close;
+            let count = 0;
+            for (let t = prevTime + intervalMs; t < currTime && count < MAX_FILL_PER_GAP; t += intervalMs, count++) {
+                filled.push({ date: new Date(t), open: lastClose, high: lastClose, low: lastClose, close: lastClose, volume: 0 });
+            }
+        }
+        filled.push(candles[i]);
+    }
+    return filled;
 }
 
 // Seed a chart array with a first candle if empty, otherwise append.
