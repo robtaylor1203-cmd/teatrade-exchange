@@ -574,6 +574,15 @@ function drawChart() {
             }
         }
     }
+    // Hard guarantee: current live price MUST be within the visible area.
+    // Compute it early so we can enforce the constraint before caching.
+    const currentPrice = prices[prices.length - 1];
+    if (currentPrice > 0) {
+        const cpPad = rawSpan * 0.12;
+        if (currentPrice + cpPad > maxPrice) maxPrice = currentPrice + cpPad;
+        if (currentPrice - cpPad < minPrice) minPrice = Math.max(0, currentPrice - cpPad);
+    }
+
     window.mainYAxisCache[cacheKey] = { min: minPrice, max: maxPrice };
 
     const priceRange = maxPrice - minPrice;
@@ -581,7 +590,6 @@ function drawChart() {
     const avgPrice = visibleCloses.reduce((a, b) => a + b, 0) / visibleCloses.length;
     const highPrice = Math.max(...visibleCloses);
     const lowPrice = Math.min(...visibleCloses);
-    const currentPrice = prices[prices.length - 1];
     const openPrice = Number(displayData[0].open) || currentPrice;
     const totalChange = openPrice > 0 ? ((currentPrice - openPrice) / openPrice * 100) : 0;
 
