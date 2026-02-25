@@ -8331,6 +8331,31 @@ a.user-dropdown-item {
 .badge-share-fb:hover { background: #1877F2; color: #fff; border-color: #1877F2; }
 .badge-share-copy:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 
+.share-bonus-callout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: linear-gradient(135deg, rgba(26,115,232,0.08), rgba(52,168,83,0.08));
+    border: 1px solid rgba(52,168,83,0.2);
+    border-radius: 10px;
+    padding: 10px 16px;
+    margin: 12px 0 14px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+.share-bonus-callout svg {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    color: var(--accent-green);
+}
+.share-bonus-callout strong {
+    color: var(--accent-green);
+    font-weight: 700;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    SHARE PROMPT (triggered after N trades)
    ═══════════════════════════════════════════════════════════════════════════ */
