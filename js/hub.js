@@ -33,9 +33,7 @@ function _getHubCurrencyInfo() {
     const _cardMap = { 'KENYAN': 'KENYA' };
 
     const tradeSym = _cardMap[raw] || raw;
-    const _allIdx = (state.dbIndexes?.length ? state.dbIndexes : (typeof defaultDbIndexes !== 'undefined' ? defaultDbIndexes : [])) || [];
-
-    const cardIdx = _allIdx.find(i => i.symbol === tradeSym);
+    const cardIdx = _findIndexDef(tradeSym);
     if (cardIdx?.forexKey && state.macroIndicators?.[cardIdx.forexKey]) {
         return { symbol: cardIdx.currency || '$', multiplier: Number(state.macroIndicators[cardIdx.forexKey]) || cardIdx.multiplier || 1 };
     }
@@ -58,10 +56,7 @@ function _hubFmtPrice(val) {
  */
 function _getHubCurrencyInfoForSymbol(sym) {
     if (!sym) return { symbol: '$', multiplier: 1 };
-    const _revCard = { 'KENYA': 'MOMBASA', 'INDIA': 'KOLKATA', 'CEYLON': 'COLOMBO', 'ASIA': 'FUTURES' };
-    const cardSym = _revCard[sym] || sym;
-    const _allIdx = (state.dbIndexes?.length ? state.dbIndexes : (typeof defaultDbIndexes !== 'undefined' ? defaultDbIndexes : [])) || [];
-    const idx = _allIdx.find(i => i.symbol === cardSym) || _allIdx.find(i => i.symbol === sym);
+    const idx = _findIndexDef(sym);
     if (idx?.forexKey && state.macroIndicators?.[idx.forexKey]) {
         return { symbol: idx.currency || '$', multiplier: Number(state.macroIndicators[idx.forexKey]) || idx.multiplier || 1 };
     }
@@ -639,9 +634,8 @@ function syncHubChartToTradeSymbol(selectId) {
     const lookupSymbol = rawSym === 'KENYAN' ? 'KENYA' : rawSym;
     const isIdx = typeof isIndexSymbol === 'function' && isIndexSymbol(lookupSymbol);
 
-    const _allIdx = (state.dbIndexes?.length ? state.dbIndexes : (typeof defaultDbIndexes !== 'undefined' ? defaultDbIndexes : [])) || [];
     const tea = !isIdx ? state.teas?.find(t => t.symbol === rawSym) : null;
-    const dbIdx = _allIdx.find(i => i.symbol === lookupSymbol);
+    const dbIdx = _findIndexDef(lookupSymbol);
     const name = tea
         ? (tea.name || rawSym)
         : (dbIdx?.name || lookupSymbol + ' Index');
@@ -724,12 +718,11 @@ function syncChartToTradeSelect() {
     if (!val) return;
 
     let symbol, name, price, isIdx, currency, forexKey;
-    const _allIdx = (state.dbIndexes?.length ? state.dbIndexes : (typeof defaultDbIndexes !== 'undefined' ? defaultDbIndexes : [])) || [];
 
     if (val.startsWith('INDEX_')) {
         symbol = val.replace('INDEX_', '');
         isIdx = true;
-        const dbIdx = _allIdx.find(i => i.symbol === symbol);
+        const dbIdx = _findIndexDef(symbol);
         name = dbIdx?.name || symbol + ' Index';
         const rawUsd = _liveIndexPrice(symbol) || 0;
         currency = typeof getCurrencyForSymbol === 'function' ? getCurrencyForSymbol(symbol) : '$';

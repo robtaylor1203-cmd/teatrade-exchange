@@ -25,6 +25,40 @@
  */
 
 // =============================================
+// INDEX LOOKUP HELPER
+// =============================================
+
+const _IDX_ALIASES = {
+    'KENYA': 'MOMBASA', 'MOMBASA': 'KENYA',
+    'INDIA': 'KOLKATA', 'KOLKATA': 'INDIA',
+    'CEYLON': 'COLOMBO', 'COLOMBO': 'CEYLON',
+    'ASIA': 'FUTURES',  'FUTURES': 'ASIA',
+    'INDONESIA': 'JAKARTA', 'JAKARTA': 'INDONESIA',
+    'BANGLADESH': 'CHITTAGONG', 'CHITTAGONG': 'BANGLADESH',
+    'MALAWI': 'LIMBE', 'LIMBE': 'MALAWI',
+};
+
+function _findIndexDef(symbol) {
+    const db  = state.dbIndexes?.length ? state.dbIndexes : [];
+    const all = [...db];
+    for (const d of defaultDbIndexes) {
+        if (!all.some(m => m.symbol === d.symbol)) all.push(d);
+    }
+    return all.find(i => i.symbol === symbol)
+        || all.find(i => i.symbol === (_IDX_ALIASES[symbol] || symbol))
+        || null;
+}
+
+function _allIndexDefs() {
+    const db  = state.dbIndexes?.length ? state.dbIndexes : [];
+    const all = [...db];
+    for (const d of defaultDbIndexes) {
+        if (!all.some(m => m.symbol === d.symbol)) all.push(d);
+    }
+    return all;
+}
+
+// =============================================
 // PRICE DATA CACHE
 // =============================================
 
@@ -209,12 +243,7 @@ async function loadChartDataFromHistory(symbol, symbolType = 'tea', timeframeOve
     const _sinceFromHours = h => h ? new Date(Date.now() - h * 3600000).toISOString() : null;
     let since = _sinceFromHours(cfg.hoursBack);
 
-    const _rev = { 'KENYA': 'MOMBASA', 'INDIA': 'KOLKATA', 'CEYLON': 'COLOMBO', 'ASIA': 'FUTURES' };
-    const _allIdx = (state.dbIndexes?.length ? state.dbIndexes : defaultDbIndexes) || [];
-    const idxDef = symbolType === 'index'
-        ? (_allIdx.find(i => i.symbol === symbol)
-            || _allIdx.find(i => i.symbol === (_rev[symbol] || symbol)))
-        : null;
+    const idxDef = symbolType === 'index' ? _findIndexDef(symbol) : null;
 
     // Attempt load at the requested window first, then widen if too sparse.
     // Wider windows re-use the same OHLC interval so candle size stays consistent.
@@ -868,10 +897,7 @@ function _getMainChartSymbolType() {
  * Returns null if the index can't be resolved or has no valid teas.
  */
 function _liveIndexPrice(indexSymbol) {
-    const _rev = { 'KENYA': 'MOMBASA', 'INDIA': 'KOLKATA', 'CEYLON': 'COLOMBO', 'ASIA': 'FUTURES' };
-    const _allIdx = (state.dbIndexes?.length ? state.dbIndexes : defaultDbIndexes) || [];
-    const idxDef = _allIdx.find(i => i.symbol === indexSymbol)
-                || _allIdx.find(i => i.symbol === (_rev[indexSymbol] || indexSymbol));
+    const idxDef = _findIndexDef(indexSymbol);
     if (!idxDef?.teas?.length) return null;
     const teaMap = {};
     state.teas.forEach(t => { teaMap[t.symbol] = t; });
@@ -894,11 +920,7 @@ function _pushPriceToActiveCharts(symbol, newPrice) {
     if (mainType === 'tea' && mainSymbol === symbol) {
         _seedOrAppendChart(state, 'chartData', newPrice);
     } else if (mainType === 'index') {
-        const _revCard = { 'KENYA': 'MOMBASA', 'INDIA': 'KOLKATA', 'CEYLON': 'COLOMBO', 'ASIA': 'FUTURES' };
-        const altSymbol = _revCard[mainSymbol] || mainSymbol;
-        const _allIdx = (state.dbIndexes?.length ? state.dbIndexes : defaultDbIndexes) || [];
-        const idxDef = _allIdx.find(i => i.symbol === mainSymbol)
-                    || _allIdx.find(i => i.symbol === altSymbol);
+        const idxDef = _findIndexDef(mainSymbol);
         if (idxDef?.teas?.includes(symbol)) {
             const idxPrice = _liveIndexPrice(mainSymbol);
             if (idxPrice > 0) {
@@ -919,8 +941,7 @@ function _pushPriceToActiveCharts(symbol, newPrice) {
         if (!hubIsIdx && hubSymbol === symbol) {
             _seedOrAppendChart(state, 'hubChartData', newPrice);
         } else if (hubIsIdx) {
-            const _hubAllIdx = (state.dbIndexes?.length ? state.dbIndexes : defaultDbIndexes) || [];
-            const idxDef = _hubAllIdx.find(i => i.symbol === hubSymbol);
+            const idxDef = _findIndexDef(hubSymbol);
             if (idxDef?.teas?.includes(symbol)) {
                 const idxPrice = _liveIndexPrice(hubSymbol);
                 if (idxPrice > 0) {
@@ -941,8 +962,7 @@ function _pushPriceToActiveCharts(symbol, newPrice) {
         if (!qqIsIdx && qqSym === symbol) {
             qqPrice = newPrice;
         } else if (qqIsIdx) {
-            const _qqAllIdx = (state.dbIndexes?.length ? state.dbIndexes : defaultDbIndexes) || [];
-            const idxDef = _qqAllIdx.find(i => i.symbol === qqSym);
+            const idxDef = _findIndexDef(qqSym);
             if (idxDef?.teas?.includes(symbol)) {
                 qqPrice = _liveIndexPrice(qqSym);
             }
@@ -1392,8 +1412,7 @@ function updateChartsWithNewPrices() {
             const fk = state.mainChartData?.forexKey;
             let mult = (fk && state.macroIndicators?.[fk]) ? Number(state.macroIndicators[fk]) : 0;
             if (!mult || mult <= 0) {
-                const _allIdx = (state.dbIndexes?.length ? state.dbIndexes : (typeof defaultDbIndexes !== 'undefined' ? defaultDbIndexes : [])) || [];
-                const _idxDef = _allIdx.find(i => i.symbol === mainSymbol);
+                const _idxDef = _findIndexDef(mainSymbol);
                 mult = _idxDef?.multiplier || 1;
             }
             mainPrice = rawUsd * mult;

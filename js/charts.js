@@ -34,9 +34,8 @@ function _getChartCurrencyInfo() {
         return { symbol: curr, multiplier: Number(state.macroIndicators[mcd.forexKey]) || 1 };
     }
 
-    // Fall back to index definition (DB or hardcoded defaults)
-    const _allIdx = (state.dbIndexes?.length ? state.dbIndexes : (typeof defaultDbIndexes !== 'undefined' ? defaultDbIndexes : [])) || [];
-    const idx = _allIdx.find(i => i.symbol === mcd.symbol);
+    // Fall back to index definition (DB + hardcoded defaults merged)
+    const idx = typeof _findIndexDef === 'function' ? _findIndexDef(mcd.symbol) : null;
     if (idx) {
         if (idx.forexKey && state.macroIndicators?.[idx.forexKey]) {
             return { symbol: curr, multiplier: Number(state.macroIndicators[idx.forexKey]) || idx.multiplier || 1 };
