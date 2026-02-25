@@ -220,7 +220,8 @@ async function apiFetchPriceHistory(symbol, limit, since) {
             const cut1 = new Date(sinceMs + third).toISOString();
             const cut2 = new Date(sinceMs + third * 2).toISOString();
 
-            const [histResult, live1, live2, live3] = await Promise.all([
+            const [histResult, preAnchor, live1, live2, live3] = await Promise.all([
+                // Simulated rows IN the window
                 supabaseClient
                     .from('price_history')
                     .select('price, recorded_at, volume')
@@ -229,6 +230,16 @@ async function apiFetchPriceHistory(symbol, limit, since) {
                     .gte('recorded_at', since)
                     .order('recorded_at', { ascending: true })
                     .limit(5000),
+                // Most recent simulated row BEFORE the window — left-edge anchor
+                // so gap-fill can generate candles from the chart's left boundary
+                supabaseClient
+                    .from('price_history')
+                    .select('price, recorded_at, volume')
+                    .eq('symbol', symbol)
+                    .eq('is_simulated', true)
+                    .lt('recorded_at', since)
+                    .order('recorded_at', { ascending: false })
+                    .limit(1),
                 supabaseClient
                     .from('price_history')
                     .select('price, recorded_at, volume')
@@ -259,6 +270,7 @@ async function apiFetchPriceHistory(symbol, limit, since) {
 
             if (!histResult.error || !live1.error || !live2.error || !live3.error) {
                 const merged = [
+                    ...(preAnchor.data || []),
                     ...(histResult.data || []),
                     ...(live1.data || []),
                     ...(live2.data || []),
