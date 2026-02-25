@@ -723,6 +723,7 @@ function handleTickerUpdate(payload) {
         if (updated.last_update) state.teas[idx].last_update = updated.last_update;
         if (updated.anchor_price) state.teas[idx].anchor_price = updated.anchor_price;
         if (updated.reference_forex) state.teas[idx].reference_forex = updated.reference_forex;
+        if (updated.volume_24h != null) state.teas[idx].volume_24h = updated.volume_24h;
 
         const symbol = state.teas[idx].symbol;
         const newPrice = updated.current_price;
