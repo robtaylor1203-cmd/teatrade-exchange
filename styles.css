@@ -236,6 +236,11 @@ body {
     color: var(--text-muted);
 }
 
+/* Native App Views — invisible wrappers on desktop */
+.app-view {
+    display: contents;
+}
+
 /* Main Grid */
 .main-grid {
     display: grid;
@@ -10919,54 +10924,514 @@ a.user-dropdown-item {
         letter-spacing: 0.2px;
     }
 
-    /* Add bottom padding to main content so it isn't hidden behind nav + trade bar */
-    .center-content {
+    /* ═══ NATIVE APP VIEW SYSTEM ═══ */
+
+    body {
+        overflow: hidden;
+        overscroll-behavior-y: none;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    .main-grid {
+        display: block !important;
+        background: none;
+        gap: 0;
+        min-height: 0;
+    }
+
+    .right-panel {
+        display: contents !important;
+        position: static !important;
+        width: auto !important;
+    }
+
+    .app-view {
+        display: none !important;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: calc(100vh - 65px);
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        background: var(--bg-primary);
+        padding-bottom: 20px;
+        z-index: 1;
+    }
+
+    .app-view.active {
+        display: block !important;
+        animation: viewFadeIn 0.2s ease-out;
+    }
+
+    @keyframes viewFadeIn {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+    }
+
+    /* Unwrap the inner containers so content fills the view */
+    .app-view .sidebar {
+        display: flex !important;
+        position: static !important;
+        width: 100% !important;
+        max-height: none !important;
+        z-index: auto !important;
+        padding: 16px;
+        padding-bottom: 80px;
+    }
+
+    .app-view .center-content {
+        display: block !important;
         padding-bottom: 140px !important;
     }
 
-    /* Mobile section visibility */
-    body.mobile-section-chart .center-content > *:not(.chart-section):not(.market-depth) {
-        display: none !important;
-    }
-
-    body.mobile-section-markets .center-content > .chart-section,
-    body.mobile-section-markets .center-content > .market-depth,
-    body.mobile-section-markets .center-content > .rsi-chart-container {
-        display: none !important;
-    }
-
-    body.mobile-section-portfolio .center-content > * {
-        display: none !important;
-    }
-
-    body.mobile-section-portfolio .right-panel {
+    .app-view .right-panel {
         display: block !important;
-        position: static;
-        width: 100%;
-        background: var(--bg-primary);
     }
 
-    body.mobile-section-portfolio .right-panel .trading-panel {
+    /* Portfolio section visible in its view */
+    #view-portfolio .portfolio-section {
+        display: block !important;
+    }
+
+    /* Order history table: horizontal scroll on mobile */
+    #view-portfolio .order-history-section {
+        display: block !important;
+    }
+
+    #view-portfolio .order-table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Hide trade bar on portfolio & account views */
+    body.mobile-section-portfolio #mobile-trade-bar,
+    body.mobile-section-account #mobile-trade-bar {
         display: none;
     }
 
-    body.mobile-section-portfolio .right-panel .portfolio-section {
+    /* ═══ TASK 1: Trading212-style Markets Watchlist ═══ */
+
+    #view-markets .sidebar-title {
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        color: var(--text-muted);
+        padding: 12px 16px 8px;
+        margin-bottom: 0;
+    }
+
+    #view-markets .watchlist-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        min-height: 60px;
+        padding: 12px 16px;
+        margin: 0;
+        border-radius: 0;
+        border: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        background: transparent;
+        cursor: pointer;
+        transition: background 0.15s;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    #view-markets .watchlist-item:active {
+        background: rgba(255, 255, 255, 0.04);
+    }
+
+    #view-markets .watchlist-name {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text-primary);
+        letter-spacing: 0.2px;
+    }
+
+    #view-markets .watchlist-grade {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 2px;
+    }
+
+    #view-markets .watchlist-price {
+        text-align: right;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 3px;
+    }
+
+    #view-markets .watchlist-value {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    #view-markets .watchlist-change {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 4px;
+        line-height: 1.4;
+    }
+
+    #view-markets .watchlist-change.up {
+        background: rgba(16, 185, 129, 0.15);
+        color: #34d399;
+    }
+
+    #view-markets .watchlist-change.down {
+        background: rgba(239, 68, 68, 0.15);
+        color: #f87171;
+    }
+
+    #view-markets .watchlist-tabs {
+        display: flex;
+        gap: 0;
+        padding: 0 16px 8px;
+    }
+
+    #view-markets .watchlist-tab {
+        flex: 1;
+        padding: 8px 0;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    #view-markets .macro-item {
+        min-height: 56px;
+        padding: 10px 16px;
+        margin: 0;
+        border-radius: 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    /* ═══ TASK 2a: Weather cards horizontal scroll in Chart view ═══ */
+
+    #view-chart .weather-cards {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x mandatory;
+        gap: 8px;
+        padding: 8px 12px;
+        margin: 0 -12px;
+    }
+
+    #view-chart .weather-cards::-webkit-scrollbar {
+        display: none;
+    }
+
+    #view-chart .weather-card {
+        flex: 0 0 auto;
+        min-width: 130px;
+        max-width: 150px;
+        scroll-snap-align: start;
+        border-radius: 12px;
+        padding: 10px 12px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    #view-chart .weather-region {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    #view-chart .weather-data {
+        font-size: 13px;
+    }
+
+    /* ═══ TASK 2b: Account view native-app layout ═══ */
+
+    #view-account {
+        display: flex;
+        flex-direction: column;
+    }
+
+    #view-account.active {
+        display: flex !important;
+    }
+
+    /* -- Profile card -- */
+    .account-profile-card {
+        display: none;
+        padding: 20px 16px 12px;
+        background: linear-gradient(180deg, #1a2332 0%, var(--bg-primary) 100%);
+    }
+
+    .account-profile-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .account-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #10b981, #059669);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 18px;
+        color: #fff;
+        flex-shrink: 0;
+    }
+
+    .account-username {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .account-mode-badge {
+        display: inline-block;
+        margin-top: 2px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        padding: 2px 8px;
+        border-radius: 4px;
+        background: rgba(59, 130, 246, 0.15);
+        color: #60a5fa;
+    }
+
+    .account-stats-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 12px;
+        padding: 14px 8px;
+        margin-bottom: 12px;
+    }
+
+    .account-stat {
+        text-align: center;
+        flex: 1;
+    }
+
+    .account-stat-value {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .account-stat-label {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 2px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .account-stat-divider {
+        width: 1px;
+        height: 28px;
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    .account-combine-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: rgba(245, 158, 11, 0.08);
+        border: 1px solid rgba(245, 158, 11, 0.2);
+        border-radius: 8px;
+        margin-bottom: 12px;
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+
+    .combine-mini-badge {
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: 1px;
+        padding: 2px 6px;
+        border-radius: 3px;
+        background: var(--accent-orange);
+        color: #000;
+    }
+
+    .account-actions-row {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+    }
+
+    .account-action-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 10px 4px;
+        border: none;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text-muted);
+        font-size: 11px;
+        font-weight: 500;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition: background 0.15s;
+    }
+
+    .account-action-btn:active {
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    .account-action-btn.logout {
+        color: var(--accent-red);
+    }
+
+    /* -- Leaderboard in account view -- */
+    #view-account .leaderboard-section {
+        padding: 16px;
+        background: transparent;
+        border: none;
+    }
+
+    #view-account .leaderboard-section .panel-title {
+        font-size: 14px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        margin-bottom: 12px;
+    }
+
+    #view-account .leaderboard-item {
+        min-height: 50px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        margin-bottom: 4px;
+        background: rgba(255, 255, 255, 0.02);
+        transition: background 0.15s;
+    }
+
+    #view-account .leaderboard-item:active {
+        background: rgba(255, 255, 255, 0.06);
+    }
+
+    #view-account .leaderboard-rank.gold { font-size: 16px; }
+    #view-account .leaderboard-rank.silver { font-size: 16px; }
+    #view-account .leaderboard-rank.bronze { font-size: 16px; }
+
+    /* Hide news, order book, top traders on mobile account view */
+    #view-account > .panel-section:not(.leaderboard-section) {
+        display: none;
+    }
+
+    #view-account > .order-book-section {
+        display: none;
+    }
+
+    /* -- Account Chat (iMessage/WhatsApp style) -- */
+    .account-chat-section {
+        display: none;
+        flex-direction: column;
+        flex: 1;
+        min-height: 250px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .account-chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .account-chat-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .account-chat-online {
+        font-size: 11px;
+        color: var(--accent-green);
+    }
+
+    .account-chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 12px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-height: 150px;
+        max-height: 300px;
+    }
+
+    .account-chat-input-bar {
+        display: flex;
+        gap: 8px;
+        padding: 10px 16px;
+        padding-bottom: max(10px, env(safe-area-inset-bottom));
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        background: rgba(0, 0, 0, 0.2);
+    }
+
+    .account-chat-input {
+        flex: 1;
+        min-height: 40px;
+        padding: 8px 14px;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-primary);
+        font-size: 15px;
+        outline: none;
+    }
+
+    .account-chat-input:focus {
+        border-color: rgba(59, 130, 246, 0.5);
+    }
+
+    .account-chat-send {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: none;
+        background: #3b82f6;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        flex-shrink: 0;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .account-chat-send:active {
+        opacity: 0.8;
+    }
+
+    /* Show mobile-only elements */
+    .account-profile-card {
         display: block !important;
     }
 
-    body.mobile-section-account .center-content > * {
-        display: none !important;
-    }
-
-    body.mobile-section-account .sidebar {
+    .account-chat-section {
         display: flex !important;
-        position: static;
-        width: 100%;
-        max-height: none;
-        z-index: auto;
-        background: var(--bg-primary);
-        padding: 16px;
-        padding-bottom: 140px;
     }
 }
 

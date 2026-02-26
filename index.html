@@ -663,7 +663,8 @@
 
     <!-- Main Grid -->
     <div class="main-grid">
-        <!-- Left Sidebar -->
+        <!-- VIEW: MARKETS — Search/Asset List & Market Overview -->
+        <div id="view-markets" class="app-view active">
         <div class="sidebar" id="mobile-sidebar">
             <!-- Mobile sidebar header with tabs (hidden on desktop) -->
             <div class="mobile-sidebar-header">
@@ -938,8 +939,9 @@
             </div><!-- /mobile-panel-account -->
 
         </div>
+        </div><!-- /view-markets -->
 
-        <!-- Center Content -->
+        <div id="view-chart" class="app-view">
         <div class="center-content">
             <!-- Chart Section -->
             <div class="chart-section" id="chart-section">
@@ -1462,75 +1464,22 @@
                 </div>
                 </div>
             </div>
-        
-            <!-- Order History Section -->
-            <div class="order-history-section">
-                <div class="order-history-header">
-                    <div class="order-history-title">
-                        Your Confirmed Orders
-                        <span class="order-count" id="order-count">0</span>
-                    </div>
-                    <div class="order-filter-buttons">
-                        <button class="filter-btn" id="filter-open" onclick="setOrdersFilter('open')">Open</button>
-                        <button class="filter-btn active" id="filter-all" onclick="setOrdersFilter('all')">All</button>
-                    </div>
-                </div>
-                <div class="order-table-wrapper">
-                <table class="order-table" id="orders-table">
-                    <thead>
-                        <tr>
-                            <th class="sortable" data-sort="time" onclick="sortOrdersTable('time')">Time</th>
-                            <th>Order ID</th>
-                            <th class="sortable" data-sort="tea" onclick="sortOrdersTable('tea')">Tea</th>
-                            <th>Side</th>
-                            <th class="sortable" data-sort="qty" onclick="sortOrdersTable('qty')">Qty (kg)</th>
-                            <th class="sortable" data-sort="entry" onclick="sortOrdersTable('entry')">Entry</th>
-                            <th class="sortable" data-sort="total" onclick="sortOrdersTable('total')">Invested</th>
-                            <th class="sortable" data-sort="pnl" onclick="sortOrdersTable('pnl')">P/L</th>
-                            <th>Return</th>
-                            <th class="sortable" data-sort="status" onclick="sortOrdersTable('status')">Status</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="orders-tbody">
-                        <tr>
-                            <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 20px;">
-                                No orders yet. Start trading!
-                            </td>
-                        </tr>
-                    </tbody>
-                    <tfoot id="orders-tfoot" style="display: none;">
-                        <tr>
-                            <td colspan="11" class="orders-summary-cell">
-                                <div class="orders-summary-bar">
-                                    <span class="orders-summary-label">OPEN POSITIONS</span>
-                                    <div class="orders-summary-stats">
-                                        <div class="orders-summary-stat">
-                                            <span class="orders-summary-stat-label">Market Value</span>
-                                            <span class="orders-summary-stat-value" id="tfoot-total">$0.00</span>
-                                        </div>
-                                        <div class="orders-summary-divider"></div>
-                                        <div class="orders-summary-stat">
-                                            <span class="orders-summary-stat-label">Unrealised P&amp;L</span>
-                                            <span class="orders-summary-stat-value" id="tfoot-pnl">$0.00</span>
-                                        </div>
-                                        <div class="orders-summary-divider"></div>
-                                        <div class="orders-summary-stat">
-                                            <span class="orders-summary-stat-label">Positions</span>
-                                            <span class="orders-summary-stat-value" id="tfoot-count">0 open</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                    </tfoot>
-                </table>
-                </div>
-            </div>
         </div>
+        <!-- Mobile Sticky Buy/Sell Action Bar (inside chart view) -->
+        <div id="mobile-trade-bar">
+            <button class="mobile-trade-btn buy" id="mobile-btn-buy" onclick="openMobileTradeSheet('BUY')">
+                BUY<br><span class="mobile-trade-price" id="mobile-buy-price">&mdash;</span>
+            </button>
+            <button class="mobile-trade-btn sell" id="mobile-btn-sell" onclick="openMobileTradeSheet('SELL')">
+                SELL<br><span class="mobile-trade-price" id="mobile-sell-price">&mdash;</span>
+            </button>
+        </div>
+        </div><!-- /view-chart -->
 
         <!-- Right Panel -->
         <div class="right-panel">
+            <!-- VIEW: PORTFOLIO — Orders, Equity & Trading Panel -->
+            <div id="view-portfolio" class="app-view">
             <!-- Trading Panel -->
             <div class="panel-section trading-panel">
                 <div class="panel-title">
@@ -1693,6 +1642,125 @@
                             </tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- Order History Section (moved here for portfolio view) -->
+            <div class="order-history-section">
+                <div class="order-history-header">
+                    <div class="order-history-title">
+                        Your Confirmed Orders
+                        <span class="order-count" id="order-count">0</span>
+                    </div>
+                    <div class="order-filter-buttons">
+                        <button class="filter-btn" id="filter-open" onclick="setOrdersFilter('open')">Open</button>
+                        <button class="filter-btn active" id="filter-all" onclick="setOrdersFilter('all')">All</button>
+                    </div>
+                </div>
+                <div class="order-table-wrapper">
+                <table class="order-table" id="orders-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" data-sort="time" onclick="sortOrdersTable('time')">Time</th>
+                            <th>Order ID</th>
+                            <th class="sortable" data-sort="tea" onclick="sortOrdersTable('tea')">Tea</th>
+                            <th>Side</th>
+                            <th class="sortable" data-sort="qty" onclick="sortOrdersTable('qty')">Qty (kg)</th>
+                            <th class="sortable" data-sort="entry" onclick="sortOrdersTable('entry')">Entry</th>
+                            <th class="sortable" data-sort="total" onclick="sortOrdersTable('total')">Invested</th>
+                            <th class="sortable" data-sort="pnl" onclick="sortOrdersTable('pnl')">P/L</th>
+                            <th>Return</th>
+                            <th class="sortable" data-sort="status" onclick="sortOrdersTable('status')">Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orders-tbody">
+                        <tr>
+                            <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                                No orders yet. Start trading!
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot id="orders-tfoot" style="display: none;">
+                        <tr>
+                            <td colspan="11" class="orders-summary-cell">
+                                <div class="orders-summary-bar">
+                                    <span class="orders-summary-label">OPEN POSITIONS</span>
+                                    <div class="orders-summary-stats">
+                                        <div class="orders-summary-stat">
+                                            <span class="orders-summary-stat-label">Market Value</span>
+                                            <span class="orders-summary-stat-value" id="tfoot-total">$0.00</span>
+                                        </div>
+                                        <div class="orders-summary-divider"></div>
+                                        <div class="orders-summary-stat">
+                                            <span class="orders-summary-stat-label">Unrealised P&amp;L</span>
+                                            <span class="orders-summary-stat-value" id="tfoot-pnl">$0.00</span>
+                                        </div>
+                                        <div class="orders-summary-divider"></div>
+                                        <div class="orders-summary-stat">
+                                            <span class="orders-summary-stat-label">Positions</span>
+                                            <span class="orders-summary-stat-value" id="tfoot-count">0 open</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+                </div>
+            </div>
+            </div><!-- /view-portfolio -->
+
+            <!-- VIEW: ACCOUNT — Leaderboard, Chat, Account Details -->
+            <div id="view-account" class="app-view">
+
+            <!-- Mobile Account Profile Header -->
+            <div class="account-profile-card" id="account-profile-card">
+                <div class="account-profile-row">
+                    <div class="account-avatar" id="account-view-avatar">TT</div>
+                    <div class="account-profile-info">
+                        <div class="account-username" id="account-view-username">Guest</div>
+                        <div class="account-mode-badge" id="account-view-mode">VIRTUAL</div>
+                    </div>
+                </div>
+                <div class="account-stats-row">
+                    <div class="account-stat">
+                        <div class="account-stat-value" id="account-view-balance">$10,000.00</div>
+                        <div class="account-stat-label">Balance</div>
+                    </div>
+                    <div class="account-stat-divider"></div>
+                    <div class="account-stat">
+                        <div class="account-stat-value" id="account-view-equity">$10,000.00</div>
+                        <div class="account-stat-label">Equity</div>
+                    </div>
+                    <div class="account-stat-divider"></div>
+                    <div class="account-stat">
+                        <div class="account-stat-value" id="account-view-pnl">$0.00</div>
+                        <div class="account-stat-label">P&amp;L</div>
+                    </div>
+                </div>
+                <div class="account-combine-status" id="account-combine-status" style="display:none;">
+                    <span class="combine-mini-badge">COMBINE</span>
+                    <span class="combine-mini-target" id="account-combine-target">Target: $75,000</span>
+                    <span class="combine-mini-days" id="account-combine-days">30d left</span>
+                </div>
+                <div class="account-actions-row">
+                    <button class="account-action-btn" onclick="openPortfolioModal()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                        Portfolio
+                    </button>
+                    <button class="account-action-btn" onclick="openPortfolioModal(); switchPortfolioModalTab('store');">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+                        Store
+                    </button>
+                    <button class="account-action-btn" onclick="openMfaSetupModal()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        Security
+                    </button>
+                    <button class="account-action-btn logout" id="account-view-logout" style="display:none;" onclick="handleLogout()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                        Log Out
+                    </button>
                 </div>
             </div>
 
@@ -1875,6 +1943,23 @@
                     <div style="padding: 12px 0; color: var(--text-muted); text-align: center;">Loading…</div>
                 </div>
             </div>
+
+            <!-- Account Chat Section (native messaging style) -->
+            <div class="account-chat-section" id="account-chat-section">
+                <div class="account-chat-header">
+                    <span class="account-chat-title">TT Messenger</span>
+                    <span class="account-chat-online" id="account-chat-online">0 online</span>
+                </div>
+                <div class="account-chat-messages" id="account-chat-messages"></div>
+                <div class="account-chat-input-bar">
+                    <input type="text" class="account-chat-input" id="account-chat-input" placeholder="Type a message...">
+                    <button class="account-chat-send" id="account-chat-send">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            </div><!-- /view-account -->
         </div>
     </div>
 
@@ -2180,33 +2265,23 @@
     </div>
     <!-- Mobile Bottom Navigation Bar (Trading212 style) -->
     <nav id="mobile-bottom-nav">
-        <button class="mobile-nav-btn active" data-section="markets" onclick="switchMobileSection('markets')">
+        <button class="mobile-nav-btn active" data-section="markets">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             <span>Markets</span>
         </button>
-        <button class="mobile-nav-btn" data-section="chart" onclick="switchMobileSection('chart')">
+        <button class="mobile-nav-btn" data-section="chart">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
             <span>Chart</span>
         </button>
-        <button class="mobile-nav-btn" data-section="portfolio" onclick="switchMobileSection('portfolio')">
+        <button class="mobile-nav-btn" data-section="portfolio">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
             <span>Portfolio</span>
         </button>
-        <button class="mobile-nav-btn" data-section="account" onclick="switchMobileSection('account')">
+        <button class="mobile-nav-btn" data-section="account">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             <span>Account</span>
         </button>
     </nav>
-
-    <!-- Mobile Sticky Buy/Sell Action Bar -->
-    <div id="mobile-trade-bar">
-        <button class="mobile-trade-btn buy" id="mobile-btn-buy" onclick="setTradeType('BUY'); executeMobileQuickTrade();">
-            BUY<br><span class="mobile-trade-price" id="mobile-buy-price">—</span>
-        </button>
-        <button class="mobile-trade-btn sell" id="mobile-btn-sell" onclick="setTradeType('SELL'); executeMobileQuickTrade();">
-            SELL<br><span class="mobile-trade-price" id="mobile-sell-price">—</span>
-        </button>
-    </div>
 
     <!-- Rotate prompt for fullscreen charts on mobile -->
     <div class="rotate-prompt" id="rotate-prompt">

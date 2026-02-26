@@ -1006,6 +1006,7 @@ let _activeMobileSection = 'markets';
 function switchMobileSection(section) {
     _activeMobileSection = section;
 
+    // Keep body class for trade-bar visibility rules
     document.body.classList.remove(
         'mobile-section-markets',
         'mobile-section-chart',
@@ -1014,11 +1015,23 @@ function switchMobileSection(section) {
     );
     document.body.classList.add('mobile-section-' + section);
 
+    // Toggle app-view active class
+    const viewMap = {
+        markets:   'view-markets',
+        chart:     'view-chart',
+        portfolio: 'view-portfolio',
+        account:   'view-account'
+    };
+    document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active'));
+    const targetView = document.getElementById(viewMap[section]);
+    if (targetView) targetView.classList.add('active');
+
+    // Highlight nav button
     document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.section === section);
     });
 
-    // On portfolio tab, ensure the section is visible and data is loaded
+    // On portfolio tab, ensure data is loaded
     if (section === 'portfolio') {
         const el = document.getElementById('portfolio-section');
         if (el) el.style.display = 'block';
@@ -1026,9 +1039,11 @@ function switchMobileSection(section) {
         if (typeof updatePortfolioDisplay === 'function') updatePortfolioDisplay();
     }
 
-    // On account tab, ensure sidebar data is fresh
+    // On account tab, sync profile data and chat
     if (section === 'account') {
         if (typeof updateMobileAccountSection === 'function') updateMobileAccountSection();
+        syncAccountViewData();
+        syncAccountChat();
     }
 
     // Resize chart when switching to chart tab
@@ -1097,3 +1112,196 @@ function executeMobileQuickTrade() {
 
 // Refresh mobile trade bar prices periodically
 setInterval(updateMobileTradePrices, 1500);
+
+// =============================================
+// MOBILE BOTTOM NAV: Initialisation
+// =============================================
+
+function initMobileNavigation() {
+    const nav = document.getElementById('mobile-bottom-nav');
+    if (!nav) return;
+
+    nav.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const section = btn.dataset.section;
+            if (!section) return;
+            switchMobileSection(section);
+        });
+    });
+
+    // Set default active view on load
+    switchMobileSection(_activeMobileSection || 'markets');
+}
+
+document.addEventListener('DOMContentLoaded', initMobileNavigation);
+
+// =============================================
+// MOBILE: Open QQ Bottom Sheet from Trade Bar
+// =============================================
+
+function openMobileTradeSheet(side) {
+    const select = document.getElementById('trade-tea-select');
+    const selectValue = select?.value;
+
+    let tea = null;
+
+    if (selectValue) {
+        if (selectValue.startsWith('INDEX_')) {
+            const sym = selectValue.replace('INDEX_', '');
+            const indexes = typeof calculateRegionalIndexes === 'function'
+                ? calculateRegionalIndexes() : [];
+            const idx = indexes.find(i => i.symbol === sym);
+            if (idx) {
+                tea = {
+                    symbol: idx.symbol,
+                    name: idx.name,
+                    current_price: idx.price,
+                    price_change_24h: idx.change || 0,
+                    isIndex: true
+                };
+            }
+        } else {
+            const teaId = parseInt(selectValue);
+            tea = state.teas?.find(t => t.id === teaId);
+        }
+    }
+
+    if (!tea && state.mainChartData?.symbol) {
+        const sym = state.mainChartData.symbol;
+        tea = state.teas?.find(t => t.symbol === sym);
+        if (!tea) {
+            const indexes = typeof calculateRegionalIndexes === 'function'
+                ? calculateRegionalIndexes() : [];
+            const idx = indexes.find(i => i.symbol === sym);
+            if (idx) {
+                tea = {
+                    symbol: idx.symbol,
+                    name: idx.name,
+                    current_price: idx.price,
+                    price_change_24h: idx.change || 0,
+                    isIndex: true
+                };
+            }
+        }
+    }
+
+    if (!tea) {
+        if (typeof showToast === 'function') showToast('Select an instrument first', '', true);
+        return;
+    }
+
+    if (typeof openQuickQuoteModal === 'function') {
+        openQuickQuoteModal(tea);
+    }
+    if (typeof setQuickTradeType === 'function') {
+        setQuickTradeType(side);
+    }
+}
+
+// =============================================
+// MOBILE: Auto-switch to Chart on asset click
+// =============================================
+
+document.addEventListener('DOMContentLoaded', function () {
+    const orig = window.openHubForSymbol;
+    if (typeof orig !== 'function') return;
+
+    window.openHubForSymbol = function () {
+        if (window.innerWidth <= 768) {
+            switchMobileSection('chart');
+        }
+        return orig.apply(this, arguments);
+    };
+});
+
+// =============================================
+// ACCOUNT VIEW: Sync profile data
+// =============================================
+
+function syncAccountViewData() {
+    const balEl = document.getElementById('account-view-balance');
+    const eqEl = document.getElementById('account-view-equity');
+    const pnlEl = document.getElementById('account-view-pnl');
+    const userEl = document.getElementById('account-view-username');
+    const avatarEl = document.getElementById('account-view-avatar');
+    const modeEl = document.getElementById('account-view-mode');
+    const logoutEl = document.getElementById('account-view-logout');
+
+    const balance = typeof getActiveBalance === 'function' ? getActiveBalance() : 0;
+    const fmt = (v) => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    if (balEl) balEl.textContent = fmt(balance);
+
+    const portfolioVal = document.getElementById('portfolio-value');
+    if (eqEl && portfolioVal) eqEl.textContent = portfolioVal.textContent;
+
+    const portfolioPnl = document.getElementById('portfolio-pnl');
+    if (pnlEl && portfolioPnl) {
+        pnlEl.textContent = portfolioPnl.textContent;
+        pnlEl.className = 'account-stat-value ' + (portfolioPnl.classList.contains('down') ? 'down' : 'up');
+    }
+
+    if (state.currentUser) {
+        const email = state.currentUser.email || '';
+        const name = email.split('@')[0] || 'Trader';
+        if (userEl) userEl.textContent = name;
+        if (avatarEl) avatarEl.textContent = name.substring(0, 2).toUpperCase();
+        if (logoutEl) logoutEl.style.display = '';
+    } else {
+        if (userEl) userEl.textContent = 'Guest';
+        if (avatarEl) avatarEl.textContent = 'TT';
+        if (logoutEl) logoutEl.style.display = 'none';
+    }
+
+    if (modeEl) {
+        const mode = state.tradingMode || 'VIRTUAL';
+        modeEl.textContent = mode;
+        modeEl.style.background = mode === 'REAL' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)';
+        modeEl.style.color = mode === 'REAL' ? '#f87171' : '#60a5fa';
+    }
+}
+
+// =============================================
+// ACCOUNT VIEW: Sync chat messages
+// =============================================
+
+function syncAccountChat() {
+    const srcMessages = document.getElementById('chat-messages');
+    const destMessages = document.getElementById('account-chat-messages');
+    if (srcMessages && destMessages) {
+        destMessages.innerHTML = srcMessages.innerHTML;
+        destMessages.scrollTop = destMessages.scrollHeight;
+    }
+
+    const srcOnline = document.getElementById('chat-online-count');
+    const destOnline = document.getElementById('account-chat-online');
+    if (srcOnline && destOnline) destOnline.textContent = srcOnline.textContent;
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const sendBtn = document.getElementById('account-chat-send');
+    const inputEl = document.getElementById('account-chat-input');
+    if (!sendBtn || !inputEl) return;
+
+    function sendFromAccountChat() {
+        const text = inputEl.value.trim();
+        if (!text) return;
+        const mainInput = document.getElementById('chat-input');
+        if (mainInput) {
+            mainInput.value = text;
+            if (typeof sendChatMessage === 'function') sendChatMessage();
+        }
+        inputEl.value = '';
+        setTimeout(syncAccountChat, 300);
+    }
+
+    sendBtn.addEventListener('click', sendFromAccountChat);
+    inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') sendFromAccountChat();
+    });
+
+    // Periodically sync chat when account tab is active
+    setInterval(() => {
+        if (_activeMobileSection === 'account') syncAccountChat();
+    }, 2000);
+});
