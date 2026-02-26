@@ -10966,6 +10966,7 @@ a.user-dropdown-item {
         background: var(--bg-primary);
         padding-bottom: 80px;
         z-index: 1;
+        transition: top 0.3s ease, height 0.3s ease;
     }
 
     .app-view.active {
@@ -11643,7 +11644,7 @@ a.user-dropdown-item {
         width: 28px;
         height: 28px;
         border-radius: 6px;
-        background: linear-gradient(135deg, #10b981, #059669);
+        background: linear-gradient(135deg, var(--accent-blue), #1557b0);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -11660,8 +11661,8 @@ a.user-dropdown-item {
 
     .mth-balance-pill {
         margin-left: auto;
-        background: rgba(16, 185, 129, 0.1);
-        border: 1px solid rgba(16, 185, 129, 0.2);
+        background: rgba(26, 115, 232, 0.1);
+        border: 1px solid rgba(26, 115, 232, 0.25);
         border-radius: 20px;
         padding: 4px 12px;
     }
@@ -11670,7 +11671,7 @@ a.user-dropdown-item {
         font-family: 'JetBrains Mono', monospace;
         font-size: 13px;
         font-weight: 600;
-        color: #34d399;
+        color: var(--accent-blue);
     }
 
     .mth-status {
@@ -11853,6 +11854,12 @@ a.user-dropdown-item {
         top: 52px !important;
         height: calc(100vh - 52px - 65px) !important;
         padding-bottom: 80px !important;
+        transition: top 0.3s ease, height 0.3s ease !important;
+    }
+
+    body.mth-header-hidden .app-view {
+        top: 0 !important;
+        height: calc(100vh - 65px) !important;
     }
 
     #view-chart {

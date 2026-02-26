@@ -1213,6 +1213,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (chartView) chartView.scrollTop = 0;
             var header = document.getElementById('mobile-top-header');
             if (header) header.classList.remove('header-hidden');
+            document.body.classList.remove('mth-header-hidden');
         }
         return orig.apply(this, arguments);
     };
@@ -1375,6 +1376,7 @@ window.openHubForSymbol = function(symbol) {
         if (chartView) chartView.scrollTop = 0;
         var header = document.getElementById('mobile-top-header');
         if (header) header.classList.remove('header-hidden');
+        document.body.classList.remove('mth-header-hidden');
     }
     if (typeof _originalOpenHub === 'function') {
         return _originalOpenHub.apply(this, arguments);
@@ -1490,8 +1492,10 @@ window.openMobileTradeSheet = function(side) {
 
                 if (delta > scrollThreshold && currentY > 52) {
                     header.classList.add('header-hidden');
+                    document.body.classList.add('mth-header-hidden');
                 } else if (delta < -scrollThreshold) {
                     header.classList.remove('header-hidden');
+                    document.body.classList.remove('mth-header-hidden');
                 }
 
                 lastScrollY = currentY;
