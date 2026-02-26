@@ -69,16 +69,19 @@ function updatePortfolioDisplay() {
         const absQty = Math.abs(pos.quantity);
         const currentValue = absQty * tea.current_price;
         const costBasis = absQty * pos.avg_entry_price;
-        const spread = (Number(tea.base_spread) || 0.01) * (Number(tea.volatility_multiplier) || 1.0);
+        const spreadMargin = tea.current_price * 0.002;
         const exitPrice = isShort
-            ? tea.current_price * (1 + spread / 2)
-            : tea.current_price * (1 - spread / 2);
-        const pnl = isShort
-            ? (pos.avg_entry_price - exitPrice) * absQty
-            : (exitPrice - pos.avg_entry_price) * absQty;
+            ? tea.current_price + spreadMargin
+            : tea.current_price - spreadMargin;
         const lev = Number(pos.leverage) || 1;
         const margin = costBasis / lev;
-        const pnlPct = margin > 0 ? (pnl / margin * 100).toFixed(1) : '0.0';
+        const notionalValue = margin * lev;
+        const units = notionalValue / pos.avg_entry_price;
+        let pnl = isShort
+            ? (pos.avg_entry_price - exitPrice) * units
+            : (exitPrice - pos.avg_entry_price) * units;
+        if (pnl < -margin) pnl = -margin;
+        const pnlPct = margin > 0 ? (pnl / margin * 100).toFixed(2) : '0.00';
         const returnValue = margin + pnl;
         holdingsValue += returnValue;
 
@@ -112,16 +115,19 @@ function updatePortfolioDisplay() {
         const absQty = Math.abs(pos.quantity);
         const currentValue = absQty * index.price;
         const costBasis = absQty * pos.avg_entry_price;
-        const idxSpread = 0.01;
+        const spreadMargin = index.price * 0.002;
         const exitPrice = isShort
-            ? index.price * (1 + idxSpread / 2)
-            : index.price * (1 - idxSpread / 2);
-        const pnl = isShort
-            ? (pos.avg_entry_price - exitPrice) * absQty
-            : (exitPrice - pos.avg_entry_price) * absQty;
+            ? index.price + spreadMargin
+            : index.price - spreadMargin;
         const lev = Number(pos.leverage) || 1;
         const margin = costBasis / lev;
-        const pnlPct = margin > 0 ? (pnl / margin * 100).toFixed(1) : '0.0';
+        const notionalValue = margin * lev;
+        const units = notionalValue / pos.avg_entry_price;
+        let pnl = isShort
+            ? (pos.avg_entry_price - exitPrice) * units
+            : (exitPrice - pos.avg_entry_price) * units;
+        if (pnl < -margin) pnl = -margin;
+        const pnlPct = margin > 0 ? (pnl / margin * 100).toFixed(2) : '0.00';
         const idxReturnValue = margin + pnl;
         holdingsValue += idxReturnValue;
 
@@ -154,31 +160,39 @@ function updatePortfolioDisplay() {
     state.positions.forEach(pos => {
         const lev = Number(pos.leverage) || 1;
         const cost = Math.abs(pos.quantity) * pos.avg_entry_price;
-        totalUsedMargin += Number(pos.margin_used) || (cost / lev);
+        const posMargin = Number(pos.margin_used) || (cost / lev);
+        totalUsedMargin += posMargin;
         const tea = pos.teas || state.teas.find(t => t.id === pos.tea_id);
         if (tea) {
             const isShort = pos.quantity < 0;
-            const absQty = Math.abs(pos.quantity);
-            const sp = (Number(tea.base_spread) || 0.01) * (Number(tea.volatility_multiplier) || 1.0);
-            const ep = isShort ? tea.current_price * (1 + sp / 2) : tea.current_price * (1 - sp / 2);
-            totalUnrealizedPnl += isShort
-                ? (pos.avg_entry_price - ep) * absQty
-                : (ep - pos.avg_entry_price) * absQty;
+            const sm = tea.current_price * 0.002;
+            const ep = isShort ? tea.current_price + sm : tea.current_price - sm;
+            const nv = posMargin * lev;
+            const units = nv / pos.avg_entry_price;
+            let posPnl = isShort
+                ? (pos.avg_entry_price - ep) * units
+                : (ep - pos.avg_entry_price) * units;
+            if (posPnl < -posMargin) posPnl = -posMargin;
+            totalUnrealizedPnl += posPnl;
         }
     });
     Object.entries(indexPositionsData).forEach(([symbol, pos]) => {
         const idxLev = Number(pos.leverage) || 1;
         const idxCost = Math.abs(pos.quantity) * pos.avg_entry_price;
-        totalUsedMargin += Number(pos.margin_used) || (idxCost / idxLev);
+        const idxMargin = Number(pos.margin_used) || (idxCost / idxLev);
+        totalUsedMargin += idxMargin;
         const index = indexes.find(idx => idx.symbol === symbol);
         if (index && pos && pos.quantity !== 0) {
             const isShort = pos.quantity < 0;
-            const absQty = Math.abs(pos.quantity);
-            const isp = 0.01;
-            const iep = isShort ? index.price * (1 + isp / 2) : index.price * (1 - isp / 2);
-            totalUnrealizedPnl += isShort
-                ? (pos.avg_entry_price - iep) * absQty
-                : (iep - pos.avg_entry_price) * absQty;
+            const ism = index.price * 0.002;
+            const iep = isShort ? index.price + ism : index.price - ism;
+            const inv = idxMargin * idxLev;
+            const units = inv / pos.avg_entry_price;
+            let idxPnl = isShort
+                ? (pos.avg_entry_price - iep) * units
+                : (iep - pos.avg_entry_price) * units;
+            if (idxPnl < -idxMargin) idxPnl = -idxMargin;
+            totalUnrealizedPnl += idxPnl;
         }
     });
 
@@ -407,7 +421,11 @@ function displayUserTrades(trades) {
         displayPairs = openingPairTrades.filter(t => !closedPairIds.has(t.id));
     }
     let displayTrades = [...displayRegular, ...displayPairs].sort((a, b) => b.id - a.id);
-    countEl.textContent = displayTrades.length;
+
+    const openTradesCount = visibleRegular.filter(t => !closedTradeIds.has(t.id)).length +
+                            openingPairTrades.filter(t => !closedPairIds.has(t.id)).length;
+    countEl.textContent = openTradesCount;
+    countEl.style.display = openTradesCount > 0 ? '' : 'none';
 
     if (displayTrades.length === 0) {
         tbody.innerHTML = `
@@ -528,13 +546,16 @@ function displayUserTrades(trades) {
                 const index = idxList.find(idx => idx.symbol === trade.index_symbol);
 
                 if (index) {
-                    const isp = 0.01;
-                    const idxExit = isShortIdx ? index.price * (1 + isp / 2) : index.price * (1 - isp / 2);
-                    if (isShortIdx) {
-                        pnl = (trade.price - idxExit) * trade.quantity;
-                    } else {
-                        pnl = (idxExit - trade.price) * trade.quantity;
-                    }
+                    const spreadMargin = index.price * 0.002;
+                    const idxExit = isShortIdx
+                        ? index.price + spreadMargin
+                        : index.price - spreadMargin;
+                    const notionalValue = total * leverage;
+                    const units = notionalValue / trade.price;
+                    pnl = isShortIdx
+                        ? (trade.price - idxExit) * units
+                        : (idxExit - trade.price) * units;
+                    if (pnl < -total) pnl = -total;
                     pnlPct = total > 0 ? (pnl / total * 100) : 0;
                 } else {
                     pnl = 0;
@@ -557,13 +578,16 @@ function displayUserTrades(trades) {
                 }
                 pnlPct = total > 0 ? (pnl / total * 100) : 0;
             } else if (tea) {
-                const tsp = (Number(tea.base_spread) || 0.01) * (Number(tea.volatility_multiplier) || 1.0);
-                const teaExit = isShortTrade ? tea.current_price * (1 + tsp / 2) : tea.current_price * (1 - tsp / 2);
-                if (isShortTrade) {
-                    pnl = (trade.price - teaExit) * trade.quantity;
-                } else {
-                    pnl = (teaExit - trade.price) * trade.quantity;
-                }
+                const spreadMargin = tea.current_price * 0.002;
+                const teaExit = isShortTrade
+                    ? tea.current_price + spreadMargin
+                    : tea.current_price - spreadMargin;
+                const notionalValue = total * leverage;
+                const units = notionalValue / trade.price;
+                pnl = isShortTrade
+                    ? (trade.price - teaExit) * units
+                    : (teaExit - trade.price) * units;
+                if (pnl < -total) pnl = -total;
                 pnlPct = total > 0 ? (pnl / total * 100) : 0;
             } else {
                 pnl = 0;
@@ -676,7 +700,7 @@ function displayUserTrades(trades) {
                 <td class="order-qty">${qtyDisplay}</td>
                 <td class="order-price">${entryDisplay}</td>
                 <td class="order-price">$${parseFloat(total.toFixed(2)).toLocaleString()}</td>
-                <td class="${pnlClass}">${pnlSign}$${pnl.toFixed(2)} (${pnlPct.toFixed(1)}%)</td>
+                <td class="${pnlClass}">${pnlSign}$${pnl.toFixed(2)} (${pnlPct.toFixed(2)}%)</td>
                 <td class="order-price ${pnlClass}">$${returnVal.toFixed(2)}</td>
                 <td><span class="order-status ${statusClass}">${status}</span></td>
                 <td>${actionBtn}</td>
