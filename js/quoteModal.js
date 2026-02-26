@@ -166,8 +166,9 @@ function openQuickQuoteModal(tea) {
     // Update open positions display
     updateQQOpenPositions(tea.symbol);
 
-    // Show modal FIRST so canvas has dimensions
+    // Show modal: add active class (drives CSS bottom-sheet transition on mobile)
     modal.classList.add('active');
+    document.body.classList.add('bottom-sheet-active');
     document.body.style.overflow = 'hidden';
 
     // Draw the chart AFTER modal is visible (needs a small delay for layout)
@@ -183,6 +184,7 @@ function closeQuickQuoteModal() {
     const modal = document.getElementById('quick-quote-modal');
     if (modal) {
         modal.classList.remove('active');
+        document.body.classList.remove('bottom-sheet-active');
         document.body.style.overflow = '';
     }
     closeMobileQQTradeForm();
@@ -1296,3 +1298,39 @@ document.getElementById('quick-quote-modal')?.addEventListener('click', (e) => {
         closeQuickQuoteModal();
     }
 });
+
+// Swipe-down-to-dismiss on the bottom sheet pill / header
+(function initBottomSheetSwipe() {
+    const sheet = document.querySelector('#quick-quote-modal .quick-quote-modal');
+    if (!sheet) return;
+
+    let startY = 0, currentY = 0, dragging = false;
+
+    sheet.addEventListener('touchstart', (e) => {
+        if (sheet.scrollTop > 0) return;
+        startY = e.touches[0].clientY;
+        currentY = startY;
+        dragging = true;
+        sheet.style.transition = 'none';
+    }, { passive: true });
+
+    sheet.addEventListener('touchmove', (e) => {
+        if (!dragging) return;
+        currentY = e.touches[0].clientY;
+        const dy = currentY - startY;
+        if (dy > 0) {
+            sheet.style.transform = `translateY(${dy}px)`;
+        }
+    }, { passive: true });
+
+    sheet.addEventListener('touchend', () => {
+        if (!dragging) return;
+        dragging = false;
+        sheet.style.transition = '';
+        const dy = currentY - startY;
+        if (dy > 100) {
+            closeQuickQuoteModal();
+        }
+        sheet.style.transform = '';
+    });
+})();

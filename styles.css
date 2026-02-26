@@ -2343,6 +2343,11 @@ body.modal-open {
     color: var(--accent-blue);
 }
 
+/* Drag pill — hidden on desktop, shown on mobile */
+.qq-sheet-pill {
+    display: none;
+}
+
 /* Quick Quote Modal */
 .quick-quote-modal-overlay {
     display: none;
@@ -6060,23 +6065,74 @@ body.modal-open {
     
     /* =============================================
        TRADING212-STYLE MOBILE QUICK QUOTE MODAL
+       — Native Bottom Sheet
        ============================================= */
-    
-    /* Full-screen takeover on mobile */
+
+    /* Backdrop overlay: always flex on mobile, visibility-driven for transitions */
     .quick-quote-modal-overlay {
+        display: flex !important;
         padding: 0;
-        align-items: stretch;
-        background: var(--bg-primary);
+        align-items: flex-end;
+        background: rgba(0, 0, 0, 0);
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: background 0.3s ease, opacity 0.3s ease, visibility 0.3s ease;
     }
-    
+
+    .quick-quote-modal-overlay.active {
+        opacity: 1;
+        visibility: visible;
+        background: rgba(0, 0, 0, 0.6);
+        pointer-events: auto;
+    }
+
+    /* Bottom sheet panel */
     .quick-quote-modal {
+        width: 100%;
         max-width: 100%;
-        max-height: 100%;
-        height: 100%;
-        border-radius: 0;
+        height: auto;
+        max-height: 88vh;
+        border-radius: 20px 20px 0 0;
+        background: #1a1d23;
         overflow-y: auto;
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
+        transform: translateY(100%);
+        transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .quick-quote-modal-overlay.active .quick-quote-modal {
+        transform: translateY(0);
+    }
+
+    /* Drag pill indicator */
+    .qq-sheet-pill {
+        display: block !important;
+        width: 40px;
+        height: 5px;
+        border-radius: 3px;
+        background: #555;
+        margin: 10px auto 6px;
+        flex-shrink: 0;
+    }
+
+    /* Thumb-friendly touch targets inside the sheet */
+    .quick-quote-modal input[type="text"],
+    .quick-quote-modal input[type="number"],
+    .quick-quote-modal select,
+    .quick-quote-modal .quick-trade-input {
+        min-height: 44px;
+        font-size: 16px;
+        padding: 10px 12px;
+        border-radius: 10px;
+    }
+
+    .quick-quote-modal input[type="range"] {
+        min-height: 44px;
+        -webkit-appearance: none;
+        appearance: none;
     }
     
     /* Header - Trading212 style: centered pill + icons */
@@ -10793,4 +10849,191 @@ a.user-dropdown-item {
 @media (max-width: 768px) {
     .admin-grid { grid-template-columns: 1fr; }
     .admin-content { width: 95vw; max-height: 90vh; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   MOBILE BOTTOM NAVIGATION BAR (Trading212 style)
+   ══════════════════════════════════════════════════════════════════════ */
+
+#mobile-bottom-nav {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    #mobile-bottom-nav {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 65px;
+        background: #0d1117;
+        border-top: 1px solid #1e2a3a;
+        z-index: 1000;
+        justify-content: space-around;
+        align-items: center;
+        padding-bottom: env(safe-area-inset-bottom);
+        -webkit-backdrop-filter: blur(12px);
+        backdrop-filter: blur(12px);
+    }
+
+    .mobile-nav-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        background: none;
+        border: none;
+        color: #6b7280;
+        font-size: 10px;
+        font-family: 'Inter', sans-serif;
+        padding: 6px 12px;
+        cursor: pointer;
+        transition: color 0.2s;
+        -webkit-tap-highlight-color: transparent;
+        position: relative;
+    }
+
+    .mobile-nav-btn.active {
+        color: #3b82f6;
+    }
+
+    .mobile-nav-btn.active::after {
+        content: '';
+        position: absolute;
+        top: -1px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 24px;
+        height: 2px;
+        background: #3b82f6;
+        border-radius: 1px;
+    }
+
+    .mobile-nav-btn svg {
+        stroke: currentColor;
+    }
+
+    .mobile-nav-btn span {
+        font-weight: 500;
+        letter-spacing: 0.2px;
+    }
+
+    /* Add bottom padding to main content so it isn't hidden behind nav + trade bar */
+    .center-content {
+        padding-bottom: 140px !important;
+    }
+
+    /* Mobile section visibility */
+    body.mobile-section-chart .center-content > *:not(.chart-section):not(.market-depth) {
+        display: none !important;
+    }
+
+    body.mobile-section-markets .center-content > .chart-section,
+    body.mobile-section-markets .center-content > .market-depth,
+    body.mobile-section-markets .center-content > .rsi-chart-container {
+        display: none !important;
+    }
+
+    body.mobile-section-portfolio .center-content > * {
+        display: none !important;
+    }
+
+    body.mobile-section-portfolio .right-panel {
+        display: block !important;
+        position: static;
+        width: 100%;
+        background: var(--bg-primary);
+    }
+
+    body.mobile-section-portfolio .right-panel .trading-panel {
+        display: none;
+    }
+
+    body.mobile-section-portfolio .right-panel .portfolio-section {
+        display: block !important;
+    }
+
+    body.mobile-section-account .center-content > * {
+        display: none !important;
+    }
+
+    body.mobile-section-account .sidebar {
+        display: flex !important;
+        position: static;
+        width: 100%;
+        max-height: none;
+        z-index: auto;
+        background: var(--bg-primary);
+        padding: 16px;
+        padding-bottom: 140px;
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   MOBILE STICKY BUY/SELL ACTION BAR
+   ══════════════════════════════════════════════════════════════════════ */
+
+#mobile-trade-bar {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    #mobile-trade-bar {
+        display: flex;
+        position: fixed;
+        bottom: 65px;
+        left: 0;
+        width: 100%;
+        padding: 8px 12px;
+        padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+        background: linear-gradient(to top, rgba(13, 17, 23, 0.98), rgba(13, 17, 23, 0.85) 70%, transparent);
+        gap: 10px;
+        z-index: 999;
+        pointer-events: none;
+    }
+
+    /* Hide when on portfolio or account tab — no trade bar needed there */
+    body.mobile-section-portfolio #mobile-trade-bar,
+    body.mobile-section-account #mobile-trade-bar {
+        display: none;
+    }
+
+    .mobile-trade-btn {
+        pointer-events: auto;
+        flex: 1;
+        height: 52px;
+        border: none;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 14px;
+        font-family: 'Inter', 'JetBrains Mono', sans-serif;
+        color: #fff;
+        cursor: pointer;
+        line-height: 1.2;
+        transition: opacity 0.15s, transform 0.1s;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .mobile-trade-btn:active {
+        opacity: 0.8;
+        transform: scale(0.97);
+    }
+
+    .mobile-trade-btn.buy {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        box-shadow: 0 2px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    .mobile-trade-btn.sell {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        box-shadow: 0 2px 12px rgba(239, 68, 68, 0.3);
+    }
+
+    .mobile-trade-price {
+        font-size: 12px;
+        font-weight: 500;
+        opacity: 0.9;
+        font-family: 'JetBrains Mono', monospace;
+    }
 }

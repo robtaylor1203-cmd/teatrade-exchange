@@ -996,3 +996,104 @@ function _mobileChartFullscreenWatch() {
 
 window.addEventListener('resize', _mobileChartFullscreenWatch);
 window.addEventListener('orientationchange', _mobileChartFullscreenWatch);
+
+// =============================================
+// MOBILE BOTTOM NAV: Section Switching
+// =============================================
+
+let _activeMobileSection = 'markets';
+
+function switchMobileSection(section) {
+    _activeMobileSection = section;
+
+    document.body.classList.remove(
+        'mobile-section-markets',
+        'mobile-section-chart',
+        'mobile-section-portfolio',
+        'mobile-section-account'
+    );
+    document.body.classList.add('mobile-section-' + section);
+
+    document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.section === section);
+    });
+
+    // On portfolio tab, ensure the section is visible and data is loaded
+    if (section === 'portfolio') {
+        const el = document.getElementById('portfolio-section');
+        if (el) el.style.display = 'block';
+        if (typeof loadUserTrades === 'function') loadUserTrades();
+        if (typeof updatePortfolioDisplay === 'function') updatePortfolioDisplay();
+    }
+
+    // On account tab, ensure sidebar data is fresh
+    if (section === 'account') {
+        if (typeof updateMobileAccountSection === 'function') updateMobileAccountSection();
+    }
+
+    // Resize chart when switching to chart tab
+    if (section === 'chart') {
+        if (typeof resizeCanvas === 'function') setTimeout(resizeCanvas, 50);
+    }
+}
+
+// =============================================
+// MOBILE BUY/SELL BAR: Live Price Updates
+// =============================================
+
+function updateMobileTradePrices() {
+    const buyEl = document.getElementById('mobile-buy-price');
+    const sellEl = document.getElementById('mobile-sell-price');
+    if (!buyEl || !sellEl) return;
+    if (window.innerWidth > 768) return;
+
+    let price = 0;
+    let spread = 0.002;
+
+    const select = document.getElementById('trade-tea-select');
+    const selectValue = select?.value;
+
+    if (selectValue) {
+        if (selectValue.startsWith('INDEX_')) {
+            const sym = selectValue.replace('INDEX_', '');
+            const indexes = typeof calculateRegionalIndexes === 'function'
+                ? calculateRegionalIndexes() : [];
+            const idx = indexes.find(i => i.symbol === sym);
+            price = idx?.price || 0;
+        } else {
+            const teaId = parseInt(selectValue);
+            const tea = state.teas?.find(t => t.id === teaId);
+            price = tea?.current_price || 0;
+            const bs = Number(tea?.base_spread) || 0.01;
+            const vm = Number(tea?.volatility_multiplier) || 1.0;
+            spread = bs * vm;
+        }
+    }
+
+    if (price > 0) {
+        const askPrice = price * (1 + spread / 2);
+        const bidPrice = price * (1 - spread / 2);
+        buyEl.textContent = '$' + askPrice.toFixed(2);
+        sellEl.textContent = '$' + bidPrice.toFixed(2);
+    } else {
+        buyEl.textContent = '\u2014';
+        sellEl.textContent = '\u2014';
+    }
+}
+
+function executeMobileQuickTrade() {
+    const select = document.getElementById('trade-tea-select');
+    if (!select?.value) {
+        if (typeof showToast === 'function') showToast('Select an instrument first', '', true);
+        return;
+    }
+    const qtyEl = document.getElementById('trade-qty');
+    if (!qtyEl?.value || parseFloat(qtyEl.value) <= 0) {
+        qtyEl.value = '100';
+        if (typeof updateTradeSummary === 'function') updateTradeSummary();
+    }
+    if (typeof executeTrade === 'function') executeTrade();
+}
+
+// Refresh mobile trade bar prices periodically
+setInterval(updateMobileTradePrices, 1500);

@@ -210,6 +210,7 @@
     <!-- Quick Quote Modal -->
     <div class="quick-quote-modal-overlay" id="quick-quote-modal">
         <div class="quick-quote-modal">
+            <div class="qq-sheet-pill"></div>
             <div class="quick-quote-header">
                 <div class="quick-quote-title qq-symbol-dropdown" id="qq-symbol-dropdown" onclick="toggleQQSymbolDropdown(event)">
                     <span class="qq-symbol-dot" id="qq-symbol-dot"></span>
@@ -2177,6 +2178,36 @@
             </div>
         </div>
     </div>
+    <!-- Mobile Bottom Navigation Bar (Trading212 style) -->
+    <nav id="mobile-bottom-nav">
+        <button class="mobile-nav-btn active" data-section="markets" onclick="switchMobileSection('markets')">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span>Markets</span>
+        </button>
+        <button class="mobile-nav-btn" data-section="chart" onclick="switchMobileSection('chart')">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <span>Chart</span>
+        </button>
+        <button class="mobile-nav-btn" data-section="portfolio" onclick="switchMobileSection('portfolio')">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
+            <span>Portfolio</span>
+        </button>
+        <button class="mobile-nav-btn" data-section="account" onclick="switchMobileSection('account')">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span>Account</span>
+        </button>
+    </nav>
+
+    <!-- Mobile Sticky Buy/Sell Action Bar -->
+    <div id="mobile-trade-bar">
+        <button class="mobile-trade-btn buy" id="mobile-btn-buy" onclick="setTradeType('BUY'); executeMobileQuickTrade();">
+            BUY<br><span class="mobile-trade-price" id="mobile-buy-price">—</span>
+        </button>
+        <button class="mobile-trade-btn sell" id="mobile-btn-sell" onclick="setTradeType('SELL'); executeMobileQuickTrade();">
+            SELL<br><span class="mobile-trade-price" id="mobile-sell-price">—</span>
+        </button>
+    </div>
+
     <!-- Rotate prompt for fullscreen charts on mobile -->
     <div class="rotate-prompt" id="rotate-prompt">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">

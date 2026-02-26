@@ -147,6 +147,9 @@ function updateTradeSummary() {
     state._currentTradingMode = tradingMode;
 
     updateTradeButton();
+
+    // Keep mobile sticky bar prices in sync
+    if (typeof updateMobileTradePrices === 'function') updateMobileTradePrices();
 }
 
 /**
@@ -331,8 +334,10 @@ async function executeTrade() {
             await loadIndexPositions();
 
         } else {
-            // ── TEA TRADE (server-side atomic execution) ────────────────
-            const result = await apiExecuteTrade(tea.symbol, state.tradeType, qty, leverage);
+            // ── TEA TRADE (server-side atomic, slippage-guarded execution) ──
+            const expectedPrice = tea.current_price;
+            const slippageTolerance = expectedPrice * 0.01;
+            const result = await apiExecuteTrade(tea.symbol, state.tradeType, qty, leverage, expectedPrice, slippageTolerance);
 
             if (!result.success) {
                 throw new Error(result.error || 'Trade failed');
@@ -431,7 +436,10 @@ async function closePosition(teaId, quantity, teaSymbol) {
     const closeQty = Math.abs(quantity);
 
     try {
-        const result = await apiExecuteTrade(teaSymbol, closeSide, closeQty);
+        const tea = state.teas.find(t => t.id === teaId);
+        const expectedPrice = tea?.current_price || 0;
+        const slippageTolerance = expectedPrice * 0.01;
+        const result = await apiExecuteTrade(teaSymbol, closeSide, closeQty, 1, expectedPrice, slippageTolerance);
 
         if (!result.success) {
             throw new Error(result.error || 'Close failed');

@@ -105,9 +105,11 @@ serve(async (req) => {
 
     // ── 2. PARSE REQUEST ───────────────────────────────────────────
     const body = await req.json()
-    const { symbol, side, quantity, mode, leverage } = body
+    const { symbol, side, quantity, mode, leverage, expected_price, slippage_tolerance } = body
     const tradingMode = (mode === 'REAL') ? 'REAL' : 'VIRTUAL'
     const lev = Math.max(1, Math.min(25, Number(leverage) || 1))
+    const expectedPrice = (expected_price != null && Number(expected_price) > 0) ? Number(expected_price) : null
+    const slippageTol = Number(slippage_tolerance) > 0 ? Number(slippage_tolerance) : 0.05
 
     if (!symbol || typeof symbol !== 'string') {
       return new Response(JSON.stringify({ success: false, error: 'Missing or invalid symbol' }), {
@@ -129,29 +131,34 @@ serve(async (req) => {
       })
     }
 
-    // ── 3. EXECUTE ATOMIC TRADE ────────────────────────────────────
-    const { data, error } = await supabaseAdmin.rpc('execute_trade', {
+    // ── 3. EXECUTE ATOMIC TRADE (secure: row-locked, slippage-guarded) ──
+    const { data, error } = await supabaseAdmin.rpc('execute_trade_secure', {
       p_user_id: user.id,
       p_tea_symbol: symbol,
       p_side: side,
       p_quantity: qty,
       p_mode: tradingMode,
       p_leverage: lev,
+      p_expected_price: expectedPrice,
+      p_slippage_tolerance: slippageTol,
     })
 
     if (error) {
-      console.error('execute_trade RPC error:', error.message)
-      return new Response(JSON.stringify({ success: false, error: error.message }), {
+      // RAISE EXCEPTION in execute_trade_secure surfaces here as an RPC error.
+      // The message contains the human-readable rejection reason.
+      const msg = error.message || 'Trade execution failed'
+      const isSlippage = msg.includes('Price moved') || msg.includes('tolerance')
+      console.error('execute_trade_secure RPC error:', msg)
+      return new Response(JSON.stringify({ success: false, error: msg }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
+        status: isSlippage ? 409 : 400,
       })
     }
 
-    // The Postgres function returns a JSONB object with success/error
     const result = data as Record<string, unknown>
 
-    if (!result.success) {
-      return new Response(JSON.stringify(result), {
+    if (!result || !result.success) {
+      return new Response(JSON.stringify(result || { success: false, error: 'Unknown error' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       })

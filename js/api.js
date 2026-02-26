@@ -927,17 +927,25 @@ async function _invokeEdgeFunction(fnName, body) {
 }
 
 /**
- * Execute a trade via the server-side Edge Function.
+ * Execute a trade via the server-side Edge Function (execute_trade_secure).
  * The server validates the user, fetches the REAL market price, checks
- * balance/holdings, and executes everything atomically in one transaction.
+ * slippage against expected_price, and executes atomically with row locks.
  *
  * @param {string} symbol   - Tea symbol (e.g. 'KEN-BP1')
  * @param {'BUY'|'SELL'} side
  * @param {number} quantity - Quantity in kg
+ * @param {number} [leverage=1]
+ * @param {number|null} [expectedPrice=null] - Price the client last saw (Fill or Kill guard)
+ * @param {number} [slippageTolerance=0.05] - Max acceptable price deviation ($)
  * @returns {Promise<{success: boolean, trade_id?: string, price?: number, total?: number, new_balance?: number, error?: string}>}
  */
-async function apiExecuteTrade(symbol, side, quantity, leverage = 1) {
-    return _invokeEdgeFunction('execute-trade', { symbol, side, quantity, leverage, mode: state.tradingMode });
+async function apiExecuteTrade(symbol, side, quantity, leverage = 1, expectedPrice = null, slippageTolerance = 0.05) {
+    const payload = { symbol, side, quantity, leverage, mode: state.tradingMode };
+    if (expectedPrice != null && expectedPrice > 0) {
+        payload.expected_price = expectedPrice;
+        payload.slippage_tolerance = slippageTolerance;
+    }
+    return _invokeEdgeFunction('execute-trade', payload);
 }
 
 // =============================================
