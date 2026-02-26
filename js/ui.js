@@ -1006,32 +1006,32 @@ let _activeMobileSection = 'markets';
 function switchMobileSection(section) {
     _activeMobileSection = section;
 
-    // Keep body class for trade-bar visibility rules
     document.body.classList.remove(
         'mobile-section-markets',
         'mobile-section-chart',
         'mobile-section-portfolio',
-        'mobile-section-account'
+        'mobile-section-chat',
+        'mobile-section-social',
+        'mobile-section-more'
     );
     document.body.classList.add('mobile-section-' + section);
 
-    // Toggle app-view active class
     const viewMap = {
         markets:   'view-markets',
         chart:     'view-chart',
         portfolio: 'view-portfolio',
-        account:   'view-account'
+        chat:      'view-chat',
+        social:    'view-social',
+        more:      'view-more'
     };
     document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active'));
     const targetView = document.getElementById(viewMap[section]);
     if (targetView) targetView.classList.add('active');
 
-    // Highlight nav button
     document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.section === section);
     });
 
-    // On portfolio tab, ensure data is loaded
     if (section === 'portfolio') {
         const el = document.getElementById('portfolio-section');
         if (el) el.style.display = 'block';
@@ -1039,16 +1039,21 @@ function switchMobileSection(section) {
         if (typeof updatePortfolioDisplay === 'function') updatePortfolioDisplay();
     }
 
-    // On account tab, sync profile data and chat
-    if (section === 'account') {
-        if (typeof updateMobileAccountSection === 'function') updateMobileAccountSection();
-        syncAccountViewData();
-        syncAccountChat();
-    }
-
-    // Resize chart when switching to chart tab
     if (section === 'chart') {
         if (typeof resizeCanvas === 'function') setTimeout(resizeCanvas, 50);
+    }
+
+    if (section === 'chat') {
+        syncChatView();
+        if (typeof clearChatNotifications === 'function') clearChatNotifications();
+    }
+
+    if (section === 'social') {
+        populateSocialLeaderboard();
+    }
+
+    if (section === 'more') {
+        closeMoreSubScreen();
     }
 }
 
@@ -1219,97 +1224,7 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 });
 
-// =============================================
-// ACCOUNT VIEW: Sync profile data
-// =============================================
-
-function syncAccountViewData() {
-    const balEl = document.getElementById('account-view-balance');
-    const eqEl = document.getElementById('account-view-equity');
-    const pnlEl = document.getElementById('account-view-pnl');
-    const userEl = document.getElementById('account-view-username');
-    const avatarEl = document.getElementById('account-view-avatar');
-    const modeEl = document.getElementById('account-view-mode');
-    const logoutEl = document.getElementById('account-view-logout');
-
-    const balance = typeof getActiveBalance === 'function' ? getActiveBalance() : 0;
-    const fmt = (v) => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-    if (balEl) balEl.textContent = fmt(balance);
-
-    const portfolioVal = document.getElementById('portfolio-value');
-    if (eqEl && portfolioVal) eqEl.textContent = portfolioVal.textContent;
-
-    const portfolioPnl = document.getElementById('portfolio-pnl');
-    if (pnlEl && portfolioPnl) {
-        pnlEl.textContent = portfolioPnl.textContent;
-        pnlEl.className = 'account-stat-value ' + (portfolioPnl.classList.contains('down') ? 'down' : 'up');
-    }
-
-    if (state.currentUser) {
-        const email = state.currentUser.email || '';
-        const name = email.split('@')[0] || 'Trader';
-        if (userEl) userEl.textContent = name;
-        if (avatarEl) avatarEl.textContent = name.substring(0, 2).toUpperCase();
-        if (logoutEl) logoutEl.style.display = '';
-    } else {
-        if (userEl) userEl.textContent = 'Guest';
-        if (avatarEl) avatarEl.textContent = 'TT';
-        if (logoutEl) logoutEl.style.display = 'none';
-    }
-
-    if (modeEl) {
-        const mode = state.tradingMode || 'VIRTUAL';
-        modeEl.textContent = mode;
-        modeEl.style.background = mode === 'REAL' ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.15)';
-        modeEl.style.color = mode === 'REAL' ? '#f87171' : '#60a5fa';
-    }
-}
-
-// =============================================
-// ACCOUNT VIEW: Sync chat messages
-// =============================================
-
-function syncAccountChat() {
-    const srcMessages = document.getElementById('chat-messages');
-    const destMessages = document.getElementById('account-chat-messages');
-    if (srcMessages && destMessages) {
-        destMessages.innerHTML = srcMessages.innerHTML;
-        destMessages.scrollTop = destMessages.scrollHeight;
-    }
-
-    const srcOnline = document.getElementById('chat-online-count');
-    const destOnline = document.getElementById('account-chat-online');
-    if (srcOnline && destOnline) destOnline.textContent = srcOnline.textContent;
-}
-
-document.addEventListener('DOMContentLoaded', function () {
-    const sendBtn = document.getElementById('account-chat-send');
-    const inputEl = document.getElementById('account-chat-input');
-    if (!sendBtn || !inputEl) return;
-
-    function sendFromAccountChat() {
-        const text = inputEl.value.trim();
-        if (!text) return;
-        const mainInput = document.getElementById('chat-input');
-        if (mainInput) {
-            mainInput.value = text;
-            if (typeof sendChatMessage === 'function') sendChatMessage();
-        }
-        inputEl.value = '';
-        setTimeout(syncAccountChat, 300);
-    }
-
-    sendBtn.addEventListener('click', sendFromAccountChat);
-    inputEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') sendFromAccountChat();
-    });
-
-    // Periodically sync chat when account tab is active
-    setInterval(() => {
-        if (_activeMobileSection === 'account') syncAccountChat();
-    }, 2000);
-});
+// (Account view removed — profile/auth handled by hamburger header menu)
 
 // ========================================================
 // FORCE NATIVE MOBILE APP ROUTING & TRADE SHEET
@@ -1318,26 +1233,40 @@ document.addEventListener('DOMContentLoaded', function () {
 window.switchMobileSection = function(section) {
     if (window.innerWidth > 768) return;
 
-    // 1. Hide all views — class-only, never inline styles (preserves desktop display:contents)
+    document.body.classList.remove(
+        'mobile-section-markets',
+        'mobile-section-chart',
+        'mobile-section-portfolio',
+        'mobile-section-chat',
+        'mobile-section-social',
+        'mobile-section-more'
+    );
+    document.body.classList.add('mobile-section-' + section);
+
     document.querySelectorAll('.app-view').forEach(v => {
         v.classList.remove('active');
         v.style.removeProperty('display');
     });
 
-    // 2. Show requested view
-    const targetView = document.getElementById('view-' + section);
-    if (targetView) {
-        targetView.classList.add('active');
-    }
+    var targetView = document.getElementById('view-' + section);
+    if (targetView) targetView.classList.add('active');
 
-    // 3. Highlight bottom nav button
     document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.section === section);
     });
 
-    // 4. Force chart resize if opening chart tab
     if (section === 'chart' && typeof resizeCanvas === 'function') {
         setTimeout(resizeCanvas, 100);
+    }
+    if (section === 'chat') {
+        if (typeof syncChatView === 'function') syncChatView();
+        if (typeof clearChatNotifications === 'function') clearChatNotifications();
+    }
+    if (section === 'social' && typeof populateSocialLeaderboard === 'function') {
+        populateSocialLeaderboard();
+    }
+    if (section === 'more' && typeof closeMoreSubScreen === 'function') {
+        closeMoreSubScreen();
     }
 };
 
@@ -1459,6 +1388,210 @@ window.openMobileTradeSheet = function(side) {
     overlay.classList.add('active');
     form.classList.add('active');
 };
+
+/* ========================================================
+   VIEW: CHAT — Sync from main chat
+   ======================================================== */
+
+function syncChatView() {
+    var src = document.getElementById('chat-messages');
+    var dst = document.getElementById('vchat-messages');
+    if (src && dst) dst.innerHTML = src.innerHTML;
+    dst && (dst.scrollTop = dst.scrollHeight);
+
+    var onlineSrc = document.getElementById('chat-online-count');
+    var onlineDst = document.getElementById('vchat-online');
+    if (onlineSrc && onlineDst) onlineDst.textContent = onlineSrc.textContent;
+}
+
+(function wireChatView() {
+    document.addEventListener('DOMContentLoaded', function() {
+        var sendBtn = document.getElementById('vchat-send');
+        var input = document.getElementById('vchat-input');
+        if (!sendBtn || !input) return;
+
+        function doSend() {
+            var mainInput = document.getElementById('chat-input');
+            if (mainInput && input.value.trim()) {
+                mainInput.value = input.value;
+                input.value = '';
+                if (typeof sendChatMessage === 'function') sendChatMessage();
+                setTimeout(syncChatView, 300);
+            }
+        }
+
+        sendBtn.onclick = doSend;
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); doSend(); }
+        });
+
+        setInterval(function() {
+            if (window.innerWidth <= 768 && document.getElementById('view-chat')?.classList.contains('active')) {
+                syncChatView();
+            }
+        }, 2000);
+    });
+})();
+
+/* ========================================================
+   VIEW: SOCIAL — Populate leaderboard
+   ======================================================== */
+
+function populateSocialLeaderboard() {
+    var list = document.getElementById('vsocial-list');
+    if (!list) return;
+
+    var src = document.getElementById('leaderboard-list');
+    var useMobileFormat = false;
+    if (!src || src.children.length === 0) {
+        src = document.getElementById('mobile-leaderboard-list');
+        useMobileFormat = true;
+    }
+    if (src && src.children.length > 0) {
+        var itemSel = useMobileFormat ? '.mobile-lb-item' : '.leaderboard-item';
+        var nameSel = useMobileFormat ? '.mobile-lb-name' : '.leaderboard-name';
+        var retSel  = useMobileFormat ? '.mobile-lb-return' : '.leaderboard-return';
+        var items = Array.from(src.querySelectorAll(itemSel));
+        if (items.length === 0) items = Array.from(src.children);
+
+        var html = '';
+        items.forEach(function(item, i) {
+            var nameEl = item.querySelector(nameSel) || item.querySelector('.leaderboard-name') || item.querySelector('.mobile-lb-name');
+            var retEl = item.querySelector(retSel) || item.querySelector('.leaderboard-return') || item.querySelector('.mobile-lb-return');
+            var name = nameEl ? nameEl.textContent : '';
+            var ret = retEl ? retEl.textContent : '';
+            var isUp = retEl ? retEl.classList.contains('up') : true;
+            var onclick = item.getAttribute('onclick') || '';
+            var rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+
+            html += '<div class="vsocial-item" onclick="' + onclick.replace(/"/g, '&quot;') + '">' +
+                '<div class="vsocial-rank ' + rankClass + '">' + (i + 1) + '</div>' +
+                '<div class="vsocial-name">' + name + '</div>' +
+                '<div class="vsocial-return ' + (isUp ? 'up' : 'down') + '">' + ret + '</div>' +
+                '</div>';
+        });
+        list.innerHTML = html;
+    } else {
+        list.innerHTML = '<div style="padding:40px 20px;text-align:center;color:var(--text-muted);">Loading leaderboard...</div>';
+    }
+}
+
+/* ========================================================
+   VIEW: MORE — Sub-screen navigation & populators
+   ======================================================== */
+
+function openMoreSubScreen(screen) {
+    var grid = document.getElementById('more-menu-grid');
+    if (grid) grid.classList.add('hidden');
+
+    document.querySelectorAll('.more-sub-screen').forEach(function(s) { s.classList.remove('active'); });
+    var sub = document.getElementById('more-sub-' + screen);
+    if (sub) sub.classList.add('active');
+
+    if (screen === 'weather') populateMoreWeather();
+    if (screen === 'currency') populateMoreCurrency();
+    if (screen === 'leaderboard') populateMoreLeaderboard();
+    if (screen === 'history') populateMoreHistory();
+    if (screen === 'alerts') populateMoreAlerts();
+}
+
+function closeMoreSubScreen() {
+    document.querySelectorAll('.more-sub-screen').forEach(function(s) { s.classList.remove('active'); });
+    var grid = document.getElementById('more-menu-grid');
+    if (grid) grid.classList.remove('hidden');
+}
+
+function populateMoreWeather() {
+    var content = document.getElementById('more-weather-content');
+    if (!content) return;
+    var cards = document.querySelectorAll('#weather-cards .weather-card');
+    if (!cards.length) { content.innerHTML = '<div style="padding:20px;color:var(--text-muted);text-align:center;">Loading weather data...</div>'; return; }
+
+    var html = '';
+    cards.forEach(function(card, idx) {
+        var flag = card.querySelector('.weather-flag')?.textContent || '';
+        var name = card.querySelector('.weather-name')?.textContent || '';
+        var icon = card.querySelector('.weather-icon')?.textContent || '';
+        var temp = card.querySelector('.weather-temp')?.textContent || '';
+        html += '<div class="more-weather-item" onclick="if(typeof openWeatherPopout===\'function\') openWeatherPopout(' + idx + ');">' +
+            '<div class="more-weather-left"><span class="more-weather-flag">' + flag + '</span><span class="more-weather-name">' + name + '</span></div>' +
+            '<div class="more-weather-right"><span>' + icon + '</span><span>' + temp + '</span></div></div>';
+    });
+    content.innerHTML = html;
+}
+
+function populateMoreCurrency() {
+    var content = document.getElementById('more-currency-content');
+    if (!content) return;
+
+    var macros = [
+        { id: 'usdkes', icon: '\u{1F1F0}\u{1F1EA}', pair: 'USD / KES', sub: 'Kenyan Shilling' },
+        { id: 'usdinr', icon: '\u{1F1EE}\u{1F1F3}', pair: 'USD / INR', sub: 'Indian Rupee' },
+        { id: 'usdlkr', icon: '\u{1F1F1}\u{1F1F0}', pair: 'USD / LKR', sub: 'Sri Lankan Rupee' },
+        { id: 'usdcny', icon: '\u{1F1E8}\u{1F1F3}', pair: 'USD / CNY', sub: 'Chinese Yuan' },
+        { id: 'oil',    icon: '\u{2699}',            pair: 'Brent Crude', sub: 'Shipping & logistics' }
+    ];
+
+    var html = '';
+    macros.forEach(function(m) {
+        var priceEl = document.getElementById('macro-' + m.id);
+        var price = priceEl ? priceEl.textContent : '\u2014';
+        html += '<div class="more-currency-item" onclick="if(typeof openMacroPopout===\'function\') openMacroPopout(\'' + m.id + '\');">' +
+            '<div class="more-currency-left"><span class="more-currency-icon">' + m.icon + '</span><div><div class="more-currency-pair">' + m.pair + '</div><div class="more-currency-sub">' + m.sub + '</div></div></div>' +
+            '<div class="more-currency-price">' + price + '</div></div>';
+    });
+    content.innerHTML = html;
+}
+
+function populateMoreLeaderboard() {
+    var content = document.getElementById('more-leaderboard-content');
+    if (!content) return;
+
+    var src = document.getElementById('leaderboard-list');
+    if (!src || src.children.length === 0) src = document.getElementById('mobile-leaderboard-list');
+    if (src && src.children.length > 0) {
+        content.innerHTML = src.innerHTML;
+    } else {
+        content.innerHTML = '<div style="padding:20px;color:var(--text-muted);text-align:center;">Loading...</div>';
+    }
+}
+
+function populateMoreHistory() {
+    var content = document.getElementById('more-history-content');
+    if (!content) return;
+
+    var src = document.querySelector('.order-history-section');
+    if (src && src.innerHTML.trim()) {
+        content.innerHTML = src.innerHTML;
+    } else {
+        content.innerHTML = '<div style="padding:20px;color:var(--text-muted);text-align:center;">No trade history available.</div>';
+    }
+}
+
+function populateMoreAlerts() {
+    var content = document.getElementById('more-alerts-content');
+    if (!content) return;
+
+    var alerts = (typeof state !== 'undefined' && state.priceAlerts) ? state.priceAlerts : {};
+    var keys = Object.keys(alerts);
+
+    if (keys.length === 0) {
+        content.innerHTML = '<div class="more-alerts-empty">No price alerts set.<br><br>Open a chart and tap the bell icon to add one.</div>';
+        return;
+    }
+
+    var html = '';
+    keys.forEach(function(sym) {
+        var a = alerts[sym];
+        var below = a.below ? 'Below $' + Number(a.below).toFixed(2) : '';
+        var above = a.above ? 'Above $' + Number(a.above).toFixed(2) : '';
+        var vals = [below, above].filter(Boolean).join(' / ');
+        html += '<div class="more-alert-item" onclick="if(typeof openPriceAlertModal===\'function\'){var t=(state.teas||[]).find(function(x){return x.symbol===\'' + sym + '\'});if(t) openPriceAlertModal(t.symbol,t.current_price);}">' +
+            '<div class="more-alert-symbol">' + sym + '</div>' +
+            '<div class="more-alert-values">' + vals + '</div></div>';
+    });
+    content.innerHTML = html;
+}
 
 /* ========================================================
    MOBILE TOP HEADER — Hamburger, Balance Sync, Scroll Behaviour

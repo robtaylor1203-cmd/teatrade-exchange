@@ -64,13 +64,24 @@ function isChatVisible() {
 function updateChatNotificationBadge() {
     const badge = document.getElementById('chat-notification-badge');
     const countEl = document.getElementById('chat-notification-count');
-    if (!badge || !countEl) return;
+    if (badge && countEl) {
+        if (state.unreadChatCount > 0) {
+            badge.classList.add('visible');
+            countEl.textContent = state.unreadChatCount > 99 ? '99+' : state.unreadChatCount;
+        } else {
+            badge.classList.remove('visible');
+        }
+    }
 
-    if (state.unreadChatCount > 0) {
-        badge.classList.add('visible');
-        countEl.textContent = state.unreadChatCount > 99 ? '99+' : state.unreadChatCount;
-    } else {
-        badge.classList.remove('visible');
+    const navBadge = document.getElementById('nav-chat-badge');
+    if (navBadge) {
+        if (state.unreadChatCount > 0) {
+            navBadge.classList.add('visible');
+            navBadge.textContent = state.unreadChatCount > 99 ? '99+' : state.unreadChatCount;
+        } else {
+            navBadge.classList.remove('visible');
+            navBadge.textContent = '';
+        }
     }
 }
 

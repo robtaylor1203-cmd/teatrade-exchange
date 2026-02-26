@@ -975,7 +975,7 @@ function updateTradeLogDisplay() {
 
 async function loadLeaderboard() {
     try {
-        const { data, error } = await apiFetchLeaderboard(10);
+        const { data, error } = await apiFetchLeaderboard(20);
         if (error) throw error;
 
         if (data && data.length > 0) {
@@ -1040,7 +1040,8 @@ function updateLeaderboardDisplay(leaders) {
     });
 
     if (html) {
-        listEl.innerHTML = html;
+        if (listEl) listEl.innerHTML = html;
+        if (typeof populateSocialLeaderboard === 'function') populateSocialLeaderboard();
     }
 }
 

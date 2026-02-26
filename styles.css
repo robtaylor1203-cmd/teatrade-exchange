@@ -247,6 +247,11 @@ body {
 .mth-menu {
     display: none;
 }
+#view-chat > *,
+#view-social > *,
+#view-more > * {
+    display: none;
+}
 
 /* Main Grid */
 .main-grid {
@@ -3103,7 +3108,7 @@ body.modal-open {
 
 @media (max-width: 768px) {
     .qq-mobile-trade-bar {
-        display: block;
+        display: none;
         position: sticky;
         bottom: 0;
         left: 0;
@@ -10964,7 +10969,7 @@ a.user-dropdown-item {
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
         background: var(--bg-primary);
-        padding-bottom: 80px;
+        padding-bottom: 0;
         z-index: 1;
         transition: top 0.3s ease, height 0.3s ease;
     }
@@ -10987,7 +10992,7 @@ a.user-dropdown-item {
         max-height: none !important;
         z-index: auto !important;
         padding: 16px;
-        padding-bottom: 80px;
+        padding-bottom: 0;
     }
 
     .app-view .center-content {
@@ -11014,10 +11019,9 @@ a.user-dropdown-item {
         -webkit-overflow-scrolling: touch;
     }
 
-    /* Hide trade bar on portfolio & account views */
-    body.mobile-section-portfolio #mobile-trade-bar,
-    body.mobile-section-account #mobile-trade-bar {
-        display: none;
+    /* Only show trade bar on chart tab */
+    body:not(.mobile-section-chart) #mobile-trade-bar {
+        display: none !important;
     }
 
     /* ═══ TASK 1: Trading212-style Markets Watchlist ═══ */
@@ -11161,286 +11165,7 @@ a.user-dropdown-item {
         font-size: 13px;
     }
 
-    /* ═══ TASK 2b: Account view native-app layout ═══ */
-
-    #view-account {
-        display: flex;
-        flex-direction: column;
-    }
-
-    #view-account.active {
-        display: flex !important;
-    }
-
-    /* -- Profile card -- */
-    .account-profile-card {
-        display: none;
-        padding: 20px 16px 12px;
-        background: linear-gradient(180deg, #1a2332 0%, var(--bg-primary) 100%);
-    }
-
-    .account-profile-row {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 16px;
-    }
-
-    .account-avatar {
-        width: 48px;
-        height: 48px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #10b981, #059669);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 700;
-        font-size: 18px;
-        color: #fff;
-        flex-shrink: 0;
-    }
-
-    .account-username {
-        font-size: 18px;
-        font-weight: 700;
-        color: var(--text-primary);
-    }
-
-    .account-mode-badge {
-        display: inline-block;
-        margin-top: 2px;
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: 1px;
-        padding: 2px 8px;
-        border-radius: 4px;
-        background: rgba(59, 130, 246, 0.15);
-        color: #60a5fa;
-    }
-
-    .account-stats-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-around;
-        background: rgba(255, 255, 255, 0.03);
-        border-radius: 12px;
-        padding: 14px 8px;
-        margin-bottom: 12px;
-    }
-
-    .account-stat {
-        text-align: center;
-        flex: 1;
-    }
-
-    .account-stat-value {
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 16px;
-        font-weight: 700;
-        color: var(--text-primary);
-    }
-
-    .account-stat-label {
-        font-size: 11px;
-        color: var(--text-muted);
-        margin-top: 2px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    .account-stat-divider {
-        width: 1px;
-        height: 28px;
-        background: rgba(255, 255, 255, 0.08);
-    }
-
-    .account-combine-status {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 12px;
-        background: rgba(245, 158, 11, 0.08);
-        border: 1px solid rgba(245, 158, 11, 0.2);
-        border-radius: 8px;
-        margin-bottom: 12px;
-        font-size: 12px;
-        color: var(--text-muted);
-    }
-
-    .combine-mini-badge {
-        font-size: 9px;
-        font-weight: 800;
-        letter-spacing: 1px;
-        padding: 2px 6px;
-        border-radius: 3px;
-        background: var(--accent-orange);
-        color: #000;
-    }
-
-    .account-actions-row {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 8px;
-    }
-
-    .account-action-btn {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 4px;
-        padding: 10px 4px;
-        border: none;
-        border-radius: 10px;
-        background: rgba(255, 255, 255, 0.04);
-        color: var(--text-muted);
-        font-size: 11px;
-        font-weight: 500;
-        cursor: pointer;
-        -webkit-tap-highlight-color: transparent;
-        transition: background 0.15s;
-    }
-
-    .account-action-btn:active {
-        background: rgba(255, 255, 255, 0.08);
-    }
-
-    .account-action-btn.logout {
-        color: var(--accent-red);
-    }
-
-    /* -- Leaderboard in account view -- */
-    #view-account .leaderboard-section {
-        padding: 16px;
-        background: transparent;
-        border: none;
-    }
-
-    #view-account .leaderboard-section .panel-title {
-        font-size: 14px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
-        margin-bottom: 12px;
-    }
-
-    #view-account .leaderboard-item {
-        min-height: 50px;
-        padding: 10px 12px;
-        border-radius: 10px;
-        margin-bottom: 4px;
-        background: rgba(255, 255, 255, 0.02);
-        transition: background 0.15s;
-    }
-
-    #view-account .leaderboard-item:active {
-        background: rgba(255, 255, 255, 0.06);
-    }
-
-    #view-account .leaderboard-rank.gold { font-size: 16px; }
-    #view-account .leaderboard-rank.silver { font-size: 16px; }
-    #view-account .leaderboard-rank.bronze { font-size: 16px; }
-
-    /* Hide news, order book, top traders on mobile account view */
-    #view-account > .panel-section:not(.leaderboard-section) {
-        display: none;
-    }
-
-    #view-account > .order-book-section {
-        display: none;
-    }
-
-    /* -- Account Chat (iMessage/WhatsApp style) -- */
-    .account-chat-section {
-        display: none;
-        flex-direction: column;
-        flex: 1;
-        min-height: 250px;
-        border-top: 1px solid rgba(255, 255, 255, 0.06);
-    }
-
-    .account-chat-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 12px 16px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    }
-
-    .account-chat-title {
-        font-size: 14px;
-        font-weight: 700;
-        color: var(--text-primary);
-    }
-
-    .account-chat-online {
-        font-size: 11px;
-        color: var(--accent-green);
-    }
-
-    .account-chat-messages {
-        flex: 1;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-        padding: 12px 16px;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        min-height: 150px;
-        max-height: 300px;
-    }
-
-    .account-chat-input-bar {
-        display: flex;
-        gap: 8px;
-        padding: 10px 16px;
-        padding-bottom: max(10px, env(safe-area-inset-bottom));
-        border-top: 1px solid rgba(255, 255, 255, 0.06);
-        background: rgba(0, 0, 0, 0.2);
-    }
-
-    .account-chat-input {
-        flex: 1;
-        min-height: 40px;
-        padding: 8px 14px;
-        border-radius: 20px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        background: rgba(255, 255, 255, 0.05);
-        color: var(--text-primary);
-        font-size: 15px;
-        outline: none;
-    }
-
-    .account-chat-input:focus {
-        border-color: rgba(59, 130, 246, 0.5);
-    }
-
-    .account-chat-send {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        border: none;
-        background: #3b82f6;
-        color: #fff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        flex-shrink: 0;
-        -webkit-tap-highlight-color: transparent;
-    }
-
-    .account-chat-send:active {
-        opacity: 0.8;
-    }
-
-    /* Show mobile-only elements */
-    .account-profile-card {
-        display: block !important;
-    }
-
-    .account-chat-section {
-        display: flex !important;
-    }
+    /* (Account view removed — replaced by Chat, Social, More tabs) */
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -11459,17 +11184,16 @@ a.user-dropdown-item {
         left: 0;
         width: 100%;
         padding: 8px 12px;
-        padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
-        background: linear-gradient(to top, rgba(13, 17, 23, 0.98), rgba(13, 17, 23, 0.85) 70%, transparent);
+        background: var(--bg-primary);
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
         gap: 10px;
         z-index: 999;
         pointer-events: none;
     }
 
-    /* Hide when on portfolio or account tab — no trade bar needed there */
-    body.mobile-section-portfolio #mobile-trade-bar,
-    body.mobile-section-account #mobile-trade-bar {
-        display: none;
+    /* Only show trade bar on chart tab */
+    body:not(.mobile-section-chart) #mobile-trade-bar {
+        display: none !important;
     }
 
     .mobile-trade-btn {
@@ -11541,11 +11265,16 @@ a.user-dropdown-item {
         -webkit-overflow-scrolling: touch !important;
         background: var(--bg-primary) !important;
         z-index: 10 !important;
-        padding-bottom: 20px !important;
+        padding-bottom: 0 !important;
     }
     .app-view.active {
         display: block !important;
         animation: viewFadeIn 0.2s ease-out;
+    }
+    .app-view .center-content {
+        display: block !important;
+        padding-bottom: 0 !important;
+        margin-bottom: 0 !important;
     }
 
     /* 4. Make the Chart massive */
@@ -11576,10 +11305,12 @@ a.user-dropdown-item {
         bottom: 65px !important;
         left: 0 !important;
         width: 100% !important;
-        padding: 12px 16px !important;
-        background: linear-gradient(to top, rgba(10,14,23, 1) 50%, rgba(10,14,23, 0)) !important;
-        z-index: 100 !important;
-        pointer-events: none !important; /* Lets touches pass through the gradient */
+        padding: 8px 12px !important;
+        background: var(--bg-primary) !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+        z-index: 999 !important;
+        gap: 10px !important;
+        pointer-events: none !important;
     }
     .mobile-trade-btn {
         pointer-events: auto !important;
@@ -11849,11 +11580,11 @@ a.user-dropdown-item {
         color: var(--accent-red) !important;
     }
 
-    /* 9. App-view positioning for header + bottom padding */
+    /* 9. App-view positioning for header */
     .app-view {
         top: 52px !important;
         height: calc(100vh - 52px - 65px) !important;
-        padding-bottom: 80px !important;
+        padding-bottom: 8px !important;
         transition: top 0.3s ease, height 0.3s ease !important;
     }
 
@@ -11863,7 +11594,51 @@ a.user-dropdown-item {
     }
 
     #view-chart {
-        padding-bottom: 150px !important;
+        padding-bottom: 72px !important;
+    }
+    #view-chart .auction-section {
+        padding-bottom: 0 !important;
+        margin-bottom: 0 !important;
+    }
+    #view-chart .auction-section:last-child {
+        padding-bottom: 0 !important;
+    }
+    #view-chart > :last-child {
+        margin-bottom: 0 !important;
+        padding-bottom: 0 !important;
+    }
+
+    /* Hide chat section on Home view — chat has its own tab now */
+    #view-markets #chat-section-sidebar {
+        display: none !important;
+    }
+
+    /* Trader profile popup — fit between header and bottom nav */
+    .trader-profile-modal {
+        z-index: 2000 !important;
+    }
+    .trader-profile-modal.active {
+        align-items: stretch !important;
+    }
+    .trader-profile-card {
+        width: 100% !important;
+        max-width: 100vw !important;
+        max-height: calc(100vh - 52px - 65px) !important;
+        margin: 52px 0 65px !important;
+        border-radius: 0 !important;
+        padding: 16px !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+    .trader-profile-close {
+        position: sticky !important;
+        top: 0 !important;
+        right: 0 !important;
+        z-index: 5 !important;
+        float: right !important;
+        background: var(--bg-secondary) !important;
+        padding: 6px 10px !important;
+        border-radius: 8px !important;
     }
 
     /* 10. Kill rotate prompt and panel-maximized popup on mobile */
@@ -11891,5 +11666,410 @@ a.user-dropdown-item {
     #view-markets .watchlist-item {
         border-bottom: 1px solid rgba(255,255,255,0.05) !important;
         padding: 16px !important;
+    }
+
+    /* New views — unhide children on mobile */
+    #view-chat > *,
+    #view-social > * {
+        display: revert !important;
+    }
+    #view-chat {
+        display: none !important;
+        overflow: hidden !important;
+    }
+    #view-chat.active {
+        display: flex !important;
+        flex-direction: column !important;
+    }
+    #view-chat .vchat-container {
+        display: flex !important;
+        flex: 1 !important;
+        min-height: 0 !important;
+    }
+
+    /* More view — explicit control (no revert) */
+    #view-more .more-list {
+        display: block !important;
+    }
+    #view-more .more-list.hidden {
+        display: none !important;
+    }
+    #view-more .more-sub-screen {
+        display: none !important;
+    }
+    #view-more .more-sub-screen.active {
+        display: block !important;
+    }
+
+    /* 12. Bottom nav — icon-only, no labels */
+    .mobile-nav-btn {
+        padding: 10px 6px !important;
+        gap: 0 !important;
+    }
+    .mobile-nav-btn span:not(.nav-chat-badge) {
+        display: none !important;
+    }
+    .mobile-nav-btn svg {
+        width: 26px !important;
+        height: 26px !important;
+        stroke-width: 2 !important;
+        shape-rendering: geometricPrecision !important;
+    }
+
+    /* 12b. Chat unread badge on nav icon */
+    .nav-chat-badge {
+        display: none;
+        position: absolute;
+        top: 4px;
+        right: 2px;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        border-radius: 9px;
+        background: var(--accent-blue);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 18px;
+        text-align: center;
+        pointer-events: none;
+    }
+    .nav-chat-badge.visible {
+        display: block;
+    }
+
+    /* 12c. Hide old bottom-left chat popup on mobile */
+    .chat-notification-badge {
+        display: none !important;
+    }
+
+    /* 13. VIEW: CHAT — Full-screen messenger */
+    .vchat-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    .vchat-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-secondary);
+        flex-shrink: 0;
+    }
+    .vchat-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+    .vchat-online {
+        font-size: 12px;
+        color: var(--accent-green);
+    }
+    .vchat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px 16px;
+        -webkit-overflow-scrolling: touch;
+    }
+    .vchat-input-bar {
+        display: flex;
+        gap: 8px;
+        padding: 10px 16px;
+        padding-bottom: calc(10px + env(safe-area-inset-bottom));
+        border-top: 1px solid var(--border);
+        background: var(--bg-secondary);
+        flex-shrink: 0;
+    }
+    .vchat-input {
+        flex: 1;
+        min-height: 40px;
+        padding: 8px 14px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        color: var(--text-primary);
+        font-size: 14px;
+        outline: none;
+    }
+    .vchat-input:focus {
+        border-color: rgba(26, 115, 232, 0.5);
+    }
+    .vchat-send {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--accent-blue);
+        border: none;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+    /* 14. VIEW: SOCIAL — Leaderboard */
+    .vsocial-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-secondary);
+    }
+    .vsocial-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+    .vsocial-date {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        color: var(--accent-orange);
+    }
+    .vsocial-list {
+        padding: 0;
+    }
+    .vsocial-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .vsocial-item:active {
+        background: rgba(255, 255, 255, 0.03);
+    }
+    .vsocial-rank {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--text-muted);
+        background: rgba(255, 255, 255, 0.05);
+        flex-shrink: 0;
+    }
+    .vsocial-rank.gold { background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; }
+    .vsocial-rank.silver { background: linear-gradient(135deg, #9ca3af, #6b7280); color: #fff; }
+    .vsocial-rank.bronze { background: linear-gradient(135deg, #d97706, #92400e); color: #fff; }
+    .vsocial-name {
+        flex: 1;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+    .vsocial-return {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        font-weight: 600;
+    }
+    .vsocial-return.up { color: var(--accent-green); }
+    .vsocial-return.down { color: var(--accent-red); }
+
+    /* 15. VIEW: MORE — Row list + sub-screens */
+    .more-list {
+        padding: 8px 0;
+    }
+    .more-row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        width: 100%;
+        padding: 16px 20px;
+        background: none;
+        border: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        margin: 0 auto;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .more-row:last-child {
+        border-bottom: none;
+    }
+    .more-row:active {
+        background: rgba(255, 255, 255, 0.03);
+    }
+    .more-row-icon {
+        flex-shrink: 0;
+    }
+    .more-row-label {
+        flex: 1;
+        font-size: 15px;
+        font-weight: 500;
+        color: var(--text-primary);
+        text-align: left;
+    }
+    .more-row-arrow {
+        flex-shrink: 0;
+        color: var(--text-muted);
+        opacity: 0.4;
+    }
+
+    .more-sub-screen {
+        display: none;
+    }
+    .more-sub-screen.active {
+        display: block;
+    }
+    .more-sub-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-secondary);
+    }
+    .more-sub-header span {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+    .more-back-btn {
+        background: none;
+        border: none;
+        color: var(--accent-blue);
+        cursor: pointer;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+    }
+    .more-sub-content {
+        padding: 0;
+    }
+
+    /* More sub-screen: weather cards */
+    .more-weather-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        cursor: pointer;
+    }
+    .more-weather-item:active {
+        background: rgba(255, 255, 255, 0.03);
+    }
+    .more-weather-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .more-weather-flag {
+        font-size: 20px;
+    }
+    .more-weather-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+    .more-weather-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        color: var(--text-muted);
+    }
+
+    /* More sub-screen: currency items */
+    .more-currency-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        cursor: pointer;
+    }
+    .more-currency-item:active {
+        background: rgba(255, 255, 255, 0.03);
+    }
+    .more-currency-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .more-currency-icon {
+        font-size: 20px;
+    }
+    .more-currency-pair {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+    .more-currency-sub {
+        font-size: 11px;
+        color: var(--text-muted);
+    }
+    .more-currency-price {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    /* More sub-screen: contact card */
+    .more-contact-card {
+        text-align: center;
+        padding: 40px 20px;
+    }
+    .more-contact-card h3 {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 16px 0 8px;
+    }
+    .more-contact-card p {
+        font-size: 13px;
+        color: var(--text-muted);
+        margin-bottom: 24px;
+    }
+    .more-contact-link {
+        display: block;
+        padding: 14px;
+        background: var(--accent-blue);
+        color: #fff;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 600;
+        text-decoration: none;
+        margin-bottom: 10px;
+    }
+    .more-contact-link.secondary {
+        background: rgba(26, 115, 232, 0.1);
+        color: var(--accent-blue);
+    }
+
+    /* More sub-screen: alerts list */
+    .more-alert-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        cursor: pointer;
+    }
+    .more-alert-symbol {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+    .more-alert-values {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+    .more-alerts-empty {
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--text-muted);
+        font-size: 14px;
     }
 }
