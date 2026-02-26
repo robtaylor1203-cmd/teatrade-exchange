@@ -11502,3 +11502,110 @@ a.user-dropdown-item {
         font-family: 'JetBrains Mono', monospace;
     }
 }
+
+/* ========================================================
+   FORCE NATIVE APP OVERRIDES (Trading212 Style)
+   ======================================================== */
+   @media (max-width: 768px) {
+    /* 1. Kill the desktop top-bar, footer, and ticker completely */
+    .top-bar, .bottom-bar, .ticker-strip {
+        display: none !important;
+    }
+
+    /* 2. Break elements out of the desktop grid */
+    .main-grid {
+        display: block !important;
+    }
+    .right-panel, .center-content {
+        display: contents !important; 
+    }
+
+    /* 3. The 4 Main Native Views */
+    .app-view {
+        display: none !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: calc(100vh - 65px) !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        background: var(--bg-primary) !important;
+        z-index: 10 !important;
+        padding-bottom: 20px !important;
+    }
+    .app-view.active {
+        display: block !important;
+        animation: viewFadeIn 0.2s ease-out;
+    }
+
+    /* 4. Make the Chart massive */
+    .chart-section {
+        padding: 0 !important;
+        background: transparent !important;
+        border: none !important;
+    }
+    .chart-header {
+        padding: 16px !important;
+        background: var(--bg-secondary) !important;
+    }
+    .chart-container {
+        height: 55vh !important; /* Massive chart */
+        border-radius: 0 !important;
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+    }
+    /* Hide the desktop chart tools to clean up UI */
+    .chart-controls {
+        display: none !important; 
+    }
+
+    /* 5. Fix the Sticky Buy/Sell Buttons */
+    #mobile-trade-bar {
+        display: flex !important;
+        position: fixed !important;
+        bottom: 65px !important;
+        left: 0 !important;
+        width: 100% !important;
+        padding: 12px 16px !important;
+        background: linear-gradient(to top, rgba(10,14,23, 1) 50%, rgba(10,14,23, 0)) !important;
+        z-index: 100 !important;
+        pointer-events: none !important; /* Lets touches pass through the gradient */
+    }
+    .mobile-trade-btn {
+        pointer-events: auto !important;
+        height: 56px !important;
+        border-radius: 12px !important;
+        font-size: 16px !important;
+    }
+
+    /* 6. Lock Bottom Nav to the bottom */
+    #mobile-bottom-nav {
+        display: flex !important;
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 65px !important;
+        background: #0a0e17 !important;
+        border-top: 1px solid var(--border) !important;
+        z-index: 9999 !important;
+        pointer-events: auto !important;
+    }
+
+    /* 7. Watchlist Polish */
+    #view-markets .sidebar {
+        padding: 0 !important;
+    }
+    #view-markets .sidebar-title {
+        padding: 16px !important;
+        background: var(--bg-secondary);
+        margin: 0 !important;
+        font-size: 13px !important;
+    }
+    #view-markets .watchlist-item {
+        border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+        padding: 16px !important;
+    }
+}

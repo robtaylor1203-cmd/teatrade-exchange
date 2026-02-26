@@ -1305,3 +1305,98 @@ document.addEventListener('DOMContentLoaded', function () {
         if (_activeMobileSection === 'account') syncAccountChat();
     }, 2000);
 });
+
+// ========================================================
+// FORCE NATIVE MOBILE APP ROUTING & TRADE SHEET
+// ========================================================
+
+window.switchMobileSection = function(section) {
+    // 1. Hide all views
+    document.querySelectorAll('.app-view').forEach(v => {
+        v.classList.remove('active');
+        v.style.display = 'none';
+    });
+    
+    // 2. Show requested view
+    const targetView = document.getElementById('view-' + section);
+    if (targetView) {
+        targetView.classList.add('active');
+        targetView.style.display = 'block';
+    }
+
+    // 3. Highlight bottom nav button
+    document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.section === section);
+    });
+
+    // 4. Force chart resize if opening chart tab
+    if (section === 'chart' && typeof resizeCanvas === 'function') {
+        setTimeout(resizeCanvas, 100);
+    }
+};
+
+window.initMobileNavigation = function() {
+    const nav = document.getElementById('mobile-bottom-nav');
+    if (!nav) return;
+
+    // Attach click listeners strictly
+    nav.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+        btn.onclick = function(e) {
+            e.preventDefault();
+            const section = this.dataset.section;
+            if (section) window.switchMobileSection(section);
+        };
+    });
+
+    // Set default active view on load
+    if (window.innerWidth <= 768) {
+        window.switchMobileSection('markets');
+    }
+};
+
+// Ensure routing initializes
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', window.initMobileNavigation);
+} else {
+    window.initMobileNavigation();
+}
+
+// Intercept asset clicks to auto-route to the Chart tab
+const _originalOpenHub = window.openHubForSymbol;
+window.openHubForSymbol = function(symbol) {
+    if (window.innerWidth <= 768) {
+        window.switchMobileSection('chart');
+    }
+    if (typeof _originalOpenHub === 'function') {
+        return _originalOpenHub.apply(this, arguments);
+    }
+};
+
+// Connect the Sticky Buy/Sell Buttons to the native Bottom Sheet
+window.openMobileTradeSheet = function(side) {
+    const overlay = document.getElementById('qq-mobile-trade-overlay');
+    const form = document.getElementById('qq-mobile-trade-form');
+    
+    if (overlay && form) {
+        overlay.classList.add('active');
+        form.classList.add('active');
+        
+        // Ensure form knows which side was clicked
+        if (typeof setQuickTradeType === 'function') {
+            setQuickTradeType(side);
+        }
+        
+        // Visually toggle the buttons
+        const buyBtn = document.getElementById('qq-mobile-btn-buy');
+        const sellBtn = document.getElementById('qq-mobile-btn-sell');
+        if (side === 'BUY' && buyBtn) {
+            buyBtn.classList.add('active');
+            sellBtn?.classList.remove('active');
+        } else if (side === 'SELL' && sellBtn) {
+            sellBtn.classList.add('active');
+            buyBtn?.classList.remove('active');
+        }
+    } else {
+        console.error("Mobile trade sheet HTML elements not found!");
+    }
+};
