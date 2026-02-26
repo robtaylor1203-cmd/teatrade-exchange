@@ -552,7 +552,35 @@ function subscribeToPositions(userId) {
         state.positionsSubscription = supabaseClient
             .channel(`user:positions:${userId}`)
             .on('postgres_changes', {
-                event: '*',
+                event: 'DELETE',
+                schema: 'public',
+                table: 'positions',
+                filter: `user_id=eq.${userId}`
+            }, async (payload) => {
+                const old = payload.old;
+                if (old && (old.stop_loss || old.take_profit)) {
+                    const sym = (state.teas || []).find(t => t.id === old.tea_id)?.symbol || 'Position';
+                    const trigger = old.stop_loss ? 'Stop Loss' : 'Take Profit';
+                    if (typeof showToast === 'function') {
+                        showToast(`${trigger} Triggered`, `${sym} was automatically closed via ${trigger}`);
+                    }
+                }
+                if (typeof loadPositions === 'function') await loadPositions();
+                if (typeof loadUserProfile === 'function') await loadUserProfile();
+                if (typeof updatePortfolioDisplay === 'function') updatePortfolioDisplay();
+                if (typeof updateUIForLoggedInUser === 'function') updateUIForLoggedInUser();
+            })
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'positions',
+                filter: `user_id=eq.${userId}`
+            }, async () => {
+                if (typeof loadPositions === 'function') await loadPositions();
+                if (typeof updatePortfolioDisplay === 'function') updatePortfolioDisplay();
+            })
+            .on('postgres_changes', {
+                event: 'UPDATE',
                 schema: 'public',
                 table: 'positions',
                 filter: `user_id=eq.${userId}`
@@ -564,6 +592,56 @@ function subscribeToPositions(userId) {
                 _handleChannelStatus(status, `positions:${userId.slice(0, 8)}`, key, create);
             });
         return state.positionsSubscription;
+    }
+    return create();
+}
+
+/**
+ * Subscribe to index position changes for the current user.
+ * Detects server-side SL/TP closures on index positions.
+ */
+function subscribeToIndexPositions(userId) {
+    const key = 'idxPosRetries';
+    if (!_realtimeState[key]) _realtimeState[key] = 0;
+
+    function create() {
+        if (state.indexPositionsSubscription) {
+            try { supabaseClient.removeChannel(state.indexPositionsSubscription); } catch (_) {}
+        }
+        state.indexPositionsSubscription = supabaseClient
+            .channel(`user:index_positions:${userId}`)
+            .on('postgres_changes', {
+                event: 'DELETE',
+                schema: 'public',
+                table: 'index_positions',
+                filter: `user_id=eq.${userId}`
+            }, async (payload) => {
+                const old = payload.old;
+                if (old && (old.stop_loss || old.take_profit)) {
+                    const sym = old.index_symbol || 'Index position';
+                    const trigger = old.stop_loss ? 'Stop Loss' : 'Take Profit';
+                    if (typeof showToast === 'function') {
+                        showToast(`${trigger} Triggered`, `${sym} was automatically closed via ${trigger}`);
+                    }
+                }
+                if (typeof loadIndexPositions === 'function') await loadIndexPositions();
+                if (typeof loadUserProfile === 'function') await loadUserProfile();
+                if (typeof updatePortfolioDisplay === 'function') updatePortfolioDisplay();
+                if (typeof updateUIForLoggedInUser === 'function') updateUIForLoggedInUser();
+            })
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'index_positions',
+                filter: `user_id=eq.${userId}`
+            }, async () => {
+                if (typeof loadIndexPositions === 'function') await loadIndexPositions();
+                if (typeof updatePortfolioDisplay === 'function') updatePortfolioDisplay();
+            })
+            .subscribe((status) => {
+                _handleChannelStatus(status, `idx_positions:${userId.slice(0, 8)}`, key, create);
+            });
+        return state.indexPositionsSubscription;
     }
     return create();
 }
@@ -750,6 +828,7 @@ function _showMarginAlert(title, message, type) {
  */
 function startUserSubscriptions(userId) {
     subscribeToPositions(userId);
+    subscribeToIndexPositions(userId);
     subscribeToTrades(userId);
     subscribeToProfile(userId);
     subscribeToPendingOrders(userId);
@@ -760,8 +839,8 @@ function startUserSubscriptions(userId) {
  * Tear down user-specific subscriptions on logout.
  */
 function stopUserSubscriptions() {
-    ['positionsSubscription', 'tradesSubscription', 'profileSubscription',
-     'pendingOrdersSubscription', 'marginNotifSubscription'].forEach(key => {
+    ['positionsSubscription', 'indexPositionsSubscription', 'tradesSubscription',
+     'profileSubscription', 'pendingOrdersSubscription', 'marginNotifSubscription'].forEach(key => {
         if (state[key]) {
             try { supabaseClient.removeChannel(state[key]); } catch (_) {}
             state[key] = null;

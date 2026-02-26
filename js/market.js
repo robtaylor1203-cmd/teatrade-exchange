@@ -1020,10 +1020,6 @@ function onTickerBatchComplete() {
     if (typeof updateTradeSummary === 'function') updateTradeSummary();
     if (typeof updateHubOrderPreview === 'function') updateHubOrderPreview();
 
-    // Check SL/TP and price alerts
-    if (state.currentUser) {
-        checkSlTpOrders();
-    }
     checkPriceAlerts();
 }
 
@@ -1442,40 +1438,6 @@ function updateChartsWithNewPrices() {
     const qqModal = document.getElementById('quick-quote-modal');
     if (typeof drawQuickQuoteChart === 'function' && state.qqCurrentTea && qqModal?.classList.contains('active')) {
         drawQuickQuoteChart(state.qqCurrentTea);
-    }
-}
-
-// =============================================
-// SL/TP ORDER CHECKING
-// =============================================
-
-async function checkSlTpOrders() {
-    for (const teaId of Object.keys(state.pendingSlTpOrders)) {
-        const order = state.pendingSlTpOrders[teaId];
-        const tea = state.teas.find(t => t.id === parseInt(teaId));
-        if (!tea) continue;
-
-        const currentPrice = tea.current_price;
-        let triggered = false;
-        let triggerType = '';
-
-        if (order.side === 'BUY') {
-            if (order.sl && currentPrice <= order.sl) {
-                triggered = true;
-                triggerType = 'Stop Loss';
-            } else if (order.tp && currentPrice >= order.tp) {
-                triggered = true;
-                triggerType = 'Take Profit';
-            }
-        }
-
-        if (triggered) {
-            if (typeof executeSlTpClose === 'function') {
-                await executeSlTpClose(parseInt(teaId), order, currentPrice, triggerType);
-            } else {
-                console.warn('executeSlTpClose not available — trading module not loaded yet');
-            }
-        }
     }
 }
 

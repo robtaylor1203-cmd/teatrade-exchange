@@ -2194,8 +2194,6 @@ DECLARE
     v_idx_price       NUMERIC;
 BEGIN
     v_default_bal := 10000;
-    v_stop_floor  := 1;     -- $1: liquidate when account is completely depleted
-    v_call_floor  := 200;   -- $200: warn when equity is critically low
 
     SELECT value INTO v_spread FROM platform_config WHERE key = 'spread_pct';
     v_spread := COALESCE(v_spread, 0.01);
@@ -2220,6 +2218,10 @@ BEGIN
             ) AS margins;
 
         IF v_used_margin <= 0 THEN CONTINUE; END IF;
+
+        -- FCA MCO: liquidate at 50% of used margin; warn at 80%
+        v_stop_floor := v_used_margin * 0.5;
+        v_call_floor := v_used_margin * 0.8;
 
         -- Unrealized P&L: tea positions
         SELECT COALESCE(SUM(
@@ -2342,8 +2344,8 @@ BEGIN
             INSERT INTO margin_notifications (user_id, type, trading_mode, equity, used_margin, margin_level, message)
                 VALUES (v_user.user_id, 'STOP_OUT', v_user.trading_mode,
                         v_equity, v_used_margin, v_equity_pct,
-                        'All positions liquidated — equity fell to $'
-                        || ROUND(v_equity, 2) || '. Account depleted.');
+                        'All positions liquidated — equity fell below 50% of margin ($'
+                        || ROUND(v_stop_floor, 2) || '). Account equity: $' || ROUND(v_equity, 2));
 
             v_liquidated := v_liquidated + 1;
 
@@ -2594,5 +2596,169 @@ BEGIN
     IF v_count > 0 THEN
         RAISE LOG 'grant_monthly_bailout: credited $1,000 to % locked accounts', v_count;
     END IF;
+END;
+$$;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- SL/TP columns on positions
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+ALTER TABLE positions
+    ADD COLUMN IF NOT EXISTS stop_loss    NUMERIC DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS take_profit  NUMERIC DEFAULT NULL;
+
+ALTER TABLE index_positions
+    ADD COLUMN IF NOT EXISTS stop_loss    NUMERIC DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS take_profit  NUMERIC DEFAULT NULL;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Server-side Stop Loss / Take Profit processor
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION process_sl_tp()
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_pos         RECORD;
+    v_market_price NUMERIC;
+    v_close_pnl   NUMERIC;
+    v_bal         NUMERIC;
+    v_spread      NUMERIC;
+    v_exit_price  NUMERIC;
+    v_closed      INT := 0;
+    v_idx_price   NUMERIC;
+BEGIN
+    SELECT value INTO v_spread FROM platform_config WHERE key = 'spread_pct';
+    v_spread := COALESCE(v_spread, 0.01);
+
+    FOR v_pos IN
+        SELECT p.*, t.current_price, t.symbol AS tea_symbol
+        FROM positions p
+        JOIN teas t ON t.id = p.tea_id
+        WHERE p.quantity != 0
+          AND (p.stop_loss IS NOT NULL OR p.take_profit IS NOT NULL)
+    LOOP
+        v_market_price := v_pos.current_price;
+        v_exit_price := NULL;
+
+        IF v_pos.quantity > 0 THEN
+            IF v_pos.stop_loss IS NOT NULL AND v_market_price <= v_pos.stop_loss THEN
+                v_exit_price := v_pos.stop_loss;
+            END IF;
+            IF v_pos.take_profit IS NOT NULL AND v_market_price >= v_pos.take_profit THEN
+                v_exit_price := v_pos.take_profit;
+            END IF;
+        ELSE
+            IF v_pos.stop_loss IS NOT NULL AND v_market_price >= v_pos.stop_loss THEN
+                v_exit_price := v_pos.stop_loss;
+            END IF;
+            IF v_pos.take_profit IS NOT NULL AND v_market_price <= v_pos.take_profit THEN
+                v_exit_price := v_pos.take_profit;
+            END IF;
+        END IF;
+
+        IF v_exit_price IS NOT NULL THEN
+            IF v_pos.quantity > 0 THEN
+                v_close_pnl := (v_exit_price * (1 - v_spread/2) - v_pos.avg_entry_price) * v_pos.quantity;
+            ELSE
+                v_close_pnl := (v_pos.avg_entry_price - v_exit_price * (1 + v_spread/2)) * ABS(v_pos.quantity);
+            END IF;
+
+            SELECT CASE WHEN v_pos.trading_mode = 'REAL' THEN real_balance ELSE virtual_balance END
+                INTO v_bal FROM profiles WHERE id = v_pos.user_id;
+
+            v_bal := GREATEST(v_bal + v_pos.margin_used + v_close_pnl, 0);
+
+            INSERT INTO trades (user_id, tea_id, side, quantity, price, total_value, trading_mode)
+                VALUES (v_pos.user_id, v_pos.tea_id,
+                        CASE WHEN v_pos.quantity > 0 THEN 'SELL' ELSE 'BUY' END,
+                        ABS(v_pos.quantity), v_exit_price,
+                        ABS(v_pos.quantity) * v_exit_price, v_pos.trading_mode);
+
+            IF v_pos.trading_mode = 'REAL' THEN
+                UPDATE profiles SET real_balance = v_bal WHERE id = v_pos.user_id;
+            ELSE
+                UPDATE profiles SET virtual_balance = v_bal, cash_balance = v_bal WHERE id = v_pos.user_id;
+            END IF;
+
+            INSERT INTO platform_revenue (revenue_type, user_id, amount, symbol)
+                VALUES (CASE WHEN v_close_pnl < 0 THEN 'sl_close' ELSE 'tp_close' END,
+                        v_pos.user_id, GREATEST(-v_close_pnl, 0), v_pos.tea_symbol);
+
+            DELETE FROM positions WHERE id = v_pos.id;
+            v_closed := v_closed + 1;
+        END IF;
+    END LOOP;
+
+    FOR v_pos IN
+        SELECT ip.*, i.teas AS idx_teas, i.multiplier
+        FROM index_positions ip
+        JOIN indexes i ON i.symbol = ip.index_symbol
+        WHERE ip.quantity != 0
+          AND (ip.stop_loss IS NOT NULL OR ip.take_profit IS NOT NULL)
+    LOOP
+        SELECT AVG(t.current_price) * COALESCE(v_pos.multiplier, 1)
+            INTO v_idx_price
+        FROM teas t
+        WHERE t.symbol = ANY(v_pos.idx_teas)
+          AND t.current_price > 0;
+
+        IF v_idx_price IS NULL THEN CONTINUE; END IF;
+
+        v_exit_price := NULL;
+
+        IF v_pos.quantity > 0 THEN
+            IF v_pos.stop_loss IS NOT NULL AND v_idx_price <= v_pos.stop_loss THEN
+                v_exit_price := v_pos.stop_loss;
+            END IF;
+            IF v_pos.take_profit IS NOT NULL AND v_idx_price >= v_pos.take_profit THEN
+                v_exit_price := v_pos.take_profit;
+            END IF;
+        ELSE
+            IF v_pos.stop_loss IS NOT NULL AND v_idx_price >= v_pos.stop_loss THEN
+                v_exit_price := v_pos.stop_loss;
+            END IF;
+            IF v_pos.take_profit IS NOT NULL AND v_idx_price <= v_pos.take_profit THEN
+                v_exit_price := v_pos.take_profit;
+            END IF;
+        END IF;
+
+        IF v_exit_price IS NOT NULL THEN
+            IF v_pos.quantity > 0 THEN
+                v_close_pnl := (v_exit_price * (1 - v_spread/2) - v_pos.avg_entry_price) * v_pos.quantity;
+            ELSE
+                v_close_pnl := (v_pos.avg_entry_price - v_exit_price * (1 + v_spread/2)) * ABS(v_pos.quantity);
+            END IF;
+
+            SELECT CASE WHEN v_pos.trading_mode = 'REAL' THEN real_balance ELSE virtual_balance END
+                INTO v_bal FROM profiles WHERE id = v_pos.user_id;
+
+            v_bal := GREATEST(v_bal + v_pos.margin_used + v_close_pnl, 0);
+
+            INSERT INTO trades (user_id, tea_id, index_symbol, side, quantity, price, total_value, trading_mode)
+                VALUES (v_pos.user_id, NULL, v_pos.index_symbol,
+                        CASE WHEN v_pos.quantity > 0 THEN 'SELL' ELSE 'BUY' END,
+                        ABS(v_pos.quantity), v_exit_price,
+                        ABS(v_pos.quantity) * v_exit_price, v_pos.trading_mode);
+
+            IF v_pos.trading_mode = 'REAL' THEN
+                UPDATE profiles SET real_balance = v_bal WHERE id = v_pos.user_id;
+            ELSE
+                UPDATE profiles SET virtual_balance = v_bal, cash_balance = v_bal WHERE id = v_pos.user_id;
+            END IF;
+
+            INSERT INTO platform_revenue (revenue_type, user_id, amount, symbol)
+                VALUES (CASE WHEN v_close_pnl < 0 THEN 'sl_close' ELSE 'tp_close' END,
+                        v_pos.user_id, GREATEST(-v_close_pnl, 0), v_pos.index_symbol);
+
+            DELETE FROM index_positions WHERE id = v_pos.id;
+            v_closed := v_closed + 1;
+        END IF;
+    END LOOP;
+
+    RETURN jsonb_build_object('success', true, 'closed', v_closed);
 END;
 $$;

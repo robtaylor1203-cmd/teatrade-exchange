@@ -40,7 +40,6 @@ const state = {
     // Trading
     tradeType: 'BUY',
     isTradeFormActive: false,
-    pendingSlTpOrders: {},
     selectedQuoteSymbol: null,
 
     // Price tracking

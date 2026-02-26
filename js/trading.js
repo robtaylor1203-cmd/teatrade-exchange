@@ -319,16 +319,27 @@ async function executeTrade() {
                 `${sideLabel} ${qty.toLocaleString()} kg of ${tea.symbol} at $${serverPrice.toFixed(4)}/kg (${leverage}x)${_sc}`);
 
             if (stopLoss || takeProfit) {
-                state.pendingSlTpOrders[tea.id] = {
-                    sl: stopLoss, tp: takeProfit, side: state.tradeType,
-                    qty: qty, symbol: tea.symbol, entryPrice: serverPrice
-                };
-                if (stopLoss && takeProfit) {
-                    showToast('SL/TP Set', `SL: $${stopLoss.toFixed(2)} | TP: $${takeProfit.toFixed(2)}`);
-                } else if (stopLoss) {
-                    showToast('Stop Loss Set', `Will close at $${stopLoss.toFixed(2)}`);
+                const slTpPayload = {};
+                if (stopLoss)   slTpPayload.stop_loss   = stopLoss;
+                if (takeProfit) slTpPayload.take_profit  = takeProfit;
+
+                const { error: slTpErr } = await supabaseClient
+                    .from('positions')
+                    .update(slTpPayload)
+                    .eq('user_id', state.userId)
+                    .eq('tea_id', tea.id)
+                    .eq('trading_mode', state.tradingMode);
+
+                if (slTpErr) {
+                    console.warn('SL/TP write failed:', slTpErr.message);
                 } else {
-                    showToast('Take Profit Set', `Will close at $${takeProfit.toFixed(2)}`);
+                    if (stopLoss && takeProfit) {
+                        showToast('SL/TP Set', `SL: $${stopLoss.toFixed(2)} | TP: $${takeProfit.toFixed(2)}`);
+                    } else if (stopLoss) {
+                        showToast('Stop Loss Set', `Will close at $${stopLoss.toFixed(2)}`);
+                    } else {
+                        showToast('Take Profit Set', `Will close at $${takeProfit.toFixed(2)}`);
+                    }
                 }
             }
         }
@@ -360,51 +371,6 @@ async function executeTrade() {
     }
 
     updateTradeButton();
-}
-
-// =============================================
-// STOP-LOSS / TAKE-PROFIT EXECUTION
-// =============================================
-
-/**
- * Execute an automatic SL/TP close for a given tea position.
- * Called by `checkSlTpOrders` (in market.js) when a trigger fires.
- */
-async function executeSlTpClose(teaId, order, currentPrice, triggerType) {
-    const tea = state.teas.find(t => t.id === teaId);
-    if (!tea) return;
-
-    const position = state.positions.find(p => p.tea_id === teaId);
-    if (!position) {
-        delete state.pendingSlTpOrders[teaId];
-        return;
-    }
-
-    const qty = Math.min(order.qty, position.quantity);
-
-    try {
-        // Server-side atomic SELL
-        const result = await apiExecuteTrade(tea.symbol, 'SELL', qty);
-
-        if (!result.success) {
-            throw new Error(result.error || 'SL/TP execution failed');
-        }
-
-        const pnl = (result.price - order.entryPrice) * qty;
-        const pnlText = pnl >= 0 ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`;
-
-        delete state.pendingSlTpOrders[teaId];
-
-        setActiveBalance(result.new_balance);
-        await Promise.all([loadPositions(), loadUserProfile()]);
-        updateUIForLoggedInUser();
-
-        showToast(`${triggerType} Triggered!`, `${order.symbol} closed at $${result.price.toFixed(2)} (${pnlText})`);
-
-    } catch (error) {
-        console.error('SL/TP execution error:', error);
-        showToast('SL/TP Error', error.message, true);
-    }
 }
 
 // =============================================

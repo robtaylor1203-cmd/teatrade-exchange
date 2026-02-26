@@ -1239,6 +1239,30 @@ async function executeQuickTrade() {
 
             setActiveBalance(result.new_balance);
             await loadPositions();
+
+            if (stopLoss || takeProfit) {
+                const slTpPayload = {};
+                if (stopLoss)   slTpPayload.stop_loss   = stopLoss;
+                if (takeProfit) slTpPayload.take_profit  = takeProfit;
+                await supabaseClient
+                    .from('positions')
+                    .update(slTpPayload)
+                    .eq('user_id', state.userId)
+                    .eq('tea_id', state.qqCurrentTea.id)
+                    .eq('trading_mode', state.tradingMode);
+            }
+        }
+
+        if (isIndexTrade && (stopLoss || takeProfit)) {
+            const slTpPayload = {};
+            if (stopLoss)   slTpPayload.stop_loss   = stopLoss;
+            if (takeProfit) slTpPayload.take_profit  = takeProfit;
+            await supabaseClient
+                .from('index_positions')
+                .update(slTpPayload)
+                .eq('user_id', state.userId)
+                .eq('index_symbol', state.qqCurrentTea.symbol)
+                .eq('trading_mode', state.tradingMode);
         }
 
         // Refresh trades and UI

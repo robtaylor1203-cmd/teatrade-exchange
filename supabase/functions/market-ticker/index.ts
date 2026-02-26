@@ -572,11 +572,16 @@ serve(async (req) => {
     if (stopOutErr) console.error('check_stop_outs error:', stopOutErr.message);
     else if (stopOutResult?.users_liquidated > 0) console.log(`🛑 Stop-out: liquidated ${stopOutResult.users_liquidated} user(s)`);
 
-    // 11. Update rolling 24h trade volumes
+    // 11. Process server-side Stop Loss / Take Profit
+    const { data: slTpResult, error: slTpErr } = await supabase.rpc('process_sl_tp');
+    if (slTpErr) console.error('process_sl_tp error:', slTpErr.message);
+    else if (slTpResult?.closed > 0) console.log(`🎯 SL/TP: auto-closed ${slTpResult.closed} position(s)`);
+
+    // 12. Update rolling 24h trade volumes
     const { error: volErr } = await supabase.rpc('update_volume_24h');
     if (volErr) console.error('update_volume_24h error:', volErr.message);
 
-    // 12. Combine challenge monitoring — check active combines for drawdown/victory/expiry
+    // 13. Combine challenge monitoring — check active combines for drawdown/victory/expiry
     try {
       const { data: activeCombines } = await supabase
         .from('combine_challenges')
