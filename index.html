@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="index, follow">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://browser.sentry-cdn.com https://www.googletagmanager.com https://www.google-analytics.com https://faves.grow.me; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src * https: wss: https://*.ingest.sentry.io https://www.google-analytics.com https://analytics.google.com https://region1.google-analytics.com; frame-src 'none'; object-src 'none'; base-uri 'self';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://browser.sentry-cdn.com https://www.googletagmanager.com https://www.google-analytics.com https://faves.grow.me; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src * https: wss: https://*.ingest.sentry.io https://www.google-analytics.com https://analytics.google.com https://region1.google-analytics.com; frame-src https://www.googletagmanager.com; object-src 'none'; base-uri 'self';">
 
     <title>TeaTrade Exchange | Live Tea Prices, Trading & Market Data</title>
     <meta name="description" content="The world's first real-time tea trading terminal. Live auction prices from Mombasa, Kolkata, Colombo and more. Trade tea futures with up to 25x leverage on a simulated exchange.">
@@ -57,18 +57,13 @@
     }
     </script>
 
-    <!-- Google Analytics (GA4) — consent-aware -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7CQLXXEKCE"></script>
-    <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('consent', 'default', { analytics_storage: 'denied' });
-    gtag('js', new Date());
-    gtag('config', 'G-7CQLXXEKCE');
-    if (localStorage.getItem('tt_cookie_consent') === 'accepted') {
-        gtag('consent', 'update', { analytics_storage: 'granted' });
-    }
-    </script>
+    <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-WXBN2QF4');</script>
+    <!-- End Google Tag Manager -->
 
     <!-- Grow.me -->
     <script data-grow-initializer="">!(function(){window.growMe||((window.growMe=function(e){window.growMe._.push(e);}),(window.growMe._=[]));var e=document.createElement("script");(e.type="text/javascript"),(e.src="https://faves.grow.me/main.js"),(e.defer=!0),e.setAttribute("data-grow-faves-site-id","U2l0ZTo0MDBmNmJhMi1mNDNlLTRkOGEtOWNmZC04NjcyMDc0MmIxY2I=");var t=document.getElementsByTagName("script")[0];t.parentNode.insertBefore(e,t);})();</script>
@@ -80,6 +75,11 @@
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WXBN2QF4"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
+
     <!-- Auth Modal -->
     <div class="auth-modal" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
         <div class="auth-backdrop" onclick="closeAuthModal()"></div>
