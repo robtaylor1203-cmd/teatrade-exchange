@@ -1389,9 +1389,9 @@ window.openMobileTradeSheet = function(side) {
     var form = document.getElementById('qq-mobile-trade-form');
     if (!overlay || !form) return;
 
-    // 1. Resolve the current chart symbol into a tradeable tea/index
-    var tea = state.qqCurrentTea || null;
-    if (!tea && state.mainChartData) {
+    // 1. Always resolve from the chart the user is viewing
+    var tea = null;
+    if (state.mainChartData && state.mainChartData.symbol) {
         var sym = state.mainChartData.symbol;
         var isIdx = state.mainChartData.isIndex;
         if (isIdx) {
@@ -1404,6 +1404,7 @@ window.openMobileTradeSheet = function(side) {
             tea = (state.teas || []).find(function(t) { return t.symbol === sym; });
         }
     }
+    if (!tea) tea = state.qqCurrentTea || null;
     if (!tea) {
         if (typeof showToast === 'function') showToast('Select an instrument first', '', true);
         return;
