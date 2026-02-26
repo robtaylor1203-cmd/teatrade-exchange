@@ -364,6 +364,7 @@ function switchTradingMode(mode) {
     }
 
     updateBalanceDisplay();
+    if (typeof syncLeverageDropdowns === 'function') syncLeverageDropdowns();
     if (state.currentUser) {
         loadPositions();
         loadIndexPositions();

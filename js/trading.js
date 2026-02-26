@@ -48,6 +48,36 @@ function adjustSlTp(inputId, delta) {
 }
 
 /**
+ * FCA leverage cap: 10x for real money, 25x for virtual/demo.
+ */
+function getMaxLeverage() {
+    return state.tradingMode === 'REAL' ? 10 : 25;
+}
+
+function clampLeverage(rawLev) {
+    return Math.max(1, Math.min(getMaxLeverage(), rawLev));
+}
+
+/**
+ * Sync both leverage dropdowns (main trade form + quick-quote) to
+ * enable/disable options that exceed the current mode's cap.
+ */
+function syncLeverageDropdowns() {
+    const max = getMaxLeverage();
+    ['trade-leverage', 'qq-leverage'].forEach(id => {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        Array.from(sel.options).forEach(opt => {
+            const v = Number(opt.value);
+            opt.disabled = v > max;
+            if (v > max && opt.selected) {
+                sel.value = String(max);
+            }
+        });
+    });
+}
+
+/**
  * Recalculate the estimated total shown below the trade form.
  * FIX: Fetches the price directly from state.teas / calculateRegionalIndexes
  * instead of the potentially-stale dataset.price on the <option> element.
@@ -87,7 +117,7 @@ function updateTradeSummary() {
     }
 
     const qty = parseFloat(qtyInput.value) || 0;
-    const leverage = parseFloat(document.getElementById('trade-leverage')?.value) || 10;
+    const leverage = clampLeverage(parseFloat(document.getElementById('trade-leverage')?.value) || 10);
     const SPREAD_PCT = baseSpread * volMultiplier;
 
     const isBuy = state.tradeType === 'BUY';
@@ -128,7 +158,7 @@ function updateTradeButton() {
     const select = document.getElementById('trade-tea-select');
     const qty = parseFloat(document.getElementById('trade-qty').value) || 0;
     const price = parseFloat(document.getElementById('trade-price').value) || 0;
-    const leverage = parseFloat(document.getElementById('trade-leverage')?.value) || 10;
+    const leverage = clampLeverage(parseFloat(document.getElementById('trade-leverage')?.value) || 10);
     const isBuy = state.tradeType === 'BUY';
     const margin = (price * qty) / leverage;
 
@@ -230,7 +260,7 @@ async function executeTrade() {
     const selectValue = select.value;
     const qty = parseFloat(document.getElementById('trade-qty').value);
     const price = parseFloat(document.getElementById('trade-price').value);
-    const leverage = parseFloat(document.getElementById('trade-leverage')?.value) || 10;
+    const leverage = clampLeverage(parseFloat(document.getElementById('trade-leverage')?.value) || 10);
     const total = price * qty;
 
     // SL / TP values
