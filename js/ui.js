@@ -1311,17 +1311,18 @@ document.addEventListener('DOMContentLoaded', function () {
 // ========================================================
 
 window.switchMobileSection = function(section) {
-    // 1. Hide all views
+    if (window.innerWidth > 768) return;
+
+    // 1. Hide all views — class-only, never inline styles (preserves desktop display:contents)
     document.querySelectorAll('.app-view').forEach(v => {
         v.classList.remove('active');
-        v.style.display = 'none';
+        v.style.removeProperty('display');
     });
-    
+
     // 2. Show requested view
     const targetView = document.getElementById('view-' + section);
     if (targetView) {
         targetView.classList.add('active');
-        targetView.style.display = 'block';
     }
 
     // 3. Highlight bottom nav button
