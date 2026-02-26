@@ -1385,31 +1385,78 @@ window.openHubForSymbol = function(symbol) {
 
 // Connect the Sticky Buy/Sell Buttons to the native Bottom Sheet
 window.openMobileTradeSheet = function(side) {
-    const overlay = document.getElementById('qq-mobile-trade-overlay');
-    const form = document.getElementById('qq-mobile-trade-form');
-    
-    if (overlay && form) {
-        overlay.classList.add('active');
-        form.classList.add('active');
-        
-        // Ensure form knows which side was clicked
-        if (typeof setQuickTradeType === 'function') {
-            setQuickTradeType(side);
+    var overlay = document.getElementById('qq-mobile-trade-overlay');
+    var form = document.getElementById('qq-mobile-trade-form');
+    if (!overlay || !form) return;
+
+    // 1. Resolve the current chart symbol into a tradeable tea/index
+    var tea = state.qqCurrentTea || null;
+    if (!tea && state.mainChartData) {
+        var sym = state.mainChartData.symbol;
+        var isIdx = state.mainChartData.isIndex;
+        if (isIdx) {
+            var indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
+            var idx = indexes.find(function(i) { return i.symbol === sym; });
+            if (idx) {
+                tea = { symbol: idx.symbol, name: idx.name, current_price: idx.price, isIndex: true };
+            }
+        } else {
+            tea = (state.teas || []).find(function(t) { return t.symbol === sym; });
         }
-        
-        // Visually toggle the buttons
-        const buyBtn = document.getElementById('qq-mobile-btn-buy');
-        const sellBtn = document.getElementById('qq-mobile-btn-sell');
-        if (side === 'BUY' && buyBtn) {
-            buyBtn.classList.add('active');
-            sellBtn?.classList.remove('active');
-        } else if (side === 'SELL' && sellBtn) {
-            sellBtn.classList.add('active');
-            buyBtn?.classList.remove('active');
-        }
-    } else {
-        console.error("Mobile trade sheet HTML elements not found!");
     }
+    if (!tea) {
+        if (typeof showToast === 'function') showToast('Select an instrument first', '', true);
+        return;
+    }
+    state.qqCurrentTea = tea;
+
+    // 2. Calculate execution price with spread (mirrors updateQuickTradeSummary)
+    var SPREAD_PCT = 0.01;
+    var marketPrice = 0;
+    if (tea.isIndex || (typeof isIndexSymbol === 'function' && isIndexSymbol(tea.symbol))) {
+        var idxs = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
+        var match = idxs.find(function(i) { return i.symbol === tea.symbol; });
+        marketPrice = match ? match.price : (tea.current_price || 0);
+    } else {
+        var liveTea = (state.teas || []).find(function(t) { return t.symbol === tea.symbol; });
+        marketPrice = liveTea ? liveTea.current_price : (tea.current_price || 0);
+    }
+    var isBuy = side === 'BUY';
+    var execPrice = isBuy ? marketPrice * (1 + SPREAD_PCT / 2) : marketPrice * (1 - SPREAD_PCT / 2);
+
+    // 3. Populate the mobile trade form
+    var titleEl = document.getElementById('qq-mobile-form-title');
+    if (titleEl) titleEl.textContent = 'Trade ' + (tea.name || tea.symbol);
+
+    var priceEl = document.getElementById('qq-mobile-price');
+    if (priceEl) priceEl.value = execPrice.toFixed(2);
+
+    var qtyEl = document.getElementById('qq-mobile-qty');
+    if (!qtyEl.value || qtyEl.value === '0') qtyEl.value = '100';
+
+    var balance = typeof getActiveBalance === 'function' ? (getActiveBalance() || 10000) : 10000;
+    var balEl = document.getElementById('qq-mobile-balance');
+    if (balEl) balEl.textContent = '$' + balance.toLocaleString('en-US', { minimumFractionDigits: 2 });
+
+    // 4. Set trade type
+    if (typeof setQuickTradeType === 'function') setQuickTradeType(side);
+
+    var buyBtn = document.getElementById('qq-mobile-btn-buy');
+    var sellBtn = document.getElementById('qq-mobile-btn-sell');
+    if (isBuy && buyBtn) {
+        buyBtn.classList.add('active');
+        if (sellBtn) sellBtn.classList.remove('active');
+    } else if (!isBuy && sellBtn) {
+        sellBtn.classList.add('active');
+        if (buyBtn) buyBtn.classList.remove('active');
+    }
+
+    // 5. Update order value summary
+    if (typeof updateMobileQQSummary === 'function') updateMobileQQSummary();
+
+    // 6. Show the form
+    overlay.classList.add('active');
+    form.classList.add('active');
 };
 
 /* ========================================================

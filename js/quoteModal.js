@@ -235,12 +235,41 @@ function closeMobileQQTradeForm() {
 }
 
 function updateMobileQQSummary() {
-    const qty   = parseFloat(document.getElementById('qq-mobile-qty')?.value) || 0;
-    const price = parseFloat(document.getElementById('qq-mobile-price')?.value) || 0;
+    const SPREAD_PCT = 0.01;
+    const tea = state.qqCurrentTea;
+    let marketPrice = 0;
+
+    if (tea) {
+        if (tea.isIndex || (typeof isIndexSymbol === 'function' && isIndexSymbol(tea.symbol))) {
+            const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
+            const idx = indexes.find(i => i.symbol === tea.symbol);
+            marketPrice = idx?.price || tea.current_price || 0;
+        } else {
+            const liveTea = state.teas?.find(t => t.symbol === tea.symbol);
+            marketPrice = liveTea?.current_price || tea.current_price || 0;
+        }
+    }
+
+    const isBuy = state.qqTradeType === 'BUY';
+    const execPrice = marketPrice > 0
+        ? (isBuy ? marketPrice * (1 + SPREAD_PCT / 2) : marketPrice * (1 - SPREAD_PCT / 2))
+        : 0;
+
+    const priceEl = document.getElementById('qq-mobile-price');
+    if (priceEl && execPrice > 0) priceEl.value = execPrice.toFixed(2);
+
+    const qty = parseFloat(document.getElementById('qq-mobile-qty')?.value) || 0;
+    const price = parseFloat(priceEl?.value) || 0;
     const total = qty * price;
 
     const valueEl = document.getElementById('qq-mobile-order-value');
     if (valueEl) valueEl.textContent = `$${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+
+    const balEl = document.getElementById('qq-mobile-balance');
+    if (balEl) {
+        const balance = typeof getActiveBalance === 'function' ? (getActiveBalance() || 10000) : 10000;
+        balEl.textContent = `$${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    }
 
     const execBtn = document.getElementById('qq-mobile-execute-btn');
     if (execBtn) {
@@ -1214,8 +1243,9 @@ async function executeQuickTrade() {
     }
 
     const execBtn = document.getElementById('qq-execute-btn');
-    execBtn.disabled    = true;
-    execBtn.textContent = 'Executing...';
+    const mobileExecBtn = document.getElementById('qq-mobile-execute-btn');
+    if (execBtn) { execBtn.disabled = true; execBtn.textContent = 'Executing...'; }
+    if (mobileExecBtn) { mobileExecBtn.disabled = true; mobileExecBtn.textContent = 'Executing...'; }
 
     try {
         const productName = state.qqCurrentTea.name || state.qqCurrentTea.symbol;
@@ -1278,8 +1308,10 @@ async function executeQuickTrade() {
     } catch (error) {
         console.error('Trade error:', error);
         showToast('Trade Failed', error.message || 'Failed to execute trade', true);
-        execBtn.disabled    = false;
+        if (execBtn) execBtn.disabled = false;
+        if (mobileExecBtn) mobileExecBtn.disabled = false;
         updateQuickTradeSummary();
+        if (typeof updateMobileQQSummary === 'function') updateMobileQQSummary();
     }
 }
 

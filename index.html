@@ -432,8 +432,8 @@
             <button class="qq-mobile-trade-form-close" onclick="closeMobileQQTradeForm()">&times;</button>
         </div>
         <div class="quick-trade-type-toggle" style="margin-bottom: 14px;">
-            <button class="quick-trade-type-btn buy active" id="qq-mobile-btn-buy" onclick="setQuickTradeType('BUY'); this.classList.add('active'); document.getElementById('qq-mobile-btn-sell').classList.remove('active');">BUY</button>
-            <button class="quick-trade-type-btn sell" id="qq-mobile-btn-sell" onclick="setQuickTradeType('SELL'); this.classList.add('active'); document.getElementById('qq-mobile-btn-buy').classList.remove('active');">SELL</button>
+            <button class="quick-trade-type-btn buy active" id="qq-mobile-btn-buy" onclick="setQuickTradeType('BUY'); this.classList.add('active'); document.getElementById('qq-mobile-btn-sell').classList.remove('active'); updateMobileQQSummary();">BUY</button>
+            <button class="quick-trade-type-btn sell" id="qq-mobile-btn-sell" onclick="setQuickTradeType('SELL'); this.classList.add('active'); document.getElementById('qq-mobile-btn-buy').classList.remove('active'); updateMobileQQSummary();">SELL</button>
         </div>
         <div class="quick-trade-input-group">
             <label>Quantity (kg)</label>
