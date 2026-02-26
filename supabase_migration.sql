@@ -2328,7 +2328,7 @@ BEGIN
             IF v_user.trading_mode = 'REAL' THEN
                 UPDATE profiles SET real_balance = v_bal WHERE id = v_user.user_id;
             ELSE
-                UPDATE profiles SET virtual_balance = v_bal WHERE id = v_user.user_id;
+                UPDATE profiles SET virtual_balance = v_bal, cash_balance = v_bal WHERE id = v_user.user_id;
             END IF;
 
             -- Lock account if balance is effectively zero
