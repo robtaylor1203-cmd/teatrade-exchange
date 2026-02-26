@@ -241,6 +241,13 @@ body {
     display: contents;
 }
 
+/* Mobile-only elements: hidden on desktop */
+#mobile-top-header,
+.mth-menu-overlay,
+.mth-menu {
+    display: none;
+}
+
 /* Main Grid */
 .main-grid {
     display: grid;
@@ -10949,15 +10956,15 @@ a.user-dropdown-item {
     .app-view {
         display: none !important;
         position: fixed;
-        top: 0;
+        top: 52px;
         left: 0;
         width: 100vw;
-        height: calc(100vh - 65px);
+        height: calc(100vh - 52px - 65px);
         overflow-y: auto;
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
         background: var(--bg-primary);
-        padding-bottom: 20px;
+        padding-bottom: 80px;
         z-index: 1;
     }
 
@@ -11524,20 +11531,25 @@ a.user-dropdown-item {
     .app-view {
         display: none !important;
         position: fixed !important;
-        top: 0 !important;
+        top: 52px !important;
         left: 0 !important;
         width: 100vw !important;
-        height: calc(100vh - 65px) !important;
+        height: calc(100vh - 52px - 65px) !important;
         overflow-y: auto !important;
         overflow-x: hidden !important;
         -webkit-overflow-scrolling: touch !important;
         background: var(--bg-primary) !important;
         z-index: 10 !important;
-        padding-bottom: 20px !important;
+        padding-bottom: 80px !important;
     }
     .app-view.active {
         display: block !important;
         animation: viewFadeIn 0.2s ease-out;
+    }
+
+    /* Extra bottom breathing room for views with trade bar */
+    #view-chart {
+        padding-bottom: 150px !important;
     }
 
     /* 4. Make the Chart massive */
@@ -11594,7 +11606,261 @@ a.user-dropdown-item {
         pointer-events: auto !important;
     }
 
-    /* 7. Watchlist Polish */
+    /* 7. Mobile Top Header Bar */
+    #mobile-top-header {
+        display: flex !important;
+        align-items: center;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 52px !important;
+        background: #0a0e17 !important;
+        border-bottom: 1px solid var(--border) !important;
+        z-index: 9999 !important;
+        padding: 0 12px !important;
+        gap: 10px;
+    }
+
+    .mth-hamburger {
+        background: none;
+        border: none;
+        color: var(--text-primary);
+        padding: 6px;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        flex-shrink: 0;
+    }
+
+    .mth-logo {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+    }
+
+    .mth-logo-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        background: linear-gradient(135deg, #10b981, #059669);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 11px;
+        color: #fff;
+    }
+
+    .mth-logo-text {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .mth-balance-pill {
+        margin-left: auto;
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(16, 185, 129, 0.2);
+        border-radius: 20px;
+        padding: 4px 12px;
+    }
+
+    .mth-balance-amount {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        font-weight: 600;
+        color: #34d399;
+    }
+
+    .mth-status {
+        flex-shrink: 0;
+        padding: 4px;
+    }
+
+    .mth-status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--accent-green);
+        animation: statusPulse 2s infinite;
+    }
+
+    @keyframes statusPulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+    }
+
+    /* 8. Hamburger Slide-out Menu */
+    .mth-menu-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 10000;
+    }
+
+    .mth-menu-overlay.active {
+        display: block;
+    }
+
+    .mth-menu {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 280px;
+        height: 100vh;
+        background: #0d1117;
+        z-index: 10001;
+        overflow-y: auto;
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+        box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+    }
+
+    .mth-menu.active {
+        display: block;
+        transform: translateX(0);
+    }
+
+    .mth-menu-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 20px 16px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .mth-menu-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #10b981, #059669);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 15px;
+        color: #fff;
+        flex-shrink: 0;
+    }
+
+    .mth-menu-user {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .mth-menu-username {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .mth-menu-mode {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        color: #60a5fa;
+        margin-top: 1px;
+    }
+
+    .mth-menu-close {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        font-size: 28px;
+        cursor: pointer;
+        padding: 0 4px;
+        line-height: 1;
+    }
+
+    .mth-menu-balance-row {
+        display: flex;
+        padding: 14px 16px;
+        gap: 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .mth-menu-stat {
+        flex: 1;
+    }
+
+    .mth-menu-stat-value {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .mth-menu-stat-label {
+        font-size: 11px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-top: 2px;
+    }
+
+    .mth-menu-items {
+        padding: 8px 0;
+    }
+
+    .mth-menu-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        padding: 14px 20px;
+        background: none;
+        border: none;
+        color: var(--text-primary);
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        -webkit-tap-highlight-color: transparent;
+        transition: background 0.15s;
+    }
+
+    .mth-menu-item:active {
+        background: rgba(255, 255, 255, 0.04);
+    }
+
+    .mth-menu-item svg {
+        color: var(--text-muted);
+        flex-shrink: 0;
+    }
+
+    .mth-menu-divider {
+        height: 1px;
+        background: rgba(255, 255, 255, 0.06);
+        margin: 4px 16px;
+    }
+
+    .mth-menu-logout {
+        color: var(--accent-red) !important;
+    }
+
+    .mth-menu-logout svg {
+        color: var(--accent-red) !important;
+    }
+
+    /* 9. Kill rotate prompt and panel-maximized popup on mobile */
+    .rotate-prompt {
+        display: none !important;
+    }
+
+    .panel-maximized {
+        position: static !important;
+        width: auto !important;
+        height: auto !important;
+        z-index: auto !important;
+    }
+
+    /* 10. Watchlist Polish */
     #view-markets .sidebar {
         padding: 0 !important;
     }

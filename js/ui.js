@@ -1209,6 +1209,8 @@ document.addEventListener('DOMContentLoaded', function () {
     window.openHubForSymbol = function () {
         if (window.innerWidth <= 768) {
             switchMobileSection('chart');
+            const chartView = document.getElementById('view-chart');
+            if (chartView) chartView.scrollTop = 0;
         }
         return orig.apply(this, arguments);
     };
@@ -1361,11 +1363,13 @@ if (document.readyState === 'loading') {
     window.initMobileNavigation();
 }
 
-// Intercept asset clicks to auto-route to the Chart tab
+// Intercept asset clicks to auto-route to the Chart tab and scroll to top
 const _originalOpenHub = window.openHubForSymbol;
 window.openHubForSymbol = function(symbol) {
     if (window.innerWidth <= 768) {
         window.switchMobileSection('chart');
+        const chartView = document.getElementById('view-chart');
+        if (chartView) chartView.scrollTop = 0;
     }
     if (typeof _originalOpenHub === 'function') {
         return _originalOpenHub.apply(this, arguments);
@@ -1400,3 +1404,106 @@ window.openMobileTradeSheet = function(side) {
         console.error("Mobile trade sheet HTML elements not found!");
     }
 };
+
+/* ========================================================
+   MOBILE TOP HEADER BAR — Hamburger Menu & Balance Sync
+   ======================================================== */
+(function initMobileHeader() {
+    function openMobileHeader() {
+        const menu = document.getElementById('mth-menu');
+        const overlay = document.getElementById('mth-menu-overlay');
+        if (menu) { menu.classList.add('active'); }
+        if (overlay) { overlay.classList.add('active'); }
+        syncMobileHeaderData();
+    }
+
+    window.closeMobileHeader = function() {
+        const menu = document.getElementById('mth-menu');
+        const overlay = document.getElementById('mth-menu-overlay');
+        if (menu) { menu.classList.remove('active'); }
+        if (overlay) { overlay.classList.remove('active'); }
+    };
+
+    function syncMobileHeaderData() {
+        const balEl = document.getElementById('user-balance');
+        const bal = balEl ? balEl.textContent : '$10,000.00';
+
+        const mthBal = document.getElementById('mth-balance');
+        const mthMenuBal = document.getElementById('mth-menu-balance');
+        if (mthBal) mthBal.textContent = bal;
+        if (mthMenuBal) mthMenuBal.textContent = bal;
+
+        const equityEl = document.getElementById('portfolio-value') || document.getElementById('account-view-equity');
+        const equity = equityEl ? equityEl.textContent : bal;
+        const mthMenuEq = document.getElementById('mth-menu-equity');
+        if (mthMenuEq) mthMenuEq.textContent = equity;
+
+        const avatar = document.getElementById('user-avatar');
+        const mthAvatar = document.getElementById('mth-menu-avatar');
+        if (avatar && mthAvatar) mthAvatar.textContent = avatar.textContent;
+
+        const modeLabel = document.getElementById('mode-label');
+        const mthMode = document.getElementById('mth-menu-mode');
+        const mthModeLabel = document.getElementById('mth-mode-label');
+        if (modeLabel && mthMode) mthMode.textContent = modeLabel.textContent;
+        if (modeLabel && mthModeLabel) {
+            mthModeLabel.textContent = modeLabel.textContent === 'REAL' ? 'Switch to VIRTUAL' : 'Switch to REAL';
+        }
+
+        const loggedIn = document.getElementById('logged-in-ui');
+        const isLoggedIn = loggedIn && loggedIn.style.display !== 'none';
+        const mthUsername = document.getElementById('mth-menu-username');
+        if (mthUsername) {
+            const avText = avatar ? avatar.textContent.trim() : '';
+            mthUsername.textContent = isLoggedIn ? (avText || 'Trader') : 'Guest';
+        }
+
+        ['mth-item-portfolio', 'mth-item-store', 'mth-item-mode', 'mth-item-security', 'mth-item-logout'].forEach(function(id) {
+            const el = document.getElementById(id);
+            if (el) el.style.display = isLoggedIn ? 'flex' : 'none';
+        });
+
+        const loginItem = document.querySelector('.mth-menu-item[onclick*="openAuthModal"]');
+        if (loginItem) loginItem.style.display = isLoggedIn ? 'none' : 'flex';
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const hamburger = document.getElementById('mth-hamburger');
+        if (hamburger) hamburger.onclick = openMobileHeader;
+
+        const closeBtn = document.getElementById('mth-menu-close');
+        if (closeBtn) closeBtn.onclick = closeMobileHeader;
+
+        const overlay = document.getElementById('mth-menu-overlay');
+        if (overlay) overlay.onclick = closeMobileHeader;
+
+        const modeToggleItem = document.getElementById('mth-item-mode');
+        if (modeToggleItem) {
+            modeToggleItem.onclick = function() {
+                const modeToggle = document.getElementById('mode-toggle');
+                if (modeToggle) {
+                    modeToggle.checked = !modeToggle.checked;
+                    if (typeof switchTradingMode === 'function') {
+                        switchTradingMode(modeToggle.checked ? 'REAL' : 'VIRTUAL');
+                    }
+                }
+                closeMobileHeader();
+            };
+        }
+
+        setInterval(function() {
+            if (window.innerWidth <= 768) {
+                const balEl = document.getElementById('user-balance');
+                const mthBal = document.getElementById('mth-balance');
+                if (balEl && mthBal) mthBal.textContent = balEl.textContent;
+
+                const statusDot = document.getElementById('status-dot');
+                const mthDot = document.getElementById('mth-status-dot');
+                if (statusDot && mthDot) {
+                    const isConnected = statusDot.classList.contains('connected');
+                    mthDot.style.background = isConnected ? 'var(--accent-green)' : '#ef4444';
+                }
+            }
+        }, 2000);
+    });
+})();
