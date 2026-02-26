@@ -1209,6 +1209,10 @@ document.addEventListener('DOMContentLoaded', function () {
     window.openHubForSymbol = function () {
         if (window.innerWidth <= 768) {
             switchMobileSection('chart');
+            var chartView = document.getElementById('view-chart');
+            if (chartView) chartView.scrollTop = 0;
+            var header = document.getElementById('mobile-top-header');
+            if (header) header.classList.remove('header-hidden');
         }
         return orig.apply(this, arguments);
     };
@@ -1362,11 +1366,15 @@ if (document.readyState === 'loading') {
     window.initMobileNavigation();
 }
 
-// Intercept asset clicks to auto-route to the Chart tab
+// Intercept asset clicks to auto-route to the Chart tab and scroll to top
 const _originalOpenHub = window.openHubForSymbol;
 window.openHubForSymbol = function(symbol) {
     if (window.innerWidth <= 768) {
         window.switchMobileSection('chart');
+        var chartView = document.getElementById('view-chart');
+        if (chartView) chartView.scrollTop = 0;
+        var header = document.getElementById('mobile-top-header');
+        if (header) header.classList.remove('header-hidden');
     }
     if (typeof _originalOpenHub === 'function') {
         return _originalOpenHub.apply(this, arguments);
@@ -1401,3 +1409,133 @@ window.openMobileTradeSheet = function(side) {
         console.error("Mobile trade sheet HTML elements not found!");
     }
 };
+
+/* ========================================================
+   MOBILE TOP HEADER — Hamburger, Balance Sync, Scroll Behaviour
+   ======================================================== */
+(function initMobileHeader() {
+    if (typeof document === 'undefined') return;
+
+    function openMobileHeader() {
+        var menu = document.getElementById('mth-menu');
+        var overlay = document.getElementById('mth-menu-overlay');
+        if (menu) menu.classList.add('active');
+        if (overlay) overlay.classList.add('active');
+        syncMobileHeaderData();
+    }
+
+    window.closeMobileHeader = function() {
+        var menu = document.getElementById('mth-menu');
+        var overlay = document.getElementById('mth-menu-overlay');
+        if (menu) menu.classList.remove('active');
+        if (overlay) overlay.classList.remove('active');
+    };
+
+    function syncMobileHeaderData() {
+        var balEl = document.getElementById('user-balance');
+        var bal = balEl ? balEl.textContent : '$10,000.00';
+
+        var mthBal = document.getElementById('mth-balance');
+        var mthMenuBal = document.getElementById('mth-menu-balance');
+        if (mthBal) mthBal.textContent = bal;
+        if (mthMenuBal) mthMenuBal.textContent = bal;
+
+        var equityEl = document.getElementById('portfolio-value') || document.getElementById('account-view-equity');
+        var mthMenuEq = document.getElementById('mth-menu-equity');
+        if (mthMenuEq) mthMenuEq.textContent = equityEl ? equityEl.textContent : bal;
+
+        var avatar = document.getElementById('user-avatar');
+        var mthAvatar = document.getElementById('mth-menu-avatar');
+        if (avatar && mthAvatar) mthAvatar.textContent = avatar.textContent;
+
+        var modeLabel = document.getElementById('mode-label');
+        var mthMode = document.getElementById('mth-menu-mode');
+        var mthModeLabel = document.getElementById('mth-mode-label');
+        if (modeLabel && mthMode) mthMode.textContent = modeLabel.textContent;
+        if (modeLabel && mthModeLabel) {
+            mthModeLabel.textContent = modeLabel.textContent === 'REAL' ? 'Switch to VIRTUAL' : 'Switch to REAL';
+        }
+
+        var loggedIn = document.getElementById('logged-in-ui');
+        var isLoggedIn = loggedIn && loggedIn.style.display !== 'none';
+        var mthUsername = document.getElementById('mth-menu-username');
+        if (mthUsername) {
+            mthUsername.textContent = isLoggedIn ? (avatar ? avatar.textContent.trim() || 'Trader' : 'Trader') : 'Guest';
+        }
+
+        var authItems = ['mth-item-portfolio', 'mth-item-store', 'mth-item-mode', 'mth-item-security', 'mth-item-logout'];
+        authItems.forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.style.display = isLoggedIn ? 'flex' : 'none';
+        });
+
+        var loginItem = document.getElementById('mth-item-login');
+        if (loginItem) loginItem.style.display = isLoggedIn ? 'none' : 'flex';
+    }
+
+    /* Scroll-hide/show: hide header on scroll down, reveal on scroll up */
+    function initScrollBehaviour() {
+        var header = document.getElementById('mobile-top-header');
+        if (!header) return;
+
+        var lastScrollY = 0;
+        var scrollThreshold = 8;
+
+        document.querySelectorAll('.app-view').forEach(function(view) {
+            view.addEventListener('scroll', function() {
+                if (window.innerWidth > 768) return;
+
+                var currentY = this.scrollTop;
+                var delta = currentY - lastScrollY;
+
+                if (delta > scrollThreshold && currentY > 52) {
+                    header.classList.add('header-hidden');
+                } else if (delta < -scrollThreshold) {
+                    header.classList.remove('header-hidden');
+                }
+
+                lastScrollY = currentY;
+            }, { passive: true });
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var hamburger = document.getElementById('mth-hamburger');
+        if (hamburger) hamburger.onclick = openMobileHeader;
+
+        var closeBtn = document.getElementById('mth-menu-close');
+        if (closeBtn) closeBtn.onclick = closeMobileHeader;
+
+        var overlay = document.getElementById('mth-menu-overlay');
+        if (overlay) overlay.onclick = closeMobileHeader;
+
+        var modeToggleItem = document.getElementById('mth-item-mode');
+        if (modeToggleItem) {
+            modeToggleItem.onclick = function() {
+                var modeToggle = document.getElementById('mode-toggle');
+                if (modeToggle) {
+                    modeToggle.checked = !modeToggle.checked;
+                    if (typeof switchTradingMode === 'function') {
+                        switchTradingMode(modeToggle.checked ? 'REAL' : 'VIRTUAL');
+                    }
+                }
+                closeMobileHeader();
+            };
+        }
+
+        initScrollBehaviour();
+
+        setInterval(function() {
+            if (window.innerWidth > 768) return;
+            var balEl = document.getElementById('user-balance');
+            var mthBal = document.getElementById('mth-balance');
+            if (balEl && mthBal) mthBal.textContent = balEl.textContent;
+
+            var statusDot = document.getElementById('status-dot');
+            var mthDot = document.getElementById('mth-status-dot');
+            if (statusDot && mthDot) {
+                mthDot.style.background = statusDot.classList.contains('connected') ? 'var(--accent-green)' : '#ef4444';
+            }
+        }, 2000);
+    });
+})();

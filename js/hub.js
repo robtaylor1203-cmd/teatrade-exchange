@@ -138,6 +138,15 @@ function openHubForSymbol(teaOrSymbol) {
     const panel = document.getElementById('chart-section');
     if (!panel) return;
 
+    if (window.innerWidth <= 768) {
+        initTradingHub();
+        if (typeof drawChart === 'function') {
+            setTimeout(drawChart, 100);
+            setTimeout(drawChart, 300);
+        }
+        return;
+    }
+
     if (!panel.classList.contains('panel-maximized')) {
         toggleMaximize('chart-section');
     } else {
