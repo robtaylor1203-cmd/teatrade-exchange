@@ -668,6 +668,12 @@ function drawChart() {
         if (x !== null) { lastX = x; break; }
     }
 
+    // Setup strict clipping region so data doesn't bleed into the axes
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(leftMargin, 0, chartWidth, h);
+    ctx.clip();
+
     if (state.chartType === 'candle') {
         const candleWidth = Math.max(4, Math.min(20, (chartWidth / Math.max(displayData.length, 1)) * 0.7));
 
@@ -860,6 +866,9 @@ function drawChart() {
     ctx.fillStyle = '#f59e0b';
     ctx.textAlign = 'left';
     ctx.fillText('AVG ' + _ci.symbol + avgPrice.toFixed(2), leftMargin + 5, avgY - 5);
+
+    // Remove clipping region for UI overlays
+    ctx.restore();
 
     // =============================================
     // LIVE PRICE CALLOUT (Trading212 style)
@@ -1102,6 +1111,12 @@ function drawRSIChart() {
     rsiCtx.fillText('50', leftMargin - 5, y50 + 3);
     rsiCtx.fillText('30', leftMargin - 5, y30 + 3);
 
+    // Setup clipping region for RSI data
+    rsiCtx.save();
+    rsiCtx.beginPath();
+    rsiCtx.rect(leftMargin, 0, chartWidth, h);
+    rsiCtx.clip();
+
     // Draw RSI line
     rsiCtx.beginPath();
     rsiCtx.strokeStyle = studyColors.rsi;
@@ -1137,6 +1152,9 @@ function drawRSIChart() {
         rsiCtx.fillStyle = 'rgba(236, 72, 153, 0.1)';
         rsiCtx.fill();
     }
+
+    // Remove clipping region
+    rsiCtx.restore();
 }
 
 // =============================================
