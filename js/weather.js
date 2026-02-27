@@ -390,4 +390,4 @@ function initWeather() {
     setInterval(loadWeather, 30 * 60 * 1000);
 }
 
-document.addEventListener('DOMContentLoaded', initWeather);
+// initWeather() is called lazily from app.js (after the trading UI paints)

@@ -52,6 +52,74 @@ const COUNTRY_MAP = {
 };
 
 // =============================================
+// SKELETON PLACEHOLDERS (pre-fill containers before data arrives)
+// =============================================
+
+function injectSkeletons() {
+    _injectWatchlistSkeleton();
+    _injectWeatherSkeleton();
+    _injectQuoteBoardSkeleton();
+    _injectAuctionSkeleton();
+}
+
+function _skeletonRow() {
+    return `<div class="skeleton-row">
+        <div class="skeleton skeleton-circle"></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+            <div class="skeleton skeleton-line w60"></div>
+            <div class="skeleton skeleton-line w30 h8"></div>
+        </div>
+        <div class="skeleton sparkline-placeholder"></div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+            <div class="skeleton skeleton-line" style="width:52px;height:14px;"></div>
+            <div class="skeleton skeleton-line" style="width:36px;height:10px;"></div>
+        </div>
+    </div>`;
+}
+
+function _injectWatchlistSkeleton() {
+    var el = document.getElementById('watchlist-teas');
+    if (!el || el.children.length > 0) return;
+    var rows = '';
+    for (var i = 0; i < 5; i++) rows += _skeletonRow();
+    el.innerHTML = rows;
+}
+
+function _injectWeatherSkeleton() {
+    var el = document.getElementById('weather-cards');
+    if (!el) return;
+    var hasReal = el.querySelector('.t212-weather-card:not(.weather-skeleton)');
+    if (hasReal) return;
+    var cards = '';
+    for (var i = 0; i < 5; i++) {
+        cards += '<div class="skeleton weather-placeholder"></div>';
+    }
+    el.innerHTML = cards;
+}
+
+function _injectQuoteBoardSkeleton() {
+    var el = document.getElementById('quote-board');
+    if (!el || el.children.length > 0) return;
+    var tiles = '';
+    for (var i = 0; i < 10; i++) {
+        tiles += '<div class="skeleton skeleton-quote-tile"></div>';
+    }
+    el.innerHTML = tiles;
+}
+
+function _injectAuctionSkeleton() {
+    var el = document.getElementById('auction-table-body');
+    if (!el || el.children.length > 0) return;
+    var rows = '';
+    for (var i = 0; i < 8; i++) {
+        rows += `<tr><td colspan="7" style="padding:0;">
+            <div class="skeleton skeleton-line w100" style="height:36px;border-radius:0;"></div>
+        </td></tr>`;
+    }
+    el.innerHTML = rows;
+}
+
+// =============================================
 // TRADABLE INSTRUMENTS TABLE
 // =============================================
 
@@ -354,11 +422,11 @@ function populateHubTeaSelects() {
 // WATCHLIST
 // =============================================
 
-function _buildSparklineSvg(symbol, currentPrice) {
+function _buildSparklineSvg(symbol, currentPrice, openPrice) {
     const history = typeof getPriceHistorySync === 'function'
         ? getPriceHistorySync(symbol, 'tea') : [];
     const closes = history.slice(-20).map(c => c.close ?? c.price ?? c);
-    if (closes.length < 2) return '';
+    if (closes.length < 2) return '<div class="skeleton sparkline-placeholder"></div>';
 
     const min = Math.min(...closes);
     const max = Math.max(...closes);
@@ -371,7 +439,8 @@ function _buildSparklineSvg(symbol, currentPrice) {
         return `${x.toFixed(1)},${y.toFixed(1)}`;
     }).join(' ');
 
-    const trending = closes[closes.length - 1] >= closes[0];
+    const baseline = (openPrice && openPrice > 0) ? openPrice : closes[0];
+    const trending = closes[closes.length - 1] >= baseline;
     const color = trending ? 'var(--accent-green)' : 'var(--accent-red)';
 
     return `<svg class="t212-sparkline" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
@@ -412,7 +481,8 @@ function updateWatchlistTeas() {
         const countryInfo = COUNTRY_MAP[originCode] || { iso: null, label: originCode };
 
         if (isMobile) {
-            const sparkline = _buildSparklineSvg(tea.symbol, priceVal);
+            const openPx = Number(tea.previous_price) || 0;
+            const sparkline = _buildSparklineSvg(tea.symbol, priceVal, openPx);
             html += `
             <div class="t212-market-row" onclick="openWatchlistChart('${escapeHtml(tea.symbol)}')" data-symbol="${escapeHtml(tea.symbol)}">
                 <div class="t212-row-left">
@@ -1932,4 +2002,88 @@ function populateMoreAlerts() {
             }
         }, 2000);
     });
+})();
+
+// =============================================
+// MOBILE GHOST SHARE BUTTON
+// =============================================
+
+function handleMobileShare() {
+    var payload = {
+        title: 'TeaTrade Exchange | Synthetic Commodity Trading',
+        text: "I'm trading 25x leveraged tea derivatives on TeaTrade. Check out the live auctions.",
+        url: window.location.origin
+    };
+
+    if (navigator.share) {
+        navigator.share(payload).catch(function() {});
+    } else {
+        navigator.clipboard.writeText(payload.url).then(function() {
+            _showShareToast('Link copied to clipboard');
+        }).catch(function() {
+            _showShareToast('Link copied to clipboard');
+        });
+    }
+}
+
+function _showShareToast(msg) {
+    var existing = document.getElementById('share-toast');
+    if (existing) existing.remove();
+
+    var toast = document.createElement('div');
+    toast.id = 'share-toast';
+    toast.textContent = msg;
+    Object.assign(toast.style, {
+        position: 'fixed', bottom: '140px', right: '16px',
+        background: 'rgba(13,17,23,0.9)', color: '#fff',
+        fontSize: '12px', fontWeight: '600', padding: '8px 14px',
+        borderRadius: '8px', zIndex: '10005',
+        border: '1px solid rgba(255,255,255,0.1)',
+        backdropFilter: 'blur(8px)',
+        opacity: '0', transform: 'translateY(8px)',
+        transition: 'opacity 0.3s ease, transform 0.3s ease'
+    });
+    document.body.appendChild(toast);
+    requestAnimationFrame(function() {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
+    });
+    setTimeout(function() {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(8px)';
+        setTimeout(function() { toast.remove(); }, 300);
+    }, 2000);
+}
+
+(function initGhostShareButton() {
+    if (window.innerWidth > 768) return;
+
+    var btn = document.getElementById('mobile-share-btn');
+    if (!btn) return;
+
+    var revealed = false;
+    function reveal() {
+        if (revealed) return;
+        revealed = true;
+        btn.classList.add('visible');
+    }
+
+    setTimeout(reveal, 30000);
+
+    var origExecute = window.executeTrade;
+    if (typeof origExecute === 'function') {
+        window.executeTrade = function() {
+            var result = origExecute.apply(this, arguments);
+            reveal();
+            return result;
+        };
+    }
+    var origExecHub = window.executeHubTrade;
+    if (typeof origExecHub === 'function') {
+        window.executeHubTrade = function() {
+            var result = origExecHub.apply(this, arguments);
+            reveal();
+            return result;
+        };
+    }
 })();

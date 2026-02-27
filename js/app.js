@@ -27,14 +27,53 @@
  */
 
 // =============================================
+// LOCAL STORAGE CACHE (instant hydration for return visitors)
+// =============================================
+
+const TT_CACHE_TEAS = 'tt_cache_teas';
+const TT_CACHE_INDEXES = 'tt_cache_indexes';
+const TT_CACHE_TTL = 300000; // 5 min
+
+function _writeCache(key, data) {
+    try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), d: data })); } catch {}
+}
+
+function _readCache(key) {
+    try {
+        var raw = JSON.parse(localStorage.getItem(key));
+        if (raw && raw.d && (Date.now() - raw.ts < TT_CACHE_TTL)) return raw.d;
+    } catch {}
+    return null;
+}
+
+function _refreshTeaUI() {
+    populateTeaSelect();
+    updateAuctionTable();
+    updatePairsTable();
+    updatePortfolioDisplay();
+    updateQuoteBoard();
+    updateWatchlistTeas();
+    populateHubTeaSelects();
+    updateAllMarketIndexes();
+    updateMainChartWithRealData();
+}
+
+// =============================================
 // DATA LOADING FUNCTIONS
 // =============================================
 
 /**
  * Fetch all teas from the database, store in state, and refresh every
  * UI surface that depends on tea data.
+ * Optimistic: renders from localStorage cache before the fetch completes.
  */
 async function loadTeas() {
+    var cached = _readCache(TT_CACHE_TEAS);
+    if (cached && cached.length > 0 && state.teas.length === 0) {
+        state.teas = cached;
+        _refreshTeaUI();
+    }
+
     try {
         const [teaResult, openPrices] = await Promise.all([
             apiFetchTeas(),
@@ -52,16 +91,8 @@ async function loadTeas() {
         });
 
         state.teas = data;
-
-        populateTeaSelect();
-        updateAuctionTable();
-        updatePairsTable();
-        updatePortfolioDisplay();
-        updateQuoteBoard();
-        updateWatchlistTeas();
-        populateHubTeaSelects();
-        updateAllMarketIndexes();
-        updateMainChartWithRealData();
+        _writeCache(TT_CACHE_TEAS, data);
+        _refreshTeaUI();
     } catch (error) {
         console.error('Failed to load teas:', error);
     }
@@ -72,6 +103,11 @@ async function loadTeas() {
  * Falls back to `defaultDbIndexes` from config.js on error.
  */
 async function loadIndexes() {
+    if (!state.dbIndexes || state.dbIndexes.length === 0) {
+        var cached = _readCache(TT_CACHE_INDEXES);
+        if (cached && cached.length > 0) state.dbIndexes = cached;
+    }
+
     try {
         const { data, error } = await apiFetchIndexes();
         if (error) throw error;
@@ -79,9 +115,12 @@ async function loadIndexes() {
             ...row,
             forexKey: row.forex_key || row.forexKey || null,
         }));
+        _writeCache(TT_CACHE_INDEXES, state.dbIndexes);
     } catch (error) {
         console.error('Failed to load indexes:', error);
-        state.dbIndexes = defaultDbIndexes;
+        if (!state.dbIndexes || state.dbIndexes.length === 0) {
+            state.dbIndexes = defaultDbIndexes;
+        }
     }
 }
 
@@ -146,48 +185,63 @@ async function loadOrigins() {
 // =============================================
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Handle Stripe checkout return before anything else
     if (typeof handleCheckoutReturn === 'function') handleCheckoutReturn();
 
-    // ── Phase 1: Auth (everything depends on this) ──
-    await checkAuthState();
+    // ── Phase 0: Instant skeleton UI + sync hydration ──
+    // The nav bar and balance already render from HTML; we just need
+    // to fill every data container with shimmer placeholders so the
+    // page looks alive the millisecond the DOM is ready.
+    if (typeof injectSkeletons === 'function') injectSkeletons();
 
-    // Hydrate tea watchlist from localStorage
     try { state.teaWatchlist = JSON.parse(localStorage.getItem('tt_tea_watchlist')) || []; }
     catch { state.teaWatchlist = []; }
 
-    // ── Phase 2: All reference data in parallel ──
-    await Promise.all([
+    // ── Phase 1: Fire everything in parallel ──
+    // Auth, reference data, market state — all launch at once.
+    // Each loader self-hydrates its UI (replacing skeletons) the
+    // moment its own fetch resolves, so we never block on anything.
+    const authPromise = checkAuthState();
+
+    // Reference data: each call replaces its skeleton on completion
+    const refPromise = Promise.allSettled([
         loadIndexes(),
         loadIndexPairs(),
         loadOrigins(),
         loadTeas(),
-    ]);
-
-    // ── Phase 3: Price cache + market data in parallel ──
-    // initializePriceCache needs teas + indexes (loaded above).
-    // Market state/pressure are independent — run everything together.
-    const priceCachePromise = initializePriceCache();
-    Promise.allSettled([
         loadMarketState(),
         loadMarketPressure(),
     ]);
 
-    // ── Phase 4: Immediate UI paint (no await — use data already in state) ──
-    startLiveForexFeed();
-    startTickerSubscription();
-    initCommandLine();
-    initQuoteBoard();
+    // ── Phase 2: Immediate UI paint (uses cached / default data) ──
+    // These are synchronous — they read whatever state already has
+    // (optimistic cache from localStorage) and render immediately.
     resizeCanvas();
     drawChart();
+    initCommandLine();
+    initQuoteBoard();
 
-    // ── Phase 5: Non-critical data — fire and forget ──
+    // Wait for auth so user-specific paths (positions, trades) work
+    await authPromise;
+
+    // Realtime feeds (need supabase auth token)
+    startLiveForexFeed();
+    startTickerSubscription();
+
+    // ── Phase 3: Non-blocking secondary data ──
+    // Price cache starts streaming; sparklines fill as data arrives.
+    const priceCachePromise = initializePriceCache();
+
     Promise.allSettled([
-        loadLeaderboard(),
         loadTeaPairs(),
         loadUserTrades(),
     ]);
-    loadTopTraders();
+
+    // ── Phase 4: Heavy / non-critical — lazy-loaded ──
+    setTimeout(() => {
+        if (typeof initWeather === 'function') initWeather();
+        loadLeaderboard();
+        loadTopTraders();
+    }, 200);
     setTimeout(() => { initChat(); }, 1000);
 
     if (state.currentUser && typeof _ensureTradeNotificationChannel === 'function') {
@@ -195,7 +249,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         _buildNotifyProfileCache();
     }
 
-    // ── Phase 6: Responsive handlers ──
+    // Wait for reference data to finish before we consider bootstrap done
+    // (individual loaders already painted their sections as they resolved)
+    await refPromise;
+
+    // ── Phase 5: Responsive handlers & reconnect logic ──
     window.addEventListener('resize', () => {
         resizeCanvas();
         adjustViewportScale();
@@ -203,7 +261,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     adjustViewportScale();
     setupRSIHover();
 
-    // Reconnect Realtime channels when network recovers or tab regains focus
     window.addEventListener('online', () => {
         console.log('[Network] Back online - reconnecting Realtime channels');
         reconnectAllChannels();
@@ -215,7 +272,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // Wait for price cache in background (sparklines fill in as data arrives)
     priceCachePromise.catch(e => console.warn('Price cache init error:', e));
 });
 

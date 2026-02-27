@@ -47,6 +47,76 @@ html {
     scroll-behavior: smooth;
 }
 
+/* =========================================
+   SKELETON SHIMMER (loading placeholders)
+   ========================================= */
+@keyframes shimmer {
+    0%   { background-position: -468px 0; }
+    100% { background-position: 468px 0; }
+}
+
+.skeleton {
+    background: #1a1a1a;
+    background-image: linear-gradient(to right, #1a1a1a 0%, #2a2a2a 20%, #1a1a1a 40%, #1a1a1a 100%);
+    background-repeat: no-repeat;
+    background-size: 800px 100%;
+    display: inline-block;
+    position: relative;
+    animation: shimmer 1.5s linear infinite forwards;
+    border-radius: 4px;
+    pointer-events: none;
+}
+
+.skeleton-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+}
+.skeleton-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.skeleton-line {
+    height: 12px;
+    border-radius: 4px;
+}
+.skeleton-line.w60 { width: 60%; }
+.skeleton-line.w40 { width: 40%; }
+.skeleton-line.w30 { width: 30%; }
+.skeleton-line.w20 { width: 20%; }
+.skeleton-line.w100 { width: 100%; }
+.skeleton-line.h8  { height: 8px; }
+.skeleton-line.h16 { height: 16px; }
+.skeleton-line.h20 { height: 20px; }
+
+.sparkline-placeholder {
+    width: 100px;
+    height: 30px;
+    margin-top: 5px;
+}
+.weather-placeholder {
+    width: 100%;
+    height: 80px;
+    margin-bottom: 10px;
+}
+
+.skeleton-card {
+    border-radius: 10px;
+    min-width: 140px;
+    height: 110px;
+    flex-shrink: 0;
+}
+
+.skeleton-quote-tile {
+    border-radius: 8px;
+    height: 60px;
+    min-width: 100px;
+    flex: 1;
+}
+
 body {
     background: var(--bg-primary);
     min-height: 100vh;
@@ -273,7 +343,8 @@ body {
 #t212-trades-list,
 #mobile-top-header,
 .mth-menu-overlay,
-.mth-menu {
+.mth-menu,
+.ghost-share-btn {
     display: none;
 }
 #view-chat > *,
@@ -11783,6 +11854,48 @@ a.user-dropdown-item {
         pointer-events: auto !important;
     }
 
+    /* 6b. Ghost Share Button */
+    .ghost-share-btn {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        position: fixed !important;
+        bottom: 82px !important;
+        right: 16px !important;
+        width: 44px !important;
+        height: 44px !important;
+        border-radius: 50% !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        background: rgba(13, 17, 23, 0.6) !important;
+        backdrop-filter: blur(12px) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
+        color: rgba(255, 255, 255, 0.5) !important;
+        z-index: 9998 !important;
+        cursor: pointer !important;
+        opacity: 0;
+        visibility: hidden;
+        transform: scale(0.8);
+        transition: opacity 0.4s ease, visibility 0.4s ease, transform 0.3s ease, color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+        -webkit-tap-highlight-color: transparent;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+    }
+    .ghost-share-btn.visible {
+        opacity: 0.45;
+        visibility: visible;
+        transform: scale(1);
+    }
+    .ghost-share-btn:active,
+    .ghost-share-btn.visible:hover {
+        opacity: 1 !important;
+        color: #fff !important;
+        border-color: rgba(255, 255, 255, 0.2) !important;
+        background: rgba(13, 17, 23, 0.85) !important;
+        transform: scale(1.05);
+    }
+    .ghost-share-btn svg {
+        pointer-events: none;
+    }
+
     /* 7. Mobile Top Header Bar */
     #mobile-top-header {
         display: flex !important;
@@ -12610,7 +12723,8 @@ a.user-dropdown-item {
     #mobile-trade-bar, 
     .portfolio-hero, 
     .t212-menu-container,
-    .ticker-strip {
+    .ticker-strip,
+    .ghost-share-btn {
         display: none !important;
     }
     

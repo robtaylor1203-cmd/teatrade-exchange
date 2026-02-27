@@ -480,6 +480,63 @@ function resizeCanvas() {
 }
 
 // =============================================
+// CHART SKELETON (shown while data streams in)
+// =============================================
+
+function _drawChartSkeleton(ctx, w, h) {
+    var cw = w - leftMargin - rightMargin;
+    var ch = h - bottomMargin - (h * 0.1);
+    var top = h * 0.1;
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    ctx.lineWidth = 1;
+    for (var i = 0; i <= 5; i++) {
+        var gy = top + ch * (i / 5);
+        ctx.beginPath();
+        ctx.moveTo(leftMargin, gy);
+        ctx.lineTo(w - rightMargin, gy);
+        ctx.stroke();
+    }
+
+    var numBars = Math.max(10, Math.floor(cw / 14));
+    var barW = 6;
+    for (var j = 0; j < numBars; j++) {
+        var bx = leftMargin + (j + 0.5) * (cw / numBars);
+        var bh = 12 + Math.abs(Math.sin(j * 0.8)) * 20;
+        var by = top + ch * 0.3 + Math.sin(j * 0.3) * ch * 0.15;
+        ctx.fillStyle = 'rgba(255,255,255,0.04)';
+        ctx.fillRect(bx - barW / 2, by, barW, bh);
+        ctx.fillStyle = 'rgba(255,255,255,0.025)';
+        ctx.fillRect(bx - 0.5, by - 4, 1, bh + 8);
+    }
+
+    var livePrice = state.mainChartData?.basePrice;
+    if (livePrice && livePrice > 0) {
+        var ly = top + ch * 0.45;
+        ctx.strokeStyle = 'rgba(26, 115, 232, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(leftMargin, ly);
+        ctx.lineTo(w - rightMargin, ly);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        var curr = (state.mainChartData.currency || '$');
+        var tag = curr + livePrice.toFixed(2);
+        ctx.font = '11px JetBrains Mono, monospace';
+        ctx.fillStyle = 'rgba(26, 115, 232, 0.5)';
+        ctx.textAlign = 'right';
+        ctx.fillText(tag, w - 4, ly - 6);
+    }
+
+    ctx.font = '12px JetBrains Mono, monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.textAlign = 'center';
+    ctx.fillText('Loading chart data\u2026', w / 2, top + ch + 20);
+}
+
+// =============================================
 // MAIN CHART DRAW
 // =============================================
 
@@ -502,12 +559,9 @@ function drawChart() {
         state.cachedTimeframe = state.currentTimeframe;
     }
 
-    // No data yet (waiting for server) — show placeholder
+    // No data yet — draw skeleton loader with optimistic price line
     if (!state.chartData || state.chartData.length === 0) {
-        ctx.font = '13px JetBrains Mono, monospace';
-        ctx.fillStyle = '#6b7280';
-        ctx.textAlign = 'center';
-        ctx.fillText('Waiting for market data\u2026', w / 2, h / 2);
+        _drawChartSkeleton(ctx, w, h);
         return;
     }
 

@@ -225,7 +225,7 @@ async function initializePriceCache() {
 // The limit passed to apiFetchPriceHistory caps the live-rows query (5 000).
 // These per-timeframe limits are kept for the convertToOHLC call only.
 const TIMEFRAME_CONFIG = {
-    '1D':  { interval: 5,     hoursBack: 24,   limit: 5000  },
+    '1D':  { interval: 5,     hoursBack: 24,   limit: 100   },
     '1W':  { interval: 60,    hoursBack: 168,  limit: 5000  },
     '1M':  { interval: 240,   hoursBack: 720,  limit: 5000  },
     '3M':  { interval: 1440,  hoursBack: 2160, limit: 5000  },
