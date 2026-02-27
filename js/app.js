@@ -36,11 +36,12 @@
  */
 async function loadTeas() {
     try {
-        const { data, error } = await apiFetchTeas();
+        const [teaResult, openPrices] = await Promise.all([
+            apiFetchTeas(),
+            apiFetchTodayOpenPrices()
+        ]);
+        const { data, error } = teaResult;
         if (error) throw error;
-
-        // Fetch today's opening prices for accurate % change
-        const openPrices = await apiFetchTodayOpenPrices();
 
         data.forEach(tea => {
             if (openPrices[tea.symbol]) {
@@ -148,72 +149,58 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Handle Stripe checkout return before anything else
     if (typeof handleCheckoutReturn === 'function') handleCheckoutReturn();
 
-    // Auth first
+    // ── Phase 1: Auth (everything depends on this) ──
     await checkAuthState();
 
     // Hydrate tea watchlist from localStorage
     try { state.teaWatchlist = JSON.parse(localStorage.getItem('tt_tea_watchlist')) || []; }
     catch { state.teaWatchlist = []; }
 
-    // Load reference data from Supabase (indexes, origins, pairs)
-    await loadIndexes();
-    await loadIndexPairs();
-    await loadOrigins();
+    // ── Phase 2: All reference data in parallel ──
+    await Promise.all([
+        loadIndexes(),
+        loadIndexPairs(),
+        loadOrigins(),
+        loadTeas(),
+    ]);
 
-    // Load teas (triggers all dependent UI refreshes)
-    await loadTeas();
+    // ── Phase 3: Price cache + market data in parallel ──
+    // initializePriceCache needs teas + indexes (loaded above).
+    // Market state/pressure are independent — run everything together.
+    const priceCachePromise = initializePriceCache();
+    Promise.allSettled([
+        loadMarketState(),
+        loadMarketPressure(),
+    ]);
 
-    // Unified price cache from database
-    await initializePriceCache();
-
-    // Load initial macro indicator values from DB (Brent crude, last cron tick)
-    await loadMarketState();
-
-    // Start the browser-direct live forex feed (fetches open.er-api.com every 60s,
-    // completely independent of the server cron — macros are always live).
+    // ── Phase 4: Immediate UI paint (no await — use data already in state) ──
     startLiveForexFeed();
-
-    // Seed order-flow depth from DB before Realtime events arrive
-    await loadMarketPressure();
-
-    // Start Realtime subscriptions (prices + macro + order flow)
     startTickerSubscription();
-
-    // Command line / universal search
     initCommandLine();
-
-    // Quote board initial paint
     initQuoteBoard();
+    resizeCanvas();
+    drawChart();
 
-    // Chat (slight delay to let DOM settle)
-    setTimeout(() => { initChat(); }, 1000);
-
-    // Leaderboard, top traders & tea pairs
-    await loadLeaderboard();
+    // ── Phase 5: Non-critical data — fire and forget ──
+    Promise.allSettled([
+        loadLeaderboard(),
+        loadTeaPairs(),
+        loadUserTrades(),
+    ]);
     loadTopTraders();
-    await loadTeaPairs();
-
-    // User data
-    await loadUserTrades();
+    setTimeout(() => { initChat(); }, 1000);
 
     if (state.currentUser && typeof _ensureTradeNotificationChannel === 'function') {
         _ensureTradeNotificationChannel();
         _buildNotifyProfileCache();
     }
 
-    // Canvas sizing + initial draw
-    resizeCanvas();
-    drawChart();
-
-    // Responsive handlers
+    // ── Phase 6: Responsive handlers ──
     window.addEventListener('resize', () => {
         resizeCanvas();
         adjustViewportScale();
     });
-
     adjustViewportScale();
-
-    // RSI hover interactivity
     setupRSIHover();
 
     // Reconnect Realtime channels when network recovers or tab regains focus
@@ -227,6 +214,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             reconnectAllChannels();
         }
     });
+
+    // Wait for price cache in background (sparklines fill in as data arrives)
+    priceCachePromise.catch(e => console.warn('Price cache init error:', e));
 });
 
 // =============================================
