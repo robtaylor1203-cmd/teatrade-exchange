@@ -1880,7 +1880,7 @@ function populateMoreAlerts() {
                 var currentY = this.scrollTop;
                 var delta = currentY - lastScrollY;
 
-                if (delta > scrollThreshold && currentY > 52) {
+                if (delta > scrollThreshold && currentY > 60) {
                     header.classList.add('header-hidden');
                     document.body.classList.add('mth-header-hidden');
                 } else if (delta < -scrollThreshold) {
