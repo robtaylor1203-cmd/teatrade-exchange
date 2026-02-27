@@ -413,17 +413,70 @@ function calculateRSI(data, period = 14) {
 }
 
 // =============================================
+// OPEN TRADE LOOKUP (for chart position overlay)
+// =============================================
+
+function getOpenTradesForSymbol(symbol) {
+    if (!symbol) return [];
+    const trades = [];
+
+    (state.positions || []).forEach(p => {
+        const teaSym = p.teas?.symbol || state.teas?.find(t => t.id === p.tea_id)?.symbol || '';
+        if (teaSym === symbol) {
+            trades.push({
+                entry_price: p.avg_entry_price || 0,
+                trade_type: p.quantity >= 0 ? 'BUY' : 'SELL',
+                quantity: Math.abs(p.quantity)
+            });
+        }
+    });
+
+    const idxPos = state.indexPositions?.[symbol];
+    if (idxPos && idxPos.quantity !== 0) {
+        trades.push({
+            entry_price: idxPos.avg_entry_price || 0,
+            trade_type: idxPos.quantity >= 0 ? 'BUY' : 'SELL',
+            quantity: Math.abs(idxPos.quantity)
+        });
+    }
+
+    return trades;
+}
+
+// =============================================
 // CANVAS RESIZE
 // =============================================
 
 function resizeCanvas() {
     const canvas = document.getElementById('priceChart');
-    if (!canvas) return;
+    const container = document.getElementById('chart-container');
+    if (!canvas || !container) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = container.getBoundingClientRect();
+
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    canvas.style.width = `${rect.width}px`;
+    canvas.style.height = `${rect.height}px`;
+
     const ctx = canvas.getContext('2d');
-    canvas.width = canvas.offsetWidth * window.devicePixelRatio;
-    canvas.height = canvas.offsetHeight * window.devicePixelRatio;
-    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-    drawChart();
+    ctx.scale(dpr, dpr);
+
+    const rsiCanvas = document.getElementById('rsiChart');
+    const rsiContainer = document.getElementById('rsi-chart-container');
+    if (rsiCanvas && rsiContainer) {
+        const rsiRect = rsiContainer.getBoundingClientRect();
+        rsiCanvas.width = rsiRect.width * dpr;
+        rsiCanvas.height = rsiRect.height * dpr;
+        rsiCanvas.style.width = `${rsiRect.width}px`;
+        rsiCanvas.style.height = `${rsiRect.height}px`;
+        rsiCanvas.getContext('2d').scale(dpr, dpr);
+    }
+
+    if (state.chartData.length > 0) {
+        drawChart();
+    }
 }
 
 // =============================================
@@ -585,7 +638,13 @@ function drawChart() {
 
     window.mainYAxisCache[cacheKey] = { min: minPrice, max: maxPrice };
 
-    const priceRange = maxPrice - minPrice;
+    let priceRange = maxPrice - minPrice;
+    if (priceRange === 0) priceRange = minPrice * 0.01 || 0.1;
+
+    const _breathPad = priceRange * 0.15;
+    maxPrice += _breathPad;
+    minPrice = Math.max(0, minPrice - _breathPad);
+    priceRange = maxPrice - minPrice;
     const visibleCloses = yData.map(d => Number(d.close) || 0).filter(p => p > 0);
     const avgPrice = visibleCloses.reduce((a, b) => a + b, 0) / visibleCloses.length;
     const highPrice = Math.max(...visibleCloses);
@@ -594,6 +653,7 @@ function drawChart() {
     const totalChange = openPrice > 0 ? ((currentPrice - openPrice) / openPrice * 100) : 0;
 
     state.chartMetrics = { minPrice, maxPrice, priceRange, avgPrice, highPrice, lowPrice, currentPrice, openPrice, totalChange };
+    if (typeof syncMobileHeader === 'function') syncMobileHeader();
     // Share with hover handlers
     const wStart = new Date(wStartMs);
     _chartWStart    = wStart;
@@ -612,12 +672,9 @@ function drawChart() {
         return getX(t);
     }
 
-    // Draw grid lines and Y-axis labels
-    ctx.strokeStyle = '#1a2332';
-    ctx.lineWidth = 1;
-    ctx.font = '10px JetBrains Mono, monospace';
-    ctx.fillStyle = '#6b7280';
-    ctx.textAlign = 'right';
+    // Draw grid lines and Y-axis labels (right-aligned)
+    ctx.strokeStyle = studyColors.grid;
+    ctx.lineWidth = 0.5;
 
     const _ccurr = (state.mainChartData?.currency || '$');
     const _cfmt = (v) => {
@@ -635,12 +692,16 @@ function drawChart() {
         ctx.lineTo(w - rightMargin, y);
         ctx.stroke();
 
-        ctx.fillText(_cfmt(priceVal), leftMargin - 8, y + 3);
+        ctx.fillStyle = studyColors.text;
+        ctx.font = '500 11px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(_cfmt(priceVal), w - 4, y);
     }
 
     // Draw X-axis labels — decoupled time grid (~1 label every 90px)
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#6b7280';
+    ctx.fillStyle = studyColors.text;
     const maxLabels = Math.max(2, Math.floor(chartWidth / 90));
     const timeStep  = wDuration / maxLabels;
     for (let i = 0; i <= maxLabels; i++) {
@@ -687,9 +748,10 @@ function drawChart() {
             const lowY   = h * 0.1 + (1 - (Number(d.low)   - minPrice) / priceRange) * chartHeight;
 
             const isUp  = d.close >= d.open;
-            const color = isUp ? '#10b981' : '#ef4444';
+            const bodyColor = isUp ? studyColors.candleUp : studyColors.candleDown;
+            const wickColor = isUp ? studyColors.wickUp : studyColors.wickDown;
 
-            ctx.strokeStyle = color;
+            ctx.strokeStyle = wickColor;
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(x, highY);
@@ -698,9 +760,9 @@ function drawChart() {
 
             const bodyTop    = Math.min(openY, closeY);
             const bodyHeight = Math.max(1, Math.abs(closeY - openY));
-            ctx.fillStyle  = color;
+            ctx.fillStyle  = bodyColor;
             ctx.fillRect(x - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
-            ctx.strokeStyle = color;
+            ctx.strokeStyle = bodyColor;
             ctx.strokeRect(x - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
         });
     } else {
@@ -807,7 +869,7 @@ function drawChart() {
             ctx.lineTo(x, y);
         }
         ctx.closePath();
-        ctx.fillStyle = 'rgba(96, 165, 250, 0.1)';
+        ctx.fillStyle = studyColors.bbFill;
         ctx.fill();
     }
 
@@ -867,18 +929,107 @@ function drawChart() {
     ctx.textAlign = 'left';
     ctx.fillText('AVG ' + _ci.symbol + avgPrice.toFixed(2), leftMargin + 5, avgY - 5);
 
+    // =============================================
+    // DRAW OPEN POSITIONS (Trading212 Style)
+    // =============================================
+    const _topMargin = h * 0.1;
+    let _chartSym = state.mainChartData?.symbol || '';
+    if (!_chartSym) {
+        const _sel = document.getElementById('trade-tea-select');
+        const _selVal = _sel?.value;
+        if (_selVal) {
+            if (_selVal.startsWith('INDEX_')) {
+                _chartSym = _selVal.replace('INDEX_', '');
+            } else {
+                const _tea = state.teas?.find(t => t.id === parseInt(_selVal));
+                if (_tea) _chartSym = _tea.symbol;
+            }
+        }
+    }
+
+    const openTrades = getOpenTradesForSymbol(_chartSym);
+
+    openTrades.forEach(trade => {
+        const entryPx = trade.entry_price * _fx;
+        const yPixel = _topMargin + chartHeight - ((entryPx - minPrice) / priceRange) * chartHeight;
+
+        if (yPixel >= _topMargin && yPixel <= _topMargin + chartHeight) {
+            ctx.save();
+
+            ctx.beginPath();
+            ctx.setLineDash([5, 5]);
+            ctx.moveTo(leftMargin, yPixel);
+            ctx.lineTo(w - rightMargin, yPixel);
+            ctx.strokeStyle = trade.trade_type === 'BUY' ? '#00e676' : '#ff3333';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            const badgeColor = trade.trade_type === 'BUY' ? 'rgba(0, 230, 118, 0.15)' : 'rgba(255, 51, 51, 0.15)';
+            const textColor = trade.trade_type === 'BUY' ? '#00e676' : '#ff3333';
+            const badgeText = `${trade.trade_type} @ ${_cfmt(entryPx)}`;
+
+            ctx.font = '600 11px -apple-system, BlinkMacSystemFont, sans-serif';
+            const badgeW = ctx.measureText(badgeText).width + 12;
+
+            ctx.fillStyle = badgeColor;
+            ctx.fillRect(leftMargin + 4, yPixel - 12, badgeW, 24);
+            ctx.fillStyle = textColor;
+            ctx.fillText(badgeText, leftMargin + 8, yPixel + 4);
+
+            ctx.restore();
+        }
+    });
+
+    // =============================================
+    // LIVE PRICE LINE (solid, full-width)
+    // =============================================
+    if (lastLivePrice !== null && lastLivePrice !== currentPrice) {
+        livePriceDirection = currentPrice > lastLivePrice ? 1 : -1;
+    }
+    lastLivePrice = currentPrice;
+
+    const _lpColor = livePriceDirection > 0 ? '#10b981' : livePriceDirection < 0 ? '#ef4444' : '#1a73e8';
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.strokeStyle = _lpColor;
+    ctx.lineWidth = 1;
+    ctx.moveTo(leftMargin, lastY);
+    ctx.lineTo(w - rightMargin, lastY);
+    ctx.stroke();
+    ctx.restore();
+
     // Remove clipping region for UI overlays
     ctx.restore();
 
     // =============================================
-    // LIVE PRICE CALLOUT (Trading212 style)
+    // LIVE PRICE Y-AXIS TAG (Trading212 style)
     // =============================================
-    drawPriceCallout(ctx, w, h, currentPrice, lastY, priceRange > 0, _ci.symbol);
+    if (currentPrice > 0) {
+        const _tagLabel = _cfmt(currentPrice);
+        ctx.font = 'bold 11px JetBrains Mono, monospace';
+        const _tagTextW = ctx.measureText(_tagLabel).width;
+        const _tagW = _tagTextW + 16;
+        const _tagH = 22;
+        const _tagRight = w - 2;
+        const _tagLeft = _tagRight - _tagW;
+        const _arrowTip = _tagLeft - 6;
+        const _tagY = Math.max(10, Math.min(h - _tagH - 10, lastY - _tagH / 2));
 
-    // =============================================
-    // DRAW ORDER POSITION LINES (Trading212 style)
-    // =============================================
-    drawOrderAnnotations(ctx, w, h, chartWidth, chartHeight, minPrice, maxPrice, priceRange, currentPrice);
+        ctx.beginPath();
+        ctx.moveTo(_arrowTip, _tagY + _tagH / 2);
+        ctx.lineTo(_tagLeft, _tagY);
+        ctx.lineTo(_tagRight, _tagY);
+        ctx.lineTo(_tagRight, _tagY + _tagH);
+        ctx.lineTo(_tagLeft, _tagY + _tagH);
+        ctx.closePath();
+        ctx.fillStyle = _lpColor;
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.fillText(_tagLabel, _tagLeft + _tagW / 2, _tagY + _tagH / 2 + 4);
+    }
 
     // Draw RSI if active
     if (state.activeStudies.rsi) {
@@ -1036,14 +1187,18 @@ function drawRSIChart() {
     if (!rsiCanvas) return;
 
     const rsiCtx = rsiCanvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rsiContainer = rsiCanvas.parentElement;
+    const rsiRect = rsiContainer ? rsiContainer.getBoundingClientRect() : rsiCanvas.getBoundingClientRect();
 
-    // Set canvas size
-    rsiCanvas.width = rsiCanvas.offsetWidth * window.devicePixelRatio;
-    rsiCanvas.height = rsiCanvas.offsetHeight * window.devicePixelRatio;
-    rsiCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    rsiCanvas.width = rsiRect.width * dpr;
+    rsiCanvas.height = rsiRect.height * dpr;
+    rsiCanvas.style.width = `${rsiRect.width}px`;
+    rsiCanvas.style.height = `${rsiRect.height}px`;
+    rsiCtx.scale(dpr, dpr);
 
-    const w = rsiCanvas.offsetWidth;
-    const h = rsiCanvas.offsetHeight;
+    const w = rsiRect.width;
+    const h = rsiRect.height;
     const chartWidth = w - leftMargin - rightMargin;
     const topPadding = 20;
     const bottomPadding = 5;
@@ -1461,4 +1616,15 @@ document.addEventListener('DOMContentLoaded', () => {
     setupRSIHover();
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
+});
+
+window.addEventListener('orientationchange', () => {
+    setTimeout(() => {
+        if (typeof resizeCanvas === 'function') {
+            resizeCanvas();
+        }
+        if (typeof drawChart === 'function') {
+            requestAnimationFrame(drawChart);
+        }
+    }, 250);
 });

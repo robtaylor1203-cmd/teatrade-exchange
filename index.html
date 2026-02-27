@@ -83,10 +83,13 @@
     <script src="https://browser.sentry-cdn.com/7.99.0/bundle.tracing.min.js" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
-        /* INSTANT MOBILE OVERRIDE: Prevents desktop UI flash during load */
+        /* INSTANT MOBILE OVERRIDE: Hide desktop-only chrome before first paint.
+           .sidebar and .right-panel are NOT included — they wrap mobile app-view content. */
         @media (max-width: 768px) {
             .top-bar, .bottom-bar, .ticker-strip {
                 display: none !important;
+                height: 0 !important;
+                overflow: hidden !important;
             }
             body, html {
                 background-color: #0a0e17 !important;
@@ -901,6 +904,23 @@
         <div class="center-content">
             <!-- Chart Section -->
             <div class="chart-section" id="chart-section">
+                <div class="t212-pro-header">
+                    <div class="pro-header-main">
+                        <div class="pro-asset-info">
+                            <h1 id="mobile-header-symbol">---</h1>
+                            <span id="mobile-header-name">Select an Asset</span>
+                        </div>
+                        <div class="pro-price-info">
+                            <div id="mobile-header-price" class="pro-live-price">$0.00</div>
+                            <div id="mobile-header-change" class="pro-change-badge">0.00%</div>
+                        </div>
+                    </div>
+                    <div class="pro-header-stats">
+                        <div class="stat-item">Vol: <span id="mobile-header-vol">0</span></div>
+                        <div class="stat-item">H: <span id="mobile-header-high">$0.00</span></div>
+                        <div class="stat-item">L: <span id="mobile-header-low">$0.00</span></div>
+                    </div>
+                </div>
                 <div class="chart-header">
                     <div>
                         <div class="chart-title">

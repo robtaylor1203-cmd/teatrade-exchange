@@ -113,6 +113,7 @@ function openHubForSymbol(teaOrSymbol) {
         isIndex: isIndex,
         isTea: !isIndex
     };
+    if (typeof updateMobileTradePrices === 'function') updateMobileTradePrices();
 
     // Invalidate price cache for this symbol so the hub chart loads fresh
     // data from DB rather than serving stale entries from a previous session.
@@ -666,6 +667,7 @@ function syncHubChartToTradeSymbol(selectId) {
         currency, forexKey, change: 0,
         isIndex: isIdx, isTea: !isIdx
     };
+    if (typeof updateMobileTradePrices === 'function') updateMobileTradePrices();
 
     // Update hub title
     const hubTitle = document.getElementById('hub-chart-title');
@@ -756,6 +758,7 @@ function syncChartToTradeSelect() {
         currency, forexKey, change: 0,
         isIndex: isIdx, isTea: !isIdx
     };
+    if (typeof updateMobileTradePrices === 'function') updateMobileTradePrices();
 
     const titleEl = document.getElementById('main-chart-title');
     if (titleEl) titleEl.textContent = name;

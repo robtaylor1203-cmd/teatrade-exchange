@@ -251,16 +251,31 @@ const teaDisplayData = {
     'IND-DRJ-SOLD': { grade: 'DRJ', estate: 'Darjeeling Reserve', origin: 'India', lot: 24502, qty: 5400, buyer: 'Harrods Ltd', status: 'SOLD', soldPrice: 8.72, soldTime: 1, priceFrom: 'IND-DRJ' }
 };
 
-// Study indicator colors
+// Trading212 Professional Color Palette
 const studyColors = {
+    // Candlesticks
+    candleUp: '#00e676',
+    candleDown: '#ff3333',
+    wickUp: '#00e676',
+    wickDown: '#ff3333',
+
+    // Grid & axes
+    grid: 'rgba(255, 255, 255, 0.06)',
+    text: '#8b929e',
+    crosshair: 'rgba(255, 255, 255, 0.4)',
+
+    // Indicators
     sma10: '#facc15', sma20: '#f59e0b', sma50: '#8b5cf6',
     ema10: '#34d399', ema20: '#10b981',
-    bollinger: '#60a5fa', rsi: '#ec4899'
+    bollinger: '#60a5fa',
+    bbFill: 'rgba(41, 98, 255, 0.08)',
+    rsi: '#ba68c8',
+    maLine: '#2962ff'
 };
 
 // Chart layout constants
-const leftMargin = 60;
-const rightMargin = 20;
+const leftMargin = 12;
+const rightMargin = 42;
 const bottomMargin = 25;
 
 // Timeframe configurations

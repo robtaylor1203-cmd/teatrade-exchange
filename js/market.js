@@ -694,6 +694,7 @@ function swapChartIndex(cardIndex) {
 
     setTimeout(() => {
         state.mainChartData = { ...clickedCardData, isIndex: true, isTea: false };
+        if (typeof updateMobileTradePrices === 'function') updateMobileTradePrices();
         const titleEl = document.getElementById('main-chart-title');
         if (titleEl) titleEl.textContent = state.mainChartData.name;
         const priceEl = document.getElementById('main-chart-price');
@@ -824,6 +825,39 @@ function updateMainChartStats() {
             changeEl.style.color = isUp ? 'var(--accent-green)' : 'var(--accent-red)';
         }
     }
+
+    syncMobileHeader();
+}
+
+function syncMobileHeader() {
+    const d = state.mainChartData;
+    if (!d) return;
+
+    const curr = d.currency || '$';
+    const price = Number(d.basePrice) || 0;
+    const change = Number(d.change) || 0;
+    const isUp = change >= 0;
+    const m = state.chartMetrics || {};
+
+    const sym = document.getElementById('mobile-header-symbol');
+    const name = document.getElementById('mobile-header-name');
+    const priceEl = document.getElementById('mobile-header-price');
+    const changeEl = document.getElementById('mobile-header-change');
+    const volEl = document.getElementById('mobile-header-vol');
+    const highEl = document.getElementById('mobile-header-high');
+    const lowEl = document.getElementById('mobile-header-low');
+
+    if (sym) sym.textContent = d.symbol || '---';
+    if (name) name.textContent = d.name || 'Select an Asset';
+    if (priceEl) priceEl.textContent = formatIndexPrice(price, curr, d.symbol);
+    if (changeEl) {
+        const pct = `${isUp ? '+' : ''}${change.toFixed(2)}%`;
+        changeEl.textContent = pct;
+        changeEl.classList.toggle('negative', !isUp);
+    }
+    if (volEl) volEl.textContent = d.volume || '—';
+    if (highEl) highEl.textContent = m.highPrice ? `${curr}${m.highPrice.toFixed(2)}` : '—';
+    if (lowEl) lowEl.textContent = m.lowPrice ? `${curr}${m.lowPrice.toFixed(2)}` : '—';
 }
 
 // =============================================

@@ -653,6 +653,7 @@ body {
     border-bottom: 1px solid var(--border);
     transition: opacity 0.15s ease, transform 0.15s ease;
 }
+.t212-pro-header { display: none; }
 
 .chart-header {
     display: flex;
@@ -742,7 +743,7 @@ body {
     border-radius: 6px;
     padding: 4px 0;
     min-width: 80px;
-    z-index: 100;
+    z-index: 200;
     display: none;
     box-shadow: 0 8px 24px rgba(0,0,0,0.3);
 }
@@ -887,7 +888,7 @@ body {
     border-radius: 8px;
     padding: 8px 0;
     min-width: 180px;
-    z-index: 100;
+    z-index: 200;
     display: none;
     box-shadow: 0 8px 24px rgba(0,0,0,0.3);
 }
@@ -6061,8 +6062,8 @@ body.modal-open {
     }
     .chart-controls {
         display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
+        flex-wrap: nowrap;
+        gap: 6px;
         width: 100%;
     }
     .chart-btn {
@@ -10943,7 +10944,7 @@ a.user-dropdown-item {
         height: 65px;
         background: #0d1117;
         border-top: 1px solid #1e2a3a;
-        z-index: 1000;
+        z-index: 10000;
         justify-content: space-around;
         align-items: center;
         padding-bottom: env(safe-area-inset-bottom);
@@ -11564,12 +11565,12 @@ a.user-dropdown-item {
         left: 0 !important;
         width: 100vw !important;
         height: calc(100vh - 65px) !important;
+        background-color: #0a0e17 !important;
+        z-index: 9999 !important;
         overflow-y: auto !important;
         overflow-x: hidden !important;
         -webkit-overflow-scrolling: touch !important;
-        background-color: #0a0e17 !important;
-        z-index: 9999 !important;
-        padding-bottom: 0 !important;
+        padding-bottom: 20px !important;
     }
     .app-view.active {
         display: block !important;
@@ -11581,25 +11582,168 @@ a.user-dropdown-item {
         margin-bottom: 0 !important;
     }
 
-    /* 4. Make the Chart massive */
+    /* 4. Seamless chart surface — one unified background, no block gaps */
     .chart-section {
         padding: 0 !important;
-        background: transparent !important;
+        margin: 0 !important;
+        background: var(--bg-primary) !important;
         border: none !important;
     }
+
+    /* Hide old desktop title/stats on mobile, keep controls */
+    .chart-header .chart-title,
+    .chart-header .chart-stats {
+        display: none !important;
+    }
     .chart-header {
-        padding: 16px !important;
-        background: var(--bg-secondary) !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        background: var(--bg-primary) !important;
+        border: none !important;
     }
+
+    /* ── T212 Pro Header (mobile only) ── */
+    .t212-pro-header {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 12px !important;
+        padding: 20px 20px 12px 20px !important;
+        background: #0a0e17 !important;
+    }
+    .pro-header-main {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: flex-start !important;
+    }
+    .pro-asset-info { display: flex !important; flex-direction: column !important; gap: 4px !important; }
+    .pro-asset-info h1 { font-size: 24px !important; font-weight: 700 !important; color: #ffffff !important; letter-spacing: -0.5px !important; line-height: 1 !important; margin: 0 !important; }
+    .pro-asset-info span { font-size: 14px !important; color: #8b929e !important; font-weight: 500 !important; }
+    .pro-price-info { display: flex !important; flex-direction: column !important; align-items: flex-end !important; gap: 4px !important; }
+    .pro-live-price { font-size: 24px !important; font-weight: 700 !important; color: #ffffff !important; font-family: 'JetBrains Mono', monospace !important; line-height: 1 !important; }
+    .pro-change-badge { font-size: 13px !important; font-weight: 600 !important; padding: 2px 8px !important; border-radius: 4px !important; background: rgba(16, 185, 129, 0.15) !important; color: #00e676 !important; }
+    .pro-change-badge.negative { background: rgba(239, 68, 68, 0.15) !important; color: #ff3333 !important; }
+    .pro-header-stats {
+        display: flex !important;
+        gap: 16px !important;
+        padding-top: 12px !important;
+        border-top: 1px solid rgba(255,255,255,0.06) !important;
+    }
+    .stat-item { font-size: 12px !important; color: #8b929e !important; font-weight: 500 !important; }
+    .stat-item span { color: #d1d5db !important; font-weight: 600 !important; font-family: 'JetBrains Mono', monospace !important; margin-left: 4px !important; }
     .chart-container {
-        height: 55vh !important; /* Massive chart */
+        height: 55vh !important;
         border-radius: 0 !important;
-        border-top: 1px solid var(--border);
-        border-bottom: 1px solid var(--border);
+        border: none !important;
+        background: var(--bg-primary) !important;
     }
-    /* Hide the desktop chart tools to clean up UI */
+    .rsi-chart-container {
+        background: var(--bg-primary) !important;
+        border-radius: 0 !important;
+        margin-top: 0 !important;
+        border: none !important;
+    }
+    /* ── Mobile Chart Toolbar: single compact row ── */
     .chart-controls {
-        display: none !important; 
+        position: relative !important;
+        z-index: 50 !important;
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        overflow: visible !important;
+        padding: 6px 12px !important;
+        gap: 6px !important;
+        background: var(--bg-primary) !important;
+        border: none !important;
+    }
+
+    /* Reset dividers / margins on sub-containers */
+    .chart-controls .chart-type-toggle,
+    .chart-controls .studies-dropdown,
+    .chart-controls .timeframe-dropdown {
+        margin-left: 0 !important;
+        padding-left: 0 !important;
+        border-left: none !important;
+    }
+
+    /* Maximize button — small square icon tap target */
+    .chart-controls .maximize-btn {
+        flex-shrink: 0 !important;
+        width: 32px !important;
+        height: 32px !important;
+        padding: 0 !important;
+        border-radius: 8px !important;
+        background: rgba(255,255,255,0.05) !important;
+        border: none !important;
+        color: #6b7280 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    /* Timeframe pill button */
+    .chart-controls .timeframe-btn {
+        flex-shrink: 0 !important;
+        padding: 5px 10px !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        border-radius: 8px !important;
+        background: rgba(255,255,255,0.05) !important;
+        border: 1px solid rgba(255,255,255,0.08) !important;
+        color: #9ca3af !important;
+        gap: 4px !important;
+    }
+
+    /* Chart type icons — compact pair */
+    .chart-controls .chart-type-toggle {
+        display: flex !important;
+        gap: 2px !important;
+    }
+    .chart-controls .chart-type-btn {
+        flex-shrink: 0 !important;
+        width: 32px !important;
+        height: 32px !important;
+        padding: 0 !important;
+        border-radius: 8px !important;
+        background: rgba(255,255,255,0.05) !important;
+        border: 1px solid rgba(255,255,255,0.08) !important;
+        color: #6b7280 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    .chart-controls .chart-type-btn.active {
+        background: rgba(26,115,232,0.2) !important;
+        color: #60a5fa !important;
+        border-color: rgba(26,115,232,0.35) !important;
+    }
+
+    /* Studies pill */
+    .chart-controls .studies-btn {
+        flex-shrink: 0 !important;
+        padding: 5px 10px !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        border-radius: 8px !important;
+        background: rgba(255,255,255,0.05) !important;
+        border: 1px solid rgba(255,255,255,0.08) !important;
+        color: #9ca3af !important;
+        gap: 4px !important;
+        white-space: nowrap !important;
+    }
+    .chart-controls .studies-btn.has-active {
+        background: rgba(139,92,246,0.2) !important;
+        color: #a78bfa !important;
+        border-color: rgba(139,92,246,0.35) !important;
+    }
+    .chart-controls .studies-btn svg {
+        width: 12px !important;
+        height: 12px !important;
+    }
+
+    /* Active / pressed state for timeframe & studies */
+    .chart-controls .timeframe-btn:active,
+    .chart-controls .studies-btn:active {
+        background: rgba(255,255,255,0.1) !important;
     }
 
     /* 5. Fix the Sticky Buy/Sell Buttons */
@@ -11633,8 +11777,7 @@ a.user-dropdown-item {
         height: 65px !important;
         background: #0a0e17 !important;
         border-top: 1px solid var(--border) !important;
-        z-index: 10002 !important;
-        z-index: 9999 !important;
+        z-index: 10000 !important;
         pointer-events: auto !important;
     }
 
@@ -12406,5 +12549,32 @@ a.user-dropdown-item {
         padding: 40px 20px;
         color: var(--text-muted);
         font-size: 14px;
+    }
+}
+
+/* =========================================
+   LANDSCAPE "PRO" CHARTING MODE
+   ========================================= */
+@media (max-width: 932px) and (orientation: landscape) {
+    #mobile-bottom-nav, 
+    #mobile-trade-bar, 
+    .portfolio-hero, 
+    .t212-menu-container {
+        display: none !important;
+    }
+    
+    .app-view {
+        height: 100vh !important;
+        padding-bottom: 0 !important;
+        z-index: 99999 !important;
+    }
+    
+    .chart-container {
+        height: calc(100vh - 60px) !important;
+        border: none !important;
+    }
+    
+    .weather-cards-container {
+        display: none !important;
     }
 }

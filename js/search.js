@@ -349,6 +349,7 @@ function switchToTea(symbol) {
             volume: '12.5K MT',
             isTea: true
         };
+        if (typeof updateMobileTradePrices === 'function') updateMobileTradePrices();
 
         document.getElementById('main-chart-title').textContent = state.mainChartData.name;
         const priceEl = document.getElementById('main-chart-price');
