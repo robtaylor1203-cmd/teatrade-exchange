@@ -5892,7 +5892,7 @@ body.modal-open {
     }
     
     /* Hide desktop-only chrome on mobile */
-    .ticker-strip, .market-cards {
+    .market-cards {
         display: none;
     }
     
@@ -11019,10 +11019,10 @@ a.user-dropdown-item {
     .app-view {
         display: none !important;
         position: fixed;
-        top: 60px;
+        top: 88px;
         left: 0;
         width: 100vw;
-        height: calc(100vh - 60px - 65px);
+        height: calc(100vh - 88px - 65px);
         overflow-y: auto;
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
@@ -11545,8 +11545,8 @@ a.user-dropdown-item {
    FORCE NATIVE APP OVERRIDES (Trading212 Style)
    ======================================================== */
    @media (max-width: 768px) {
-    /* 1. Kill the desktop top-bar, footer, ticker, and market cards completely */
-    .top-bar, .bottom-bar, .ticker-strip, .market-cards {
+    /* 1. Kill the desktop top-bar, footer, and market cards completely */
+    .top-bar, .bottom-bar, .market-cards {
         display: none !important;
     }
 
@@ -11804,6 +11804,40 @@ a.user-dropdown-item {
         transform: translateY(-100%);
     }
 
+    /* 7b. Live Ticker Tape — sits below header */
+    .ticker-strip {
+        display: block !important;
+        position: fixed !important;
+        top: 60px !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 28px !important;
+        background: #0a0e17 !important;
+        border: none !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+        z-index: 9999 !important;
+        overflow: hidden !important;
+        transition: transform 0.3s ease;
+    }
+    body.mth-header-hidden .ticker-strip {
+        transform: translateY(-60px);
+    }
+    .ticker-strip .ticker-track {
+        height: 28px !important;
+    }
+    .ticker-strip .ticker-item {
+        padding: 0 12px !important;
+        font-size: 11px !important;
+    }
+    .ticker-strip .ticker-symbol {
+        font-size: 10px !important;
+    }
+    .ticker-strip .ticker-price,
+    .ticker-strip .ticker-change {
+        font-size: 10px !important;
+        font-family: 'JetBrains Mono', monospace !important;
+    }
+
     .mth-hamburger {
         background: none;
         border: none;
@@ -12030,10 +12064,10 @@ a.user-dropdown-item {
         color: var(--accent-red) !important;
     }
 
-    /* 9. App-view positioning for header */
+    /* 9. App-view positioning for header + ticker */
     .app-view {
-        top: 60px !important;
-        height: calc(100vh - 60px - 65px) !important;
+        top: 88px !important;
+        height: calc(100vh - 88px - 65px) !important;
         padding-bottom: 8px !important;
         transition: top 0.3s ease, height 0.3s ease !important;
     }
@@ -12059,8 +12093,8 @@ a.user-dropdown-item {
     .portfolio-modal-content {
         width: 100% !important;
         max-width: 100vw !important;
-        max-height: calc(100vh - 60px - 65px) !important;
-        margin: 60px 0 65px !important;
+        max-height: calc(100vh - 88px - 65px) !important;
+        margin: 88px 0 65px !important;
         border-radius: 0 !important;
     }
     .pairs-modal-overlay {
@@ -12075,8 +12109,8 @@ a.user-dropdown-item {
     .trader-profile-card {
         width: 100% !important;
         max-width: 100vw !important;
-        max-height: calc(100vh - 60px - 65px) !important;
-        margin: 60px 0 65px !important;
+        max-height: calc(100vh - 88px - 65px) !important;
+        margin: 88px 0 65px !important;
         border-radius: 0 !important;
         padding: 16px !important;
         overflow-y: auto !important;
@@ -12575,7 +12609,8 @@ a.user-dropdown-item {
     #mobile-bottom-nav, 
     #mobile-trade-bar, 
     .portfolio-hero, 
-    .t212-menu-container {
+    .t212-menu-container,
+    .ticker-strip {
         display: none !important;
     }
     
