@@ -82,6 +82,17 @@
     <link rel="stylesheet" href="styles.css?v=20260220a">
     <script src="https://browser.sentry-cdn.com/7.99.0/bundle.tracing.min.js" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        /* INSTANT MOBILE OVERRIDE: Prevents desktop UI flash during load */
+        @media (max-width: 768px) {
+            .top-bar, .bottom-bar, .ticker-strip {
+                display: none !important;
+            }
+            body, html {
+                background-color: #0a0e17 !important;
+            }
+        }
+    </style>
 </head>
 <body>
     <!-- Google Tag Manager (noscript) -->
@@ -689,96 +700,58 @@
                 <!-- Dynamically populated -->
                 </div>
                 <div id="watchlist-macro" style="display: none;">
-                    <div class="macro-item macro-clickable" id="macro-row-usdkes" onclick="openMacroPopout('usdkes', this)" title="Click for detailed analysis">
-                        <div class="macro-info">
-                            <div class="macro-icon currency">&#127472;&#127466;</div>
-                            <div>
-                                <div class="macro-name">USD / KES</div>
-                                <div class="macro-subtext">Kenyan Shilling</div>
-                            </div>
-                        </div>
-                        <div class="macro-value">
-                            <div class="macro-price" id="macro-usdkes">&mdash;</div>
-                            <div class="macro-change" id="macro-usdkes-change">&mdash;</div>
-                        </div>
+                    <!-- Mobile: dynamically rendered as t212-market-rows by renderMacroWatchlist() -->
+                    <!-- Desktop fallback rows -->
+                    <div class="macro-item macro-clickable macro-desktop-row" id="macro-row-usdkes" onclick="openMacroPopout('usdkes', this)">
+                        <div class="macro-info"><div class="macro-icon currency">KE</div><div><div class="macro-name">USD / KES</div><div class="macro-subtext">Kenyan Shilling</div></div></div>
+                        <div class="macro-value"><div class="macro-price" id="macro-usdkes">&mdash;</div><div class="macro-change" id="macro-usdkes-change">&mdash;</div></div>
                     </div>
-                    <div class="macro-item macro-clickable" id="macro-row-usdinr" onclick="openMacroPopout('usdinr', this)" title="Click for detailed analysis">
-                        <div class="macro-info">
-                            <div class="macro-icon currency">&#127470;&#127475;</div>
-                            <div>
-                                <div class="macro-name">USD / INR</div>
-                                <div class="macro-subtext">Indian Rupee</div>
-                            </div>
-                        </div>
-                        <div class="macro-value">
-                            <div class="macro-price" id="macro-usdinr">&mdash;</div>
-                            <div class="macro-change" id="macro-usdinr-change">&mdash;</div>
-                        </div>
+                    <div class="macro-item macro-clickable macro-desktop-row" id="macro-row-usdinr" onclick="openMacroPopout('usdinr', this)">
+                        <div class="macro-info"><div class="macro-icon currency"></div><div><div class="macro-name">USD / INR</div><div class="macro-subtext">Indian Rupee</div></div></div>
+                        <div class="macro-value"><div class="macro-price" id="macro-usdinr">&mdash;</div><div class="macro-change" id="macro-usdinr-change">&mdash;</div></div>
                     </div>
-                    <div class="macro-item macro-clickable" id="macro-row-usdlkr" onclick="openMacroPopout('usdlkr', this)" title="Click for detailed analysis">
-                        <div class="macro-info">
-                            <div class="macro-icon currency">&#127473;&#127472;</div>
-                            <div>
-                                <div class="macro-name">USD / LKR</div>
-                                <div class="macro-subtext">Sri Lankan Rupee</div>
-                            </div>
-                        </div>
-                        <div class="macro-value">
-                            <div class="macro-price" id="macro-usdlkr">&mdash;</div>
-                            <div class="macro-change" id="macro-usdlkr-change">&mdash;</div>
-                        </div>
+                    <div class="macro-item macro-clickable macro-desktop-row" id="macro-row-usdlkr" onclick="openMacroPopout('usdlkr', this)">
+                        <div class="macro-info"><div class="macro-icon currency"></div><div><div class="macro-name">USD / LKR</div><div class="macro-subtext">Sri Lankan Rupee</div></div></div>
+                        <div class="macro-value"><div class="macro-price" id="macro-usdlkr">&mdash;</div><div class="macro-change" id="macro-usdlkr-change">&mdash;</div></div>
                     </div>
-                    <div class="macro-item macro-clickable" id="macro-row-usdcny" onclick="openMacroPopout('usdcny', this)" title="Click for detailed analysis">
-                        <div class="macro-info">
-                            <div class="macro-icon currency">&#127464;&#127475;</div>
-                            <div>
-                                <div class="macro-name">USD / CNY</div>
-                                <div class="macro-subtext">Chinese Yuan</div>
-                            </div>
-                        </div>
-                        <div class="macro-value">
-                            <div class="macro-price" id="macro-usdcny">&mdash;</div>
-                            <div class="macro-change" id="macro-usdcny-change">&mdash;</div>
-                        </div>
+                    <div class="macro-item macro-clickable macro-desktop-row" id="macro-row-usdcny" onclick="openMacroPopout('usdcny', this)">
+                        <div class="macro-info"><div class="macro-icon currency"></div><div><div class="macro-name">USD / CNY</div><div class="macro-subtext">Chinese Yuan</div></div></div>
+                        <div class="macro-value"><div class="macro-price" id="macro-usdcny">&mdash;</div><div class="macro-change" id="macro-usdcny-change">&mdash;</div></div>
                     </div>
-                    <div class="macro-item macro-clickable" id="macro-row-oil" onclick="openMacroPopout('oil', this)" title="Click for detailed analysis">
-                        <div class="macro-info">
-                            <div class="macro-icon oil">&#9981;</div>
-                            <div>
-                                <div class="macro-name">Brent Crude</div>
-                                <div class="macro-subtext">Shipping &amp; logistics</div>
-                            </div>
-                        </div>
-                        <div class="macro-value">
-                            <div class="macro-price" id="macro-oil">&mdash;</div>
-                            <div class="macro-change" id="macro-oil-change">&mdash;</div>
-                        </div>
+                    <div class="macro-item macro-clickable macro-desktop-row" id="macro-row-oil" onclick="openMacroPopout('oil', this)">
+                        <div class="macro-info"><div class="macro-icon oil">&#9981;</div><div><div class="macro-name">Brent Crude</div><div class="macro-subtext">Shipping &amp; logistics</div></div></div>
+                        <div class="macro-value"><div class="macro-price" id="macro-oil">&mdash;</div><div class="macro-change" id="macro-oil-change">&mdash;</div></div>
                     </div>
                 </div>
             </div>
 
             <div class="sidebar-section">
                 <div class="sidebar-title">Growing Regions</div>
-                <div class="weather-cards" id="weather-cards">
-                    <div class="weather-card weather-skeleton">
-                        <div class="weather-region"><span class="weather-flag">🇰🇪</span><span class="weather-name">Kericho</span></div>
-                        <div class="weather-data"><span class="weather-icon">—</span><span class="weather-temp">—</span></div>
+                <div class="weather-cards weather-cards-container" id="weather-cards">
+                    <div class="t212-weather-card weather-skeleton">
+                        <div class="wc-head"><span class="wc-region">Kericho</span><span class="wc-condition">—</span></div>
+                        <div class="wc-temp-row"><span class="wc-temp-val">—</span></div>
+                        <div class="wc-indicators"></div>
                     </div>
-                    <div class="weather-card weather-skeleton">
-                        <div class="weather-region"><span class="weather-flag">🇰🇪</span><span class="weather-name">Nandi</span></div>
-                        <div class="weather-data"><span class="weather-icon">—</span><span class="weather-temp">—</span></div>
+                    <div class="t212-weather-card weather-skeleton">
+                        <div class="wc-head"><span class="wc-region">Nandi</span><span class="wc-condition">—</span></div>
+                        <div class="wc-temp-row"><span class="wc-temp-val">—</span></div>
+                        <div class="wc-indicators"></div>
                     </div>
-                    <div class="weather-card weather-skeleton">
-                        <div class="weather-region"><span class="weather-flag">🇮🇳</span><span class="weather-name">Darjeeling</span></div>
-                        <div class="weather-data"><span class="weather-icon">—</span><span class="weather-temp">—</span></div>
+                    <div class="t212-weather-card weather-skeleton">
+                        <div class="wc-head"><span class="wc-region">Darjeeling</span><span class="wc-condition">—</span></div>
+                        <div class="wc-temp-row"><span class="wc-temp-val">—</span></div>
+                        <div class="wc-indicators"></div>
                     </div>
-                    <div class="weather-card weather-skeleton">
-                        <div class="weather-region"><span class="weather-flag">🇮🇳</span><span class="weather-name">Assam</span></div>
-                        <div class="weather-data"><span class="weather-icon">—</span><span class="weather-temp">—</span></div>
+                    <div class="t212-weather-card weather-skeleton">
+                        <div class="wc-head"><span class="wc-region">Assam</span><span class="wc-condition">—</span></div>
+                        <div class="wc-temp-row"><span class="wc-temp-val">—</span></div>
+                        <div class="wc-indicators"></div>
                     </div>
-                    <div class="weather-card weather-skeleton">
-                        <div class="weather-region"><span class="weather-flag">🇱🇰</span><span class="weather-name">Ceylon</span></div>
-                        <div class="weather-data"><span class="weather-icon">—</span><span class="weather-temp">—</span></div>
+                    <div class="t212-weather-card weather-skeleton">
+                        <div class="wc-head"><span class="wc-region">Ceylon</span><span class="wc-condition">—</span></div>
+                        <div class="wc-temp-row"><span class="wc-temp-val">—</span></div>
+                        <div class="wc-indicators"></div>
                     </div>
                 </div>
             </div>
@@ -810,65 +783,48 @@
             </div>
 
             <div class="sidebar-section">
-                <div class="sidebar-title">Auction Centers</div>
-                <div class="watchlist-item" style="flex-direction: column; align-items: flex-start; gap: 4px;">
-                    <div style="display: flex; justify-content: space-between; width: 100%;">
-                        <span class="watchlist-name">Mombasa</span>
-                        <span class="up" style="font-size: 12px;">&#9679; LIVE</span>
-                    </div>
-                    <div class="volume-bar" style="width: 100%;"><div class="volume-fill" style="width: 85%;"></div></div>
-                </div>
-                <div class="watchlist-item" style="flex-direction: column; align-items: flex-start; gap: 4px;">
-                    <div style="display: flex; justify-content: space-between; width: 100%;">
-                        <span class="watchlist-name">Kolkata</span>
-                        <span style="color: var(--text-muted); font-size: 12px;">Opens 09:30</span>
-                    </div>
-                    <div class="volume-bar" style="width: 100%;"><div class="volume-fill" style="width: 0%;"></div></div>
-                </div>
-                <div class="watchlist-item" style="flex-direction: column; align-items: flex-start; gap: 4px;">
-                    <div style="display: flex; justify-content: space-between; width: 100%;">
-                        <span class="watchlist-name">Colombo</span>
-                        <span style="color: var(--accent-orange); font-size: 12px;">&#9679; Pre-Market</span>
-                    </div>
-                    <div class="volume-bar" style="width: 100%;"><div class="volume-fill" style="width: 20%;"></div></div>
-                </div>
-            </div>
-
-            <!-- Upcoming Auctions (moved from right panel) -->
-            <div class="sidebar-section">
-                <div class="sidebar-title">Upcoming Auctions</div>
+                <div class="sidebar-title">Auction Centres</div>
                 <div class="calendar-item">
                     <div class="calendar-date">
                         <div class="calendar-day">12</div>
                         <div class="calendar-month">Feb</div>
                     </div>
-                    <div class="calendar-info">
-                        <div class="calendar-name">Mombasa Sale 06</div>
-                        <div class="calendar-center">Kenya Tea Exchange</div>
+                    <div class="calendar-item-body">
+                        <div class="calendar-info">
+                            <div class="calendar-name">Mombasa Sale 06</div>
+                            <div class="calendar-center">Kenya Tea Exchange</div>
+                        </div>
+                        <span class="calendar-status live">LIVE</span>
+                        <div class="calendar-progress"><div class="calendar-progress-fill" style="width: 85%;"></div></div>
                     </div>
-                    <span class="calendar-status live">LIVE</span>
                 </div>
                 <div class="calendar-item">
                     <div class="calendar-date">
                         <div class="calendar-day">13</div>
                         <div class="calendar-month">Feb</div>
                     </div>
-                    <div class="calendar-info">
-                        <div class="calendar-name">Kolkata Auction 08</div>
-                        <div class="calendar-center">Calcutta Tea Traders</div>
+                    <div class="calendar-item-body">
+                        <div class="calendar-info">
+                            <div class="calendar-name">Kolkata Auction 08</div>
+                            <div class="calendar-center">Calcutta Tea Traders</div>
+                        </div>
+                        <span class="calendar-status upcoming">09:30 IST</span>
+                        <div class="calendar-progress"><div class="calendar-progress-fill" style="width: 0%;"></div></div>
                     </div>
-                    <span class="calendar-status upcoming">09:30 IST</span>
                 </div>
                 <div class="calendar-item">
                     <div class="calendar-date">
                         <div class="calendar-day">14</div>
                         <div class="calendar-month">Feb</div>
                     </div>
-                    <div class="calendar-info">
-                        <div class="calendar-name">Colombo Weekly</div>
-                        <div class="calendar-center">Ceylon Tea Board</div>
+                    <div class="calendar-item-body">
+                        <div class="calendar-info">
+                            <div class="calendar-name">Colombo Weekly</div>
+                            <div class="calendar-center">Ceylon Tea Board</div>
+                        </div>
+                        <span class="calendar-status upcoming">10:00 LKT</span>
+                        <div class="calendar-progress"><div class="calendar-progress-fill" style="width: 20%;"></div></div>
                     </div>
-                    <span class="calendar-status upcoming">10:00 LKT</span>
                 </div>
             </div>
             
@@ -1471,6 +1427,22 @@
         <div class="right-panel">
             <!-- VIEW: PORTFOLIO — Orders, Equity & Trading Panel -->
             <div id="view-portfolio" class="app-view">
+            <!-- Mobile T212 Portfolio Hero (hidden on desktop) -->
+            <div class="portfolio-hero">
+                <div class="portfolio-balance-label">Total Portfolio Value</div>
+                <div class="portfolio-balance-value" id="t212-total-value">$0.00</div>
+                <div class="portfolio-metrics">
+                    <div class="metric-col">
+                        <span class="portfolio-balance-label">Invested</span>
+                        <span class="metric-val" id="t212-invested">$0.00</span>
+                    </div>
+                    <div class="metric-col">
+                        <span class="portfolio-balance-label">Free Funds</span>
+                        <span class="metric-val" id="t212-free-funds">$0.00</span>
+                    </div>
+                </div>
+            </div>
+            <div id="t212-trades-list"></div>
             <!-- Trading Panel -->
             <div class="panel-section trading-panel">
                 <div class="panel-title">
@@ -1730,37 +1702,73 @@
 
             <!-- VIEW: MORE — Feature Menu Grid + Sub-screens -->
             <div id="view-more" class="app-view">
-                <div class="more-list" id="more-menu-grid">
-                    <button class="more-row" onclick="openMoreSubScreen('weather')">
-                        <svg class="more-row-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
-                        <span class="more-row-label">Weather</span>
-                        <svg class="more-row-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-                    </button>
-                    <button class="more-row" onclick="openMoreSubScreen('currency')">
-                        <svg class="more-row-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                        <span class="more-row-label">Currency &amp; Oil</span>
-                        <svg class="more-row-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-                    </button>
-                    <button class="more-row" onclick="openMoreSubScreen('leaderboard')">
-                        <svg class="more-row-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
-                        <span class="more-row-label">Leaderboard</span>
-                        <svg class="more-row-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-                    </button>
-                    <button class="more-row" onclick="openMoreSubScreen('history')">
-                        <svg class="more-row-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                        <span class="more-row-label">Trade History</span>
-                        <svg class="more-row-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-                    </button>
-                    <button class="more-row" onclick="openMoreSubScreen('alerts')">
-                        <svg class="more-row-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                        <span class="more-row-label">Price Alerts</span>
-                        <svg class="more-row-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-                    </button>
-                    <button class="more-row" onclick="openMoreSubScreen('contact')">
-                        <svg class="more-row-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                        <span class="more-row-label">Contact Us</span>
-                        <svg class="more-row-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-                    </button>
+                <div class="t212-menu-container" id="more-menu-grid">
+                    <div class="t212-menu-profile">
+                        <div class="t212-profile-avatar">TT</div>
+                        <div class="t212-profile-info">
+                            <div class="t212-profile-name" id="menu-username">Tea Trader</div>
+                            <div class="t212-profile-status" id="t212-profile-status">Virtual Account</div>
+                        </div>
+                    </div>
+
+                    <div class="t212-menu-group">
+                        <div class="t212-menu-row" onclick="openMoreSubScreen('weather')">
+                            <div class="t212-row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg></div>
+                            <div class="t212-row-label">Weather</div>
+                            <div class="t212-row-chevron">›</div>
+                        </div>
+                        <div class="t212-menu-row" onclick="openMoreSubScreen('currency')">
+                            <div class="t212-row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+                            <div class="t212-row-label">Currency &amp; Oil</div>
+                            <div class="t212-row-chevron">›</div>
+                        </div>
+                    </div>
+
+                    <div class="t212-menu-group">
+                        <div class="t212-menu-row" onclick="openPortfolioModal()">
+                            <div class="t212-row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
+                            <div class="t212-row-label">Trading History &amp; Reports</div>
+                            <div class="t212-row-chevron">›</div>
+                        </div>
+                        <div class="t212-menu-row" onclick="openMoreSubScreen('alerts')">
+                            <div class="t212-row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
+                            <div class="t212-row-label">Price Alerts</div>
+                            <div class="t212-row-chevron">›</div>
+                        </div>
+                        <div class="t212-menu-row" onclick="openMoreSubScreen('history')">
+                            <div class="t212-row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+                            <div class="t212-row-label">Trade History</div>
+                            <div class="t212-row-chevron">›</div>
+                        </div>
+                    </div>
+
+                    <div class="t212-menu-group">
+                        <div class="t212-menu-row" onclick="purchaseCombineEntry()">
+                            <div class="t212-row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg></div>
+                            <div class="t212-row-label">Combine Challenge</div>
+                            <div class="t212-row-chevron">›</div>
+                        </div>
+                        <div class="t212-menu-row" onclick="window.switchMobileSection('social')">
+                            <div class="t212-row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+                            <div class="t212-row-label">Leaderboard</div>
+                            <div class="t212-row-chevron">›</div>
+                        </div>
+                    </div>
+
+                    <div class="t212-menu-group">
+                        <div class="t212-menu-row" onclick="openMoreSubScreen('contact')">
+                            <div class="t212-row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div>
+                            <div class="t212-row-label">Contact Us</div>
+                            <div class="t212-row-chevron">›</div>
+                        </div>
+                    </div>
+
+                    <div class="t212-menu-group">
+                        <div class="t212-menu-row" onclick="handleLogout()">
+                            <div class="t212-row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div>
+                            <div class="t212-row-label" style="color: var(--accent-red);">Log Out</div>
+                        </div>
+                    </div>
                 </div>
                 <!-- Sub-screens (hidden by default, toggled by JS) -->
                 <div class="more-sub-screen" id="more-sub-weather">

@@ -55,6 +55,7 @@ function updatePortfolioDisplay() {
         const pnlPct = startBal > 0 ? (pnl / startBal * 100).toFixed(2) : '0.00';
         pnlEl.textContent = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} (${pnlPct}%)`;
         pnlEl.className = 'portfolio-pnl ' + (pnl >= 0 ? 'up' : 'down');
+        _updateT212Hero(totalValue, 0, totalValue);
         return;
     }
 
@@ -210,6 +211,8 @@ function updatePortfolioDisplay() {
     pnlEl.textContent = `${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)} (${totalPnlPct}%)`;
     pnlEl.className = 'portfolio-pnl ' + (totalPnl >= 0 ? 'up' : 'down');
 
+    _updateT212Hero(equity, totalUsedMargin, freeMargin);
+
     // Client-side equity-floor warnings (supplements server-side checks)
     if (totalUsedMargin > 0) {
         _checkClientMarginLevel(equityPct, equity, totalUsedMargin);
@@ -232,6 +235,16 @@ function updatePortfolioDisplay() {
           `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Free Funds</span><span>$${freeMargin.toFixed(2)}</span></div>` +
           `<div style="display:flex;justify-content:space-between;"><span>Account Health</span><span style="color:${phColor};font-weight:600;">${phDisplay}</span></div>`
         : '';
+}
+
+function _updateT212Hero(totalValue, invested, freeFunds) {
+    const fmt = v => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const tv = document.getElementById('t212-total-value');
+    const inv = document.getElementById('t212-invested');
+    const ff = document.getElementById('t212-free-funds');
+    if (tv) tv.textContent = fmt(totalValue);
+    if (inv) inv.textContent = fmt(invested);
+    if (ff) ff.textContent = fmt(freeFunds);
 }
 
 let _lastMarginWarningTime = 0;
@@ -435,6 +448,8 @@ function displayUserTrades(trades) {
                 </td>
             </tr>
         `;
+        const t212Empty = document.getElementById('t212-trades-list');
+        if (t212Empty) t212Empty.innerHTML = '<div style="color:#8b929e;font-size:13px;text-align:center;padding:40px 20px;">No orders yet. Start trading!</div>';
         return;
     }
 
@@ -729,6 +744,66 @@ function displayUserTrades(trades) {
     }
 
     tbody.innerHTML = html;
+
+    // T212 mobile trade rows
+    const t212List = document.getElementById('t212-trades-list');
+    if (t212List) {
+        if (processedTrades.length === 0) {
+            t212List.innerHTML = '<div style="color:#8b929e;font-size:13px;text-align:center;padding:40px 20px;">No orders yet. Start trading!</div>';
+        } else {
+            const openTrades = processedTrades.filter(p => !p.isClosed);
+            const closedTrades = processedTrades.filter(p => p.isClosed);
+
+            let t212Html = '';
+            if (openTrades.length > 0) {
+                t212Html += '<div class="t212-section-header">Open Positions</div>';
+                openTrades.forEach(({ trade, teaSymbol, total, pnl, pnlPct }) => {
+                    const badgeClass = trade.side === 'BUY' ? 'text-green' : 'text-red';
+                    const pnlClass = pnl >= 0 ? 't212-text-green' : 't212-text-red';
+                    const pnlSign = pnl >= 0 ? '+' : '';
+                    const currentValue = total + pnl;
+                    const assetInitial = teaSymbol.substring(0, 1).toUpperCase();
+
+                    t212Html += `
+                    <div class="t212-trade-row">
+                        <div class="t212-trade-icon">${escapeHtml(assetInitial)}</div>
+                        <div class="t212-trade-left">
+                            <span class="t212-symbol">${escapeHtml(teaSymbol)}</span>
+                            <span class="t212-trade-desc"><span class="${badgeClass}" style="font-weight:600;">${trade.side}</span> &bull; Avg $${trade.price.toFixed(2)}</span>
+                        </div>
+                        <div class="t212-trade-right">
+                            <span class="t212-trade-val">$${currentValue.toFixed(2)}</span>
+                            <span class="t212-trade-pnl ${pnlClass}">${pnlSign}$${pnl.toFixed(2)} (${pnlPct.toFixed(1)}%)</span>
+                        </div>
+                    </div>`;
+                });
+            }
+            if (closedTrades.length > 0) {
+                t212Html += '<div class="t212-section-header">Closed</div>';
+                closedTrades.forEach(({ trade, teaSymbol, total, pnl, pnlPct }) => {
+                    const badgeClass = trade.side === 'BUY' ? 'text-green' : 'text-red';
+                    const pnlClass = pnl >= 0 ? 't212-text-green' : 't212-text-red';
+                    const pnlSign = pnl >= 0 ? '+' : '';
+                    const currentValue = total + pnl;
+                    const assetInitial = teaSymbol.substring(0, 1).toUpperCase();
+
+                    t212Html += `
+                    <div class="t212-trade-row" style="opacity:0.6;">
+                        <div class="t212-trade-icon">${escapeHtml(assetInitial)}</div>
+                        <div class="t212-trade-left">
+                            <span class="t212-symbol">${escapeHtml(teaSymbol)}</span>
+                            <span class="t212-trade-desc"><span class="${badgeClass}" style="font-weight:600;">${trade.side}</span> &bull; Avg $${trade.price.toFixed(2)}</span>
+                        </div>
+                        <div class="t212-trade-right">
+                            <span class="t212-trade-val">$${currentValue.toFixed(2)}</span>
+                            <span class="t212-trade-pnl ${pnlClass}">${pnlSign}$${pnl.toFixed(2)} (${pnlPct.toFixed(1)}%)</span>
+                        </div>
+                    </div>`;
+                });
+            }
+            t212List.innerHTML = t212Html;
+        }
+    }
 }
 
 // =============================================

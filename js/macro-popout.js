@@ -10,7 +10,7 @@ const MACRO_DEFS = {
         quote:       'kes',
         name:        'USD / KES',
         fullName:    'Kenyan Shilling',
-        flag:        '🇰🇪',
+        flagIso:     'ke',
         type:        'forex',
         decimals:    2,
         spreadPct:   0.04,
@@ -31,7 +31,7 @@ const MACRO_DEFS = {
         quote:       'inr',
         name:        'USD / INR',
         fullName:    'Indian Rupee',
-        flag:        '🇮🇳',
+        flagIso:     'in',
         type:        'forex',
         decimals:    2,
         spreadPct:   0.03,
@@ -52,7 +52,7 @@ const MACRO_DEFS = {
         quote:       'lkr',
         name:        'USD / LKR',
         fullName:    'Sri Lankan Rupee',
-        flag:        '🇱🇰',
+        flagIso:     'lk',
         type:        'forex',
         decimals:    2,
         spreadPct:   0.12,
@@ -73,7 +73,7 @@ const MACRO_DEFS = {
         quote:       'cny',
         name:        'USD / CNY',
         fullName:    'Chinese Yuan',
-        flag:        '🇨🇳',
+        flagIso:     'cn',
         type:        'forex',
         decimals:    4,
         spreadPct:   0.02,
@@ -94,7 +94,8 @@ const MACRO_DEFS = {
         quote:       null,
         name:        'Brent Crude',
         fullName:    'ICE Brent · $/bbl',
-        flag:        '🛢️',
+        flagIso:     null,
+        flagFallback: '🛢️',
         type:        'commodity',
         decimals:    2,
         spreadPct:   0.05,
@@ -262,7 +263,7 @@ async function openMacroPopout(id, rowEl) {
 
     <div class="mp-header">
         <div class="mp-title-row">
-            <span class="mp-flag">${def.flag}</span>
+            <span class="mp-flag">${def.flagIso ? flagImg(def.flagIso, 28) : (def.flagFallback || '')}</span>
             <div>
                 <div class="mp-name">${def.name}</div>
                 <div class="mp-fullname">${def.fullName}</div>

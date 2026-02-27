@@ -14,26 +14,41 @@
  *   openPriceAlertModal
  */
 
-// Country prefix → flag emoji + display label
+// CDN flag image helper (Windows doesn't render flag emojis)
+function flagImg(iso, size = 20) {
+    if (!iso) return '';
+    return `<img src="https://flagcdn.com/w40/${iso}.png" alt="" class="flag-img" style="width:${size}px;height:auto;">`;
+}
+
+function getOriginFlag(origin) {
+    if (!origin) return flagImg('gb', 20);
+    const flags = { 'Kenya': 'ke', 'India': 'in', 'Sri Lanka': 'lk', 'Rwanda': 'rw', 'China': 'cn', 'Vietnam': 'vn', 'Japan': 'jp' };
+    for (const [key, iso] of Object.entries(flags)) {
+        if (origin.includes(key)) return flagImg(iso, 20);
+    }
+    return flagImg('gb', 20);
+}
+
+// Country prefix → flag ISO + display label
 const COUNTRY_MAP = {
-    KEN: { flag: '🇰🇪', label: 'Kenya'      },
-    IND: { flag: '🇮🇳', label: 'India'      },
-    SRI: { flag: '🇱🇰', label: 'Sri Lanka'  },
-    MLW: { flag: '🇲🇼', label: 'Malawi'     },
-    RWA: { flag: '🇷🇼', label: 'Rwanda'     },
-    UGA: { flag: '🇺🇬', label: 'Uganda'     },
-    TZA: { flag: '🇹🇿', label: 'Tanzania'   },
-    VIE: { flag: '🇻🇳', label: 'Vietnam'    },
-    JPN: { flag: '🇯🇵', label: 'Japan'      },
-    BGD: { flag: '🇧🇩', label: 'Bangladesh' },
-    IDN: { flag: '🇮🇩', label: 'Indonesia'  },
-    KOL: { flag: '🇮🇳', label: 'Kolkata'    },
-    GUW: { flag: '🇮🇳', label: 'Guwahati'   },
-    JAL: { flag: '🇮🇳', label: 'Jalpaiguri' },
-    COC: { flag: '🇮🇳', label: 'Cochin'     },
-    CMB: { flag: '🇮🇳', label: 'Coimbatore' },
-    SIL: { flag: '🇮🇳', label: 'Siliguri'   },
-    COO: { flag: '🇮🇳', label: 'Coonoor'    },
+    KEN: { iso: 'ke', label: 'Kenya'      },
+    IND: { iso: 'in', label: 'India'      },
+    SRI: { iso: 'lk', label: 'Sri Lanka'  },
+    MLW: { iso: 'mw', label: 'Malawi'     },
+    RWA: { iso: 'rw', label: 'Rwanda'     },
+    UGA: { iso: 'ug', label: 'Uganda'     },
+    TZA: { iso: 'tz', label: 'Tanzania'   },
+    VIE: { iso: 'vn', label: 'Vietnam'    },
+    JPN: { iso: 'jp', label: 'Japan'      },
+    BGD: { iso: 'bd', label: 'Bangladesh' },
+    IDN: { iso: 'id', label: 'Indonesia'  },
+    KOL: { iso: 'in', label: 'Kolkata'    },
+    GUW: { iso: 'in', label: 'Guwahati'   },
+    JAL: { iso: 'in', label: 'Jalpaiguri' },
+    COC: { iso: 'in', label: 'Cochin'     },
+    CMB: { iso: 'in', label: 'Coimbatore' },
+    SIL: { iso: 'in', label: 'Siliguri'   },
+    COO: { iso: 'in', label: 'Coonoor'    },
 };
 
 // =============================================
@@ -339,6 +354,31 @@ function populateHubTeaSelects() {
 // WATCHLIST
 // =============================================
 
+function _buildSparklineSvg(symbol, currentPrice) {
+    const history = typeof getPriceHistorySync === 'function'
+        ? getPriceHistorySync(symbol, 'tea') : [];
+    const closes = history.slice(-20).map(c => c.close ?? c.price ?? c);
+    if (closes.length < 2) return '';
+
+    const min = Math.min(...closes);
+    const max = Math.max(...closes);
+    const range = max - min || 1;
+    const w = 80, h = 28;
+
+    const points = closes.map((v, i) => {
+        const x = (i / (closes.length - 1)) * w;
+        const y = h - ((v - min) / range) * (h - 4) - 2;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+
+    const trending = closes[closes.length - 1] >= closes[0];
+    const color = trending ? 'var(--accent-green)' : 'var(--accent-red)';
+
+    return `<svg class="t212-sparkline" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+        <polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+}
+
 function updateWatchlistTeas() {
     const container = document.getElementById('watchlist-teas');
     if (!container || !state.teas || state.teas.length === 0) return;
@@ -357,29 +397,50 @@ function updateWatchlistTeas() {
         return;
     }
 
+    const isMobile = window.innerWidth <= 768;
     let html = '';
+
     watchlistTeas.forEach(tea => {
         const change = tea.previous_price > 0
             ? ((tea.current_price - tea.previous_price) / tea.previous_price) * 100
             : (tea.price_change_24h || 0);
         const isUp = change >= 0;
         const shortSymbol = tea.symbol.split('-')[1] || tea.symbol;
-        const origin = tea.symbol.split('-')[0] || '';
-
+        const originCode = tea.symbol.split('-')[0] || '';
         const priceVal = Number(tea.current_price) || 0;
         const changeVal = Number(change) || 0;
-        html += `
+        const countryInfo = COUNTRY_MAP[originCode] || { iso: null, label: originCode };
+
+        if (isMobile) {
+            const sparkline = _buildSparklineSvg(tea.symbol, priceVal);
+            html += `
+            <div class="t212-market-row" onclick="openWatchlistChart('${escapeHtml(tea.symbol)}')" data-symbol="${escapeHtml(tea.symbol)}">
+                <div class="t212-row-left">
+                    <div class="t212-flag-circle">${flagImg(countryInfo.iso, 22)}</div>
+                    <div class="t212-symbol-stack">
+                        <span class="t212-symbol-name">${escapeHtml(shortSymbol)}</span>
+                        <span class="t212-symbol-desc">${escapeHtml(tea.name || countryInfo.label + ' ' + shortSymbol)}</span>
+                    </div>
+                </div>
+                <div class="t212-sparkline-wrap">${sparkline}</div>
+                <div class="t212-row-right">
+                    <span class="t212-price-text">$${priceVal.toFixed(2)}</span>
+                    <span class="t212-change-pill ${isUp ? 'up' : 'down'}">${isUp ? '+' : ''}${changeVal.toFixed(1)}%</span>
+                </div>
+            </div>`;
+        } else {
+            html += `
             <div class="watchlist-item" onclick="openWatchlistChart('${escapeHtml(tea.symbol)}')" data-symbol="${escapeHtml(tea.symbol)}">
                 <div>
                     <div class="watchlist-name">${escapeHtml(tea.name || shortSymbol)}</div>
-                    <div class="watchlist-grade">${escapeHtml(origin)} ${escapeHtml(tea.grade || shortSymbol)}</div>
+                    <div class="watchlist-grade">${escapeHtml(originCode)} ${escapeHtml(tea.grade || shortSymbol)}</div>
                 </div>
                 <div class="watchlist-price">
                     <div class="watchlist-value">$${priceVal.toFixed(2)}</div>
                     <div class="watchlist-change ${isUp ? 'up' : 'down'}">${isUp ? '+' : ''}${changeVal.toFixed(1)}%</div>
                 </div>
-            </div>
-        `;
+            </div>`;
+        }
     });
 
     container.innerHTML = html;
@@ -395,6 +456,106 @@ function switchWatchlistTab(tab) {
 
     document.getElementById('watchlist-teas').style.display = tab === 'teas' ? 'block' : 'none';
     document.getElementById('watchlist-macro').style.display = tab === 'macro' ? 'block' : 'none';
+
+    if (tab === 'macro') {
+        renderMacroWatchlist();
+        _prefetchMacroSparklines();
+    }
+}
+
+// ── Macro watchlist: T212-style rows with flags + sparklines ──
+
+const MACRO_ROW_DEFS = [
+    { id: 'usdkes', key: 'usd_kes', iso: 'ke', name: 'USD / KES', desc: 'Kenyan Shilling',   prefix: '',  decimals: 2 },
+    { id: 'usdinr', key: 'usd_inr', iso: 'in', name: 'USD / INR', desc: 'Indian Rupee',       prefix: '',  decimals: 2 },
+    { id: 'usdlkr', key: 'usd_lkr', iso: 'lk', name: 'USD / LKR', desc: 'Sri Lankan Rupee',   prefix: '',  decimals: 2 },
+    { id: 'usdcny', key: 'usd_cny', iso: 'cn', name: 'USD / CNY', desc: 'Chinese Yuan',       prefix: '',  decimals: 4 },
+    { id: 'oil',    key: 'brent_crude', iso: null, name: 'Brent Crude', desc: 'Shipping & logistics', prefix: '$', decimals: 2, oilIcon: true },
+];
+
+function _buildMacroSparkline(stateKey) {
+    const cache = (typeof _macroHistoryCache !== 'undefined') ? _macroHistoryCache[stateKey] : null;
+    const history = cache?.history || [];
+    const rates = history.map(h => h.rate).filter(r => r != null);
+    if (rates.length < 2) return '';
+
+    const min = Math.min(...rates);
+    const max = Math.max(...rates);
+    const range = max - min || 1;
+    const w = 80, h = 28;
+
+    const points = rates.map((v, i) => {
+        const x = (i / (rates.length - 1)) * w;
+        const y = h - ((v - min) / range) * (h - 4) - 2;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+
+    const trending = rates[rates.length - 1] >= rates[0];
+    const color = trending ? 'var(--accent-green)' : 'var(--accent-red)';
+
+    return `<svg class="t212-sparkline" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+        <polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+}
+
+async function _prefetchMacroSparklines() {
+    if (typeof MACRO_DEFS === 'undefined' || typeof _getHistory !== 'function') return;
+    for (const id of Object.keys(MACRO_DEFS)) {
+        await _getHistory(MACRO_DEFS[id]);
+    }
+    renderMacroWatchlist();
+}
+
+function renderMacroWatchlist() {
+    const container = document.getElementById('watchlist-macro');
+    if (!container) return;
+    if (window.innerWidth > 768) return;
+
+    const DASH = '\u2014';
+    let html = '';
+
+    MACRO_ROW_DEFS.forEach(def => {
+        const raw = state.macroIndicators?.[def.key];
+        const value = Number(raw);
+        const baseline = state.macroBaseline?.[def.key];
+        const prev = (baseline != null && !isNaN(Number(baseline))) ? Number(baseline) : Number(state.previousMacro?.[def.key]);
+
+        const priceStr = (!isNaN(value)) ? `${def.prefix}${value.toFixed(def.decimals)}` : DASH;
+
+        let changePct = 0;
+        let changeClass = '';
+        let changeStr = DASH;
+        if (!isNaN(value) && !isNaN(prev) && prev !== 0) {
+            changePct = ((value - prev) / prev) * 100;
+            changeClass = changePct > 0 ? 'up' : changePct < 0 ? 'down' : '';
+            const arrow = changePct > 0 ? '\u25B2' : changePct < 0 ? '\u25BC' : '';
+            changeStr = `${arrow} ${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`;
+        }
+
+        const flagCircle = def.iso
+            ? `<div class="t212-flag-circle">${flagImg(def.iso, 22)}</div>`
+            : `<div class="t212-flag-circle" style="font-size:18px;">🛢️</div>`;
+
+        const sparkline = _buildMacroSparkline(def.key);
+
+        html += `
+        <div class="t212-market-row" onclick="openMacroPopout('${def.id}', this)">
+            <div class="t212-row-left">
+                ${flagCircle}
+                <div class="t212-symbol-stack">
+                    <span class="t212-symbol-name">${def.name}</span>
+                    <span class="t212-symbol-desc">${def.desc}</span>
+                </div>
+            </div>
+            <div class="t212-sparkline-wrap">${sparkline}</div>
+            <div class="t212-row-right">
+                <span class="t212-price-text">${priceStr}</span>
+                <span class="t212-change-pill ${changeClass}">${changeStr}</span>
+            </div>
+        </div>`;
+    });
+
+    container.innerHTML = html;
 }
 
 // =============================================
@@ -579,6 +740,14 @@ function updateMacroIndicators() {
     if (state.macroIndicators) {
         state.previousMacro = { ...state.macroIndicators };
     }
+
+    // Re-render mobile T212-style macro rows if the macro tab is visible
+    if (window.innerWidth <= 768) {
+        const macroPanel = document.getElementById('watchlist-macro');
+        if (macroPanel && macroPanel.style.display !== 'none') {
+            renderMacroWatchlist();
+        }
+    }
 }
 
 // =============================================
@@ -651,11 +820,11 @@ function updateGlobalTicker() {
     const DASH = '\u2014';
 
     const macroItems = [
-        { flag: '\uD83C\uDDF0\uD83C\uDDEA', label: 'KES',  key: 'usd_kes',     prefix: '',  decimals: 2 },
-        { flag: '\uD83C\uDDEE\uD83C\uDDF3', label: 'INR',  key: 'usd_inr',     prefix: '',  decimals: 2 },
-        { flag: '\uD83C\uDDF1\uD83C\uDDF0', label: 'LKR',  key: 'usd_lkr',     prefix: '',  decimals: 2 },
-        { flag: '\uD83C\uDDE8\uD83C\uDDF3', label: 'CNY',  key: 'usd_cny',     prefix: '',  decimals: 4 },
-        { flag: '\uD83D\uDEE2\uFE0F',       label: 'OIL',  key: 'brent_crude', prefix: '$', decimals: 2 }
+        { iso: 'ke', label: 'KES',  key: 'usd_kes',     prefix: '',  decimals: 2 },
+        { iso: 'in', label: 'INR',  key: 'usd_inr',     prefix: '',  decimals: 2 },
+        { iso: 'lk', label: 'LKR',  key: 'usd_lkr',     prefix: '',  decimals: 2 },
+        { iso: 'cn', label: 'CNY',  key: 'usd_cny',     prefix: '',  decimals: 4 },
+        { iso: null, label: 'OIL',  key: 'brent_crude', prefix: '$', decimals: 2, fallback: '\uD83D\uDEE2\uFE0F' }
     ];
 
     const hasData = macroItems.some(t => {
@@ -676,9 +845,11 @@ function updateGlobalTicker() {
             const val = Number(raw);
             const baseline = Number(state.macroBaseline?.[t.key]);
 
+            const tickerFlag = t.iso ? flagImg(t.iso, 14) : (t.fallback || '');
+
             if (raw == null || isNaN(val)) {
                 return `<div class="ticker-item">` +
-                    `<span class="ticker-flag">${t.flag}</span>` +
+                    `<span class="ticker-flag">${tickerFlag}</span>` +
                     `<span class="ticker-symbol">${t.label}</span>` +
                     `<span class="ticker-price">${DASH}</span>` +
                     `</div>`;
@@ -695,7 +866,7 @@ function updateGlobalTicker() {
                 : `${DASH}`;
 
             return `<div class="ticker-item">` +
-                `<span class="ticker-flag">${t.flag}</span>` +
+                `<span class="ticker-flag">${tickerFlag}</span>` +
                 `<span class="ticker-symbol">${t.label}</span>` +
                 `<span class="ticker-price ${changeClass}">${priceStr}</span>` +
                 `<span class="ticker-change ${changeClass}">${changeStr}</span>` +
@@ -797,7 +968,7 @@ function updateQuoteBoard() {
         const volDisplay = volume >= 1000 ? `${Math.round(volume / 1000)}K` : volume.toString();
         const country = COUNTRY_MAP[prefix];
         const countryHtml = country
-            ? `<div class="quote-country" title="${country.label}"><span class="quote-country-flag">${country.flag}</span><span class="quote-country-code">${prefix}</span></div>`
+            ? `<div class="quote-country" title="${country.label}"><span class="quote-country-flag">${flagImg(country.iso, 16)}</span><span class="quote-country-code">${prefix}</span></div>`
             : `<div class="quote-country" style="visibility:hidden;"><span class="quote-country-code">${prefix}</span></div>`;
 
         return `
@@ -1067,32 +1238,45 @@ function updateMobileTradePrices() {
     if (!buyEl || !sellEl) return;
     if (window.innerWidth > 768) return;
 
-    let price = 0;
-    let spread = 0.002;
+    const SPREAD_PCT = 0.01;
+    let marketPrice = 0;
 
-    const select = document.getElementById('trade-tea-select');
-    const selectValue = select?.value;
+    if (state.mainChartData && state.mainChartData.symbol) {
+        const sym = state.mainChartData.symbol;
+        const isIdx = state.mainChartData.isIndex;
 
-    if (selectValue) {
-        if (selectValue.startsWith('INDEX_')) {
-            const sym = selectValue.replace('INDEX_', '');
+        if (isIdx) {
             const indexes = typeof calculateRegionalIndexes === 'function'
                 ? calculateRegionalIndexes() : [];
             const idx = indexes.find(i => i.symbol === sym);
-            price = idx?.price || 0;
+            marketPrice = idx?.price || 0;
         } else {
-            const teaId = parseInt(selectValue);
-            const tea = state.teas?.find(t => t.id === teaId);
-            price = tea?.current_price || 0;
-            const bs = Number(tea?.base_spread) || 0.01;
-            const vm = Number(tea?.volatility_multiplier) || 1.0;
-            spread = bs * vm;
+            const tea = (state.teas || []).find(t => t.symbol === sym);
+            marketPrice = tea?.current_price || 0;
         }
     }
 
-    if (price > 0) {
-        const askPrice = price * (1 + spread / 2);
-        const bidPrice = price * (1 - spread / 2);
+    if (marketPrice <= 0) {
+        const select = document.getElementById('trade-tea-select');
+        const selectValue = select?.value;
+        if (selectValue) {
+            if (selectValue.startsWith('INDEX_')) {
+                const s = selectValue.replace('INDEX_', '');
+                const indexes = typeof calculateRegionalIndexes === 'function'
+                    ? calculateRegionalIndexes() : [];
+                const idx = indexes.find(i => i.symbol === s);
+                marketPrice = idx?.price || 0;
+            } else {
+                const teaId = parseInt(selectValue);
+                const tea = state.teas?.find(t => t.id === teaId);
+                marketPrice = tea?.current_price || 0;
+            }
+        }
+    }
+
+    if (marketPrice > 0) {
+        const askPrice = marketPrice * (1 + SPREAD_PCT / 2);
+        const bidPrice = marketPrice * (1 - SPREAD_PCT / 2);
         buyEl.textContent = '$' + askPrice.toFixed(2);
         sellEl.textContent = '$' + bidPrice.toFixed(2);
     } else {
@@ -1116,7 +1300,7 @@ function executeMobileQuickTrade() {
 }
 
 // Refresh mobile trade bar prices periodically
-setInterval(updateMobileTradePrices, 1500);
+setInterval(updateMobileTradePrices, 1000);
 
 // =============================================
 // MOBILE BOTTOM NAV: Initialisation
@@ -1504,18 +1688,17 @@ function closeMoreSubScreen() {
 function populateMoreWeather() {
     var content = document.getElementById('more-weather-content');
     if (!content) return;
-    var cards = document.querySelectorAll('#weather-cards .weather-card');
+    var cards = document.querySelectorAll('#weather-cards .t212-weather-card');
     if (!cards.length) { content.innerHTML = '<div style="padding:20px;color:var(--text-muted);text-align:center;">Loading weather data...</div>'; return; }
 
     var html = '';
     cards.forEach(function(card, idx) {
-        var flag = card.querySelector('.weather-flag')?.textContent || '';
-        var name = card.querySelector('.weather-name')?.textContent || '';
-        var icon = card.querySelector('.weather-icon')?.textContent || '';
-        var temp = card.querySelector('.weather-temp')?.textContent || '';
+        var name = card.querySelector('.wc-region')?.textContent || '';
+        var condition = card.querySelector('.wc-condition')?.textContent || '';
+        var temp = card.querySelector('.wc-temp-val')?.textContent || '';
         html += '<div class="more-weather-item" onclick="if(typeof openWeatherPopout===\'function\') openWeatherPopout(' + idx + ');">' +
-            '<div class="more-weather-left"><span class="more-weather-flag">' + flag + '</span><span class="more-weather-name">' + name + '</span></div>' +
-            '<div class="more-weather-right"><span>' + icon + '</span><span>' + temp + '</span></div></div>';
+            '<div class="more-weather-left"><span class="more-weather-name">' + name + '</span><span style="color:var(--text-muted);font-size:12px;">' + condition + '</span></div>' +
+            '<div class="more-weather-right"><span>' + temp + '</span></div></div>';
     });
     content.innerHTML = html;
 }
@@ -1644,6 +1827,32 @@ function populateMoreAlerts() {
         var mthUsername = document.getElementById('mth-menu-username');
         if (mthUsername) {
             mthUsername.textContent = isLoggedIn ? (avatar ? avatar.textContent.trim() || 'Trader' : 'Trader') : 'Guest';
+        }
+        var menuUsername = document.getElementById('menu-username');
+        if (menuUsername) {
+            menuUsername.textContent = isLoggedIn ? (state.userProfile?.username || avatar?.textContent?.trim() || 'Tea Trader') : 'Guest';
+        }
+        var t212Avatar = document.querySelector('.t212-profile-avatar');
+        if (t212Avatar && avatar) {
+            t212Avatar.textContent = avatar.textContent.trim() || 'TT';
+        }
+        var profileStatus = document.getElementById('t212-profile-status');
+        if (profileStatus) {
+            var tier = state.userProfile?.tier;
+            var mode = state.tradingMode || 'VIRTUAL';
+            if (tier && tier.toLowerCase() === 'pro') {
+                profileStatus.textContent = 'PRO Account';
+                profileStatus.style.background = 'rgba(26, 115, 232, 0.15)';
+                profileStatus.style.color = 'var(--accent-blue)';
+            } else if (mode === 'REAL') {
+                profileStatus.textContent = 'Real Account';
+                profileStatus.style.background = 'rgba(16, 185, 129, 0.15)';
+                profileStatus.style.color = 'var(--accent-green)';
+            } else {
+                profileStatus.textContent = 'Virtual Account';
+                profileStatus.style.background = 'rgba(16, 185, 129, 0.15)';
+                profileStatus.style.color = 'var(--accent-green)';
+            }
         }
 
         var authItems = ['mth-item-portfolio', 'mth-item-store', 'mth-item-mode', 'mth-item-security', 'mth-item-logout'];

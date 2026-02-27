@@ -4,11 +4,11 @@
 // =============================================
 
 const WEATHER_REGIONS = [
-    { id: 'kericho',    name: 'Kericho',    country: 'Kenya',     flag: '🇰🇪', lat: -0.37, lon: 35.28 },
-    { id: 'nandi',      name: 'Nandi',      country: 'Kenya',     flag: '🇰🇪', lat:  0.18, lon: 35.10 },
-    { id: 'darjeeling', name: 'Darjeeling', country: 'India',     flag: '🇮🇳', lat: 27.03, lon: 88.26 },
-    { id: 'assam',      name: 'Assam',      country: 'India',     flag: '🇮🇳', lat: 26.14, lon: 91.74 },
-    { id: 'ceylon',     name: 'Ceylon',     country: 'Sri Lanka', flag: '🇱🇰', lat:  7.87, lon: 80.77 },
+    { id: 'kericho',    name: 'Kericho',    country: 'Kenya',     iso: 'ke', lat: -0.37, lon: 35.28 },
+    { id: 'nandi',      name: 'Nandi',      country: 'Kenya',     iso: 'ke', lat:  0.18, lon: 35.10 },
+    { id: 'darjeeling', name: 'Darjeeling', country: 'India',     iso: 'in', lat: 27.03, lon: 88.26 },
+    { id: 'assam',      name: 'Assam',      country: 'India',     iso: 'in', lat: 26.14, lon: 91.74 },
+    { id: 'ceylon',     name: 'Ceylon',     country: 'Sri Lanka', iso: 'lk', lat:  7.87, lon: 80.77 },
 ];
 
 // Cached results for popout re-renders
@@ -130,40 +130,36 @@ function _renderWeatherCards(results) {
     container.innerHTML = results.map(({ region, weather: w, error }, idx) => {
         if (error || !w) {
             return `
-            <div class="weather-card weather-error" data-weather-idx="${idx}" onclick="retryWeatherCard(${idx})" title="Click to retry">
-                <span class="wc-flag">${region.flag}</span>
-                <div class="wc-body">
-                    <span class="wc-name">${region.name}</span>
-                    <span class="wc-label weather-retry-label">Unavailable · Retry</span>
+            <div class="t212-weather-card weather-error" data-weather-idx="${idx}" onclick="retryWeatherCard(${idx})" title="Click to retry">
+                <div class="wc-head">
+                    <span class="wc-region">${region.name}</span>
+                    <span class="wc-condition">Offline</span>
                 </div>
-                <span class="wc-temp wc-retry-icon">↻</span>
+                <div class="wc-temp-row"><span class="wc-temp-val">—</span></div>
+                <div class="wc-indicators"><span class="wc-retry-tap">Tap to retry</span></div>
             </div>`;
         }
 
-        const { icon, label } = _wmoInfo(w.code);
+        const { label, bg } = _wmoInfo(w.code);
         const level = _tempLevel(w.temp);
-        const tempDiff = w.temp - w.feelsLike;
-        const feelsNote = Math.abs(tempDiff) >= 2
-            ? `Feels ${tempDiff > 0 ? 'cooler' : 'warmer'} · ${w.feelsLike}°`
-            : `Feels like ${w.feelsLike}°`;
+        const windDir = _degToCompass(w.windDir);
 
         return `
-        <div class="weather-card" data-temp-level="${level}" data-weather-idx="${idx}" onclick="openWeatherPopout(${idx}, this)">
-            <span class="wc-flag">${region.flag}</span>
-            <div class="wc-body">
-                <span class="wc-name">${region.name}</span>
-                <span class="wc-label">${label}</span>
+        <div class="t212-weather-card" data-temp-level="${level}" data-weather-bg="${bg}" data-weather-idx="${idx}" onclick="openWeatherPopout(${idx}, this)">
+            <div class="wc-head">
+                <span class="wc-region">${region.name}</span>
+                <span class="wc-condition">${label}</span>
             </div>
-            <div class="wc-right">
-                <div class="wc-icon-temp">
-                    <span class="wc-icon">${icon}</span>
-                    <span class="wc-temp">${w.temp}°</span>
-                </div>
-                <div class="wc-humidity-row">
-                    <div class="hbar">${_humidityBar(w.humidity)}</div>
-                    <span class="wc-hpct">${w.humidity}%</span>
-                </div>
+            <div class="wc-temp-row">
+                <span class="wc-temp-val">${w.temp}°</span>
+                <span class="wc-feels">Feels ${w.feelsLike}°</span>
             </div>
+            <div class="wc-indicators">
+                <div class="wc-ind" title="Humidity"><span class="wc-ind-icon">💧</span><span class="wc-ind-val">${w.humidity}%</span></div>
+                <div class="wc-ind" title="Wind"><span class="wc-ind-icon">↗</span><span class="wc-ind-val">${w.windSpeed}<small>km/h</small></span></div>
+                ${w.uv != null ? `<div class="wc-ind" title="UV Index"><span class="wc-ind-icon">◐</span><span class="wc-ind-val">${w.uv}</span></div>` : ''}
+            </div>
+            <div class="wc-accent-bar"></div>
         </div>`;
     }).join('');
 }
@@ -238,7 +234,7 @@ function openWeatherPopout(idx, cardEl) {
 
     <div class="wp-header">
         <div class="wp-title-row">
-            <span class="wp-flag">${region.flag}</span>
+            <span class="wp-flag">${flagImg(region.iso, 28)}</span>
             <div>
                 <div class="wp-name">${region.name}</div>
                 <div class="wp-country">${region.country}</div>
