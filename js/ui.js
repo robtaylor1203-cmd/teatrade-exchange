@@ -422,26 +422,29 @@ function populateHubTeaSelects() {
 // WATCHLIST
 // =============================================
 
-function _buildSparklineSvg(symbol, currentPrice, openPrice) {
+function _buildSparklineSvg(symbol, currentPrice, isUp) {
     const history = typeof getPriceHistorySync === 'function'
         ? getPriceHistorySync(symbol, 'tea') : [];
     const closes = history.slice(-20).map(c => c.close ?? c.price ?? c);
-    if (closes.length < 2) return '<div class="skeleton sparkline-placeholder"></div>';
+    const color = isUp ? 'var(--accent-green)' : 'var(--accent-red)';
+    const w = 80, h = 28;
+
+    if (closes.length < 2) {
+        if (!currentPrice || currentPrice <= 0) return '<div class="skeleton sparkline-placeholder"></div>';
+        return `<svg class="t212-sparkline" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+            <line x1="0" y1="${h / 2}" x2="${w}" y2="${h / 2}" stroke="${color}" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>`;
+    }
 
     const min = Math.min(...closes);
     const max = Math.max(...closes);
     const range = max - min || 1;
-    const w = 80, h = 28;
 
     const points = closes.map((v, i) => {
         const x = (i / (closes.length - 1)) * w;
         const y = h - ((v - min) / range) * (h - 4) - 2;
         return `${x.toFixed(1)},${y.toFixed(1)}`;
     }).join(' ');
-
-    const baseline = (openPrice && openPrice > 0) ? openPrice : closes[0];
-    const trending = closes[closes.length - 1] >= baseline;
-    const color = trending ? 'var(--accent-green)' : 'var(--accent-red)';
 
     return `<svg class="t212-sparkline" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
         <polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -481,8 +484,7 @@ function updateWatchlistTeas() {
         const countryInfo = COUNTRY_MAP[originCode] || { iso: null, label: originCode };
 
         if (isMobile) {
-            const openPx = Number(tea.previous_price) || 0;
-            const sparkline = _buildSparklineSvg(tea.symbol, priceVal, openPx);
+            const sparkline = _buildSparklineSvg(tea.symbol, priceVal, isUp);
             html += `
             <div class="t212-market-row" onclick="openWatchlistChart('${escapeHtml(tea.symbol)}')" data-symbol="${escapeHtml(tea.symbol)}">
                 <div class="t212-row-left">
