@@ -12052,7 +12052,20 @@ a.user-dropdown-item {
         display: none !important;
     }
 
-    /* Trader profile popup — fit between header and bottom nav */
+    /* Modals must sit above app-views (9999) and header/nav (10000) */
+    .portfolio-modal {
+        z-index: 10003 !important;
+    }
+    .portfolio-modal-content {
+        width: 100% !important;
+        max-width: 100vw !important;
+        max-height: calc(100vh - 52px - 65px) !important;
+        margin: 52px 0 65px !important;
+        border-radius: 0 !important;
+    }
+    .pairs-modal-overlay {
+        z-index: 10003 !important;
+    }
     .trader-profile-modal {
         z-index: 10003 !important;
     }
