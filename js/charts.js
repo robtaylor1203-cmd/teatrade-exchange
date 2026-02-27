@@ -426,7 +426,13 @@ function getOpenTradesForSymbol(symbol) {
             trades.push({
                 entry_price: p.avg_entry_price || 0,
                 trade_type: p.quantity >= 0 ? 'BUY' : 'SELL',
-                quantity: Math.abs(p.quantity)
+                quantity: Math.abs(p.quantity),
+                tea_id: p.tea_id,
+                symbol: teaSym,
+                stop_loss: p.stop_loss || null,
+                take_profit: p.take_profit || null,
+                leverage: p.leverage || 1,
+                pos_type: 'tea'
             });
         }
     });
@@ -436,12 +442,19 @@ function getOpenTradesForSymbol(symbol) {
         trades.push({
             entry_price: idxPos.avg_entry_price || 0,
             trade_type: idxPos.quantity >= 0 ? 'BUY' : 'SELL',
-            quantity: Math.abs(idxPos.quantity)
+            quantity: Math.abs(idxPos.quantity),
+            symbol: symbol,
+            stop_loss: idxPos.stop_loss || null,
+            take_profit: idxPos.take_profit || null,
+            leverage: idxPos.leverage || 1,
+            pos_type: 'index'
         });
     }
 
     return trades;
 }
+
+var _orderBadgeHitBoxes = [];
 
 // =============================================
 // CANVAS RESIZE
@@ -1003,35 +1016,39 @@ function drawChart() {
 
     const openTrades = getOpenTradesForSymbol(_chartSym);
 
+    // Draw dashed entry-price lines (inside clipping region);
+    // collect data for Y-axis badges (drawn after clip is removed)
+    var _pendingBadges = [];
+    _orderBadgeHitBoxes = [];
+
     openTrades.forEach(trade => {
         const entryPx = trade.entry_price * _fx;
-        const yPixel = _topMargin + chartHeight - ((entryPx - minPrice) / priceRange) * chartHeight;
+        var rawY = _topMargin + chartHeight - ((entryPx - minPrice) / priceRange) * chartHeight;
 
-        if (yPixel >= _topMargin && yPixel <= _topMargin + chartHeight) {
+        var onScreen = rawY >= _topMargin && rawY <= _topMargin + chartHeight;
+        var yPixel = rawY;
+        var isSticky = false;
+        if (rawY < _topMargin) { yPixel = _topMargin + 2; isSticky = true; }
+        if (rawY > _topMargin + chartHeight) { yPixel = _topMargin + chartHeight - 2; isSticky = true; }
+
+        var isBuy = trade.trade_type === 'BUY';
+        var inProfit = isBuy ? (currentPrice > entryPx) : (currentPrice < entryPx);
+        var lineColor = inProfit ? '#00e676' : '#ef4444';
+
+        if (onScreen) {
             ctx.save();
-
             ctx.beginPath();
             ctx.setLineDash([5, 5]);
-            ctx.moveTo(leftMargin, yPixel);
-            ctx.lineTo(w - rightMargin, yPixel);
-            ctx.strokeStyle = trade.trade_type === 'BUY' ? '#00e676' : '#ff3333';
+            ctx.moveTo(leftMargin, rawY);
+            ctx.lineTo(w - rightMargin, rawY);
+            ctx.strokeStyle = lineColor;
             ctx.lineWidth = 1.5;
             ctx.stroke();
-
-            const badgeColor = trade.trade_type === 'BUY' ? 'rgba(0, 230, 118, 0.15)' : 'rgba(255, 51, 51, 0.15)';
-            const textColor = trade.trade_type === 'BUY' ? '#00e676' : '#ff3333';
-            const badgeText = `${trade.trade_type} @ ${_cfmt(entryPx)}`;
-
-            ctx.font = '600 11px -apple-system, BlinkMacSystemFont, sans-serif';
-            const badgeW = ctx.measureText(badgeText).width + 12;
-
-            ctx.fillStyle = badgeColor;
-            ctx.fillRect(leftMargin + 4, yPixel - 12, badgeW, 24);
-            ctx.fillStyle = textColor;
-            ctx.fillText(badgeText, leftMargin + 8, yPixel + 4);
-
+            ctx.setLineDash([]);
             ctx.restore();
         }
+
+        _pendingBadges.push({ trade, entryPx, yPixel, isSticky, isBuy, inProfit });
     });
 
     // =============================================
@@ -1085,10 +1102,297 @@ function drawChart() {
         ctx.fillText(_tagLabel, _tagLeft + _tagW / 2, _tagY + _tagH / 2 + 4);
     }
 
+    // =============================================
+    // ORDER BADGES ON Y-AXIS (drawn outside clip region)
+    // =============================================
+    _pendingBadges.forEach(function(b) {
+        var trade = b.trade, entryPx = b.entryPx, yPixel = b.yPixel;
+        var isSticky = b.isSticky, inProfit = b.inProfit;
+
+        ctx.save();
+        var badgeLabel = trade.trade_type + ' @ ' + _cfmt(entryPx);
+        ctx.font = 'bold 10px JetBrains Mono, -apple-system, sans-serif';
+        var textW = ctx.measureText(badgeLabel).width;
+        var xW = 12;
+        var badgeW = textW + xW + 20;
+        var badgeH = 22;
+        var badgeRight = w - 2;
+        var badgeLeft = badgeRight - badgeW;
+        var arrowTip = badgeLeft - 5;
+        var badgeY = yPixel - badgeH / 2;
+
+        var bgColor = inProfit ? '#00e676' : '#ef4444';
+        ctx.globalAlpha = isSticky ? 0.6 : 1.0;
+
+        ctx.beginPath();
+        ctx.moveTo(arrowTip, badgeY + badgeH / 2);
+        ctx.lineTo(badgeLeft, badgeY);
+        ctx.lineTo(badgeRight, badgeY);
+        ctx.lineTo(badgeRight, badgeY + badgeH);
+        ctx.lineTo(badgeLeft, badgeY + badgeH);
+        ctx.closePath();
+        ctx.fillStyle = bgColor;
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(badgeLabel, badgeLeft + 6, badgeY + badgeH / 2 + 1);
+
+        var xCenterX = badgeRight - 10;
+        var xCenterY = badgeY + badgeH / 2;
+        ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(xCenterX - 3, xCenterY - 3);
+        ctx.lineTo(xCenterX + 3, xCenterY + 3);
+        ctx.moveTo(xCenterX + 3, xCenterY - 3);
+        ctx.lineTo(xCenterX - 3, xCenterY + 3);
+        ctx.stroke();
+
+        ctx.globalAlpha = 1.0;
+        ctx.restore();
+
+        _orderBadgeHitBoxes.push({
+            x: arrowTip,
+            y: badgeY,
+            w: badgeW + 5,
+            h: badgeH,
+            trade: trade,
+            entryPx: entryPx
+        });
+    });
+
     // Draw RSI if active
     if (state.activeStudies.rsi) {
         drawRSIChart();
     }
+}
+
+// =============================================
+// ORDER BADGE CLICK HANDLER
+// =============================================
+
+(function _initBadgeClickHandler() {
+    var _attached = false;
+    function _hitTest(cx, cy) {
+        if (!_orderBadgeHitBoxes || _orderBadgeHitBoxes.length === 0) return null;
+        for (var i = _orderBadgeHitBoxes.length - 1; i >= 0; i--) {
+            var hb = _orderBadgeHitBoxes[i];
+            if (cx >= hb.x && cx <= hb.x + hb.w && cy >= hb.y && cy <= hb.y + hb.h) return hb;
+        }
+        return null;
+    }
+    function attach() {
+        var canvas = document.getElementById('priceChart');
+        if (!canvas || _attached) return;
+        _attached = true;
+
+        canvas.addEventListener('click', function(e) {
+            var rect = canvas.getBoundingClientRect();
+            var hit = _hitTest(e.clientX - rect.left, e.clientY - rect.top);
+            if (hit) openOrderManagement(hit.trade, hit.entryPx);
+        });
+
+        canvas.addEventListener('mousemove', function(e) {
+            var rect = canvas.getBoundingClientRect();
+            var hit = _hitTest(e.clientX - rect.left, e.clientY - rect.top);
+            canvas.style.cursor = hit ? 'pointer' : '';
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attach);
+    } else {
+        setTimeout(attach, 100);
+    }
+})();
+
+// =============================================
+// ORDER MANAGEMENT MODAL
+// =============================================
+
+function openOrderManagement(trade, entryPxDisplay) {
+    var existing = document.getElementById('order-mgmt-modal');
+    if (existing) existing.remove();
+
+    var isBuy = trade.trade_type === 'BUY';
+    var sideLabel = isBuy ? 'LONG' : 'SHORT';
+    var sideColor = isBuy ? '#00e676' : '#ef4444';
+
+    var tea = state.teas?.find(function(t) { return t.id === trade.tea_id; });
+    var currentPx = 0;
+    if (trade.pos_type === 'index') {
+        var indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
+        var idx = indexes.find(function(ix) { return ix.symbol === trade.symbol; });
+        currentPx = idx ? idx.price : trade.entry_price;
+    } else {
+        currentPx = tea ? tea.current_price : trade.entry_price;
+    }
+
+    var _ci = _getChartCurrencyInfo();
+    var fx = _ci.multiplier || 1;
+    var curr = _ci.symbol || '$';
+
+    var displayCurrent = currentPx * fx;
+    var displayEntry = entryPxDisplay;
+
+    var pnl;
+    if (isBuy) {
+        pnl = (currentPx - trade.entry_price) * trade.quantity;
+    } else {
+        pnl = (trade.entry_price - currentPx) * trade.quantity;
+    }
+    pnl *= fx;
+
+    var pnlColor = pnl >= 0 ? '#00e676' : '#ef4444';
+    var pnlSign = pnl >= 0 ? '+' : '';
+    var pnlPct = trade.entry_price > 0 ? ((isBuy ? (currentPx - trade.entry_price) : (trade.entry_price - currentPx)) / trade.entry_price * 100) : 0;
+
+    var slVal = trade.stop_loss ? trade.stop_loss.toFixed(2) : '';
+    var tpVal = trade.take_profit ? trade.take_profit.toFixed(2) : '';
+
+    var fmtPx = function(v) {
+        if (v >= 1000) return curr + v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        if (v >= 100) return curr + v.toFixed(1);
+        return curr + v.toFixed(2);
+    };
+
+    var modal = document.createElement('div');
+    modal.id = 'order-mgmt-modal';
+    modal.className = 'order-mgmt-overlay';
+    modal.innerHTML =
+        '<div class="order-mgmt-card">' +
+            '<div class="order-mgmt-header">' +
+                '<div class="order-mgmt-title">' +
+                    '<span class="order-mgmt-side" style="color:' + sideColor + '">' + sideLabel + '</span> ' +
+                    '<span class="order-mgmt-sym">' + (trade.symbol || 'Position') + '</span>' +
+                '</div>' +
+                '<button class="order-mgmt-close-x" id="order-mgmt-dismiss">&times;</button>' +
+            '</div>' +
+
+            '<div class="order-mgmt-stats">' +
+                '<div class="order-mgmt-stat">' +
+                    '<div class="order-mgmt-stat-label">Entry Price</div>' +
+                    '<div class="order-mgmt-stat-value">' + fmtPx(displayEntry) + '</div>' +
+                '</div>' +
+                '<div class="order-mgmt-stat">' +
+                    '<div class="order-mgmt-stat-label">Current Price</div>' +
+                    '<div class="order-mgmt-stat-value">' + fmtPx(displayCurrent) + '</div>' +
+                '</div>' +
+                '<div class="order-mgmt-stat">' +
+                    '<div class="order-mgmt-stat-label">Quantity</div>' +
+                    '<div class="order-mgmt-stat-value">' + trade.quantity.toLocaleString() + ' kg</div>' +
+                '</div>' +
+                '<div class="order-mgmt-stat">' +
+                    '<div class="order-mgmt-stat-label">Leverage</div>' +
+                    '<div class="order-mgmt-stat-value">' + (trade.leverage || 1) + 'x</div>' +
+                '</div>' +
+            '</div>' +
+
+            '<div class="order-mgmt-pnl" style="background:' + pnlColor + '15;border:1px solid ' + pnlColor + '30">' +
+                '<div class="order-mgmt-pnl-label">Unrealised P&L</div>' +
+                '<div class="order-mgmt-pnl-value" style="color:' + pnlColor + '">' +
+                    pnlSign + fmtPx(Math.abs(pnl)) + ' (' + pnlSign + pnlPct.toFixed(1) + '%)' +
+                '</div>' +
+            '</div>' +
+
+            '<div class="order-mgmt-sltp">' +
+                '<div class="order-mgmt-sltp-row">' +
+                    '<label class="order-mgmt-sltp-label">Stop Loss</label>' +
+                    '<div class="order-mgmt-sltp-input-wrap">' +
+                        '<button class="order-mgmt-sltp-btn" data-action="sl-down">−</button>' +
+                        '<input type="number" class="order-mgmt-sltp-input" id="order-mgmt-sl" placeholder="Not set" step="0.01" value="' + slVal + '">' +
+                        '<button class="order-mgmt-sltp-btn" data-action="sl-up">+</button>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="order-mgmt-sltp-row">' +
+                    '<label class="order-mgmt-sltp-label">Take Profit</label>' +
+                    '<div class="order-mgmt-sltp-input-wrap">' +
+                        '<button class="order-mgmt-sltp-btn" data-action="tp-down">−</button>' +
+                        '<input type="number" class="order-mgmt-sltp-input" id="order-mgmt-tp" placeholder="Not set" step="0.01" value="' + tpVal + '">' +
+                        '<button class="order-mgmt-sltp-btn" data-action="tp-up">+</button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+
+            '<div class="order-mgmt-actions">' +
+                '<button class="order-mgmt-btn order-mgmt-btn-save" id="order-mgmt-save-sltp">Save SL / TP</button>' +
+                '<button class="order-mgmt-btn order-mgmt-btn-close" id="order-mgmt-close-pos">Close Position</button>' +
+            '</div>' +
+        '</div>';
+
+    document.body.appendChild(modal);
+
+    function dismiss() { modal.remove(); }
+    modal.addEventListener('click', function(e) { if (e.target === modal) dismiss(); });
+    document.getElementById('order-mgmt-dismiss').addEventListener('click', dismiss);
+
+    // SL / TP stepper buttons
+    var step = currentPx > 100 ? 1 : currentPx > 10 ? 0.1 : 0.01;
+    modal.querySelectorAll('.order-mgmt-sltp-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var action = btn.getAttribute('data-action');
+            var inputId = action.startsWith('sl') ? 'order-mgmt-sl' : 'order-mgmt-tp';
+            var input = document.getElementById(inputId);
+            var val = parseFloat(input.value) || currentPx;
+            val = action.endsWith('up') ? val + step : Math.max(0, val - step);
+            input.value = val.toFixed(2);
+        });
+    });
+
+    // Save SL / TP
+    document.getElementById('order-mgmt-save-sltp').addEventListener('click', async function() {
+        var sl = parseFloat(document.getElementById('order-mgmt-sl').value) || null;
+        var tp = parseFloat(document.getElementById('order-mgmt-tp').value) || null;
+
+        if (!sl && !tp) {
+            if (typeof showToast === 'function') showToast('Info', 'Enter a Stop Loss or Take Profit value');
+            return;
+        }
+
+        if (trade.pos_type === 'tea' && trade.tea_id) {
+            var payload = {};
+            if (sl) payload.stop_loss = sl;
+            else payload.stop_loss = null;
+            if (tp) payload.take_profit = tp;
+            else payload.take_profit = null;
+
+            try {
+                var result = await supabaseClient
+                    .from('positions')
+                    .update(payload)
+                    .eq('user_id', state.userId)
+                    .eq('tea_id', trade.tea_id)
+                    .eq('trading_mode', state.tradingMode);
+
+                if (result.error) throw result.error;
+
+                if (typeof showToast === 'function') {
+                    var parts = [];
+                    if (sl) parts.push('SL: $' + sl.toFixed(2));
+                    if (tp) parts.push('TP: $' + tp.toFixed(2));
+                    showToast('SL/TP Updated', parts.join(' | '));
+                }
+                if (typeof loadPositions === 'function') await loadPositions();
+                dismiss();
+            } catch (err) {
+                console.error('SL/TP update error:', err);
+                if (typeof showToast === 'function') showToast('Error', err.message || 'Failed to update', true);
+            }
+        } else {
+            if (typeof showToast === 'function') showToast('Info', 'SL/TP only available for tea positions');
+        }
+    });
+
+    // Close Position
+    document.getElementById('order-mgmt-close-pos').addEventListener('click', function() {
+        dismiss();
+        if (trade.pos_type === 'index') {
+            closeIndexPosition(trade.symbol, trade.quantity, null);
+        } else {
+            closePosition(trade.tea_id, isBuy ? trade.quantity : -trade.quantity, trade.symbol);
+        }
+    });
 }
 
 // =============================================

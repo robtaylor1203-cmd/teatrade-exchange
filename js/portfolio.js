@@ -757,16 +757,26 @@ function displayUserTrades(trades) {
             let t212Html = '';
             if (openTrades.length > 0) {
                 t212Html += '<div class="t212-section-header">Open Positions</div>';
-                openTrades.forEach(({ trade, teaSymbol, total, pnl, pnlPct }) => {
+                openTrades.forEach(({ trade, teaSymbol, total, pnl, pnlPct, isPairTrade, isIndexTrade }) => {
                     const badgeClass = trade.side === 'BUY' ? 'text-green' : 'text-red';
                     const pnlClass = pnl >= 0 ? 't212-text-green' : 't212-text-red';
                     const pnlSign = pnl >= 0 ? '+' : '';
                     const currentValue = total + pnl;
-                    const assetInitial = teaSymbol.substring(0, 1).toUpperCase();
+
+                    let closeAction;
+                    if (isPairTrade) {
+                        closeAction = `confirmClosePosition('pair', '${trade.id}', '${escapeHtml(teaSymbol)}', ${pnl})`;
+                    } else if (isIndexTrade) {
+                        closeAction = `confirmClosePosition('index', '${trade.id}', '${escapeHtml(trade.index_symbol)}', ${pnl}, ${trade.quantity})`;
+                    } else {
+                        closeAction = `confirmClosePosition('tea', '${trade.id}', '${escapeHtml(teaSymbol)}', ${pnl}, ${trade.quantity}, ${trade.tea_id})`;
+                    }
 
                     t212Html += `
                     <div class="t212-trade-row">
-                        <div class="t212-trade-icon">${escapeHtml(assetInitial)}</div>
+                        <div class="t212-close-btn" onclick="${closeAction}" title="Close position">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </div>
                         <div class="t212-trade-left">
                             <span class="t212-symbol">${escapeHtml(teaSymbol)}</span>
                             <span class="t212-trade-desc"><span class="${badgeClass}" style="font-weight:600;">${trade.side}</span> &bull; Avg $${trade.price.toFixed(2)}</span>
@@ -804,6 +814,62 @@ function displayUserTrades(trades) {
             t212List.innerHTML = t212Html;
         }
     }
+}
+
+// =============================================
+// CLOSE POSITION CONFIRMATION PROMPT
+// =============================================
+
+function confirmClosePosition(type, tradeId, symbol, pnl, quantity, teaId) {
+    var existing = document.getElementById('close-position-modal');
+    if (existing) existing.remove();
+
+    var pnlColor = pnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+    var pnlSign = pnl >= 0 ? '+' : '';
+    var pnlText = pnlSign + '$' + Math.abs(pnl).toFixed(2);
+
+    var modal = document.createElement('div');
+    modal.id = 'close-position-modal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:10010;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);';
+    modal.innerHTML = `
+        <div style="background:#151d2b;border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:24px;width:calc(100% - 40px);max-width:340px;text-align:center;">
+            <div style="width:44px;height:44px;border-radius:50%;background:rgba(239,68,68,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </div>
+            <div style="font-size:16px;font-weight:600;color:#f3f4f6;margin-bottom:4px;">Close Position</div>
+            <div style="font-size:13px;color:#9ca3af;margin-bottom:16px;">
+                Are you sure you want to close<br>
+                <span style="color:#f3f4f6;font-weight:600;">${symbol}</span>
+                <span style="font-size:11px;color:#6b7280;"> (Ref: ${tradeId.toString().slice(0, 8)})</span>
+            </div>
+            <div style="font-size:15px;font-weight:600;color:${pnlColor};margin-bottom:20px;">
+                P&L: ${pnlText}
+            </div>
+            <div style="display:flex;gap:10px;">
+                <button onclick="document.getElementById('close-position-modal').remove()"
+                    style="flex:1;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:transparent;color:#9ca3af;font-size:14px;font-weight:600;cursor:pointer;">
+                    Cancel
+                </button>
+                <button id="confirm-close-btn"
+                    style="flex:1;padding:12px;border-radius:10px;border:none;background:#ef4444;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">
+                    Close Position
+                </button>
+            </div>
+        </div>`;
+
+    document.body.appendChild(modal);
+    modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+
+    document.getElementById('confirm-close-btn').addEventListener('click', function() {
+        modal.remove();
+        if (type === 'pair') {
+            closePairPosition(tradeId);
+        } else if (type === 'index') {
+            closeIndexPosition(symbol, quantity, tradeId);
+        } else {
+            closePosition(teaId, quantity, symbol);
+        }
+    });
 }
 
 // =============================================
