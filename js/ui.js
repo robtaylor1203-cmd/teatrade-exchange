@@ -1141,20 +1141,25 @@ async function loadTopTraders() {
     try {
         const traders = await apiFetchTopTraders(5);
         if (!traders || traders.length === 0) {
-            container.innerHTML = '<div style="padding: 12px 0; color: var(--text-muted); text-align: center;">No trades this week yet</div>';
+            container.innerHTML = '<div style="padding:10px 0;color:var(--text-muted);text-align:center;font-size:11px;">No trades this week yet</div>';
             return;
         }
         container.innerHTML = traders.map((t, i) => {
+            const rank = i + 1;
+            let rankClass = '';
+            if (rank === 1) rankClass = 'gold';
+            else if (rank === 2) rankClass = 'silver';
+            else if (rank === 3) rankClass = 'bronze';
             const vol = t.total_volume;
             let label;
             if (vol >= 1e6) label = (vol / 1e6).toFixed(1) + 'M kg';
             else if (vol >= 1e3) label = (vol / 1e3).toFixed(0) + 'K kg';
             else label = vol.toLocaleString() + ' kg';
-            const border = i < traders.length - 1 ? 'border-bottom: 1px solid var(--border);' : '';
             const name = t.username || t.user_id?.slice(0, 8) || 'Anon';
-            return `<div style="display: flex; justify-content: space-between; padding: 8px 0; ${border}">
-                <span>${i + 1}. ${name}</span>
-                <span style="font-family: 'JetBrains Mono', monospace;">${label}</span>
+            return `<div class="rp-lb-item">
+                <div class="rp-lb-rank ${rankClass}">${rank}</div>
+                <div class="rp-lb-name">${escapeHtml(name)}</div>
+                <div class="rp-lb-val" style="color:var(--text-muted);">${label}</div>
             </div>`;
         }).join('');
     } catch (e) {
@@ -1170,6 +1175,8 @@ adjustViewportScale();
 // =============================================
 
 function updateMobileLeaderboard(leaders) {
+    _updateRightPanelLeaderboard(leaders);
+
     const container = document.getElementById('mobile-leaderboard-list');
     const dateEl = document.getElementById('mobile-lb-date');
     if (!container) return;
@@ -1197,6 +1204,38 @@ function updateMobileLeaderboard(leaders) {
             <div class="mobile-lb-rank ${rankClass}">${rank}</div>
             <div class="mobile-lb-name">${escapeHtml(user.username)}</div>
             <div class="mobile-lb-return ${pctClass}">${sign}${pct.toFixed(1)}%</div>
+        </div>`;
+    }).join('');
+}
+
+function _updateRightPanelLeaderboard(leaders) {
+    const container = document.getElementById('rp-leaderboard-list');
+    const dateEl = document.getElementById('rp-lb-date');
+    if (!container) return;
+
+    if (dateEl) {
+        const now = new Date();
+        dateEl.textContent = now.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }).toUpperCase();
+    }
+
+    if (!leaders || leaders.length === 0) {
+        container.innerHTML = '<div style="padding:10px 0;color:var(--text-muted);text-align:center;font-size:11px;">No traders yet</div>';
+        return;
+    }
+
+    container.innerHTML = leaders.slice(0, 10).map((user, i) => {
+        const rank = i + 1;
+        let rankClass = '';
+        if (rank === 1) rankClass = 'gold';
+        else if (rank === 2) rankClass = 'silver';
+        else if (rank === 3) rankClass = 'bronze';
+        const pct = user.return_pct || 0;
+        const pctClass = pct >= 0 ? 'up' : 'down';
+        const sign = pct >= 0 ? '+' : '';
+        return `<div class="rp-lb-item" onclick="if(typeof openTraderProfile==='function') openTraderProfile('${escapeHtml(user.username)}', ${pct}, ${user.total_value || 0}, ${rank});">
+            <div class="rp-lb-rank ${rankClass}">${rank}</div>
+            <div class="rp-lb-name">${escapeHtml(user.username)}</div>
+            <div class="rp-lb-val ${pctClass}">${sign}${pct.toFixed(1)}%</div>
         </div>`;
     }).join('');
 }
@@ -1757,70 +1796,222 @@ function closeMoreSubScreen() {
     if (grid) grid.classList.remove('hidden');
 }
 
+function _weatherSvgIcon(bg) {
+    var icons = {
+        sunny:  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.8"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>',
+        cloudy: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>',
+        rain:   '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8"><path d="M17.5 17H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><line x1="8" y1="19" x2="8" y2="21"/><line x1="12" y1="19" x2="12" y2="21"/><line x1="16" y1="19" x2="16" y2="21"/></svg>',
+        snow:   '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="1.8"><path d="M17.5 17H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><line x1="8" y1="20" x2="8.01" y2="20"/><line x1="12" y1="20" x2="12.01" y2="20"/><line x1="16" y1="20" x2="16.01" y2="20"/></svg>',
+        foggy:  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.8"><path d="M17.5 17H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><line x1="4" y1="20" x2="20" y2="20"/><line x1="6" y1="23" x2="18" y2="23"/></svg>',
+        storm:  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="1.8"><path d="M17.5 17H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><polyline points="13 17 9 22 13 22 11 24"/></svg>'
+    };
+    return icons[bg] || icons.cloudy;
+}
+
 function populateMoreWeather() {
     var content = document.getElementById('more-weather-content');
     if (!content) return;
-    var cards = document.querySelectorAll('#weather-cards .t212-weather-card');
-    if (!cards.length) { content.innerHTML = '<div style="padding:20px;color:var(--text-muted);text-align:center;">Loading weather data...</div>'; return; }
+
+    var cache = (typeof _weatherCache !== 'undefined') ? _weatherCache : [];
+    if (!cache.length) {
+        content.innerHTML = '<div class="ms-empty"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="1.5"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg><p>Weather data is loading...</p><p class="ms-empty-sub">Growing region forecasts will appear here once loaded.</p></div>';
+        return;
+    }
 
     var html = '';
-    cards.forEach(function(card, idx) {
-        var name = card.querySelector('.wc-region')?.textContent || '';
-        var condition = card.querySelector('.wc-condition')?.textContent || '';
-        var temp = card.querySelector('.wc-temp-val')?.textContent || '';
-        html += '<div class="more-weather-item" onclick="if(typeof openWeatherPopout===\'function\') openWeatherPopout(' + idx + ');">' +
-            '<div class="more-weather-left"><span class="more-weather-name">' + name + '</span><span style="color:var(--text-muted);font-size:12px;">' + condition + '</span></div>' +
-            '<div class="more-weather-right"><span>' + temp + '</span></div></div>';
+    cache.forEach(function(entry, idx) {
+        if (!entry || entry.error || !entry.weather) return;
+        var r = entry.region;
+        var w = entry.weather;
+        var temp = w.temp != null ? w.temp + '°' : '--';
+        var feels = w.feelsLike != null ? 'Feels ' + w.feelsLike + '°' : '';
+        var humidity = w.humidity != null ? w.humidity + '%' : '--';
+        var wind = w.windSpeed != null ? w.windSpeed + ' km/h' : '--';
+        var cond = (typeof _wmoInfo === 'function') ? _wmoInfo(w.code) : { label: 'Unknown', bg: 'cloudy' };
+        var svgIcon = _weatherSvgIcon(cond.bg);
+        var flag = (typeof flagImg === 'function') ? flagImg(r.iso, 20) : '';
+
+        html += '<div class="ms-card" onclick="if(typeof openWeatherPopout===\'function\') openWeatherPopout(' + idx + ', this);">' +
+            '<div class="ms-card-row">' +
+                '<div class="ms-weather-icon-wrap">' + svgIcon + '</div>' +
+                '<div class="ms-card-info">' +
+                    '<div class="ms-card-title">' + flag + ' ' + r.name + '</div>' +
+                    '<div class="ms-card-sub">' + cond.label + '</div>' +
+                '</div>' +
+                '<div style="text-align:right;">' +
+                    '<div class="ms-card-value">' + temp + '</div>' +
+                    '<div style="font-size:11px;color:#6b7280;">' + feels + '</div>' +
+                '</div>' +
+            '</div>' +
+            '<div class="ms-card-stats">' +
+                '<span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M12 2v6l3 3"/><path d="M12 22a7 7 0 0 0 0-14"/></svg> ' + humidity + '</span>' +
+                '<span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg> ' + wind + '</span>' +
+                (w.uv != null ? '<span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/></svg> UV ' + w.uv + '</span>' : '') +
+            '</div>' +
+        '</div>';
     });
-    content.innerHTML = html;
+    content.innerHTML = html || '<div class="ms-empty"><p>No weather data available.</p></div>';
 }
 
 function populateMoreCurrency() {
     var content = document.getElementById('more-currency-content');
     if (!content) return;
 
-    var macros = [
-        { id: 'usdkes', icon: '\u{1F1F0}\u{1F1EA}', pair: 'USD / KES', sub: 'Kenyan Shilling' },
-        { id: 'usdinr', icon: '\u{1F1EE}\u{1F1F3}', pair: 'USD / INR', sub: 'Indian Rupee' },
-        { id: 'usdlkr', icon: '\u{1F1F1}\u{1F1F0}', pair: 'USD / LKR', sub: 'Sri Lankan Rupee' },
-        { id: 'usdcny', icon: '\u{1F1E8}\u{1F1F3}', pair: 'USD / CNY', sub: 'Chinese Yuan' },
-        { id: 'oil',    icon: '\u{2699}',            pair: 'Brent Crude', sub: 'Shipping & logistics' }
-    ];
-
+    var DASH = '\u2014';
     var html = '';
-    macros.forEach(function(m) {
-        var priceEl = document.getElementById('macro-' + m.id);
-        var price = priceEl ? priceEl.textContent : '\u2014';
-        html += '<div class="more-currency-item" onclick="if(typeof openMacroPopout===\'function\') openMacroPopout(\'' + m.id + '\');">' +
-            '<div class="more-currency-left"><span class="more-currency-icon">' + m.icon + '</span><div><div class="more-currency-pair">' + m.pair + '</div><div class="more-currency-sub">' + m.sub + '</div></div></div>' +
-            '<div class="more-currency-price">' + price + '</div></div>';
+
+    MACRO_ROW_DEFS.forEach(function(def) {
+        var raw = state.macroIndicators?.[def.key];
+        var value = Number(raw);
+        var baseline = state.macroBaseline?.[def.key];
+        var prev = (baseline != null && !isNaN(Number(baseline))) ? Number(baseline) : Number(state.previousMacro?.[def.key]);
+
+        var priceStr = (!isNaN(value)) ? def.prefix + value.toFixed(def.decimals) : DASH;
+
+        var changePct = 0;
+        var changeClass = '';
+        var changeStr = DASH;
+        if (!isNaN(value) && !isNaN(prev) && prev !== 0) {
+            changePct = ((value - prev) / prev) * 100;
+            changeClass = changePct > 0 ? 'up' : changePct < 0 ? 'down' : '';
+            var arrow = changePct > 0 ? '\u25B2' : changePct < 0 ? '\u25BC' : '';
+            changeStr = arrow + ' ' + (changePct >= 0 ? '+' : '') + changePct.toFixed(2) + '%';
+        }
+
+        var flagCircle = def.iso
+            ? '<div class="t212-flag-circle">' + flagImg(def.iso, 22) + '</div>'
+            : '<div class="t212-flag-circle"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M6 12h12"/></svg></div>';
+
+        var sparkline = _buildMacroSparkline(def.key);
+
+        html += '<div class="t212-market-row" style="margin:0 16px;border-radius:12px;margin-bottom:8px;background:#151d2b;border:1px solid rgba(255,255,255,0.05);" onclick="if(typeof openMacroPopout===\'function\') openMacroPopout(\'' + def.id + '\', this);">' +
+            '<div class="t212-row-left">' +
+                flagCircle +
+                '<div class="t212-symbol-stack">' +
+                    '<span class="t212-symbol-name">' + def.name + '</span>' +
+                    '<span class="t212-symbol-desc">' + def.desc + '</span>' +
+                '</div>' +
+            '</div>' +
+            '<div class="t212-sparkline-wrap">' + sparkline + '</div>' +
+            '<div class="t212-row-right">' +
+                '<span class="t212-price-text">' + priceStr + '</span>' +
+                '<span class="t212-change-pill ' + changeClass + '">' + changeStr + '</span>' +
+            '</div>' +
+        '</div>';
     });
-    content.innerHTML = html;
+
+    content.innerHTML = '<div style="padding-top:12px;">' + html + '</div>';
 }
 
 function populateMoreLeaderboard() {
     var content = document.getElementById('more-leaderboard-content');
     if (!content) return;
 
-    var src = document.getElementById('leaderboard-list');
-    if (!src || src.children.length === 0) src = document.getElementById('mobile-leaderboard-list');
-    if (src && src.children.length > 0) {
-        content.innerHTML = src.innerHTML;
-    } else {
-        content.innerHTML = '<div style="padding:20px;color:var(--text-muted);text-align:center;">Loading...</div>';
+    var traders = (typeof state !== 'undefined' && state.topTraders) ? state.topTraders : [];
+    if (!traders.length) {
+        var src = document.getElementById('leaderboard-list');
+        if (!src || src.children.length === 0) src = document.getElementById('mobile-leaderboard-list');
+        if (src && src.children.length > 0) {
+            content.innerHTML = '<div style="padding:16px;">' + src.innerHTML + '</div>';
+            return;
+        }
+        content.innerHTML = '<div class="ms-empty"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="1.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg><p>Leaderboard loading...</p></div>';
+        return;
     }
+
+    var html = '';
+    traders.forEach(function(t, i) {
+        var rank = i + 1;
+        var medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '<span style="color:#6b7280;font-weight:600;">#' + rank + '</span>';
+        var name = t.display_name || t.username || 'Trader';
+        var vol = t.total_volume ? '$' + Number(t.total_volume).toLocaleString() : '--';
+        html += '<div class="ms-card" style="cursor:default;">' +
+            '<div class="ms-card-row">' +
+                '<div class="ms-card-icon" style="font-size:20px;width:32px;text-align:center;">' + medal + '</div>' +
+                '<div class="ms-card-info"><div class="ms-card-title">' + name + '</div></div>' +
+                '<div class="ms-card-value" style="font-size:13px;">' + vol + '</div>' +
+            '</div>' +
+        '</div>';
+    });
+    content.innerHTML = html;
 }
 
 function populateMoreHistory() {
     var content = document.getElementById('more-history-content');
     if (!content) return;
 
-    var src = document.querySelector('.order-history-section');
-    if (src && src.innerHTML.trim()) {
-        content.innerHTML = src.innerHTML;
-    } else {
-        content.innerHTML = '<div style="padding:20px;color:var(--text-muted);text-align:center;">No trade history available.</div>';
+    var trades = (typeof state !== 'undefined' && state.currentTradesData) ? state.currentTradesData : [];
+    if (!trades.length) {
+        content.innerHTML = '<div class="ms-empty"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><p>No trade history yet</p><p class="ms-empty-sub">Your completed trades will appear here.</p></div>';
+        return;
     }
+
+    var sorted = trades.slice().sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
+
+    var totalTrades = sorted.length;
+    var buys = sorted.filter(function(t) { return t.side === 'BUY'; }).length;
+    var sells = totalTrades - buys;
+    var totalVolume = sorted.reduce(function(sum, t) { return sum + Math.abs(t.quantity || 0) * (t.price || 0); }, 0);
+
+    var uniqueSymbols = {};
+    sorted.forEach(function(t) {
+        var s = t.index_symbol || '';
+        if (!s && t.tea_id) {
+            var tea = (state.teas || []).find(function(x) { return x.id === t.tea_id; });
+            s = tea ? tea.symbol : '';
+        }
+        if (s) uniqueSymbols[s] = (uniqueSymbols[s] || 0) + 1;
+    });
+    var topSymbol = Object.keys(uniqueSymbols).sort(function(a, b) { return uniqueSymbols[b] - uniqueSymbols[a]; })[0] || '--';
+
+    var html = '<div class="ms-stats-grid">' +
+        '<div class="ms-stat-card">' +
+            '<div class="ms-stat-value">' + totalTrades + '</div>' +
+            '<div class="ms-stat-label">Total Trades</div>' +
+        '</div>' +
+        '<div class="ms-stat-card">' +
+            '<div class="ms-stat-value" style="color:#00e676;">' + buys + ' <span style="color:#6b7280;font-size:11px;">/ </span><span style="color:#ef4444;">' + sells + '</span></div>' +
+            '<div class="ms-stat-label">Buy / Sell</div>' +
+        '</div>' +
+        '<div class="ms-stat-card">' +
+            '<div class="ms-stat-value">$' + (totalVolume >= 1000 ? (totalVolume / 1000).toFixed(1) + 'k' : totalVolume.toFixed(0)) + '</div>' +
+            '<div class="ms-stat-label">Volume</div>' +
+        '</div>' +
+        '<div class="ms-stat-card">' +
+            '<div class="ms-stat-value" style="font-size:13px;">' + topSymbol + '</div>' +
+            '<div class="ms-stat-label">Most Traded</div>' +
+        '</div>' +
+    '</div>';
+
+    html += '<div class="ms-section-title">Recent Trades</div>';
+
+    sorted.slice(0, 30).forEach(function(t) {
+        var sym = '';
+        if (t.index_symbol) { sym = t.index_symbol; }
+        else {
+            var tea = (state.teas || []).find(function(x) { return x.id === t.tea_id; });
+            sym = tea ? tea.symbol : 'Tea #' + t.tea_id;
+        }
+        var isBuy = t.side === 'BUY';
+        var sideColor = isBuy ? '#00e676' : '#ef4444';
+        var date = new Date(t.created_at);
+        var dateStr = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' ' + date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        var qty = Math.abs(t.quantity || 0);
+        var price = t.price ? '$' + Number(t.price).toFixed(2) : '--';
+        var lev = t.leverage && t.leverage > 1 ? t.leverage + 'x' : '';
+
+        html += '<div class="ms-card" style="cursor:default;">' +
+            '<div class="ms-card-row">' +
+                '<div class="ms-trade-badge" style="background:' + sideColor + '15;color:' + sideColor + ';">' + t.side + '</div>' +
+                '<div class="ms-card-info">' +
+                    '<div class="ms-card-title">' + sym + (lev ? ' <span style="font-size:10px;color:#6b7280;">' + lev + '</span>' : '') + '</div>' +
+                    '<div class="ms-card-sub">' + dateStr + ' &middot; ' + qty.toLocaleString() + ' kg</div>' +
+                '</div>' +
+                '<div class="ms-card-value">' + price + '</div>' +
+            '</div>' +
+        '</div>';
+    });
+    content.innerHTML = html;
 }
 
 function populateMoreAlerts() {
@@ -1831,19 +2022,32 @@ function populateMoreAlerts() {
     var keys = Object.keys(alerts);
 
     if (keys.length === 0) {
-        content.innerHTML = '<div class="more-alerts-empty">No price alerts set.<br><br>Open a chart and tap the bell icon to add one.</div>';
+        content.innerHTML = '<div class="ms-empty"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><p>No price alerts set</p><p class="ms-empty-sub">Open a chart and tap the bell icon to create one.</p></div>';
         return;
     }
 
     var html = '';
     keys.forEach(function(sym) {
         var a = alerts[sym];
-        var below = a.below ? 'Below $' + Number(a.below).toFixed(2) : '';
-        var above = a.above ? 'Above $' + Number(a.above).toFixed(2) : '';
-        var vals = [below, above].filter(Boolean).join(' / ');
-        html += '<div class="more-alert-item" onclick="if(typeof openPriceAlertModal===\'function\'){var t=(state.teas||[]).find(function(x){return x.symbol===\'' + sym + '\'});if(t) openPriceAlertModal(t.symbol,t.current_price);}">' +
-            '<div class="more-alert-symbol">' + sym + '</div>' +
-            '<div class="more-alert-values">' + vals + '</div></div>';
+        var tea = (state.teas || []).find(function(x) { return x.symbol === sym; });
+        var currentPx = tea ? '$' + Number(tea.current_price).toFixed(2) : '';
+        var below = a.below ? '$' + Number(a.below).toFixed(2) : '--';
+        var above = a.above ? '$' + Number(a.above).toFixed(2) : '--';
+
+        html += '<div class="ms-card" onclick="if(typeof openPriceAlertModal===\'function\'){var t=(state.teas||[]).find(function(x){return x.symbol===\'' + sym + '\'});if(t) openPriceAlertModal(t.symbol,t.current_price);}">' +
+            '<div class="ms-card-row">' +
+                '<div style="width:42px;height:42px;border-radius:10px;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+                    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>' +
+                '</div>' +
+                '<div class="ms-card-info" style="margin-left:12px;">' +
+                    '<div class="ms-card-title">' + sym + (currentPx ? ' <span style="color:#6b7280;font-size:12px;">' + currentPx + '</span>' : '') + '</div>' +
+                    '<div class="ms-card-sub">' +
+                        '<span style="color:#ef4444;">SL ' + below + '</span> &bull; <span style="color:#00e676;">TP ' + above + '</span>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="ms-card-chevron">›</div>' +
+            '</div>' +
+        '</div>';
     });
     content.innerHTML = html;
 }
@@ -2070,7 +2274,7 @@ function _showShareToast(msg) {
         btn.classList.add('visible');
     }
 
-    setTimeout(reveal, 30000);
+    setTimeout(reveal, 5000);
 
     var origExecute = window.executeTrade;
     if (typeof origExecute === 'function') {

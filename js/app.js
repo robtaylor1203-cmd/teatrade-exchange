@@ -220,6 +220,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     initCommandLine();
     initQuoteBoard();
 
+    // Deferred chart redraw: layout may not be final when DOMContentLoaded fires,
+    // so re-measure the canvas once the browser has painted the first frame.
+    requestAnimationFrame(() => { resizeCanvas(); drawChart(); });
+
     // Wait for auth so user-specific paths (positions, trades) work
     await authPromise;
 
@@ -229,7 +233,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ── Phase 3: Non-blocking secondary data ──
     // Price cache starts streaming; sparklines fill as data arrives.
-    const priceCachePromise = initializePriceCache();
+    const priceCachePromise = initializePriceCache().then(() => {
+        state.cachedTimeframe = null;
+        drawChart();
+    });
 
     Promise.allSettled([
         loadTeaPairs(),

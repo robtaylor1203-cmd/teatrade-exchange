@@ -706,23 +706,23 @@
                     <!-- Mobile: dynamically rendered as t212-market-rows by renderMacroWatchlist() -->
                     <!-- Desktop fallback rows -->
                     <div class="macro-item macro-clickable macro-desktop-row" id="macro-row-usdkes" onclick="openMacroPopout('usdkes', this)">
-                        <div class="macro-info"><div class="macro-icon currency">KE</div><div><div class="macro-name">USD / KES</div><div class="macro-subtext">Kenyan Shilling</div></div></div>
+                        <div class="macro-info"><div class="macro-icon currency"><img src="https://flagcdn.com/w40/ke.png" alt="KE" class="flag-img" style="width:20px;height:auto;"></div><div><div class="macro-name">USD / KES</div><div class="macro-subtext">Kenyan Shilling</div></div></div>
                         <div class="macro-value"><div class="macro-price" id="macro-usdkes">&mdash;</div><div class="macro-change" id="macro-usdkes-change">&mdash;</div></div>
                     </div>
                     <div class="macro-item macro-clickable macro-desktop-row" id="macro-row-usdinr" onclick="openMacroPopout('usdinr', this)">
-                        <div class="macro-info"><div class="macro-icon currency"></div><div><div class="macro-name">USD / INR</div><div class="macro-subtext">Indian Rupee</div></div></div>
+                        <div class="macro-info"><div class="macro-icon currency"><img src="https://flagcdn.com/w40/in.png" alt="IN" class="flag-img" style="width:20px;height:auto;"></div><div><div class="macro-name">USD / INR</div><div class="macro-subtext">Indian Rupee</div></div></div>
                         <div class="macro-value"><div class="macro-price" id="macro-usdinr">&mdash;</div><div class="macro-change" id="macro-usdinr-change">&mdash;</div></div>
                     </div>
                     <div class="macro-item macro-clickable macro-desktop-row" id="macro-row-usdlkr" onclick="openMacroPopout('usdlkr', this)">
-                        <div class="macro-info"><div class="macro-icon currency"></div><div><div class="macro-name">USD / LKR</div><div class="macro-subtext">Sri Lankan Rupee</div></div></div>
+                        <div class="macro-info"><div class="macro-icon currency"><img src="https://flagcdn.com/w40/lk.png" alt="LK" class="flag-img" style="width:20px;height:auto;"></div><div><div class="macro-name">USD / LKR</div><div class="macro-subtext">Sri Lankan Rupee</div></div></div>
                         <div class="macro-value"><div class="macro-price" id="macro-usdlkr">&mdash;</div><div class="macro-change" id="macro-usdlkr-change">&mdash;</div></div>
                     </div>
                     <div class="macro-item macro-clickable macro-desktop-row" id="macro-row-usdcny" onclick="openMacroPopout('usdcny', this)">
-                        <div class="macro-info"><div class="macro-icon currency"></div><div><div class="macro-name">USD / CNY</div><div class="macro-subtext">Chinese Yuan</div></div></div>
+                        <div class="macro-info"><div class="macro-icon currency"><img src="https://flagcdn.com/w40/cn.png" alt="CN" class="flag-img" style="width:20px;height:auto;"></div><div><div class="macro-name">USD / CNY</div><div class="macro-subtext">Chinese Yuan</div></div></div>
                         <div class="macro-value"><div class="macro-price" id="macro-usdcny">&mdash;</div><div class="macro-change" id="macro-usdcny-change">&mdash;</div></div>
                     </div>
                     <div class="macro-item macro-clickable macro-desktop-row" id="macro-row-oil" onclick="openMacroPopout('oil', this)">
-                        <div class="macro-info"><div class="macro-icon oil">&#9981;</div><div><div class="macro-name">Brent Crude</div><div class="macro-subtext">Shipping &amp; logistics</div></div></div>
+                        <div class="macro-info"><div class="macro-icon oil"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M6 12h12"/></svg></div><div><div class="macro-name">Brent Crude</div><div class="macro-subtext">Shipping &amp; logistics</div></div></div>
                         <div class="macro-value"><div class="macro-price" id="macro-oil">&mdash;</div><div class="macro-change" id="macro-oil-change">&mdash;</div></div>
                     </div>
                 </div>
@@ -830,8 +830,8 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- Mobile Leaderboard (visible by default in menu panel) -->
+
+            <!-- Leaderboard (in sidebar for mobile, hidden on wide desktop where right-panel shows it) -->
             <div class="mobile-leaderboard-section" id="mobile-leaderboard-section">
                 <div class="mobile-leaderboard-header">
                     <div class="mobile-leaderboard-title">Leaderboard</div>
@@ -1440,6 +1440,72 @@
                 </div>
                 </div>
             </div>
+
+            <!-- Your Confirmed Orders (below tradable instruments) -->
+            <div class="order-history-section" id="order-history-center">
+                <div class="order-history-header">
+                    <div class="order-history-title">
+                        Your Confirmed Orders
+                        <span class="order-count" id="order-count">0</span>
+                    </div>
+                    <div class="order-filter-buttons">
+                        <button class="filter-btn" id="filter-open" onclick="setOrdersFilter('open')">Open</button>
+                        <button class="filter-btn active" id="filter-all" onclick="setOrdersFilter('all')">All</button>
+                    </div>
+                </div>
+                <div class="order-table-wrapper">
+                <table class="order-table" id="orders-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" data-sort="time" onclick="sortOrdersTable('time')">Time</th>
+                            <th>Order ID</th>
+                            <th class="sortable" data-sort="tea" onclick="sortOrdersTable('tea')">Tea</th>
+                            <th>Side</th>
+                            <th class="sortable" data-sort="qty" onclick="sortOrdersTable('qty')">Qty (kg)</th>
+                            <th class="sortable" data-sort="entry" onclick="sortOrdersTable('entry')">Entry</th>
+                            <th class="sortable" data-sort="total" onclick="sortOrdersTable('total')">Invested</th>
+                            <th class="sortable" data-sort="pnl" onclick="sortOrdersTable('pnl')">P/L</th>
+                            <th>Return</th>
+                            <th class="sortable" data-sort="status" onclick="sortOrdersTable('status')">Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orders-tbody">
+                        <tr>
+                            <td colspan="11" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                                No orders yet. Start trading!
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot id="orders-tfoot" style="display: none;">
+                        <tr>
+                            <td colspan="11" class="orders-summary-cell">
+                                <div class="orders-summary-bar">
+                                    <span class="orders-summary-label">OPEN POSITIONS</span>
+                                    <div class="orders-summary-stats">
+                                        <div class="orders-summary-stat">
+                                            <span class="orders-summary-stat-label">Market Value</span>
+                                            <span class="orders-summary-stat-value" id="tfoot-total">$0.00</span>
+                                        </div>
+                                        <div class="orders-summary-divider"></div>
+                                        <div class="orders-summary-stat">
+                                            <span class="orders-summary-stat-label">Unrealised P&amp;L</span>
+                                            <span class="orders-summary-stat-value" id="tfoot-pnl">$0.00</span>
+                                        </div>
+                                        <div class="orders-summary-divider"></div>
+                                        <div class="orders-summary-stat">
+                                            <span class="orders-summary-stat-label">Positions</span>
+                                            <span class="orders-summary-stat-value" id="tfoot-count">0 open</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+                </div>
+            </div>
+
         </div>
         </div><!-- /view-chart -->
 
@@ -1628,71 +1694,149 @@
                 </div>
             </div>
 
-            <!-- Order History Section (moved here for portfolio view) -->
-            <div class="order-history-section">
-                <div class="order-history-header">
-                    <div class="order-history-title">
-                        Your Confirmed Orders
-                        <span class="order-count" id="order-count">0</span>
-                    </div>
-                    <div class="order-filter-buttons">
-                        <button class="filter-btn" id="filter-open" onclick="setOrdersFilter('open')">Open</button>
-                        <button class="filter-btn active" id="filter-all" onclick="setOrdersFilter('all')">All</button>
-                    </div>
+            </div><!-- /view-portfolio -->
+
+            <!-- Market News -->
+            <div class="panel-section rp-section" id="rp-market-news">
+                <div class="panel-title">
+                    Market News
+                    <span class="live-badge">LIVE</span>
                 </div>
-                <div class="order-table-wrapper">
-                <table class="order-table" id="orders-table">
-                    <thead>
-                        <tr>
-                            <th class="sortable" data-sort="time" onclick="sortOrdersTable('time')">Time</th>
-                            <th>Order ID</th>
-                            <th class="sortable" data-sort="tea" onclick="sortOrdersTable('tea')">Tea</th>
-                            <th>Side</th>
-                            <th class="sortable" data-sort="qty" onclick="sortOrdersTable('qty')">Qty (kg)</th>
-                            <th class="sortable" data-sort="entry" onclick="sortOrdersTable('entry')">Entry</th>
-                            <th class="sortable" data-sort="total" onclick="sortOrdersTable('total')">Invested</th>
-                            <th class="sortable" data-sort="pnl" onclick="sortOrdersTable('pnl')">P/L</th>
-                            <th>Return</th>
-                            <th class="sortable" data-sort="status" onclick="sortOrdersTable('status')">Status</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="orders-tbody">
-                        <tr>
-                            <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 20px;">
-                                No orders yet. Start trading!
-                            </td>
-                        </tr>
-                    </tbody>
-                    <tfoot id="orders-tfoot" style="display: none;">
-                        <tr>
-                            <td colspan="11" class="orders-summary-cell">
-                                <div class="orders-summary-bar">
-                                    <span class="orders-summary-label">OPEN POSITIONS</span>
-                                    <div class="orders-summary-stats">
-                                        <div class="orders-summary-stat">
-                                            <span class="orders-summary-stat-label">Market Value</span>
-                                            <span class="orders-summary-stat-value" id="tfoot-total">$0.00</span>
-                                        </div>
-                                        <div class="orders-summary-divider"></div>
-                                        <div class="orders-summary-stat">
-                                            <span class="orders-summary-stat-label">Unrealised P&amp;L</span>
-                                            <span class="orders-summary-stat-value" id="tfoot-pnl">$0.00</span>
-                                        </div>
-                                        <div class="orders-summary-divider"></div>
-                                        <div class="orders-summary-stat">
-                                            <span class="orders-summary-stat-label">Positions</span>
-                                            <span class="orders-summary-stat-value" id="tfoot-count">0 open</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                    </tfoot>
-                </table>
+                <div class="news-feed">
+                    <div class="news-item">
+                        <div class="news-time">14:32 UTC</div>
+                        <div class="news-headline">
+                            <span class="news-tag kenya">KENYA</span>
+                            Mombasa auction sees record volume as BP1 grades surge 4.2%
+                        </div>
+                    </div>
+                    <div class="news-item">
+                        <div class="news-time">14:18 UTC</div>
+                        <div class="news-headline">
+                            <span class="news-tag india">INDIA</span>
+                            Darjeeling first flush arrives early; quality reports exceptional
+                        </div>
+                    </div>
+                    <div class="news-item">
+                        <div class="news-time">13:45 UTC</div>
+                        <div class="news-headline">
+                            <span class="news-tag sri-lanka">SRI LANKA</span>
+                            Ceylon tea exports up 8% YoY as European demand strengthens
+                        </div>
+                    </div>
+                    <div class="news-item">
+                        <div class="news-time">12:20 UTC</div>
+                        <div class="news-headline">
+                            <span class="news-tag china">CHINA</span>
+                            Yunnan Pu-erh vintage releases fetch premium at Kunming fair
+                        </div>
+                    </div>
+                    <div class="news-item">
+                        <div class="news-time">11:05 UTC</div>
+                        <div class="news-headline">
+                            <span class="news-tag kenya">KENYA</span>
+                            Weather outlook favorable for Q1 harvest across Rift Valley
+                        </div>
+                    </div>
                 </div>
             </div>
-            </div><!-- /view-portfolio -->
+
+            <!-- Order Book / Depth of Market -->
+            <div class="panel-section order-book-section rp-section">
+                <div class="panel-title">
+                    Order Book (Mombasa BP1)
+                    <span class="live-badge">LIVE</span>
+                </div>
+                <div class="order-book-container">
+                    <div class="ob-row ob-header">
+                        <span>Price (USD)</span>
+                        <span>Qty (Tons)</span>
+                        <span>Total</span>
+                    </div>
+                    <div class="ob-row">
+                        <span class="ob-price-down">3.48</span>
+                        <span>12.5</span>
+                        <span>45.2</span>
+                        <div class="depth-bar ask-bar" style="width: 20%"></div>
+                    </div>
+                    <div class="ob-row">
+                        <span class="ob-price-down">3.47</span>
+                        <span>45.0</span>
+                        <span>32.7</span>
+                        <div class="depth-bar ask-bar" style="width: 60%"></div>
+                    </div>
+                    <div class="ob-row">
+                        <span class="ob-price-down">3.46</span>
+                        <span>22.1</span>
+                        <span>22.1</span>
+                        <div class="depth-bar ask-bar" style="width: 35%"></div>
+                    </div>
+                    <div class="ob-spread">
+                        <span class="ob-spread-label">Spread: 0.02 (0.58%)</span>
+                        <div class="ob-spread-price">$3.44</div>
+                    </div>
+                    <div class="ob-row">
+                        <span class="ob-price-up">3.44</span>
+                        <span>150.0</span>
+                        <span>150.0</span>
+                        <div class="depth-bar bid-bar" style="width: 90%"></div>
+                    </div>
+                    <div class="ob-row">
+                        <span class="ob-price-up">3.43</span>
+                        <span>80.5</span>
+                        <span>230.5</span>
+                        <div class="depth-bar bid-bar" style="width: 50%"></div>
+                    </div>
+                    <div class="ob-row">
+                        <span class="ob-price-up">3.42</span>
+                        <span>40.2</span>
+                        <span>270.7</span>
+                        <div class="depth-bar bid-bar" style="width: 30%"></div>
+                    </div>
+                    <div class="ob-row">
+                        <span class="ob-price-up">3.41</span>
+                        <span>65.8</span>
+                        <span>336.5</span>
+                        <div class="depth-bar bid-bar" style="width: 45%"></div>
+                    </div>
+                    <div class="ob-row">
+                        <span class="ob-price-up">3.40</span>
+                        <span>28.3</span>
+                        <span>364.8</span>
+                        <div class="depth-bar bid-bar" style="width: 22%"></div>
+                    </div>
+                    <div class="ob-blur-overlay">
+                        <div class="ob-lock-content">
+                            <div class="ob-lock-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                </svg>
+                            </div>
+                            <h4>Institutional Data</h4>
+                            <p>Real-time bid/ask depth limited to Exchange Partners</p>
+                            <button class="ob-btn-access" onclick="document.getElementById('early-access-modal').style.display='flex'">Request Access</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Leaderboard (desktop right panel) -->
+            <div class="rp-section" id="rp-leaderboard-section">
+                <div class="rp-section-header">
+                    <div class="rp-section-title">Leaderboard</div>
+                    <div class="rp-section-date" id="rp-lb-date"></div>
+                </div>
+                <div id="rp-leaderboard-list"></div>
+            </div>
+
+            <!-- Top 5 Buyers (desktop right panel) -->
+            <div class="rp-section" id="rp-top-buyers-section">
+                <div class="rp-section-header">
+                    <div class="rp-section-title">Top 5 Buyers</div>
+                </div>
+                <div id="top-traders-list"></div>
+            </div>
 
             <!-- VIEW: CHAT — Full-screen TT Messenger -->
             <div id="view-chat" class="app-view">
@@ -1814,12 +1958,14 @@
                 <div class="more-sub-screen" id="more-sub-contact">
                     <div class="more-sub-header"><button class="more-back-btn" onclick="closeMoreSubScreen()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button><span>Contact Us</span></div>
                     <div class="more-sub-content" id="more-contact-content">
-                        <div class="more-contact-card">
-                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                            <h3>Get in Touch</h3>
-                            <p>Questions, feedback, or partnership enquiries</p>
-                            <a href="contact.html" class="more-contact-link">Open Contact Page</a>
-                            <a href="about.html" class="more-contact-link secondary">About TeaTrade</a>
+                        <div class="ms-empty" style="padding-top:40px;">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                            <p style="font-size:18px;margin-top:8px;">Get in Touch</p>
+                            <p class="ms-empty-sub">Questions, feedback, or partnership enquiries</p>
+                        </div>
+                        <div style="padding:0 16px;">
+                            <a href="contact.html" class="more-contact-link" style="display:block;padding:14px;background:var(--accent-blue);color:#fff;border-radius:10px;font-size:15px;font-weight:600;text-decoration:none;text-align:center;margin-bottom:10px;">Open Contact Page</a>
+                            <a href="about.html" class="more-contact-link secondary" style="display:block;padding:14px;background:rgba(26,115,232,0.1);color:var(--accent-blue);border-radius:10px;font-size:15px;font-weight:600;text-decoration:none;text-align:center;">About TeaTrade</a>
                         </div>
                     </div>
                 </div>

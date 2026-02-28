@@ -221,14 +221,17 @@ function generateChartData(timeframe) {
     fullHistory = getPriceHistorySync(symbol, symbolType);
 
     if (!fullHistory || fullHistory.length === 0) {
-        state.isFetchingHistory = true;
-        getPriceHistory(symbol, symbolType)
-            .catch(() => {})
-            .finally(() => {
-                state.isFetchingHistory = false;
-                state.cachedTimeframe = null;
-                drawChart();
-            });
+        if (!state.isFetchingHistory) {
+            state.isFetchingHistory = true;
+            getPriceHistory(symbol, symbolType)
+                .catch(() => {})
+                .finally(() => {
+                    state.isFetchingHistory = false;
+                    state.cachedTimeframe = null;
+                    drawChart();
+                });
+        }
+        return [];
     }
 
     const sampled = sampleHistoricalData(fullHistory, timeframe, config);
@@ -501,7 +504,8 @@ function _drawChartSkeleton(ctx, w, h) {
     var ch = h - bottomMargin - (h * 0.1);
     var top = h * 0.1;
 
-    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    // Grid lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
     ctx.lineWidth = 1;
     for (var i = 0; i <= 5; i++) {
         var gy = top + ch * (i / 5);
@@ -511,42 +515,87 @@ function _drawChartSkeleton(ctx, w, h) {
         ctx.stroke();
     }
 
-    var numBars = Math.max(10, Math.floor(cw / 14));
-    var barW = 6;
-    for (var j = 0; j < numBars; j++) {
-        var bx = leftMargin + (j + 0.5) * (cw / numBars);
-        var bh = 12 + Math.abs(Math.sin(j * 0.8)) * 20;
-        var by = top + ch * 0.3 + Math.sin(j * 0.3) * ch * 0.15;
-        ctx.fillStyle = 'rgba(255,255,255,0.04)';
-        ctx.fillRect(bx - barW / 2, by, barW, bh);
-        ctx.fillStyle = 'rgba(255,255,255,0.025)';
-        ctx.fillRect(bx - 0.5, by - 4, 1, bh + 8);
+    // Generate a realistic-looking placeholder price line using basePrice
+    var livePrice = state.mainChartData?.basePrice || 3.42;
+    var curr = (state.mainChartData?.currency || '$');
+    var numPoints = Math.max(40, Math.floor(cw / 8));
+    var seed = 42;
+    var _rng = function() { seed = (seed * 16807 + 0) % 2147483647; return (seed & 0x7fffffff) / 2147483647; };
+
+    // Build a random-walk price series around basePrice
+    var pts = [livePrice];
+    var drift = livePrice * 0.003;
+    for (var p = 1; p < numPoints; p++) {
+        pts.push(pts[p - 1] + ((_rng() - 0.48) * drift));
+    }
+    var pMin = Math.min.apply(null, pts);
+    var pMax = Math.max.apply(null, pts);
+    var pRange = pMax - pMin || 1;
+
+    // Draw candlestick-style bars
+    var barW = Math.max(3, Math.floor(cw / numPoints * 0.6));
+    for (var j = 1; j < numPoints; j++) {
+        var bx = leftMargin + (j / numPoints) * cw;
+        var openY = top + ch * 0.05 + ((pMax - pts[j - 1]) / pRange) * ch * 0.9;
+        var closeY = top + ch * 0.05 + ((pMax - pts[j]) / pRange) * ch * 0.9;
+        var isUp = pts[j] >= pts[j - 1];
+        var bodyTop = Math.min(openY, closeY);
+        var bodyH = Math.max(Math.abs(closeY - openY), 1);
+        var wickH = bodyH * 0.6 + 2;
+
+        ctx.fillStyle = isUp ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.12)';
+        ctx.fillRect(bx - barW / 2, bodyTop, barW, bodyH);
+        ctx.fillStyle = isUp ? 'rgba(16,185,129,0.10)' : 'rgba(239,68,68,0.08)';
+        ctx.fillRect(bx - 0.5, bodyTop - wickH, 1, bodyH + wickH * 2);
     }
 
-    var livePrice = state.mainChartData?.basePrice;
-    if (livePrice && livePrice > 0) {
-        var ly = top + ch * 0.45;
-        ctx.strokeStyle = 'rgba(26, 115, 232, 0.3)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([6, 4]);
-        ctx.beginPath();
-        ctx.moveTo(leftMargin, ly);
-        ctx.lineTo(w - rightMargin, ly);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        var curr = (state.mainChartData.currency || '$');
-        var tag = curr + livePrice.toFixed(2);
-        ctx.font = '11px JetBrains Mono, monospace';
-        ctx.fillStyle = 'rgba(26, 115, 232, 0.5)';
-        ctx.textAlign = 'right';
-        ctx.fillText(tag, w - 4, ly - 6);
+    // Draw a smooth price line over the bars
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(26, 115, 232, 0.35)';
+    ctx.lineWidth = 1.5;
+    for (var k = 0; k < numPoints; k++) {
+        var lx = leftMargin + (k / numPoints) * cw;
+        var ly = top + ch * 0.05 + ((pMax - pts[k]) / pRange) * ch * 0.9;
+        if (k === 0) ctx.moveTo(lx, ly);
+        else ctx.lineTo(lx, ly);
     }
+    ctx.stroke();
 
-    ctx.font = '12px JetBrains Mono, monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    // Area fill under the line
+    var lastX = leftMargin + ((numPoints - 1) / numPoints) * cw;
+    var lastY = top + ch * 0.05 + ((pMax - pts[numPoints - 1]) / pRange) * ch * 0.9;
+    ctx.lineTo(lastX, top + ch);
+    ctx.lineTo(leftMargin, top + ch);
+    ctx.closePath();
+    var grad = ctx.createLinearGradient(0, top, 0, top + ch);
+    grad.addColorStop(0, 'rgba(26, 115, 232, 0.08)');
+    grad.addColorStop(1, 'rgba(26, 115, 232, 0.0)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Current price dashed line
+    var priceY = top + ch * 0.05 + ((pMax - livePrice) / pRange) * ch * 0.9;
+    ctx.strokeStyle = 'rgba(26, 115, 232, 0.5)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(leftMargin, priceY);
+    ctx.lineTo(w - rightMargin, priceY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Price tag
+    var tag = curr + livePrice.toFixed(2);
+    ctx.font = '11px JetBrains Mono, monospace';
+    ctx.fillStyle = 'rgba(26, 115, 232, 0.7)';
+    ctx.textAlign = 'right';
+    ctx.fillText(tag, w - 4, priceY - 6);
+
+    // Loading indicator
+    ctx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.textAlign = 'center';
-    ctx.fillText('Loading chart data\u2026', w / 2, top + ch + 20);
+    ctx.fillText('Loading live market data\u2026', w / 2, top + ch + 20);
 }
 
 // =============================================
