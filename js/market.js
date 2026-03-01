@@ -434,32 +434,9 @@ function convertToOHLC(priceData, intervalMinutes = 60) {
 }
 
 function _fillCandleGaps(candles, intervalMs) {
-    if (candles.length < 2) return candles;
-    const MAX_FILL_PER_GAP = 500;
-
-    const filled = [candles[0]];
-    for (let i = 1; i < candles.length; i++) {
-        const prevTime = candles[i - 1].date.getTime();
-        const currTime = candles[i].date.getTime();
-        const gap = currTime - prevTime;
-        if (gap > intervalMs * 1.5) {
-            const flatPrice = candles[i - 1].close;
-            const steps = Math.min(Math.round(gap / intervalMs) - 1, MAX_FILL_PER_GAP);
-
-            for (let s = 1; s <= steps; s++) {
-                filled.push({
-                    date: new Date(prevTime + s * intervalMs),
-                    open: flatPrice,
-                    high: flatPrice,
-                    low: flatPrice,
-                    close: flatPrice,
-                    volume: 0
-                });
-            }
-        }
-        filled.push(candles[i]);
-    }
-    return filled;
+    // TradingView Lightweight Charts handles discontinuous time series natively.
+    // The legacy zero-volume forward-fill logic is no longer needed and distorts indicators.
+    return candles;
 }
 
 // Seed a chart array with a first candle if empty, otherwise append.

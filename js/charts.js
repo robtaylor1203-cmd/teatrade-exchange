@@ -261,8 +261,8 @@ function generateChartData(timeframe) {
         return [];
     }
 
-    const maxPoints = (config.points || 96) + 25; // +25 for technical warm-up
-    return fullHistory.slice(-maxPoints);
+    // Return full history so TradingView can natively handle zooming and panning
+    return fullHistory;
 }
 
 function _getChartCurrencyInfo() {
@@ -288,9 +288,11 @@ function drawChart() {
     if (!document.getElementById('tv-chart')) return;
     if (!tvChart) _initTvChartIfNull();
 
+    let needsRescale = false;
     if (state.cachedTimeframe !== state.currentTimeframe || state.chartData.length === 0) {
         state.chartData = generateChartData(state.currentTimeframe);
         state.cachedTimeframe = state.currentTimeframe;
+        needsRescale = true;
     }
 
     if (!state.chartData || state.chartData.length === 0) return; // Loading state handled by UI usually
@@ -344,6 +346,12 @@ function drawChart() {
     mainSeries.setData(tvData);
     if (mainSeries._linkedArea) mainSeries._linkedArea.setData(tvData);
     volumeSeries.setData(volData);
+
+    // Auto-scale to fit data frame on load or timeframe/symbol swap
+    if (needsRescale || !window._tvInitialScaleDone) {
+        tvChart.timeScale().fitContent();
+        window._tvInitialScaleDone = true;
+    }
 
     // Apply Technicals: Bollinger Bands
     if (state.activeStudies.bollinger) {
