@@ -1,0 +1,40 @@
+﻿node.exe : 
+Initialising login 
+role...
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Users\robta\AppData
+\Roaming\ ...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (Initialising    
+ login role...:Stri    
+ng) [], RemoteExce    
+ption
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+Connecting to remote 
+database...
+Found local migration 
+files to be inserted 
+before the last 
+migration on remote 
+database.
+
+Rerun the command with 
+--include-all flag to 
+apply these migrations:
+supabase\migrations\202
+60222130000_contact_sub
+missions.sql      
+supabase\migrations\202
+60222150000_fix_index_t
+rade_signature.sql
+

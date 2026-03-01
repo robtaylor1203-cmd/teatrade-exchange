@@ -59,6 +59,8 @@ function renderAdminDashboard(container, data) {
     const r = data.revenue;
     const p = data.pnl || {};
     const top = data.top_traders || [];
+    const exposure = data.exposure || { total_long_kg: 0, total_short_kg: 0 };
+    const scraper = data.scraper || [];
 
     const netPnl = Number(p.net_pnl || 0);
     const counterparty = Number(p.counterparty_pnl || 0);
@@ -69,6 +71,58 @@ function renderAdminDashboard(container, data) {
 
     container.innerHTML = `
         <div class="admin-grid">
+            <!-- SYSTEM EXPOSURE CARD -->
+            <div class="admin-card">
+                <div class="admin-card-header">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+                    System Exposure
+                </div>
+                <div class="admin-stat-big">${_fmt(exposure.total_long_kg + exposure.total_short_kg)} kg</div>
+                <div class="admin-stat-label">Total open volume across all markets</div>
+                <div class="admin-stat-row">
+                    <div class="admin-stat-item">
+                        <span class="admin-stat-value admin-buy">${_fmt(exposure.total_long_kg)}</span>
+                        <span class="admin-stat-sub">Long (kg)</span>
+                    </div>
+                    <div class="admin-stat-item">
+                        <span class="admin-stat-value admin-sell">${_fmt(exposure.total_short_kg)}</span>
+                        <span class="admin-stat-sub">Short (kg)</span>
+                    </div>
+                </div>
+                <div class="admin-divider"></div>
+                <div class="admin-stat-row">
+                    <div class="admin-stat-item">
+                        <span class="admin-stat-value">${exposure.total_long_kg > exposure.total_short_kg ? 'LONG BIASED' : 'SHORT BIASED'}</span>
+                        <span class="admin-stat-sub">Platform bias</span>
+                    </div>
+                    <div class="admin-stat-item">
+                        <span class="admin-stat-value">${_fmt(Math.abs(exposure.total_long_kg - exposure.total_short_kg))}</span>
+                        <span class="admin-stat-sub">Net Delta (kg)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SCRAPER HEALTH CARD -->
+            <div class="admin-card">
+                <div class="admin-card-header">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                    Scraper Diagnostics
+                </div>
+                <div class="admin-stat-label" style="margin-bottom:8px">Last 5 VWAP Sync Events</div>
+                <div class="admin-scraper-logs" style="font-family:monospace; font-size:11px; color:var(--text-muted); background:var(--bg-tertiary); padding:8px; border-radius:4px; max-height:140px; overflow-y:auto; line-height: 1.4;">
+                    ${scraper.length === 0 ? '<i>No logs found</i>' : scraper.map(s => {
+        const isErr = !!s.error_message;
+        const target = s.target_id || 'UNKNOWN';
+        const time = new Date(s.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        if (isErr) {
+            return '<div style="color:var(--accent-red); margin-bottom:4px; border-bottom:1px solid var(--border-light); padding-bottom:4px;">[' + time + '] ' + target + ': ERR - ' + s.error_message + '</div>';
+        } else {
+            return '<div style="color:var(--accent-green); margin-bottom:4px; border-bottom:1px solid var(--border-light); padding-bottom:4px;">[' + time + '] ' + target + ': OK - ' + s.records_updated + ' synced</div>';
+        }
+    }).join('')}
+                </div>
+            </div>
+
             <!-- PLATFORM NET P&L CARD — the real bottom line -->
             <div class="admin-card admin-card-highlight">
                 <div class="admin-card-header">
