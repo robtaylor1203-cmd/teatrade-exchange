@@ -269,21 +269,9 @@ async function loadChartDataFromHistory(symbol, symbolType = 'tea', timeframeOve
 
     if (!result || result.length === 0) return null;
 
-    // Extend to "now" so the chart's right edge always has a candle.
-    const lastCandle = result[result.length - 1];
-    const lastTime = lastCandle.date instanceof Date ? lastCandle.date.getTime() : new Date(lastCandle.date).getTime();
-    const intervalMs = cfg.interval * 60000;
-    const now = Date.now();
-    if (now - lastTime > intervalMs * 1.5) {
-        const price = lastCandle.close;
-        for (let t = lastTime + intervalMs; t <= now; t += intervalMs) {
-            result.push({
-                date: new Date(t),
-                open: price, high: price, low: price, close: price,
-                volume: 0
-            });
-        }
-    }
+    // Legacy logic used to forward-fill flat candles to "now".
+    // TradingView handles current-time tracking without needing padding candles.
+    return result;
 
     return result;
 }
