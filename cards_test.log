@@ -1,0 +1,48 @@
+LOG: 💱 Live forex + Brent feed started (refreshes every 60s)
+LOG: Realtime ticker subscriptions started (prices + macro + order flow)
+LOG: Initializing price cache from database...
+LOG: Price cache initialized
+LOG: [Realtime] ticker:teas connected
+LOG: [Realtime] ticker:market_state connected
+LOG: [Realtime] market:pressure connected
+LOG: Access to fetch at 'https://query1.finance.yahoo.com/v8/finance/chart/BZ=F?interval=1d&range=5d' from origin 'http://localhost:8080' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. If an opaque response serves your needs, set the request's mode to 'no-cors' to fetch the resource with CORS disabled.
+LOG: Failed to load resource: net::ERR_FAILED
+LOG: Live Brent fetch failed (will use DB value): Failed to fetch
+LOG: 💱 Live forex: KES 128.98 | INR 91.11 | LKR 309.10 | CNY 6.8709
+LOG: [Realtime] chat_messages connected
+LOG: 📊 Market pressure seeded for 0 symbol(s)
+LOG: 📊 Market pressure seeded for 0 symbol(s)
+LOG: Loaded 262 candles for INDEX_KENYA_1W from database
+LOG: Loaded 262 candles for BGD-BOP_1W from database
+LOG: Failed to load resource: the server responded with a status of 401 ()
+LOG: [Health] Health check failed: Health endpoint returned HTTP 401
+
+
+CARDS_HTML:
+
+        <div class="market-card" id="market-card-0" onclick="swapChartIndex(0)">
+            <div class="market-card-label">Mombasa Auction (Kenya)</div>
+            <div class="market-card-value" id="card-value-0">$1.95</div>
+            <div class="market-card-change up" id="card-change-0">▲ +0.1%</div>
+        </div>
+        <div class="market-card" id="market-card-1" onclick="swapChartIndex(1)">
+            <div class="market-card-label">Kolkata Auction (India)</div>
+            <div class="market-card-value" id="card-value-1">₹337.45</div>
+            <div class="market-card-change up" id="card-change-1">▲ +9.9%</div>
+        </div>
+        <div class="market-card" id="market-card-2" onclick="swapChartIndex(2)">
+            <div class="market-card-label">Colombo Auction (Sri Lanka)</div>
+            <div class="market-card-value" id="card-value-2">Rs1,150.41</div>
+            <div class="market-card-change down" id="card-change-2">▼ 11.7%</div>
+        </div>
+        <div class="market-card" id="market-card-3" onclick="swapChartIndex(3)">
+            <div class="market-card-label">Jakarta Auction (Indonesia)</div>
+            <div class="market-card-value" id="card-value-3">Rp22,501.32</div>
+            <div class="market-card-change down" id="card-change-3">▼ 7.7%</div>
+        </div>
+        <div class="market-card" id="market-card-4" onclick="swapChartIndex(4)">
+            <div class="market-card-label">Global Tea Futures</div>
+            <div class="market-card-value" id="card-value-4">$2,463.17</div>
+            <div class="market-card-change up" id="card-change-4">▲ +7.8%</div>
+        </div>
+    

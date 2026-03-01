@@ -136,9 +136,10 @@ const state = {
 
 // Card data for market index cards
 const cardData = [
-    { name: 'Mombasa Auction Index', symbol: 'MOMBASA', basePrice: 2.87, change: 1.8, currency: '$', volume: '6.8M' },
-    { name: 'Kolkata Tea Index', symbol: 'KOLKATA', basePrice: 267.45, change: 3.2, currency: '\u20B9', volume: '4.2M', forexKey: 'usd_inr' },
-    { name: 'Colombo Index', symbol: 'COLOMBO', basePrice: 988.00, change: -1.8, currency: '\u20A8', volume: '5.1M', forexKey: 'usd_lkr' },
+    { name: 'Mombasa Auction (Kenya)', symbol: 'MOMBASA', basePrice: 2.87, change: 1.8, currency: '$', volume: '11.2M' },
+    { name: 'Kolkata Auction (India)', symbol: 'KOLKATA', basePrice: 267.45, change: 3.2, currency: '\u20B9', volume: '8.4M', forexKey: 'usd_inr' },
+    { name: 'Colombo Auction (Sri Lanka)', symbol: 'COLOMBO', basePrice: 988.00, change: -1.8, currency: 'Rs', volume: '7.1M', forexKey: 'usd_lkr' },
+    { name: 'Jakarta Auction (Indonesia)', symbol: 'JAKARTA', basePrice: 15700, change: 0.4, currency: 'Rp', volume: '4.2M', forexKey: 'usd_idr' },
     { name: 'Global Tea Futures', symbol: 'FUTURES', basePrice: 3847, change: 0.7, currency: '$', volume: '12.4M' }
 ];
 
@@ -146,18 +147,18 @@ const cardData = [
 const defaultDbIndexes = [
     // Country indexes
     { symbol: 'KENYA', name: 'Kenya Tea Index', teas: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS'], color: 'var(--accent-green)', currency: '$', multiplier: 1, is_market_card: false },
-    { symbol: 'INDIA', name: 'India Tea Index', teas: ['IND-ASM','IND-DRJ','KOL-SF','KOL-AUT','KOL-GOLD','GUW-BOP','GUW-BP','GUW-OF','GUW-PF','JAL-BOP','JAL-BP','JAL-DUST','JAL-PF','COC-BOP','COC-OP','COC-DUST','COC-PF','CMB-BOP','CMB-BP','CMB-DUST','CMB-OP','SIL-DRJ','SIL-BOP','SIL-DUST','SIL-FNGS','COO-BOP','COO-OP','COO-DUST','COO-PF'], color: 'var(--accent-orange)', currency: '$', multiplier: 1, is_market_card: false },
+    { symbol: 'INDIA', name: 'India Tea Index', teas: ['IND-ASM', 'IND-DRJ', 'KOL-SF', 'KOL-AUT', 'KOL-GOLD', 'GUW-BOP', 'GUW-BP', 'GUW-OF', 'GUW-PF', 'JAL-BOP', 'JAL-BP', 'JAL-DUST', 'JAL-PF', 'COC-BOP', 'COC-OP', 'COC-DUST', 'COC-PF', 'CMB-BOP', 'CMB-BP', 'CMB-DUST', 'CMB-OP', 'SIL-DRJ', 'SIL-BOP', 'SIL-DUST', 'SIL-FNGS', 'COO-BOP', 'COO-OP', 'COO-DUST', 'COO-PF'], color: 'var(--accent-orange)', currency: '$', multiplier: 1, is_market_card: false },
     { symbol: 'CEYLON', name: 'Ceylon Tea Index', teas: ['SRI-BOP', 'SRI-PEK', 'SRI-OP', 'SRI-FBOP', 'SRI-DUST', 'SRI-BOP1'], color: 'var(--accent-purple)', currency: '$', multiplier: 1, is_market_card: false },
     { symbol: 'INDONESIA', name: 'Indonesia Tea Index', teas: ['IDN-BOP', 'IDN-PF', 'IDN-DUST', 'IDN-BT'], color: 'var(--accent-teal)', currency: '$', multiplier: 1, is_market_card: false },
     { symbol: 'BANGLADESH', name: 'Bangladesh Tea Index', teas: ['BGD-BOP', 'BGD-BP', 'BGD-DUST', 'BGD-FNGS'], color: 'var(--accent-cyan)', currency: '$', multiplier: 1, is_market_card: false },
     { symbol: 'MALAWI', name: 'Malawi Tea Index', teas: ['MLW-BP1', 'MLW-PF1', 'MLW-DUST', 'MLW-FNGS'], color: 'var(--accent-green)', currency: '$', multiplier: 1, is_market_card: false },
     { symbol: 'AFRICA', name: 'African Tea Index', teas: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS', 'MLW-BP1', 'MLW-PF1', 'MLW-DUST', 'MLW-FNGS', 'RWA-OP'], color: 'var(--accent-green)', currency: '$', multiplier: 1, is_market_card: false },
-    { symbol: 'ASIA', name: 'Asian Tea Index', teas: ['IND-ASM','IND-DRJ','SRI-BOP','SRI-PEK','IDN-BOP','BGD-BOP','GUW-BOP','COC-OP','CMB-BOP','COO-BOP','SIL-DRJ','JAL-BOP'], color: 'var(--accent-blue)', currency: '$', multiplier: 1, is_market_card: false },
+    { symbol: 'ASIA', name: 'Asian Tea Index', teas: ['IND-ASM', 'IND-DRJ', 'SRI-BOP', 'SRI-PEK', 'IDN-BOP', 'BGD-BOP', 'GUW-BOP', 'COC-OP', 'CMB-BOP', 'COO-BOP', 'SIL-DRJ', 'JAL-BOP'], color: 'var(--accent-blue)', currency: '$', multiplier: 1, is_market_card: false },
     // 12 Auction centre indexes
-    { symbol: 'MOMBASA', name: 'Mombasa Auction Index', teas: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS'], color: 'var(--accent-green)', currency: '$', multiplier: 1, is_market_card: true },
-    { symbol: 'KOLKATA', name: 'Kolkata Auction Index', teas: ['IND-ASM', 'IND-DRJ', 'KOL-SF', 'KOL-AUT', 'KOL-GOLD'], color: 'var(--accent-orange)', currency: '\u20B9', multiplier: 83.5, forexKey: 'usd_inr', is_market_card: true },
-    { symbol: 'COLOMBO', name: 'Colombo Auction Index', teas: ['SRI-BOP', 'SRI-PEK', 'SRI-OP', 'SRI-FBOP', 'SRI-DUST', 'SRI-BOP1'], color: 'var(--accent-purple)', currency: '\u20A8', multiplier: 305, forexKey: 'usd_lkr', is_market_card: true },
-    { symbol: 'JAKARTA', name: 'Jakarta Auction Index', teas: ['IDN-BOP', 'IDN-PF', 'IDN-DUST', 'IDN-BT'], color: 'var(--accent-teal)', currency: 'Rp', multiplier: 15700, forexKey: 'usd_idr', is_market_card: false },
+    { symbol: 'MOMBASA', name: 'Mombasa Auction (TBEAL)', teas: ['KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS'], color: 'var(--accent-green)', currency: '$', multiplier: 1, is_market_card: true },
+    { symbol: 'KOLKATA', name: 'Kolkata Auction (J Thomas)', teas: ['IND-ASM', 'IND-DRJ', 'KOL-SF', 'KOL-AUT', 'KOL-GOLD'], color: 'var(--accent-orange)', currency: '\u20B9', multiplier: 83.5, forexKey: 'usd_inr', is_market_card: true },
+    { symbol: 'COLOMBO', name: 'Colombo Auction (Ceylon)', teas: ['SRI-BOP', 'SRI-PEK', 'SRI-OP', 'SRI-FBOP', 'SRI-DUST', 'SRI-BOP1'], color: 'var(--accent-purple)', currency: '\u20A8', multiplier: 305, forexKey: 'usd_lkr', is_market_card: true },
+    { symbol: 'JAKARTA', name: 'Jakarta Auction (Van Rees)', teas: ['IDN-BOP', 'IDN-PF', 'IDN-DUST', 'IDN-BT'], color: 'var(--accent-teal)', currency: 'Rp', multiplier: 15700, forexKey: 'usd_idr', is_market_card: true },
     { symbol: 'CHITTAGONG', name: 'Chittagong Auction Index', teas: ['BGD-BOP', 'BGD-BP', 'BGD-DUST', 'BGD-FNGS'], color: 'var(--accent-cyan)', currency: '\u09F3', multiplier: 110, forexKey: 'usd_bdt', is_market_card: false },
     { symbol: 'GUWAHATI', name: 'Guwahati Auction Index', teas: ['GUW-BOP', 'GUW-BP', 'GUW-OF', 'GUW-PF'], color: 'var(--accent-orange)', currency: '\u20B9', multiplier: 83.5, forexKey: 'usd_inr', is_market_card: false },
     { symbol: 'JALPAIGURI', name: 'Jalpaiguri Auction Index', teas: ['JAL-BOP', 'JAL-BP', 'JAL-DUST', 'JAL-PF'], color: 'var(--accent-amber)', currency: '\u20B9', multiplier: 83.5, forexKey: 'usd_inr', is_market_card: false },
@@ -173,72 +174,72 @@ const defaultDbIndexes = [
 // Tea display data for auction table
 const teaDisplayData = {
     // Kenya (Mombasa)
-    'KEN-BP1':  { grade: 'BP1',   estate: 'Kenya BP1',                   origin: 'Kenya',      lot: 24604, qty: 22000, buyer: '\u2014', status: 'BIDDING' },
-    'KEN-PF1':  { grade: 'PF1',   estate: 'Kenya PF1',                   origin: 'Kenya',      lot: 24606, qty: 18900, buyer: '\u2014', status: 'BIDDING' },
-    'KEN-DUST': { grade: 'DUST1', estate: 'Kenya Dust 1',                origin: 'Kenya',      lot: 24605, qty: 5400,  buyer: '\u2014', status: 'BIDDING' },
-    'KEN-PD':   { grade: 'PD',    estate: 'Kenya Pekoe Dust',            origin: 'Kenya',      lot: 24618, qty: 30000, buyer: '\u2014', status: 'BIDDING' },
-    'KEN-BMF':  { grade: 'BMF',   estate: 'Kenya Broken Mixed Fanning',  origin: 'Kenya',      lot: 24619, qty: 8000,  buyer: '\u2014', status: 'BIDDING' },
-    'KEN-FNGS': { grade: 'FNGS1', estate: 'Kenya Fannings',              origin: 'Kenya',      lot: 24620, qty: 6000,  buyer: '\u2014', status: 'BIDDING' },
+    'KEN-BP1': { grade: 'BP1', estate: 'Kenya BP1', origin: 'Kenya', lot: 24604, qty: 22000, buyer: '\u2014', status: 'BIDDING' },
+    'KEN-PF1': { grade: 'PF1', estate: 'Kenya PF1', origin: 'Kenya', lot: 24606, qty: 18900, buyer: '\u2014', status: 'BIDDING' },
+    'KEN-DUST': { grade: 'DUST1', estate: 'Kenya Dust 1', origin: 'Kenya', lot: 24605, qty: 5400, buyer: '\u2014', status: 'BIDDING' },
+    'KEN-PD': { grade: 'PD', estate: 'Kenya Pekoe Dust', origin: 'Kenya', lot: 24618, qty: 30000, buyer: '\u2014', status: 'BIDDING' },
+    'KEN-BMF': { grade: 'BMF', estate: 'Kenya Broken Mixed Fanning', origin: 'Kenya', lot: 24619, qty: 8000, buyer: '\u2014', status: 'BIDDING' },
+    'KEN-FNGS': { grade: 'FNGS1', estate: 'Kenya Fannings', origin: 'Kenya', lot: 24620, qty: 6000, buyer: '\u2014', status: 'BIDDING' },
     // Indonesia (Jakarta)
-    'IDN-BOP':  { grade: 'BOP',  estate: 'Indonesia BOP',            origin: 'Indonesia',   lot: 24700, qty: 14000, buyer: '\u2014', status: 'BIDDING' },
-    'IDN-PF':   { grade: 'PF',   estate: 'Indonesia Pekoe Fannings', origin: 'Indonesia',   lot: 24701, qty: 10500, buyer: '\u2014', status: 'BIDDING' },
-    'IDN-DUST': { grade: 'DUST', estate: 'Indonesia Dust',           origin: 'Indonesia',   lot: 24702, qty: 8200,  buyer: '\u2014', status: 'BIDDING' },
-    'IDN-BT':   { grade: 'BT',   estate: 'Indonesia Broken Tea',    origin: 'Indonesia',   lot: 24703, qty: 11300, buyer: '\u2014', status: 'BIDDING' },
+    'IDN-BOP': { grade: 'BOP', estate: 'Indonesia BOP', origin: 'Indonesia', lot: 24700, qty: 14000, buyer: '\u2014', status: 'BIDDING' },
+    'IDN-PF': { grade: 'PF', estate: 'Indonesia Pekoe Fannings', origin: 'Indonesia', lot: 24701, qty: 10500, buyer: '\u2014', status: 'BIDDING' },
+    'IDN-DUST': { grade: 'DUST', estate: 'Indonesia Dust', origin: 'Indonesia', lot: 24702, qty: 8200, buyer: '\u2014', status: 'BIDDING' },
+    'IDN-BT': { grade: 'BT', estate: 'Indonesia Broken Tea', origin: 'Indonesia', lot: 24703, qty: 11300, buyer: '\u2014', status: 'BIDDING' },
     // Bangladesh (Chittagong)
-    'BGD-BOP':  { grade: 'BOP',  estate: 'Bangladesh BOP',           origin: 'Bangladesh',  lot: 24710, qty: 12000, buyer: '\u2014', status: 'BIDDING' },
-    'BGD-BP':   { grade: 'BP',   estate: 'Bangladesh Broken Pekoe',  origin: 'Bangladesh',  lot: 24711, qty: 9500,  buyer: '\u2014', status: 'BIDDING' },
-    'BGD-DUST': { grade: 'DUST', estate: 'Bangladesh Dust',          origin: 'Bangladesh',  lot: 24712, qty: 7000,  buyer: '\u2014', status: 'BIDDING' },
-    'BGD-FNGS': { grade: 'FNGS', estate: 'Bangladesh Fannings',      origin: 'Bangladesh',  lot: 24713, qty: 8800,  buyer: '\u2014', status: 'BIDDING' },
+    'BGD-BOP': { grade: 'BOP', estate: 'Bangladesh BOP', origin: 'Bangladesh', lot: 24710, qty: 12000, buyer: '\u2014', status: 'BIDDING' },
+    'BGD-BP': { grade: 'BP', estate: 'Bangladesh Broken Pekoe', origin: 'Bangladesh', lot: 24711, qty: 9500, buyer: '\u2014', status: 'BIDDING' },
+    'BGD-DUST': { grade: 'DUST', estate: 'Bangladesh Dust', origin: 'Bangladesh', lot: 24712, qty: 7000, buyer: '\u2014', status: 'BIDDING' },
+    'BGD-FNGS': { grade: 'FNGS', estate: 'Bangladesh Fannings', origin: 'Bangladesh', lot: 24713, qty: 8800, buyer: '\u2014', status: 'BIDDING' },
     // India — Guwahati (Assam CTC)
-    'GUW-BOP':  { grade: 'BOP', estate: 'Assam CTC BOP',         origin: 'India',  lot: 24720, qty: 16000, buyer: '\u2014', status: 'BIDDING' },
-    'GUW-BP':   { grade: 'BP',  estate: 'Assam CTC BP',          origin: 'India',  lot: 24721, qty: 13500, buyer: '\u2014', status: 'BIDDING' },
-    'GUW-OF':   { grade: 'OF',  estate: 'Assam Orthodox Flowery', origin: 'India',  lot: 24722, qty: 7200,  buyer: '\u2014', status: 'BIDDING' },
-    'GUW-PF':   { grade: 'PF',  estate: 'Assam CTC PF',          origin: 'India',  lot: 24723, qty: 11000, buyer: '\u2014', status: 'BIDDING' },
+    'GUW-BOP': { grade: 'BOP', estate: 'Assam CTC BOP', origin: 'India', lot: 24720, qty: 16000, buyer: '\u2014', status: 'BIDDING' },
+    'GUW-BP': { grade: 'BP', estate: 'Assam CTC BP', origin: 'India', lot: 24721, qty: 13500, buyer: '\u2014', status: 'BIDDING' },
+    'GUW-OF': { grade: 'OF', estate: 'Assam Orthodox Flowery', origin: 'India', lot: 24722, qty: 7200, buyer: '\u2014', status: 'BIDDING' },
+    'GUW-PF': { grade: 'PF', estate: 'Assam CTC PF', origin: 'India', lot: 24723, qty: 11000, buyer: '\u2014', status: 'BIDDING' },
     // India — Jalpaiguri (Dooars/Terai)
-    'JAL-BOP':  { grade: 'BOP',  estate: 'Dooars CTC BOP', origin: 'India',  lot: 24730, qty: 14500, buyer: '\u2014', status: 'BIDDING' },
-    'JAL-BP':   { grade: 'BP',   estate: 'Dooars CTC BP',  origin: 'India',  lot: 24731, qty: 12000, buyer: '\u2014', status: 'BIDDING' },
-    'JAL-DUST': { grade: 'DUST', estate: 'Terai CTC Dust', origin: 'India',  lot: 24732, qty: 9000,  buyer: '\u2014', status: 'BIDDING' },
-    'JAL-PF':   { grade: 'PF',   estate: 'Terai CTC PF',  origin: 'India',  lot: 24733, qty: 10500, buyer: '\u2014', status: 'BIDDING' },
+    'JAL-BOP': { grade: 'BOP', estate: 'Dooars CTC BOP', origin: 'India', lot: 24730, qty: 14500, buyer: '\u2014', status: 'BIDDING' },
+    'JAL-BP': { grade: 'BP', estate: 'Dooars CTC BP', origin: 'India', lot: 24731, qty: 12000, buyer: '\u2014', status: 'BIDDING' },
+    'JAL-DUST': { grade: 'DUST', estate: 'Terai CTC Dust', origin: 'India', lot: 24732, qty: 9000, buyer: '\u2014', status: 'BIDDING' },
+    'JAL-PF': { grade: 'PF', estate: 'Terai CTC PF', origin: 'India', lot: 24733, qty: 10500, buyer: '\u2014', status: 'BIDDING' },
     // India — Kolkata (Darjeeling specialty)
-    'IND-ASM':  { grade: 'ASM',  estate: 'Assam Orthodox',          origin: 'India',  lot: 24602, qty: 8200,  buyer: '\u2014', status: 'BIDDING' },
-    'IND-DRJ':  { grade: 'DRJ',  estate: 'Darjeeling First Flush',  origin: 'India',  lot: 24603, qty: 15600, buyer: '\u2014', status: 'BIDDING' },
-    'KOL-SF':   { grade: 'SF',   estate: 'Darjeeling Second Flush', origin: 'India',  lot: 24740, qty: 6800,  buyer: '\u2014', status: 'BIDDING' },
-    'KOL-AUT':  { grade: 'AUT',  estate: 'Darjeeling Autumnal',     origin: 'India',  lot: 24741, qty: 9200,  buyer: '\u2014', status: 'BIDDING' },
-    'KOL-GOLD': { grade: 'GOLD', estate: 'Darjeeling Gold Tip',     origin: 'India',  lot: 24742, qty: 3500,  buyer: '\u2014', status: 'BIDDING' },
+    'IND-ASM': { grade: 'ASM', estate: 'Assam Orthodox', origin: 'India', lot: 24602, qty: 8200, buyer: '\u2014', status: 'BIDDING' },
+    'IND-DRJ': { grade: 'DRJ', estate: 'Darjeeling First Flush', origin: 'India', lot: 24603, qty: 15600, buyer: '\u2014', status: 'BIDDING' },
+    'KOL-SF': { grade: 'SF', estate: 'Darjeeling Second Flush', origin: 'India', lot: 24740, qty: 6800, buyer: '\u2014', status: 'BIDDING' },
+    'KOL-AUT': { grade: 'AUT', estate: 'Darjeeling Autumnal', origin: 'India', lot: 24741, qty: 9200, buyer: '\u2014', status: 'BIDDING' },
+    'KOL-GOLD': { grade: 'GOLD', estate: 'Darjeeling Gold Tip', origin: 'India', lot: 24742, qty: 3500, buyer: '\u2014', status: 'BIDDING' },
     // Sri Lanka (Colombo)
-    'SRI-BOP':  { grade: 'BOP',  estate: 'Ceylon BOP',          origin: 'Sri Lanka',  lot: 24609, qty: 14500, buyer: '\u2014', status: 'BIDDING' },
-    'SRI-PEK':  { grade: 'PEK',  estate: 'Ceylon Pekoe',        origin: 'Sri Lanka',  lot: 24610, qty: 8700,  buyer: '\u2014', status: 'BIDDING' },
-    'SRI-OP':   { grade: 'OP',   estate: 'Ceylon Orange Pekoe', origin: 'Sri Lanka',  lot: 24750, qty: 10200, buyer: '\u2014', status: 'BIDDING' },
-    'SRI-FBOP': { grade: 'FBOP', estate: 'Ceylon Flowery BOP',  origin: 'Sri Lanka',  lot: 24751, qty: 7600,  buyer: '\u2014', status: 'BIDDING' },
-    'SRI-DUST': { grade: 'DUST', estate: 'Ceylon Dust',          origin: 'Sri Lanka',  lot: 24752, qty: 6400,  buyer: '\u2014', status: 'BIDDING' },
-    'SRI-BOP1': { grade: 'BOP1', estate: 'Ceylon BOP1',          origin: 'Sri Lanka',  lot: 24753, qty: 11800, buyer: '\u2014', status: 'BIDDING' },
+    'SRI-BOP': { grade: 'BOP', estate: 'Ceylon BOP', origin: 'Sri Lanka', lot: 24609, qty: 14500, buyer: '\u2014', status: 'BIDDING' },
+    'SRI-PEK': { grade: 'PEK', estate: 'Ceylon Pekoe', origin: 'Sri Lanka', lot: 24610, qty: 8700, buyer: '\u2014', status: 'BIDDING' },
+    'SRI-OP': { grade: 'OP', estate: 'Ceylon Orange Pekoe', origin: 'Sri Lanka', lot: 24750, qty: 10200, buyer: '\u2014', status: 'BIDDING' },
+    'SRI-FBOP': { grade: 'FBOP', estate: 'Ceylon Flowery BOP', origin: 'Sri Lanka', lot: 24751, qty: 7600, buyer: '\u2014', status: 'BIDDING' },
+    'SRI-DUST': { grade: 'DUST', estate: 'Ceylon Dust', origin: 'Sri Lanka', lot: 24752, qty: 6400, buyer: '\u2014', status: 'BIDDING' },
+    'SRI-BOP1': { grade: 'BOP1', estate: 'Ceylon BOP1', origin: 'Sri Lanka', lot: 24753, qty: 11800, buyer: '\u2014', status: 'BIDDING' },
     // India — Cochin (Kerala)
-    'COC-BOP':  { grade: 'BOP',  estate: 'Kerala Orthodox BOP', origin: 'India',  lot: 24760, qty: 13000, buyer: '\u2014', status: 'BIDDING' },
-    'COC-OP':   { grade: 'OP',   estate: 'Kerala Orange Pekoe', origin: 'India',  lot: 24761, qty: 9500,  buyer: '\u2014', status: 'BIDDING' },
-    'COC-DUST': { grade: 'DUST', estate: 'Kerala CTC Dust',     origin: 'India',  lot: 24762, qty: 7800,  buyer: '\u2014', status: 'BIDDING' },
-    'COC-PF':   { grade: 'PF',   estate: 'Kerala CTC PF',       origin: 'India',  lot: 24763, qty: 8600,  buyer: '\u2014', status: 'BIDDING' },
+    'COC-BOP': { grade: 'BOP', estate: 'Kerala Orthodox BOP', origin: 'India', lot: 24760, qty: 13000, buyer: '\u2014', status: 'BIDDING' },
+    'COC-OP': { grade: 'OP', estate: 'Kerala Orange Pekoe', origin: 'India', lot: 24761, qty: 9500, buyer: '\u2014', status: 'BIDDING' },
+    'COC-DUST': { grade: 'DUST', estate: 'Kerala CTC Dust', origin: 'India', lot: 24762, qty: 7800, buyer: '\u2014', status: 'BIDDING' },
+    'COC-PF': { grade: 'PF', estate: 'Kerala CTC PF', origin: 'India', lot: 24763, qty: 8600, buyer: '\u2014', status: 'BIDDING' },
     // India — Coimbatore (Tamil Nadu)
-    'CMB-BOP':  { grade: 'BOP',  estate: 'Tamil Nadu CTC BOP',     origin: 'India',  lot: 24770, qty: 15000, buyer: '\u2014', status: 'BIDDING' },
-    'CMB-BP':   { grade: 'BP',   estate: 'Tamil Nadu CTC BP',      origin: 'India',  lot: 24771, qty: 12500, buyer: '\u2014', status: 'BIDDING' },
-    'CMB-DUST': { grade: 'DUST', estate: 'Tamil Nadu CTC Dust',    origin: 'India',  lot: 24772, qty: 8000,  buyer: '\u2014', status: 'BIDDING' },
-    'CMB-OP':   { grade: 'OP',   estate: 'Tamil Nadu Orthodox OP', origin: 'India',  lot: 24773, qty: 6500,  buyer: '\u2014', status: 'BIDDING' },
+    'CMB-BOP': { grade: 'BOP', estate: 'Tamil Nadu CTC BOP', origin: 'India', lot: 24770, qty: 15000, buyer: '\u2014', status: 'BIDDING' },
+    'CMB-BP': { grade: 'BP', estate: 'Tamil Nadu CTC BP', origin: 'India', lot: 24771, qty: 12500, buyer: '\u2014', status: 'BIDDING' },
+    'CMB-DUST': { grade: 'DUST', estate: 'Tamil Nadu CTC Dust', origin: 'India', lot: 24772, qty: 8000, buyer: '\u2014', status: 'BIDDING' },
+    'CMB-OP': { grade: 'OP', estate: 'Tamil Nadu Orthodox OP', origin: 'India', lot: 24773, qty: 6500, buyer: '\u2014', status: 'BIDDING' },
     // India — Siliguri (Darjeeling/Terai)
-    'SIL-DRJ':  { grade: 'DRJ',  estate: 'Darjeeling Whole Leaf', origin: 'India',  lot: 24780, qty: 4500,  buyer: '\u2014', status: 'BIDDING' },
-    'SIL-BOP':  { grade: 'BOP',  estate: 'Darjeeling BOP',        origin: 'India',  lot: 24781, qty: 7200,  buyer: '\u2014', status: 'BIDDING' },
-    'SIL-DUST': { grade: 'DUST', estate: 'Terai Dust',            origin: 'India',  lot: 24782, qty: 9800,  buyer: '\u2014', status: 'BIDDING' },
-    'SIL-FNGS': { grade: 'FNGS', estate: 'Terai Fannings',        origin: 'India',  lot: 24783, qty: 8500,  buyer: '\u2014', status: 'BIDDING' },
+    'SIL-DRJ': { grade: 'DRJ', estate: 'Darjeeling Whole Leaf', origin: 'India', lot: 24780, qty: 4500, buyer: '\u2014', status: 'BIDDING' },
+    'SIL-BOP': { grade: 'BOP', estate: 'Darjeeling BOP', origin: 'India', lot: 24781, qty: 7200, buyer: '\u2014', status: 'BIDDING' },
+    'SIL-DUST': { grade: 'DUST', estate: 'Terai Dust', origin: 'India', lot: 24782, qty: 9800, buyer: '\u2014', status: 'BIDDING' },
+    'SIL-FNGS': { grade: 'FNGS', estate: 'Terai Fannings', origin: 'India', lot: 24783, qty: 8500, buyer: '\u2014', status: 'BIDDING' },
     // India — Coonoor (Nilgiris)
-    'COO-BOP':  { grade: 'BOP',  estate: 'Nilgiri CTC BOP',     origin: 'India',  lot: 24790, qty: 14000, buyer: '\u2014', status: 'BIDDING' },
-    'COO-OP':   { grade: 'OP',   estate: 'Nilgiri Orthodox OP',  origin: 'India',  lot: 24791, qty: 8800,  buyer: '\u2014', status: 'BIDDING' },
-    'COO-DUST': { grade: 'DUST', estate: 'Nilgiri CTC Dust',    origin: 'India',  lot: 24792, qty: 7500,  buyer: '\u2014', status: 'BIDDING' },
-    'COO-PF':   { grade: 'PF',   estate: 'Nilgiri CTC PF',      origin: 'India',  lot: 24793, qty: 9200,  buyer: '\u2014', status: 'BIDDING' },
+    'COO-BOP': { grade: 'BOP', estate: 'Nilgiri CTC BOP', origin: 'India', lot: 24790, qty: 14000, buyer: '\u2014', status: 'BIDDING' },
+    'COO-OP': { grade: 'OP', estate: 'Nilgiri Orthodox OP', origin: 'India', lot: 24791, qty: 8800, buyer: '\u2014', status: 'BIDDING' },
+    'COO-DUST': { grade: 'DUST', estate: 'Nilgiri CTC Dust', origin: 'India', lot: 24792, qty: 7500, buyer: '\u2014', status: 'BIDDING' },
+    'COO-PF': { grade: 'PF', estate: 'Nilgiri CTC PF', origin: 'India', lot: 24793, qty: 9200, buyer: '\u2014', status: 'BIDDING' },
     // Malawi (Limbe)
-    'MLW-BP1':  { grade: 'BP1',  estate: 'Malawi BP1',      origin: 'Malawi',  lot: 24607, qty: 9800,  buyer: '\u2014', status: 'BIDDING' },
-    'MLW-PF1':  { grade: 'PF1',  estate: 'Malawi PF1',      origin: 'Malawi',  lot: 24800, qty: 7600,  buyer: '\u2014', status: 'BIDDING' },
-    'MLW-DUST': { grade: 'DUST', estate: 'Malawi Dust',     origin: 'Malawi',  lot: 24801, qty: 5500,  buyer: '\u2014', status: 'BIDDING' },
-    'MLW-FNGS': { grade: 'FNGS', estate: 'Malawi Fannings', origin: 'Malawi',  lot: 24802, qty: 6200,  buyer: '\u2014', status: 'BIDDING' },
+    'MLW-BP1': { grade: 'BP1', estate: 'Malawi BP1', origin: 'Malawi', lot: 24607, qty: 9800, buyer: '\u2014', status: 'BIDDING' },
+    'MLW-PF1': { grade: 'PF1', estate: 'Malawi PF1', origin: 'Malawi', lot: 24800, qty: 7600, buyer: '\u2014', status: 'BIDDING' },
+    'MLW-DUST': { grade: 'DUST', estate: 'Malawi Dust', origin: 'Malawi', lot: 24801, qty: 5500, buyer: '\u2014', status: 'BIDDING' },
+    'MLW-FNGS': { grade: 'FNGS', estate: 'Malawi Fannings', origin: 'Malawi', lot: 24802, qty: 6200, buyer: '\u2014', status: 'BIDDING' },
     // Rwanda
-    'RWA-OP':   { grade: 'OP',   estate: 'Rwanda OP',       origin: 'Rwanda',  lot: 24608, qty: 6200,  buyer: '\u2014', status: 'BIDDING' },
+    'RWA-OP': { grade: 'OP', estate: 'Rwanda OP', origin: 'Rwanda', lot: 24608, qty: 6200, buyer: '\u2014', status: 'BIDDING' },
     // Auction display variants
     'IND-DRJ-2': { grade: 'DRJ', estate: 'Darjeeling Second Flush', origin: 'India', lot: 24612, qty: 11200, buyer: '\u2014', status: 'BIDDING', priceFrom: 'IND-DRJ' },
     'KEN-BP1-2': { grade: 'BP1', estate: 'Kenya Premium BP1', origin: 'Kenya', lot: 24613, qty: 19500, buyer: '\u2014', status: 'BIDDING', priceFrom: 'KEN-BP1' },
@@ -280,12 +281,12 @@ const bottomMargin = 25;
 
 // Timeframe configurations
 const timeframeConfig = {
-    '1D':  { points: 288, labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'], labelFormat: 'time',  baseDate: new Date() },
-    '1W':  { points: 168, labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],               labelFormat: 'day',   baseDate: new Date() },
-    '1M':  { points: 180, labels: ['W1', 'W2', 'W3', 'W4'],                                        labelFormat: 'week',  baseDate: new Date() },
-    '3M':  { points: 130, labels: ['M1', 'M2', 'M3'],                                              labelFormat: 'month', baseDate: new Date() },
-    '1Y':  { points: 365, labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], labelFormat: 'month', baseDate: new Date() },
-    'ALL': { points: 800, labels: ['2022', '2023', '2024', '2025', '2026'],                        labelFormat: 'year',  baseDate: new Date() }
+    '1D': { points: 288, labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'], labelFormat: 'time', baseDate: new Date() },
+    '1W': { points: 168, labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], labelFormat: 'day', baseDate: new Date() },
+    '1M': { points: 180, labels: ['W1', 'W2', 'W3', 'W4'], labelFormat: 'week', baseDate: new Date() },
+    '3M': { points: 130, labels: ['M1', 'M2', 'M3'], labelFormat: 'month', baseDate: new Date() },
+    '1Y': { points: 365, labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], labelFormat: 'month', baseDate: new Date() },
+    'ALL': { points: 800, labels: ['2022', '2023', '2024', '2025', '2026'], labelFormat: 'year', baseDate: new Date() }
 };
 
 // Debounce delay for batching Realtime ticker updates into a single UI refresh (ms)
@@ -309,7 +310,7 @@ const _TRADE_TO_CARD = { 'KENYA': 'MOMBASA', 'INDIA': 'KOLKATA', 'CEYLON': 'COLO
 function getCurrencyForSymbol(sym) {
     const cardSym = _TRADE_TO_CARD[sym] || sym;
     const idx = (state.dbIndexes || []).find(i => i.symbol === cardSym) ||
-                (state.dbIndexes || []).find(i => i.symbol === sym);
+        (state.dbIndexes || []).find(i => i.symbol === sym);
     return idx?.currency || '$';
 }
 
@@ -357,10 +358,13 @@ function switchTradingMode(mode) {
     if (mode !== 'VIRTUAL' && mode !== 'REAL') return;
 
     if (mode === 'REAL') {
-        const toggle = document.getElementById('mode-toggle');
-        if (toggle) toggle.checked = false;
-        showRealMoneyComingSoon();
-        return;
+        const agreed = state.userProfile?.fca_agreed || localStorage.getItem('tt_fca_agreed_' + state.currentUser?.id);
+        if (!agreed) {
+            const toggle = document.getElementById('mode-toggle');
+            if (toggle) toggle.checked = false;
+            showFcaAgreementModal();
+            return;
+        }
     }
 
     state.tradingMode = mode;
@@ -376,6 +380,19 @@ function switchTradingMode(mode) {
     if (indicator) {
         indicator.classList.toggle('mode-real', mode === 'REAL');
         indicator.classList.toggle('mode-virtual', mode !== 'REAL');
+    }
+
+    // Toggle FCA banner visibility
+    const fcaBanner = document.getElementById('fca-risk-banner');
+    if (fcaBanner) {
+        fcaBanner.style.display = mode === 'REAL' ? 'block' : 'none';
+
+        // Also adjust body margin for mobile to not cover bottom nav
+        if (mode === 'REAL' && window.innerWidth <= 768) {
+            document.body.style.paddingBottom = '36px'; // make room for banner above nav
+        } else {
+            document.body.style.paddingBottom = '0px';
+        }
     }
 
     updateBalanceDisplay();
@@ -400,19 +417,19 @@ function updateBalanceDisplay() {
 const STRIPE_PUBLIC_KEY = 'pk_live_51T3irl4HRHSKpIgeZU3YMgZZW7RhueKvuQe1i49QVnDI2LXIlAbvg4brtursEJ0MkFxQOgyL4qqg1jVcISrmEZmq00g13ycKfH';
 
 const BADGE_DEFINITIONS = {
-    SNIPER:         { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/></svg>', color: '#ef4444', bg: 'rgba(239,68,68,0.12)', name: 'The Sniper',       cat: 'Respect',    desc: '75%+ win rate over 50 closed trades',                 unlock: '0/50 trades at 75% WR' },
-    DIAMOND_HANDS:  { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12,2 15,9 22,9 17,14 19,22 12,18 5,22 7,14 2,9 9,9"/></svg>', color: '#818cf8', bg: 'rgba(129,140,248,0.12)', name: 'Diamond Hands',    cat: 'Respect',    desc: 'Held a winning position open for 7+ days',             unlock: 'Hold a winner 7 days' },
-    TEN_BAGGER:     { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/></svg>', color: '#22c55e', bg: 'rgba(34,197,94,0.12)', name: 'The 10-Bagger',    cat: 'Respect',    desc: '+1,000% ROI on a single trade',                        unlock: 'Achieve 1000% ROI' },
-    IRON_CLAD:      { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', color: '#64748b', bg: 'rgba(100,116,139,0.12)', name: 'Iron Clad',       cat: 'Respect',    desc: 'Traded 30 consecutive days without a margin call',     unlock: '0/30 consecutive days' },
-    WHALE:          { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12c0-4.4 3.6-8 8-8h2c4.4 0 8 3.6 8 8s-3.6 8-8 8h-2c-4.4 0-8-3.6-8-8z"/><circle cx="8" cy="11" r="1" fill="currentColor"/><path d="M16 15c-1 1-3 1-4 0"/></svg>', color: '#3b82f6', bg: 'rgba(59,130,246,0.12)', name: 'The Whale',        cat: 'Whale',      desc: 'Surpassed $1,000,000 in total notional volume',        unlock: '$0 / $1M volume' },
-    SHEPHERD:       { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', name: 'The Shepherd',     cat: 'Whale',      desc: '5+ users actively copy-trading you',                   unlock: '0/5 followers' },
-    PHOENIX:        { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L8 8l-6 2 4 5-1 6 7-3 7 3-1-6 4-5-6-2z"/></svg>', color: '#f97316', bg: 'rgba(249,115,22,0.12)', name: 'The Phoenix',      cat: 'Lore',       desc: 'Blew up, paid reset, then made 10% profit',          unlock: 'Rise from the ashes' },
-    BOTTOM_CATCHER: { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="23,18 13.5,8.5 8.5,13.5 1,6"/><polyline points="17,18 23,18 23,12"/></svg>', color: '#06b6d4', bg: 'rgba(6,182,212,0.12)', name: 'Bottom Catcher',   cat: 'Lore',       desc: 'Bought within 1% of the weekly low',                   unlock: 'Catch the bottom' },
-    SURVIVOR:       { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9 12l2 2 4-4"/></svg>', color: '#10b981', bg: 'rgba(16,185,129,0.12)', name: 'Survivor',         cat: 'Lore',       desc: 'Survived a trade at 5% margin, closed in the green',   unlock: 'Hold and survive' },
-    PRO_MEMBER:     { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26z"/></svg>', color: '#a855f7', bg: 'rgba(168,85,247,0.12)', name: 'PRO Member',       cat: 'Status',     desc: 'Active TeaTrade PRO subscriber',                       unlock: 'Subscribe to PRO' },
-    FUNDED_TRADER:  { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>', color: '#eab308', bg: 'rgba(234,179,8,0.15)', name: 'Funded Trader',    cat: 'Status',     desc: 'Passed the TeaTrade Combine Challenge',                unlock: 'Pass the Combine' },
+    SNIPER: { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/></svg>', color: '#ef4444', bg: 'rgba(239,68,68,0.12)', name: 'The Sniper', cat: 'Respect', desc: '75%+ win rate over 50 closed trades', unlock: '0/50 trades at 75% WR' },
+    DIAMOND_HANDS: { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12,2 15,9 22,9 17,14 19,22 12,18 5,22 7,14 2,9 9,9"/></svg>', color: '#818cf8', bg: 'rgba(129,140,248,0.12)', name: 'Diamond Hands', cat: 'Respect', desc: 'Held a winning position open for 7+ days', unlock: 'Hold a winner 7 days' },
+    TEN_BAGGER: { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/></svg>', color: '#22c55e', bg: 'rgba(34,197,94,0.12)', name: 'The 10-Bagger', cat: 'Respect', desc: '+1,000% ROI on a single trade', unlock: 'Achieve 1000% ROI' },
+    IRON_CLAD: { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', color: '#64748b', bg: 'rgba(100,116,139,0.12)', name: 'Iron Clad', cat: 'Respect', desc: 'Traded 30 consecutive days without a margin call', unlock: '0/30 consecutive days' },
+    WHALE: { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12c0-4.4 3.6-8 8-8h2c4.4 0 8 3.6 8 8s-3.6 8-8 8h-2c-4.4 0-8-3.6-8-8z"/><circle cx="8" cy="11" r="1" fill="currentColor"/><path d="M16 15c-1 1-3 1-4 0"/></svg>', color: '#3b82f6', bg: 'rgba(59,130,246,0.12)', name: 'The Whale', cat: 'Whale', desc: 'Surpassed $1,000,000 in total notional volume', unlock: '$0 / $1M volume' },
+    SHEPHERD: { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', name: 'The Shepherd', cat: 'Whale', desc: '5+ users actively copy-trading you', unlock: '0/5 followers' },
+    PHOENIX: { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L8 8l-6 2 4 5-1 6 7-3 7 3-1-6 4-5-6-2z"/></svg>', color: '#f97316', bg: 'rgba(249,115,22,0.12)', name: 'The Phoenix', cat: 'Lore', desc: 'Blew up, paid reset, then made 10% profit', unlock: 'Rise from the ashes' },
+    BOTTOM_CATCHER: { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="23,18 13.5,8.5 8.5,13.5 1,6"/><polyline points="17,18 23,18 23,12"/></svg>', color: '#06b6d4', bg: 'rgba(6,182,212,0.12)', name: 'Bottom Catcher', cat: 'Lore', desc: 'Bought within 1% of the weekly low', unlock: 'Catch the bottom' },
+    SURVIVOR: { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9 12l2 2 4-4"/></svg>', color: '#10b981', bg: 'rgba(16,185,129,0.12)', name: 'Survivor', cat: 'Lore', desc: 'Survived a trade at 5% margin, closed in the green', unlock: 'Hold and survive' },
+    PRO_MEMBER: { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26z"/></svg>', color: '#a855f7', bg: 'rgba(168,85,247,0.12)', name: 'PRO Member', cat: 'Status', desc: 'Active TeaTrade PRO subscriber', unlock: 'Subscribe to PRO' },
+    FUNDED_TRADER: { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>', color: '#eab308', bg: 'rgba(234,179,8,0.15)', name: 'Funded Trader', cat: 'Status', desc: 'Passed the TeaTrade Combine Challenge', unlock: 'Pass the Combine' },
 };
-const BADGE_PRIORITY = ['FUNDED_TRADER','PRO_MEMBER','WHALE','SNIPER','TEN_BAGGER','SHEPHERD','DIAMOND_HANDS','IRON_CLAD','PHOENIX','SURVIVOR','BOTTOM_CATCHER'];
+const BADGE_PRIORITY = ['FUNDED_TRADER', 'PRO_MEMBER', 'WHALE', 'SNIPER', 'TEN_BAGGER', 'SHEPHERD', 'DIAMOND_HANDS', 'IRON_CLAD', 'PHOENIX', 'SURVIVOR', 'BOTTOM_CATCHER'];
 
 // =============================================
 // REAL MONEY COMING SOON
@@ -449,6 +466,54 @@ function closeRealMoneyModal() {
 }
 
 // =============================================
+// FCA COMPLIANCE HELPERS
+// =============================================
+
+function showFcaAgreementModal() {
+    const modal = document.getElementById('fca-agreement-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeFcaAgreementModal() {
+    const modal = document.getElementById('fca-agreement-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function cancelFcaAgreement() {
+    closeFcaAgreementModal();
+}
+
+function checkFcaAcceptance() {
+    const risk = document.getElementById('fca-check-risk')?.checked;
+    const terms = document.getElementById('fca-check-terms')?.checked;
+    const btn = document.getElementById('fca-btn-accept');
+    if (btn) btn.disabled = !(risk && terms);
+}
+
+async function acceptFcaAgreement() {
+    if (!state.currentUser) {
+        if (typeof openAuthModal === 'function') openAuthModal();
+        closeFcaAgreementModal();
+        return;
+    }
+
+    if (state.userProfile) {
+        state.userProfile.fca_agreed = true;
+    }
+    localStorage.setItem('tt_fca_agreed_' + state.currentUser.id, 'true');
+    closeFcaAgreementModal();
+
+    // Attempt backend save, fail silently if column doesn't exist
+    try {
+        await supabaseClient.from('profiles').update({ fca_agreed: true }).eq('id', state.currentUser.id);
+    } catch (e) {
+        console.warn('Failed to save FCA state to backend', e);
+    }
+
+    switchTradingMode('REAL');
+}
+
+// =============================================
 // ACCOUNT LOCKED / MONETIZATION HELPERS
 // =============================================
 
@@ -468,7 +533,7 @@ function showAccountLockedModal() {
 
     const resetAt = state.userProfile?.next_free_reset_at;
     const timerEl = document.getElementById('locked-bailout-timer');
-    const btnEl   = document.getElementById('locked-bailout-btn');
+    const btnEl = document.getElementById('locked-bailout-btn');
 
     if (resetAt && new Date(resetAt) <= new Date()) {
         if (timerEl) timerEl.textContent = 'Available now!';

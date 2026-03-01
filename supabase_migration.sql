@@ -89,10 +89,11 @@ INSERT INTO indexes (symbol, name, teas, color, display_order) VALUES
 ON CONFLICT (symbol) DO NOTHING;
 
 INSERT INTO indexes (symbol, name, teas, color, currency, multiplier, is_market_card, display_order) VALUES
-    ('MOMBASA',  'Mombasa Auction Index', ARRAY['KEN-BP1', 'KEN-PF1', 'KEN-DUST'], 'var(--accent-green)', '$', 1,    TRUE, 10),
-    ('KOLKATA',  'Kolkata Tea Index',     ARRAY['IND-ASM', 'IND-DRJ'],               'var(--accent-orange)', '₹', 83,  TRUE, 11),
-    ('COLOMBO',  'Colombo Index',         ARRAY['SRI-BOP', 'SRI-PEK'],               'var(--accent-purple)', '$', 1,   TRUE, 12),
-    ('FUTURES',  'Global Tea Futures',    ARRAY['KEN-BP1', 'IND-ASM', 'SRI-BOP', 'CHN-YUN', 'IND-DRJ'], 'var(--accent-blue)', '$', 1000, TRUE, 13)
+    ('MOMBASA',  'Mombasa Auction (Kenya)', ARRAY['KEN-BP1', 'KEN-PF1', 'KEN-DUST'], 'var(--accent-green)', '$', 1,    TRUE, 10),
+    ('KOLKATA',  'Kolkata Auction (India)',     ARRAY['IND-ASM', 'IND-DRJ'],               'var(--accent-orange)', '₹', 83,  TRUE, 11),
+    ('COLOMBO',  'Colombo Auction (Sri Lanka)',         ARRAY['SRI-BOP', 'SRI-PEK'],               'var(--accent-purple)', '$', 1,   TRUE, 12),
+    ('JAKARTA',  'Jakarta Auction (Indonesia)',    ARRAY['IDN-BOP', 'IDN-PF', 'IDN-DUST'], 'var(--accent-teal)', 'Rp', 15700, TRUE, 13),
+    ('FUTURES',  'Global Tea Futures',    ARRAY['KEN-BP1', 'IND-ASM', 'SRI-BOP', 'CHN-YUN', 'IND-DRJ'], 'var(--accent-blue)', '$', 1000, TRUE, 14)
 ON CONFLICT (symbol) DO NOTHING;
 
 

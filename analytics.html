@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="index, follow">
+    <title>TeaTrade Terminal v1.0 | Analytics</title>
+    <meta name="description" content="TeaTrade Terminal v1.0 — institutional analytics with momentum heatmap, macro correlation, AI sentiment, RSI matrix, and personal alpha tracking.">
+    <link rel="canonical" href="https://exchange.teatrade.co.uk/analytics.html" />
+    <link rel="icon" type="image/png" href="images/favicon-nb.png">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=20260228b">
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7CQLXXEKCE"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('consent', 'default', { analytics_storage: 'denied' });
+    gtag('js', new Date());
+    gtag('config', 'G-7CQLXXEKCE');
+    if (localStorage.getItem('tt_cookie_consent') === 'accepted') {
+        gtag('consent', 'update', { analytics_storage: 'granted' });
+    }
+    </script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        html, body { height: 100%; }
+        body { display: flex; flex-direction: column; min-height: 100vh; background: var(--terminal-bg); }
+    </style>
+</head>
+<body>
+    <!-- TOP BAR -->
+    <div class="top-bar">
+        <div class="logo">
+            <a href="/" style="display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;">
+                <div class="logo-icon">TT</div>
+                <div class="logo-text">TeaTrade <span>Exchange</span></div>
+            </a>
+        </div>
+        <nav class="nav-links">
+            <a href="/">Markets</a>
+            <a href="#">Auctions</a>
+            <a href="analytics.html" class="active">Analytics</a>
+        </nav>
+        <div class="user-section">
+            <div class="market-status" id="market-status">
+                <div class="status-dot waiting" id="status-dot"></div>
+                <span id="status-text">Connecting...</span>
+            </div>
+            <div id="logged-out-ui">
+                <a href="/" class="login-btn" style="text-decoration:none;">Back to Terminal</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- TICKER STRIP -->
+    <div class="ticker-strip" id="global-ticker-strip">
+        <div class="ticker-track" id="global-ticker-track">
+            <div class="ticker-item ticker-loading">
+                <span class="ticker-symbol">Connecting to market data...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- COMMAND BAR -->
+    <div class="analytics-toolbar">
+        <div class="filter-group" id="tf-group">
+            <button class="btn-sm" data-tf="1H">1H</button>
+            <button class="btn-sm" data-tf="4H">4H</button>
+            <button class="btn-sm active" data-tf="1D">1D</button>
+            <button class="btn-sm" data-tf="1W">1W</button>
+        </div>
+        <div class="toolbar-divider"></div>
+        <div class="origin-group" id="origin-group">
+            <button class="origin-btn active" data-origin="all">ALL</button>
+            <button class="origin-btn" data-origin="kenya">KEN</button>
+            <button class="origin-btn" data-origin="india">IND</button>
+            <button class="origin-btn" data-origin="srilanka">LKA</button>
+        </div>
+        <div class="toolbar-divider"></div>
+        <div class="search-bar">
+            <input type="text" placeholder="COMMAND > SEARCH ASSETS..." id="asset-search">
+        </div>
+        <div class="toolbar-right">
+            <div class="toolbar-status">
+                <div class="toolbar-status-dot" id="conn-dot"></div>
+                <span id="conn-label">CONNECTING</span>
+            </div>
+            <button class="toolbar-csv" id="csv-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                CSV
+            </button>
+        </div>
+    </div>
+
+    <!-- 12-COLUMN WIDGET GRID -->
+    <div class="analytics-grid">
+
+        <!-- Widget A: Market Momentum Heatmap (6 cols) -->
+        <div class="widget" id="widget-heatmap" style="grid-column: span 6;">
+            <div class="widget-header">
+                <div class="wh-left">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                    <span>Market Momentum Heatmap</span>
+                    <span class="pulse">LIVE</span>
+                </div>
+                <div class="wh-actions">
+                    <button class="wh-btn" onclick="refreshWidget('heatmap')" title="Refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+                    <button class="wh-btn" onclick="maximizeWidget('widget-heatmap')" title="Maximize"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                </div>
+            </div>
+            <div class="widget-content" id="heatmap-container"></div>
+        </div>
+
+        <!-- Widget B: Macro Correlations (6 cols) -->
+        <div class="widget" id="widget-corr" style="grid-column: span 6;">
+            <div class="widget-header">
+                <div class="wh-left">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    <span>Macro Correlations (Tea vs FX/Oil)</span>
+                </div>
+                <div class="wh-actions">
+                    <button class="wh-btn" onclick="refreshWidget('corr')" title="Refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+                    <button class="wh-btn" onclick="maximizeWidget('widget-corr')" title="Maximize"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                </div>
+            </div>
+            <div class="widget-content" id="correlation-chart">
+                <div class="corr-controls-bar" id="corr-controls"></div>
+                <div class="corr-chart-area" id="corr-area">
+                    <div class="corr-crosshair" id="corr-crosshair"></div>
+                    <div class="corr-tooltip-box" id="corr-tooltip"></div>
+                </div>
+                <div class="corr-footer" id="corr-footer"></div>
+            </div>
+        </div>
+
+        <!-- Widget C: Auction Intelligence Feed (4 cols) -->
+        <div class="widget w-half" id="widget-news" style="grid-column: span 4;">
+            <div class="widget-header">
+                <div class="wh-left">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>
+                    <span>Auction Intelligence Feed</span>
+                    <span class="pulse pulse-ai">AI</span>
+                </div>
+                <div class="wh-actions">
+                    <button class="wh-btn" onclick="refreshWidget('news')" title="Refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+                    <button class="wh-btn" onclick="maximizeWidget('widget-news')" title="Maximize"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                </div>
+            </div>
+            <div class="widget-content" id="news-digest">
+                <div class="t-gauge-wrap" id="gauge-wrap">
+                    <div class="t-gauge-labels">
+                        <span>FEAR</span>
+                        <span class="t-gc" id="sentiment-label">--</span>
+                        <span>GREED</span>
+                    </div>
+                    <svg class="t-gauge-svg" viewBox="0 0 200 48" preserveAspectRatio="xMidYMax meet">
+                        <defs>
+                            <linearGradient id="gg" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="#ff3344"/>
+                                <stop offset="30%" stop-color="#f59e0b"/>
+                                <stop offset="50%" stop-color="#333"/>
+                                <stop offset="70%" stop-color="#00ff88"/>
+                                <stop offset="100%" stop-color="#00ff88"/>
+                            </linearGradient>
+                        </defs>
+                        <path d="M 10 44 A 90 90 0 0 1 190 44" fill="none" stroke="url(#gg)" stroke-width="4" stroke-linecap="round"/>
+                        <line class="t-gauge-needle" id="gauge-needle" x1="100" y1="44" x2="100" y2="10" stroke="#eee" stroke-width="1.5" stroke-linecap="round"/>
+                        <circle cx="100" cy="44" r="3" fill="#eee"/>
+                        <text id="gauge-value" x="100" y="38" text-anchor="middle" font-family="JetBrains Mono" font-size="10" font-weight="700" fill="#eee">50</text>
+                    </svg>
+                </div>
+                <div id="news-feed"></div>
+            </div>
+        </div>
+
+        <!-- Widget D: RSI Matrix (4 cols) -->
+        <div class="widget w-half" id="widget-rsi" style="grid-column: span 4;">
+            <div class="widget-header">
+                <div class="wh-left">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+                    <span>Relative Strength Index (Origin Comparison)</span>
+                </div>
+                <div class="wh-actions">
+                    <button class="wh-btn" onclick="refreshWidget('rsi')" title="Refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+                    <button class="wh-btn" onclick="maximizeWidget('widget-rsi')" title="Maximize"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                </div>
+            </div>
+            <div class="widget-content" id="rsi-matrix"></div>
+        </div>
+
+        <!-- Widget E: Trading DNA / Quant Sheet (4 cols) -->
+        <div class="widget w-half" id="widget-quant" style="grid-column: span 4;">
+            <div class="widget-header">
+                <div class="wh-left">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>Trading DNA (Personal Performance)</span>
+                </div>
+                <div class="wh-actions">
+                    <button class="wh-btn" onclick="refreshWidget('quant')" title="Refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+                    <button class="wh-btn" onclick="maximizeWidget('widget-quant')" title="Maximize"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                </div>
+            </div>
+            <div class="widget-content" id="quant-tear-sheet"></div>
+        </div>
+    </div>
+
+    <!-- Heatmap tooltip (global, positioned by JS) -->
+    <div class="hm-tooltip" id="hm-tooltip"></div>
+
+    <!-- AI Drawer -->
+    <div class="ai-drawer-overlay" id="ai-overlay"></div>
+    <div class="ai-drawer" id="ai-drawer">
+        <div class="ai-drawer-head">
+            <h3>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10H12V2z"/></svg>
+                IMPACT ANALYSIS
+            </h3>
+            <button class="ai-drawer-close" id="ai-close">&times;</button>
+        </div>
+        <div class="ai-drawer-body" id="ai-body"></div>
+    </div>
+
+    <!-- BOTTOM BAR -->
+    <div class="bottom-bar">
+        <div class="bottom-stat">
+            <span>Last Update: <span style="color: var(--text-primary);" id="footer-last-update">--:--:-- UTC</span></span>
+            <span>Session: <span style="color: #00ff88;">Active</span></span>
+        </div>
+        <div class="bottom-stat">
+            <a href="about.html" class="footer-link">About</a>
+            <a href="terms.html" class="footer-link">Terms</a>
+            <a href="privacy.html" class="footer-link">Privacy</a>
+            <a href="contact.html" class="footer-link">Contact</a>
+            <span>&#169; 2026 TeaTrade Exchange</span>
+        </div>
+    </div>
+
+    <script src="js/analytics.js?v=20260228d"></script>
+</body>
+</html>

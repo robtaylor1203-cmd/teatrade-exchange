@@ -1,0 +1,22 @@
+[
+  {
+    "symbol": "IDN-BOP",
+    "current_price": 25875,
+    "volume_24h": 471207
+  },
+  {
+    "symbol": "KOL-AUT",
+    "current_price": 2.645,
+    "volume_24h": 857856
+  },
+  {
+    "symbol": "SRI-BOP",
+    "current_price": 1219.644,
+    "volume_24h": 437691
+  },
+  {
+    "symbol": "KOL-SF",
+    "current_price": 2.975,
+    "volume_24h": 782382
+  }
+]

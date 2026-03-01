@@ -32,14 +32,14 @@ const _IDX_ALIASES = {
     'KENYA': 'MOMBASA', 'MOMBASA': 'KENYA',
     'INDIA': 'KOLKATA', 'KOLKATA': 'INDIA',
     'CEYLON': 'COLOMBO', 'COLOMBO': 'CEYLON',
-    'ASIA': 'FUTURES',  'FUTURES': 'ASIA',
+    'ASIA': 'FUTURES', 'FUTURES': 'ASIA',
     'INDONESIA': 'JAKARTA', 'JAKARTA': 'INDONESIA',
     'BANGLADESH': 'CHITTAGONG', 'CHITTAGONG': 'BANGLADESH',
     'MALAWI': 'LIMBE', 'LIMBE': 'MALAWI',
 };
 
 function _findIndexDef(symbol) {
-    const db  = state.dbIndexes?.length ? state.dbIndexes : [];
+    const db = state.dbIndexes?.length ? state.dbIndexes : [];
     const all = [...db];
     for (const d of defaultDbIndexes) {
         if (!all.some(m => m.symbol === d.symbol)) all.push(d);
@@ -50,7 +50,7 @@ function _findIndexDef(symbol) {
 }
 
 function _allIndexDefs() {
-    const db  = state.dbIndexes?.length ? state.dbIndexes : [];
+    const db = state.dbIndexes?.length ? state.dbIndexes : [];
     const all = [...db];
     for (const d of defaultDbIndexes) {
         if (!all.some(m => m.symbol === d.symbol)) all.push(d);
@@ -115,7 +115,7 @@ function getPriceHistorySync(symbol, symbolType = 'tea') {
     }
 
     // Trigger async load in background
-    getPriceHistory(symbol, symbolType).catch(() => {});
+    getPriceHistory(symbol, symbolType).catch(() => { });
 
     return [];
 }
@@ -161,7 +161,7 @@ function updatePriceCache(symbol, newPrice, symbolType = 'tea') {
     // Determine candle interval from data
     const candleInterval = data.length > 1
         ? (data[1].date instanceof Date ? data[1].date.getTime() : new Date(data[1].date).getTime()) -
-          (data[0].date instanceof Date ? data[0].date.getTime() : new Date(data[0].date).getTime())
+        (data[0].date instanceof Date ? data[0].date.getTime() : new Date(data[0].date).getTime())
         : 3600000;
 
     if (now.getTime() - lastCandleTime < candleInterval) {
@@ -225,12 +225,12 @@ async function initializePriceCache() {
 // The limit passed to apiFetchPriceHistory caps the live-rows query (5 000).
 // These per-timeframe limits are kept for the convertToOHLC call only.
 const TIMEFRAME_CONFIG = {
-    '1D':  { interval: 5,     hoursBack: 24,   limit: 100   },
-    '1W':  { interval: 60,    hoursBack: 168,  limit: 5000  },
-    '1M':  { interval: 240,   hoursBack: 720,  limit: 5000  },
-    '3M':  { interval: 1440,  hoursBack: 2160, limit: 5000  },
-    '1Y':  { interval: 1440,  hoursBack: 8760, limit: 5000  },
-    'ALL': { interval: 10080, hoursBack: null,  limit: 10000 }
+    '1D': { interval: 5, hoursBack: 24, limit: 100 },
+    '1W': { interval: 60, hoursBack: 168, limit: 5000 },
+    '1M': { interval: 240, hoursBack: 720, limit: 5000 },
+    '3M': { interval: 1440, hoursBack: 2160, limit: 5000 },
+    '1Y': { interval: 1440, hoursBack: 8760, limit: 5000 },
+    'ALL': { interval: 10080, hoursBack: null, limit: 10000 }
 };
 
 // Load chart data from database with timeframe-aware filtering.
@@ -345,11 +345,11 @@ async function _loadCompositeIndexOHLC(teaSymbols, cfg, since) {
         if (avgAtEachTick.length === 0) continue;
 
         candles.push({
-            date:   new Date(bk),
-            open:   avgAtEachTick[0],
-            high:   Math.max(...avgAtEachTick),
-            low:    Math.min(...avgAtEachTick),
-            close:  avgAtEachTick[avgAtEachTick.length - 1],
+            date: new Date(bk),
+            open: avgAtEachTick[0],
+            high: Math.max(...avgAtEachTick),
+            low: Math.min(...avgAtEachTick),
+            close: avgAtEachTick[avgAtEachTick.length - 1],
             volume: 0
         });
     }
@@ -359,7 +359,7 @@ async function _loadCompositeIndexOHLC(teaSymbols, cfg, since) {
         for (let i = 1; i < candles.length; i++) {
             candles[i].open = candles[i - 1].close;
             candles[i].high = Math.max(candles[i].high, candles[i].open, candles[i].close);
-            candles[i].low  = Math.min(candles[i].low, candles[i].open, candles[i].close);
+            candles[i].low = Math.min(candles[i].low, candles[i].open, candles[i].close);
         }
     }
 
@@ -515,12 +515,10 @@ function appendPriceToChart(chartDataArray, newPrice, timestamp = new Date()) {
 // MARKET INDEXES
 // =============================================
 
-// Calculate market display indexes from real tea data
-function calculateMarketIndexes() {
-    if (!state.teas || state.teas.length === 0) return null;
-
-    const teaMap = {};
-    state.teas.forEach(t => teaMap[t.symbol] = t);
+// Update all market index displays with real calculated prices
+function updateAllMarketIndexes() {
+    const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
+    if (!indexes || indexes.length === 0) return;
 
     const _getLiveMultiplier = (idx) => {
         if (idx.forexKey && state.macroIndicators[idx.forexKey]) {
@@ -529,66 +527,22 @@ function calculateMarketIndexes() {
         return idx.multiplier || 1;
     };
 
-    const calcIndex = (symbols, multiplier = 1) => {
-        const validTeas = symbols.map(s => teaMap[s]).filter(t => t && t.current_price > 0);
-        if (validTeas.length === 0) return { price: 0, change: 0 };
-
-        const avgPrice = validTeas.reduce((sum, t) => sum + t.current_price, 0) / validTeas.length * multiplier;
-        const avgPrevPrice = validTeas.reduce((sum, t) => sum + (t.previous_price || t.current_price), 0) / validTeas.length * multiplier;
-        const change = avgPrevPrice > 0 ? ((avgPrice - avgPrevPrice) / avgPrevPrice) * 100 : 0;
-
-        return { price: avgPrice, change: change };
-    };
-
-    const result = {};
-
-    if (state.dbIndexes.length > 0) {
-        state.dbIndexes.forEach(idx => {
-            const mult = _getLiveMultiplier(idx);
-            const calc = calcIndex(idx.teas || [], mult);
-            result[idx.symbol] = calc;
-        });
-    } else {
-        const lkr = Number(state.macroIndicators.usd_lkr) || 305;
-        const inr = Number(state.macroIndicators.usd_inr) || 83.5;
-        const idr = Number(state.macroIndicators.usd_idr) || 15700;
-        const bdt = Number(state.macroIndicators.usd_bdt) || 110;
-        result.KENYA = calcIndex(['KEN-BP1', 'KEN-PF1', 'KEN-DUST']);
-        result.MOMBASA = calcIndex(['KEN-BP1', 'KEN-PF1', 'KEN-DUST', 'KEN-PD', 'KEN-BMF', 'KEN-FNGS']);
-        result.KOLKATA = calcIndex(['IND-ASM', 'IND-DRJ', 'KOL-SF', 'KOL-AUT', 'KOL-GOLD'], inr);
-        result.COLOMBO = calcIndex(['SRI-BOP', 'SRI-PEK', 'SRI-OP', 'SRI-FBOP', 'SRI-DUST', 'SRI-BOP1'], lkr);
-        result.JAKARTA = calcIndex(['IDN-BOP', 'IDN-PF', 'IDN-DUST', 'IDN-BT'], idr);
-        result.CHITTAGONG = calcIndex(['BGD-BOP', 'BGD-BP', 'BGD-DUST', 'BGD-FNGS'], bdt);
-        result.GUWAHATI = calcIndex(['GUW-BOP', 'GUW-BP', 'GUW-OF', 'GUW-PF'], inr);
-        result.JALPAIGURI = calcIndex(['JAL-BOP', 'JAL-BP', 'JAL-DUST', 'JAL-PF'], inr);
-        result.COCHIN = calcIndex(['COC-BOP', 'COC-OP', 'COC-DUST', 'COC-PF'], inr);
-        result.COIMBATORE = calcIndex(['CMB-BOP', 'CMB-BP', 'CMB-DUST', 'CMB-OP'], inr);
-        result.LIMBE = calcIndex(['MLW-BP1', 'MLW-PF1', 'MLW-DUST', 'MLW-FNGS']);
-        result.SILIGURI = calcIndex(['SIL-DRJ', 'SIL-BOP', 'SIL-DUST', 'SIL-FNGS'], inr);
-        result.COONOOR = calcIndex(['COO-BOP', 'COO-OP', 'COO-DUST', 'COO-PF'], inr);
-        result.FUTURES = calcIndex(['KEN-BP1', 'IND-ASM', 'SRI-BOP', 'IDN-BOP', 'BGD-BOP', 'MLW-BP1'], 1000);
-    }
-
-    return result;
-}
-
-// Update all market index displays with real calculated prices
-function updateAllMarketIndexes() {
-    const indexes = calculateMarketIndexes();
-    if (!indexes) return;
+    const idxMap = {};
+    indexes.forEach(idx => idxMap[idx.symbol] = idx);
 
     // Update main chart if it's showing a KENYA-equivalent symbol
     const mainIdxSym = _CARD_TO_INDEX[state.mainChartData.symbol] || state.mainChartData.symbol;
-    if (indexes[mainIdxSym]) {
-        state.mainChartData.basePrice = indexes[mainIdxSym].price;
-        state.mainChartData.change = indexes[mainIdxSym].change;
+    if (idxMap[mainIdxSym]) {
+        const _idx = idxMap[mainIdxSym];
+        state.mainChartData.basePrice = _idx.price * _getLiveMultiplier(_idx);
+        state.mainChartData.change = _idx.change;
     }
 
     // Update card data
     cardData.forEach((card, i) => {
-        const idx = indexes[card.symbol];
+        const idx = idxMap[card.symbol];
         if (idx) {
-            card.basePrice = idx.price;
+            card.basePrice = idx.price * _getLiveMultiplier(idx);
             card.change = idx.change;
         }
     });
@@ -625,9 +579,7 @@ function updateAllMarketIndexes() {
     });
 
     // Incrementally update index price caches (do NOT wipe history).
-    // The cache stores USD — use _liveIndexPrice which returns raw USD
-    // rather than the local-currency value from calculateMarketIndexes.
-    Object.entries(indexes).forEach(([symbol]) => {
+    Object.entries(idxMap).forEach(([symbol]) => {
         const usdPrice = typeof _liveIndexPrice === 'function' ? _liveIndexPrice(symbol) : null;
         if (usdPrice && usdPrice > 0) {
             updatePriceCache(symbol, usdPrice, 'index');
@@ -715,11 +667,26 @@ function calculateRegionalIndexes() {
         : defaultDbIndexes;
 
     return indexes.map(idx => {
-        const prices = idx.teas.map(s => teaMap[s]?.current_price || 0).filter(p => p > 0);
-        const prevPrices = idx.teas.map(s => teaMap[s]?.previous_price || 0).filter(p => p > 0);
+        let totalVol = 0;
+        let weightedSum = 0;
+        let prevTotalVol = 0;
+        let prevWeightedSum = 0;
 
-        const avgPrice = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
-        const avgPrevPrice = prevPrices.length > 0 ? prevPrices.reduce((a, b) => a + b, 0) / prevPrices.length : avgPrice;
+        idx.teas.forEach(s => {
+            const tea = teaMap[s];
+            if (tea && tea.current_price > 0 && tea.volume_24h > 0) {
+                totalVol += tea.volume_24h;
+                weightedSum += tea.current_price * tea.volume_24h;
+
+                if (tea.previous_price > 0) {
+                    prevTotalVol += tea.volume_24h;
+                    prevWeightedSum += tea.previous_price * tea.volume_24h;
+                }
+            }
+        });
+
+        const avgPrice = totalVol > 0 ? weightedSum / totalVol : 0;
+        const avgPrevPrice = prevTotalVol > 0 ? prevWeightedSum / prevTotalVol : avgPrice;
         const change = avgPrevPrice > 0 ? ((avgPrice - avgPrevPrice) / avgPrevPrice) * 100 : 0;
 
         return {
@@ -727,7 +694,8 @@ function calculateRegionalIndexes() {
             price: avgPrice,
             previousPrice: avgPrevPrice,
             change: change,
-            isIndex: true
+            isIndex: true,
+            volume: totalVol
         };
     });
 }
@@ -905,7 +873,7 @@ function _liveIndexPrice(indexSymbol) {
 function _pushPriceToActiveCharts(symbol, newPrice) {
     // ── Main chart (data stored in USD; forex applied at render) ──────────
     const mainSymbol = _getMainChartSymbol();
-    const mainType   = _getMainChartSymbolType();
+    const mainType = _getMainChartSymbolType();
 
     if (mainType === 'tea' && mainSymbol === symbol) {
         _seedOrAppendChart(state, 'chartData', newPrice);
@@ -923,10 +891,10 @@ function _pushPriceToActiveCharts(symbol, newPrice) {
     // ── Hub fullscreen chart (data stored in USD; forex applied at render) ──
     const hubSection = document.getElementById('chart-section');
     if (hubSection?.classList.contains('panel-maximized')) {
-        const hubRaw    = document.getElementById('hub-buy-symbol')?.value || '';
-        const _cardMap  = { 'KENYAN': 'KENYA' };
+        const hubRaw = document.getElementById('hub-buy-symbol')?.value || '';
+        const _cardMap = { 'KENYAN': 'KENYA' };
         const hubSymbol = _cardMap[hubRaw] || hubRaw;
-        const hubIsIdx  = typeof isIndexSymbol === 'function' && isIndexSymbol(hubSymbol);
+        const hubIsIdx = typeof isIndexSymbol === 'function' && isIndexSymbol(hubSymbol);
 
         if (!hubIsIdx && hubSymbol === symbol) {
             _seedOrAppendChart(state, 'hubChartData', newPrice);
@@ -945,9 +913,9 @@ function _pushPriceToActiveCharts(symbol, newPrice) {
     // ── Quick-quote modal ─────────────────────────────────────────────────
     const qqModal = document.getElementById('quick-quote-modal');
     if (state.qqCurrentTea && qqModal?.classList.contains('active')) {
-        const qqSym   = state.qqCurrentTea.symbol;
+        const qqSym = state.qqCurrentTea.symbol;
         const qqIsIdx = state.qqCurrentTea.isIndex;
-        let qqPrice   = null;
+        let qqPrice = null;
 
         if (!qqIsIdx && qqSym === symbol) {
             qqPrice = newPrice;
@@ -1069,15 +1037,15 @@ function handleMarketPressureUpdate(payload) {
     if (!row || !row.symbol) return;
 
     state.marketPressure[row.symbol] = {
-        buy5m:        Number(row.buy_volume_5m)   || 0,
-        sell5m:       Number(row.sell_volume_5m)  || 0,
-        buy30m:       Number(row.buy_volume_30m)  || 0,
-        sell30m:      Number(row.sell_volume_30m) || 0,
-        tradeCount5m: Number(row.trade_count_5m)  || 0,
-        tradeCount30m:Number(row.trade_count_30m) || 0,
-        lastSide:     row.last_side,
-        lastQty:      Number(row.last_qty)         || 0,
-        updatedAt:    row.updated_at,
+        buy5m: Number(row.buy_volume_5m) || 0,
+        sell5m: Number(row.sell_volume_5m) || 0,
+        buy30m: Number(row.buy_volume_30m) || 0,
+        sell30m: Number(row.sell_volume_30m) || 0,
+        tradeCount5m: Number(row.trade_count_5m) || 0,
+        tradeCount30m: Number(row.trade_count_30m) || 0,
+        lastSide: row.last_side,
+        lastQty: Number(row.last_qty) || 0,
+        updatedAt: row.updated_at,
     };
 
     // Immediately redraw market depth — this fires on every trade
@@ -1094,15 +1062,15 @@ async function loadMarketPressure() {
         if (error || !data) return;
         data.forEach(row => {
             state.marketPressure[row.symbol] = {
-                buy5m:         Number(row.buy_volume_5m)   || 0,
-                sell5m:        Number(row.sell_volume_5m)  || 0,
-                buy30m:        Number(row.buy_volume_30m)  || 0,
-                sell30m:       Number(row.sell_volume_30m) || 0,
-                tradeCount5m:  Number(row.trade_count_5m)  || 0,
+                buy5m: Number(row.buy_volume_5m) || 0,
+                sell5m: Number(row.sell_volume_5m) || 0,
+                buy30m: Number(row.buy_volume_30m) || 0,
+                sell30m: Number(row.sell_volume_30m) || 0,
+                tradeCount5m: Number(row.trade_count_5m) || 0,
                 tradeCount30m: Number(row.trade_count_30m) || 0,
-                lastSide:      row.last_side,
-                lastQty:       Number(row.last_qty)         || 0,
-                updatedAt:     row.updated_at,
+                lastSide: row.last_side,
+                lastQty: Number(row.last_qty) || 0,
+                updatedAt: row.updated_at,
             };
         });
         console.log(`📊 Market pressure seeded for ${data.length} symbol(s)`);
@@ -1188,7 +1156,7 @@ async function fetchLiveForex() {
         });
 
         if (typeof updateMacroIndicators === 'function') updateMacroIndicators();
-        if (typeof updateGlobalTicker    === 'function') updateGlobalTicker();
+        if (typeof updateGlobalTicker === 'function') updateGlobalTicker();
         console.log(`💱 Live forex: KES ${r.KES?.toFixed(2)} | INR ${r.INR?.toFixed(2)} | LKR ${r.LKR?.toFixed(2)} | CNY ${r.CNY?.toFixed(4)}`);
     } catch (e) {
         console.warn('Live forex fetch failed (will retry):', e.message);
@@ -1211,13 +1179,13 @@ async function fetchLiveBrent() {
         state.macroIndicators['brent_crude'] = price;
 
         if (typeof updateMacroIndicators === 'function') updateMacroIndicators();
-        if (typeof updateGlobalTicker    === 'function') updateGlobalTicker();
+        if (typeof updateGlobalTicker === 'function') updateGlobalTicker();
         console.log(`🛢️  Live Brent crude: $${price.toFixed(2)}/bbl`);
 
         // Cache 5-day close history for the popout sparkline
         const result = data?.chart?.result?.[0];
         const timestamps = result?.timestamp ?? [];
-        const closes     = result?.indicators?.quote?.[0]?.close ?? [];
+        const closes = result?.indicators?.quote?.[0]?.close ?? [];
         if (timestamps.length > 0 && closes.length > 0) {
             const history = timestamps.map((ts, i) => ({
                 date: new Date(ts * 1000).toISOString().split('T')[0],
@@ -1386,8 +1354,8 @@ setInterval(async () => {
 function updateChartsWithNewPrices() {
     // ── Main chart price display ──────────────────────────────────────────
     const mainSymbol = _getMainChartSymbol();
-    const mainType   = _getMainChartSymbolType();
-    let mainPrice    = null;
+    const mainType = _getMainChartSymbolType();
+    let mainPrice = null;
 
     if (mainType === 'tea' && mainSymbol) {
         const tea = state.teas?.find(t => t.symbol === mainSymbol);

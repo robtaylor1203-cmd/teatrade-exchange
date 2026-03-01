@@ -49,7 +49,7 @@ function updatePortfolioDisplay() {
             </div>
         `;
         const totalValue = getActiveBalance();
-        valueEl.textContent = '$' + totalValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        valueEl.textContent = '$' + totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const startBal = state.tradingMode === 'REAL' ? 0 : 10000;
         const pnl = totalValue - startBal;
         const pnlPct = startBal > 0 ? (pnl / startBal * 100).toFixed(2) : '0.00';
@@ -204,7 +204,7 @@ function updatePortfolioDisplay() {
     const startBal = state.tradingMode === 'REAL' ? 0 : 10000;
     const equityPct = startBal > 0 ? (equity / startBal * 100) : 100;
 
-    valueEl.textContent = '$' + equity.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    valueEl.textContent = '$' + equity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     const totalPnl = equity - startBal;
     const totalPnlPct = startBal > 0 ? (totalPnl / startBal * 100).toFixed(2) : '0.00';
@@ -230,10 +230,10 @@ function updatePortfolioDisplay() {
     const phDisplay = '$' + equity.toFixed(2);
     marginHtml.innerHTML = totalUsedMargin > 0
         ? `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Balance</span><span>$${balance.toFixed(2)}</span></div>` +
-          `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Equity</span><span style="font-weight:600;">$${equity.toFixed(2)}</span></div>` +
-          `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Invested</span><span>$${totalUsedMargin.toFixed(2)}</span></div>` +
-          `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Free Funds</span><span>$${freeMargin.toFixed(2)}</span></div>` +
-          `<div style="display:flex;justify-content:space-between;"><span>Account Health</span><span style="color:${phColor};font-weight:600;">${phDisplay}</span></div>`
+        `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Equity</span><span style="font-weight:600;">$${equity.toFixed(2)}</span></div>` +
+        `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Invested</span><span>$${totalUsedMargin.toFixed(2)}</span></div>` +
+        `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Free Funds</span><span>$${freeMargin.toFixed(2)}</span></div>` +
+        `<div style="display:flex;justify-content:space-between;"><span>Account Health</span><span style="color:${phColor};font-weight:600;">${phDisplay}</span></div>`
         : '';
 }
 
@@ -254,6 +254,29 @@ function _checkClientMarginLevel(equityPct, equity, usedMargin) {
     const now = Date.now();
     if (now - _lastMarginWarningTime < _MARGIN_WARN_COOLDOWN_MS) return;
 
+    // REAL mode: FCA 50% margin closeout rule
+    if (state.tradingMode === 'REAL') {
+        const marginLevelPct = usedMargin > 0 ? (equity / usedMargin) * 100 : 100;
+
+        if (marginLevelPct <= 50) {
+            _lastMarginWarningTime = now;
+            if (typeof _showMarginAlert === 'function') {
+                _showMarginAlert('MARGIN CLOSEOUT (FCA 50% Rule)',
+                    `Account equity dropped below 50% of margin requirements ($${equity.toFixed(2)}). All positions will be liquidated.`,
+                    'stop_out');
+            }
+        } else if (marginLevelPct <= 80) {
+            _lastMarginWarningTime = now;
+            if (typeof _showMarginAlert === 'function') {
+                _showMarginAlert('Margin Call Warning',
+                    `Account equity has fallen to ${marginLevelPct.toFixed(1)}% of margin requirements. Consider closing positions.`,
+                    'margin_call');
+            }
+        }
+        return;
+    }
+
+    // VIRTUAL mode: Gamified fixed-dollar thresholds
     if (equity <= 1) {
         _lastMarginWarningTime = now;
         if (typeof _showMarginAlert === 'function') {
@@ -436,7 +459,7 @@ function displayUserTrades(trades) {
     let displayTrades = [...displayRegular, ...displayPairs].sort((a, b) => b.id - a.id);
 
     const openTradesCount = visibleRegular.filter(t => !closedTradeIds.has(t.id)).length +
-                            openingPairTrades.filter(t => !closedPairIds.has(t.id)).length;
+        openingPairTrades.filter(t => !closedPairIds.has(t.id)).length;
     countEl.textContent = openTradesCount;
     countEl.style.display = openTradesCount > 0 ? '' : 'none';
 
@@ -460,7 +483,7 @@ function displayUserTrades(trades) {
             : new Date(0);
         const timeStr = trade.created_at
             ? time.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' ' +
-              time.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+            time.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
             : '--:--';
         const orderId = '#' + String(trade.id).substring(0, 5).toUpperCase();
         const tea = state.teas.find(t => t.id === trade.tea_id);
@@ -735,7 +758,7 @@ function displayUserTrades(trades) {
         const openPnlSign = openTotalPnl >= 0 ? '+' : '';
         const openPnlPct = openTotalValue > 0 ? (openTotalPnl / openTotalValue * 100) : 0;
 
-        tfootTotal.textContent = '$' + openTotalValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        tfootTotal.textContent = '$' + openTotalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         tfootPnl.className = `orders-summary-stat-value ${openPnlClass}`;
         tfootPnl.textContent = `${openPnlSign}$${openTotalPnl.toFixed(2)} (${openPnlPct.toFixed(1)}%)`;
         tfootCount.textContent = `${openCount} open`;
@@ -858,9 +881,9 @@ function confirmClosePosition(type, tradeId, symbol, pnl, quantity, teaId) {
         </div>`;
 
     document.body.appendChild(modal);
-    modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+    modal.addEventListener('click', function (e) { if (e.target === modal) modal.remove(); });
 
-    document.getElementById('confirm-close-btn').addEventListener('click', function() {
+    document.getElementById('confirm-close-btn').addEventListener('click', function () {
         modal.remove();
         if (type === 'pair') {
             closePairPosition(tradeId);
@@ -1155,7 +1178,7 @@ function updateLeaderboardDisplay(leaders) {
         const userTier = user.tier || 'FREE';
         const hasFundedBadge = user.combine_badge === true;
         let badgeHtml = (userTier === 'PRO' ? '<span class="badge-pro">PRO</span>' : '')
-                      + (hasFundedBadge ? '<span class="badge-funded">FUNDED</span>' : '');
+            + (hasFundedBadge ? '<span class="badge-funded">FUNDED</span>' : '');
 
         let userBadges = user.badges;
         if (typeof userBadges === 'string') { try { userBadges = JSON.parse(userBadges); } catch { userBadges = []; } }
@@ -1395,7 +1418,7 @@ let _notifySeenTrades = new Set();
 function reconnectTradeNotifications() {
     _stopNotifyPolling();
     if (_tradeNotifyChannel) {
-        try { supabaseClient.removeChannel(_tradeNotifyChannel); } catch (_) {}
+        try { supabaseClient.removeChannel(_tradeNotifyChannel); } catch (_) { }
         _tradeNotifyChannel = null;
     }
     _ensureTradeNotificationChannel();
@@ -1419,7 +1442,7 @@ async function _ensureTradeNotificationChannel() {
                 .eq('id', f.following_id)
                 .single();
             if (data?.username) _tradeNotifyProfileCache[f.following_id] = data.username;
-        } catch (_) {}
+        } catch (_) { }
     }
 
     console.log('[FollowNotify] all followed IDs:', [..._allFollowedIds]);
@@ -1485,7 +1508,7 @@ async function _initLastSeenTradeId() {
             .order('id', { ascending: false })
             .limit(1);
         if (data?.[0]?.id) _lastSeenTradeId = data[0].id;
-    } catch (_) {}
+    } catch (_) { }
 }
 
 async function _pollFollowedTrades() {
@@ -1543,7 +1566,7 @@ async function _showTradeNotification(trade) {
                 username = data.username;
                 _tradeNotifyProfileCache[trade.user_id] = username;
             }
-        } catch (_) {}
+        } catch (_) { }
     }
     if (!username) username = trade.user_id?.slice(0, 8) || 'Trader';
     const initials = username.slice(0, 2).toUpperCase();
@@ -1695,8 +1718,8 @@ async function openTraderProfile(username, returnPct, totalValue, rank) {
     if (!modal) return;
 
     const hasPrecomputed = returnPct != null && totalValue != null;
-    const followed  = isTraderFollowed(username);
-    const initials  = username.slice(0, 2).toUpperCase();
+    const followed = isTraderFollowed(username);
+    const initials = username.slice(0, 2).toUpperCase();
 
     const _rankStr = (r) => {
         if (r == null) return '';
@@ -1706,7 +1729,7 @@ async function openTraderProfile(username, returnPct, totalValue, rank) {
     const _buildCard = (rp, tv, r, profileMeta) => {
         const isLoading = rp == null || tv == null;
         const retClass = isLoading ? '' : (rp >= 0 ? 'up' : 'down');
-        const retSign  = isLoading ? '' : (rp >= 0 ? '+' : '');
+        const retSign = isLoading ? '' : (rp >= 0 ? '+' : '');
         const startVal = isLoading ? 0 : (tv / (1 + rp / 100) || 0);
         const gainLoss = isLoading ? 0 : (tv - startVal);
         const gainSign = gainLoss >= 0 ? '+' : '';
@@ -1831,7 +1854,7 @@ async function openTraderProfile(username, returnPct, totalValue, rank) {
 
     const traderBadges = profileData?.data?.badges;
     const badgesArr = Array.isArray(traderBadges) ? traderBadges
-        : (typeof traderBadges === 'string' ? (function() { try { return JSON.parse(traderBadges); } catch { return []; } })() : []);
+        : (typeof traderBadges === 'string' ? (function () { try { return JSON.parse(traderBadges); } catch { return []; } })() : []);
     const badgesRow = document.getElementById('trader-profile-badges-row');
     if (badgesRow) {
         if (badgesArr.length === 0) {
@@ -1905,8 +1928,8 @@ function switchPortfolioModalTab(tab) {
         btn.classList.toggle('active', btn.dataset.tab === tab);
     });
     document.getElementById('portfolio-tab-financial').style.display = tab === 'financial' ? 'block' : 'none';
-    document.getElementById('portfolio-tab-history').style.display   = tab === 'history'   ? 'block' : 'none';
-    document.getElementById('portfolio-tab-social').style.display    = tab === 'social'    ? 'flex'  : 'none';
+    document.getElementById('portfolio-tab-history').style.display = tab === 'history' ? 'block' : 'none';
+    document.getElementById('portfolio-tab-social').style.display = tab === 'social' ? 'flex' : 'none';
     const badgesTab = document.getElementById('portfolio-tab-badges');
     if (badgesTab) badgesTab.style.display = tab === 'badges' ? 'block' : 'none';
     const storeTab = document.getElementById('portfolio-tab-store');
@@ -2103,8 +2126,8 @@ function renderFinancialTab() {
         <div class="pf-section">
             <div class="pf-section-title">Open Positions</div>
             ${posCount === 0
-                ? '<div class="pf-empty">No open positions. Start trading to build your portfolio.</div>'
-                : `<div class="pf-positions-table">
+            ? '<div class="pf-empty">No open positions. Start trading to build your portfolio.</div>'
+            : `<div class="pf-positions-table">
                     <div class="pf-pos-header">
                         <div>Symbol</div><div>Qty</div><div>Avg Entry</div><div>Current</div><div>Return</div><div>P&amp;L</div>
                     </div>
@@ -2340,7 +2363,7 @@ function _filterHistory(filter) {
 
 async function renderPortfolioModal() {
     const watchlist = getTraderWatchlist();
-    const wlPanel   = document.getElementById('portfolio-watchlist-panel');
+    const wlPanel = document.getElementById('portfolio-watchlist-panel');
     const statsPanel = document.getElementById('portfolio-stats-panel');
     if (!wlPanel || !statsPanel) return;
 
@@ -2357,7 +2380,7 @@ async function renderPortfolioModal() {
 
     wlPanel.innerHTML = watchlist.map(t => {
         const retClass = t.returnPct >= 0 ? 'up' : 'down';
-        const retSign  = t.returnPct >= 0 ? '+' : '';
+        const retSign = t.returnPct >= 0 ? '+' : '';
         return `
             <div class="portfolio-wl-item" onclick="selectPortfolioTrader('${escapeHtml(t.username)}')" data-username="${escapeHtml(t.username)}">
                 <div class="portfolio-wl-avatar">${t.username.slice(0, 2).toUpperCase()}</div>
@@ -2386,7 +2409,7 @@ async function _refreshWatchlistLiveStats(watchlist) {
         const retEl = document.getElementById(`wl-return-${t.username}`);
         if (retEl) {
             const retClass = t.returnPct >= 0 ? 'up' : 'down';
-            const retSign  = t.returnPct >= 0 ? '+' : '';
+            const retSign = t.returnPct >= 0 ? '+' : '';
             retEl.textContent = `${retSign}${t.returnPct.toFixed(1)}%`;
             retEl.className = `portfolio-wl-return ${retClass}`;
         }
@@ -2412,7 +2435,7 @@ async function selectPortfolioTrader(username) {
 
     const _renderStats = (rp, tv, notifyOn, targetUserId) => {
         const retClass = rp >= 0 ? 'up' : 'down';
-        const retSign  = rp >= 0 ? '+' : '';
+        const retSign = rp >= 0 ? '+' : '';
         const startVal = tv / (1 + rp / 100) || 0;
         const gainLoss = tv - startVal;
         const gainSign = gainLoss >= 0 ? '+' : '';
@@ -2427,7 +2450,7 @@ async function selectPortfolioTrader(username) {
                     <div class="portfolio-trader-avatar">${initials}</div>
                     <div style="flex:1;min-width:0;">
                         <div class="portfolio-trader-name">${escapeHtml(username)}</div>
-                        <div class="portfolio-trader-since">Following since ${new Date(followedAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}</div>
+                        <div class="portfolio-trader-since">Following since ${new Date(followedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
                     </div>
                     <button class="notify-toggle-btn ${notifyOn ? 'active' : ''}"
                         id="notify-toggle-btn"
@@ -2443,15 +2466,15 @@ async function selectPortfolioTrader(username) {
                     </div>
                     <div class="portfolio-stat">
                         <div class="portfolio-stat-label">Portfolio Value</div>
-                        <div class="portfolio-stat-value">$${tv.toLocaleString('en-US',{maximumFractionDigits:0})}</div>
+                        <div class="portfolio-stat-value">$${tv.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
                     </div>
                     <div class="portfolio-stat">
                         <div class="portfolio-stat-label">P&amp;L</div>
-                        <div class="portfolio-stat-value ${gainLoss>=0?'up':'down'}">${gainSign}$${Math.abs(gainLoss).toLocaleString('en-US',{maximumFractionDigits:0})}</div>
+                        <div class="portfolio-stat-value ${gainLoss >= 0 ? 'up' : 'down'}">${gainSign}$${Math.abs(gainLoss).toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
                     </div>
                     <div class="portfolio-stat">
                         <div class="portfolio-stat-label">Starting Capital</div>
-                        <div class="portfolio-stat-value">$${startVal.toLocaleString('en-US',{maximumFractionDigits:0})}</div>
+                        <div class="portfolio-stat-value">$${startVal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
                     </div>
                 </div>
                 <div class="portfolio-activity-section">
@@ -2499,7 +2522,7 @@ async function _handleNotifyToggle(targetUserId, currentState) {
         btn.className = `notify-toggle-btn ${newState ? 'active' : ''}`;
         btn.title = newState ? 'Notifications on — click to mute' : 'Notifications off — click to enable';
         btn.setAttribute('onclick', `_handleNotifyToggle('${targetUserId}', ${newState})`);
-        const bellOn  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+        const bellOn = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
         const bellOff = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
         btn.innerHTML = newState ? bellOn : bellOff;
     }
@@ -2649,9 +2672,9 @@ function renderBadgesTab() {
 
     for (const [cat, badges] of Object.entries(categories)) {
         const catLabel = cat === 'Respect' ? 'Respect Badges (Performance)'
-                       : cat === 'Whale' ? 'Whale Badges (Volume)'
-                       : cat === 'Lore' ? 'Lore Badges (Redemption)'
-                       : 'Status Badges (Monetization)';
+            : cat === 'Whale' ? 'Whale Badges (Volume)'
+                : cat === 'Lore' ? 'Lore Badges (Redemption)'
+                    : 'Status Badges (Monetization)';
 
         html += `<div class="badges-category">
             <div class="badges-category-label">${catLabel}</div>
@@ -2725,8 +2748,8 @@ function renderStoreTab() {
             <div class="store-card-title">${hasBadge ? 'Funded Trader' : 'TeaTrade Combine'}</div>
             <div class="store-card-desc">
                 ${hasBadge
-                    ? 'You passed the Combine and earned the Funded Trader badge. Enter again to prove your skills.'
-                    : 'Prove you are an elite trader. Get a $50,000 challenge account. Make 50% profit in 30 days without a 5% daily drawdown to earn the Funded Trader badge.'}
+            ? 'You passed the Combine and earned the Funded Trader badge. Enter again to prove your skills.'
+            : 'Prove you are an elite trader. Get a $50,000 challenge account. Make 50% profit in 30 days without a 5% daily drawdown to earn the Funded Trader badge.'}
             </div>
             <button class="store-card-btn" onclick="purchaseCombineEntry()" ${inCombine ? 'disabled' : ''}>
                 ${inCombine ? 'Challenge In Progress' : 'Enter Combine &mdash; &pound;49.00'}
@@ -2738,8 +2761,8 @@ function renderStoreTab() {
             <div class="store-card-title">${isPro ? 'TeaTrade PRO (Active)' : 'TeaTrade PRO'}</div>
             <div class="store-card-desc">
                 ${isPro
-                    ? 'You have PRO access. Copy the Top 5 traders, auto-copy mode, premium indicators, and gold chat badge.'
-                    : 'Follow and auto-copy the Top 5 leaderboard traders. Premium chart indicators and a gold username in chat.'}
+            ? 'You have PRO access. Copy the Top 5 traders, auto-copy mode, premium indicators, and gold chat badge.'
+            : 'Follow and auto-copy the Top 5 leaderboard traders. Premium chart indicators and a gold username in chat.'}
             </div>
             <button class="store-card-btn" onclick="purchaseProSubscription()" ${isPro ? 'disabled' : ''}>
                 ${isPro ? 'Already PRO' : 'Upgrade to PRO &mdash; &pound;14.99/mo'}
@@ -2809,7 +2832,7 @@ function _getKnownBadges() {
 }
 
 function _setKnownBadges(badges) {
-    try { localStorage.setItem(_BADGE_NOTIFY_KEY, JSON.stringify(badges)); } catch {}
+    try { localStorage.setItem(_BADGE_NOTIFY_KEY, JSON.stringify(badges)); } catch { }
 }
 
 async function checkAndNotifyNewBadges() {

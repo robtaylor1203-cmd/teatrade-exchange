@@ -1,0 +1,33 @@
+name: Daily Auction Scraper
+
+on:
+  schedule:
+    # Runs at 18:00 (6 PM) GMT every day
+    - cron: '0 18 * * *'
+  workflow_dispatch: # Allows manual triggering from GH interface
+
+jobs:
+  scrape-and-inject:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './scraper/package.json'
+
+      - name: Install Dependencies
+        working-directory: ./scraper
+        run: npm ci
+
+      - name: Run Node Scraper
+        working-directory: ./scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: npm start

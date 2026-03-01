@@ -1,0 +1,23 @@
+LOG: [Error] Uncaught TypeError: Cannot read properties of undefined (reading 'createClient') http://localhost:8080/js/config.js?v=20260222m 10
+ERROR: TypeError: Cannot read properties of undefined (reading 'createClient')
+STACK: TypeError: Cannot read properties of undefined (reading 'createClient')
+    at <anonymous> (http://localhost:8080/js/config.js?v=20260222m:10:40)
+LOG: [Error] Uncaught ReferenceError: state is not defined http://localhost:8080/js/charts.js?v=20260225d 493
+ERROR: ReferenceError: state is not defined
+STACK: ReferenceError: state is not defined
+    at resizeCanvas (http://localhost:8080/js/charts.js?v=20260225d:493:5)
+    at <anonymous> (http://localhost:8080/js/charts.js?v=20260225d:2025:5)
+LOG: [Unhandled Promise Rejection] JSHandle@error
+ERROR: ReferenceError: state is not defined
+STACK: ReferenceError: state is not defined
+    at <anonymous> (http://localhost:8080/js/app.js?v=20260222m:197:13)
+LOG: Failed to load resource: the server responded with a status of 401 ()
+LOG: [Health] Health check failed: Health endpoint returned HTTP 401
+LOG: [Error] Uncaught ReferenceError: state is not defined http://localhost:8080/js/ui.js?v=20260219u 647
+ERROR: ReferenceError: state is not defined
+STACK: ReferenceError: state is not defined
+    at updateMarketDepth (http://localhost:8080/js/ui.js?v=20260219u:647:25)
+LOG: [Error] Uncaught ReferenceError: state is not defined http://localhost:8080/js/ui.js?v=20260219u 1017
+ERROR: ReferenceError: state is not defined
+STACK: ReferenceError: state is not defined
+    at updateQuoteBoard (http://localhost:8080/js/ui.js?v=20260219u:1017:20)
