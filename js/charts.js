@@ -151,7 +151,6 @@ function _initTvChartIfNull() {
             bottomColor: 'rgba(26, 115, 232, 0)',
             lineColor: 'transparent',
             lineWidth: 0,
-            priceScaleId: mainSeries.priceScaleId(),
         });
         // We will sync data to areaSeries below
         mainSeries._linkedArea = areaSeries;
@@ -310,9 +309,17 @@ function drawChart() {
     const volData = [];
     let prevVolume = 0;
 
-    state.chartData.forEach(d => {
-        // TV requires UNIX timestamp in seconds
+    // Ensure data is strictly ascending and unique by timestamp (required by TV)
+    const sortedData = [...state.chartData]
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    let lastTime = 0;
+    sortedData.forEach(d => {
         const tvTime = Math.floor(new Date(d.date).getTime() / 1000);
+
+        // Skip duplicate timestamps
+        if (tvTime <= lastTime && lastTime !== 0) return;
+        lastTime = tvTime;
 
         const open = d.open * _fx;
         const close = d.close * _fx;
