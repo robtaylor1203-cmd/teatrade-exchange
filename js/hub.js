@@ -214,7 +214,7 @@ function initTradingHub() {
         loadTeas().then(() => {
             if (typeof updateAllMarketIndexes === 'function') updateAllMarketIndexes();
             updateHubOrderPreview();
-        }).catch(() => {});
+        }).catch(() => { });
     }
 
     // Load index positions from localStorage
@@ -289,7 +289,7 @@ function initTradingHub() {
         if (nowSym !== _hubSym) return;
         state.hubChartData = freshData;
         drawHubChart();
-    }).catch(() => {});
+    }).catch(() => { });
 
     // Update hub title to match main chart
     const hubTitle = document.getElementById('hub-chart-title');
@@ -716,7 +716,7 @@ function syncHubChartToTradeSymbol(selectId) {
         updateHubPriceDisplay();
         drawChart();
         drawHubChart();
-    }).catch(() => {});
+    }).catch(() => { });
 }
 
 /**
@@ -1384,8 +1384,8 @@ function setHubTimeframe(tf) {
     // Sync global timeframe state so getPriceHistory uses the correct
     // TIMEFRAME_CONFIG interval (5-min candles for 1D, hourly for 1W, etc.)
     state.currentTimeframe = tf;
-    state.cachedTimeframe  = null;
-    state.chartData        = [];
+    state.cachedTimeframe = null;
+    state.chartData = [];
     if (window.mainYAxisCache) window.mainYAxisCache = {};
 
     // Update all timeframe labels (hub + main chart dropdown)
@@ -1403,11 +1403,11 @@ function setHubTimeframe(tf) {
     document.getElementById('hub-studies-menu')?.classList.remove('visible');
 
     // Resolve the symbol the hub chart is currently displaying
-    const rawSymbol  = document.getElementById('hub-buy-symbol')?.value
-                       || state.mainChartData?.symbol
-                       || 'KENYA';
-    const symbol     = rawSymbol === 'KENYAN' ? 'KENYA' : rawSymbol;
-    const isIndex    = isIndexSymbol(symbol);
+    const rawSymbol = document.getElementById('hub-buy-symbol')?.value
+        || state.mainChartData?.symbol
+        || 'KENYA';
+    const symbol = rawSymbol === 'KENYAN' ? 'KENYA' : rawSymbol;
+    const isIndex = isIndexSymbol(symbol);
     const symbolType = isIndex ? 'index' : 'tea';
 
     // Show loading state immediately
@@ -1421,7 +1421,7 @@ function setHubTimeframe(tf) {
     // for the previous timeframe is returned from the loading-promise guard and
     // then incorrectly applied to the newly selected timeframe.
     const snapshotSymbol = symbol;
-    const snapshotTf     = tf;
+    const snapshotTf = tf;
 
     loadChartDataFromHistory(symbol, symbolType, tf)
         .then(data => {
@@ -1436,9 +1436,9 @@ function setHubTimeframe(tf) {
             const _tfKey = state.currentTimeframe || '1D';
             const cacheKey = (symbolType === 'index' ? `INDEX_${symbol}` : symbol) + `_${_tfKey}`;
             if (state.priceDataCache) {
-                state.priceDataCache.data[cacheKey]       = data;
+                state.priceDataCache.data[cacheKey] = data;
                 state.priceDataCache.lastUpdate[cacheKey] = Date.now();
-                state.priceDataCache.loaded[cacheKey]     = true;
+                state.priceDataCache.loaded[cacheKey] = true;
                 delete state.priceDataCache.loading[cacheKey];
             }
 
@@ -1446,7 +1446,7 @@ function setHubTimeframe(tf) {
             drawHubChart();
             updateHubPriceDisplay();
         })
-        .catch(() => {});
+        .catch(() => { });
 }
 
 function toggleHubStudiesMenu() {
@@ -1819,47 +1819,11 @@ async function executeHubTrade(side) {
 // =============================================
 
 function startTradeLogSimulation() {
-    // Clear existing
+    // Disabled logic for Phase 6 LIVE Environment Transition
+    // Real trades should populate this via Realtime subscription in the future.
     tradeLogEntries = [];
     if (state.tradeLogInterval) clearInterval(state.tradeLogInterval);
-
-    // Generate initial entries
-    const symbols = ['TEA-KE', 'TEA-LK', 'TEA-IN', 'TEA-ID', 'TEA-BD', 'TEA-MW'];
-    for (let i = 0; i < 8; i++) {
-        const symbol = symbols[Math.floor(Math.random() * symbols.length)];
-        const tea = state.teas?.find(t => t.symbol === symbol);
-        const basePrice = tea?.current_price || (3 + Math.random() * 2);
-
-        tradeLogEntries.push({
-            time: new Date(Date.now() - (i * 5000) - Math.random() * 60000),
-            symbol: symbol,
-            side: Math.random() > 0.5 ? 'buy' : 'sell',
-            quantity: Math.round((100 + Math.random() * 900) / 50) * 50,
-            price: basePrice + (Math.random() - 0.5) * 0.1
-        });
-    }
-
     renderTradeLog();
-
-    // Simulate new trades
-    state.tradeLogInterval = setInterval(() => {
-        if (!state.maximizedPanel?.classList.contains('panel-maximized')) {
-            clearInterval(state.tradeLogInterval);
-            return;
-        }
-
-        const symbol = symbols[Math.floor(Math.random() * symbols.length)];
-        const tea = state.teas?.find(t => t.symbol === symbol);
-        const basePrice = tea?.current_price || (3 + Math.random() * 2);
-
-        addTradeToLog({
-            time: new Date(),
-            symbol: symbol,
-            side: Math.random() > 0.5 ? 'buy' : 'sell',
-            quantity: Math.round((100 + Math.random() * 900) / 50) * 50,
-            price: basePrice + (Math.random() - 0.5) * 0.1
-        });
-    }, 3000 + Math.random() * 5000);
 }
 
 function addTradeToLog(trade) {

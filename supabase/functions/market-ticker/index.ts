@@ -191,7 +191,7 @@ function getSeasonalFactor(currencyPair: string, symbol: string): number {
   }
   if (currencyPair === 'USD_CNY') {
     if (month === 12 || month === 1) return 1.07;
-    if (month >= 4 && month <= 6)   return 1.03;
+    if (month >= 4 && month <= 6) return 1.03;
     return 1.0;
   }
   if (currencyPair === 'USD_IDR') {
@@ -320,15 +320,15 @@ serve(async (req) => {
 
     // 4. Update market_state for the frontend ticker
     await supabase.from('market_state').upsert([
-      { key: 'usd_kes',     value: rates.USD_KES   },
-      { key: 'usd_inr',     value: rates.USD_INR   },
-      { key: 'usd_lkr',     value: rates.USD_LKR   },
-      { key: 'usd_cny',     value: rates.USD_CNY   },
-      { key: 'usd_idr',     value: rates.USD_IDR   },
-      { key: 'usd_bdt',     value: rates.USD_BDT   },
-      { key: 'brent_crude', value: brentPrice       },
-      { key: 'data_source', value: sourceStatus     },
-      { key: 'last_tick',   value: new Date().toISOString() },
+      { key: 'usd_kes', value: rates.USD_KES },
+      { key: 'usd_inr', value: rates.USD_INR },
+      { key: 'usd_lkr', value: rates.USD_LKR },
+      { key: 'usd_cny', value: rates.USD_CNY },
+      { key: 'usd_idr', value: rates.USD_IDR },
+      { key: 'usd_bdt', value: rates.USD_BDT },
+      { key: 'brent_crude', value: brentPrice },
+      { key: 'data_source', value: sourceStatus },
+      { key: 'last_tick', value: new Date().toISOString() },
     ]);
 
     // 5. Compute new prices for all teas
@@ -362,9 +362,10 @@ serve(async (req) => {
       // Brent crude shipping-cost pass-through (inverse, dampened)
       const brentEffect = getBrentImpact(brentPrice);
 
-      // Gaussian noise — realistic commodity tick-level movement
-      const σ = TICK_VOL[rawPair] ?? DEFAULT_TICK_VOL;
-      const noise = gaussianRandom() * σ;
+      // PHASE 6: Disable Gaussian noise generation for the Live Scraped Market Transition.
+      // const σ = TICK_VOL[rawPair] ?? DEFAULT_TICK_VOL;
+      // const noise = gaussianRandom() * σ;
+      const noise = 0;
 
       // Combined external-factor price (same formula as before adding flow)
       const externalPrice = forexAdjusted * seasonal * (1 + noise) * (1 + brentEffect);
@@ -433,7 +434,7 @@ serve(async (req) => {
 
       const updateObj: typeof updates[number] = {
         symbol: tea.symbol,
-        current_price: finalPrice,
+        current_price: tea.anchor_price, // PHASE 6: Force static prices until Scraper updates Anchor Price
         last_update: timestamp,
       };
 
@@ -488,7 +489,7 @@ serve(async (req) => {
         last_update: update.last_update,
       };
       if (update.trading_mode !== undefined) payload.trading_mode = update.trading_mode;
-      if (update.halt_until !== undefined)   payload.halt_until = update.halt_until;
+      if (update.halt_until !== undefined) payload.halt_until = update.halt_until;
       if (update.volatility_multiplier !== undefined) payload.volatility_multiplier = update.volatility_multiplier;
 
       await supabase.from('teas')
@@ -512,7 +513,7 @@ serve(async (req) => {
     if (writeHistory && updates.length > 0) {
       const historyRows = updates.map(u => ({
         symbol: u.symbol,
-        price:  u.current_price,
+        price: u.current_price,
         volume: 0,
         recorded_at: timestamp,
         is_simulated: false,
@@ -547,7 +548,7 @@ serve(async (req) => {
         .from('indexes')
         .select('symbol, teas, multiplier');
 
-      const indexRows: Array<{symbol:string;price:number;volume:number;recorded_at:string;is_simulated:boolean}> = [];
+      const indexRows: Array<{ symbol: string; price: number; volume: number; recorded_at: string; is_simulated: boolean }> = [];
       for (const idx of (allIndexes || [])) {
         const avg = avgOf(idx.teas || []);
         if (avg !== null && isFinite(avg) && avg > 0) {
@@ -558,7 +559,7 @@ serve(async (req) => {
       if (indexRows.length > 0) {
         const { error: idxErr } = await supabase.from('price_history').insert(indexRows);
         if (idxErr) console.error('index history error:', idxErr.message);
-        else console.log(`📊 Recorded ${indexRows.length} index price points (${indexRows.map(r=>r.symbol).join(', ')})`);
+        else console.log(`📊 Recorded ${indexRows.length} index price points (${indexRows.map(r => r.symbol).join(', ')})`);
       }
     }
 
