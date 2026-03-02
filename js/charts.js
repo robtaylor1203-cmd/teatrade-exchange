@@ -245,11 +245,15 @@ function generateChartData(timeframe) {
     }
 
     const fullHistory = getPriceHistorySync(symbol, symbolType);
+    const cacheKey = (symbolType === 'index' ? `INDEX_${symbol}` : symbol) + `_${timeframe}`;
+    const isOfficiallyLoaded = state.priceDataCache?.loaded?.[cacheKey];
 
-    if (!fullHistory || fullHistory.length === 0) {
+    // If we only have 0-1 items and we haven't officially loaded from DB,
+    // the single point is likely a live-tick spooling into an empty cache wrapper.
+    if (!isOfficiallyLoaded || !fullHistory || fullHistory.length < 2) {
         if (!state.isFetchingHistory) {
             state.isFetchingHistory = true;
-            getPriceHistory(symbol, symbolType)
+            getPriceHistory(symbol, symbolType, timeframe)
                 .catch(() => { })
                 .finally(() => {
                     state.isFetchingHistory = false;
@@ -257,7 +261,7 @@ function generateChartData(timeframe) {
                     drawChart();
                 });
         }
-        return [];
+        return fullHistory || []; // Fallback to whatever exists while waiting
     }
 
     // Return full history so TradingView can natively handle zooming and panning
