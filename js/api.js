@@ -206,7 +206,7 @@ async function apiFetchPriceHistory(symbol, limit, since) {
                     .eq('is_simulated', true)
                     .gte('recorded_at', since)
                     .order('recorded_at', { ascending: false })
-                    .limit(1000),
+                    .limit(limit || 5000),
                 supabaseClient
                     .from('price_history')
                     .select('price, recorded_at, volume')
@@ -214,7 +214,7 @@ async function apiFetchPriceHistory(symbol, limit, since) {
                     .eq('is_simulated', false)
                     .gte('recorded_at', since)
                     .order('recorded_at', { ascending: false })
-                    .limit(1000)
+                    .limit(limit || 5000)
             ]);
 
             if (!histResult.error || !liveResult.error) {

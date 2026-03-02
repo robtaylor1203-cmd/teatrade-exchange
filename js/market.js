@@ -86,15 +86,14 @@ async function getPriceHistory(symbol, symbolType = 'tea', forcedTimeframe = nul
 
             if (dbData && dbData.length >= 1) {
                 state.priceDataCache.data[cacheKey] = dbData;
-                state.priceDataCache.loaded[cacheKey] = true;
-                state.priceDataCache.lastUpdate[cacheKey] = Date.now();
-                return dbData;
+            } else {
+                state.priceDataCache.data[cacheKey] = [];
             }
+            // Always mark as loaded to prevent infinite retry loops on new assets
+            state.priceDataCache.loaded[cacheKey] = true;
+            state.priceDataCache.lastUpdate[cacheKey] = Date.now();
+            return state.priceDataCache.data[cacheKey];
 
-            state.priceDataCache.data[cacheKey] = [];
-            state.priceDataCache.loaded[cacheKey] = false;
-            state.priceDataCache.lastUpdate[cacheKey] = 0;
-            return [];
         } finally {
             delete state.priceDataCache.loading[cacheKey];
         }

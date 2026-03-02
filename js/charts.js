@@ -291,14 +291,19 @@ function drawChart() {
     if (!document.getElementById('tv-chart')) return;
     if (!tvChart) _initTvChartIfNull();
 
-    let needsRescale = false;
-    if (state.cachedTimeframe !== state.currentTimeframe || state.chartData.length === 0) {
-        state.chartData = generateChartData(state.currentTimeframe);
-        state.cachedTimeframe = state.currentTimeframe;
-        needsRescale = true;
-    }
+    const previousLength = state.chartData ? state.chartData.length : 0;
+    state.chartData = generateChartData(state.currentTimeframe);
+    const newLength = state.chartData ? state.chartData.length : 0;
+    state.cachedTimeframe = state.currentTimeframe;
 
-    if (!state.chartData || state.chartData.length === 0) return; // Loading state handled by UI usually
+    if (!state.chartData || newLength === 0) return; // Loading state handled by UI usually
+
+    // We only need to force a layout rescale if we transition from a spoofed/empty chart
+    // (<2 candles) to a fully populated historical chart, or if this is the very first load.
+    let forceRescale = false;
+    if (!window._tvInitialScaleDone || (previousLength < 2 && newLength >= 2)) {
+        forceRescale = true;
+    }
 
     const _ci = _getChartCurrencyInfo();
     let _fx = _ci.multiplier || 1;
@@ -351,7 +356,7 @@ function drawChart() {
     volumeSeries.setData(volData);
 
     // Auto-scale to fit data frame on load or timeframe/symbol swap
-    if (needsRescale || !window._tvInitialScaleDone) {
+    if (forceRescale) {
         tvChart.timeScale().fitContent();
         window._tvInitialScaleDone = true;
     }
