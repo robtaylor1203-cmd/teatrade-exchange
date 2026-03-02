@@ -283,75 +283,88 @@ async function _loadCompositeIndexOHLC(teaSymbols, cfg, since) {
 
     const intervalMs = cfg.interval * 60000;
 
-    // Group every tick into sub-buckets keyed by (interval, tickTime) so we
-    // can compute a cross-tea average at each individual tick time, then
-    // derive proper OHLC (open/high/low/close) from ALL tick-level averages
-    // within the candle interval — not just the single last-price average.
-    const buckets = {};
-
+    // Combine all ticks into a single chronologically sorted array
+    const allTicks = [];
     allRows.forEach((rows, teaIdx) => {
         if (!rows) return;
         rows.forEach(tick => {
-            const t = new Date(tick.recorded_at).getTime();
-            const bk = Math.floor(t / intervalMs) * intervalMs;
-            if (!buckets[bk]) buckets[bk] = { ticks: [] };
-            buckets[bk].ticks.push({ time: t, teaIdx, price: tick.price });
+            allTicks.push({ time: new Date(tick.recorded_at).getTime(), teaIdx, price: tick.price });
         });
     });
 
-    const sortedKeys = Object.keys(buckets).map(Number).sort((a, b) => a - b);
+    if (allTicks.length === 0) return null;
+    allTicks.sort((a, b) => a.time - b.time);
+
+    // Track the last known price for each tea to compute rolling cross-tea averages
     const lastKnown = new Array(teaSymbols.length).fill(null);
-    const candles = [];
+    const averagedTicks = [];
 
-    for (const bk of sortedKeys) {
-        const bucket = buckets[bk];
-
-        // Group ticks by their exact time, compute cross-tea average at each
-        const ticksByTime = {};
-        bucket.ticks.forEach(t => {
-            if (!ticksByTime[t.time]) ticksByTime[t.time] = {};
-            ticksByTime[t.time][t.teaIdx] = t.price;
+    // Pre-fill lastKnown with the earliest available price for each tea, 
+    // so the initial average isn't skewed by the order they arrive in the first few ticks
+    for (const t of allTicks) {
+        if (lastKnown[t.teaIdx] === null) {
             lastKnown[t.teaIdx] = t.price;
-        });
+        }
+    }
 
-        // For each tick-time, fill forward missing teas and compute average
-        const tickTimes = Object.keys(ticksByTime).map(Number).sort((a, b) => a - b);
-        const avgAtEachTick = [];
+    // Now walk through chronologically and generate a single average price point per timestamp
+    for (const t of allTicks) {
+        lastKnown[t.teaIdx] = t.price;
 
-        for (const tt of tickTimes) {
-            const teaPrices = ticksByTime[tt];
-            const merged = lastKnown.map((lk, i) => teaPrices[i] != null ? teaPrices[i] : lk);
-            // Update lastKnown with any new values from this tick
-            merged.forEach((p, i) => { if (p != null) lastKnown[i] = p; });
-
-            const valid = merged.filter(p => p != null && p > 0);
-            if (valid.length > 0) {
-                avgAtEachTick.push(valid.reduce((a, b) => a + b, 0) / valid.length);
+        // Compute average of all currently known tea prices
+        let sum = 0;
+        let count = 0;
+        for (let i = 0; i < lastKnown.length; i++) {
+            if (lastKnown[i] !== null && lastKnown[i] > 0) {
+                sum += lastKnown[i];
+                count++;
             }
         }
 
-        if (avgAtEachTick.length === 0) continue;
+        if (count > 0) {
+            averagedTicks.push({ time: t.time, price: sum / count });
+        }
+    }
 
+    // Group the averaged series into candles
+    const candles = [];
+    let currentBucket = null;
+    let bucketData = [];
+
+    averagedTicks.forEach(tick => {
+        const bucketStart = Math.floor(tick.time / intervalMs) * intervalMs;
+
+        if (currentBucket !== bucketStart) {
+            if (bucketData.length > 0) {
+                candles.push({
+                    date: new Date(currentBucket),
+                    open: bucketData[0],
+                    high: Math.max(...bucketData),
+                    low: Math.min(...bucketData),
+                    close: bucketData[bucketData.length - 1],
+                    volume: 0
+                });
+            }
+            currentBucket = bucketStart;
+            bucketData = [];
+        }
+        bucketData.push(tick.price);
+    });
+
+    if (bucketData.length > 0) {
         candles.push({
-            date: new Date(bk),
-            open: avgAtEachTick[0],
-            high: Math.max(...avgAtEachTick),
-            low: Math.min(...avgAtEachTick),
-            close: avgAtEachTick[avgAtEachTick.length - 1],
+            date: new Date(currentBucket),
+            open: bucketData[0],
+            high: Math.max(...bucketData),
+            low: Math.min(...bucketData),
+            close: bucketData[bucketData.length - 1],
             volume: 0
         });
     }
 
-    // Connect candles: open of this candle = close of previous
-    if (candles.length > 1) {
-        for (let i = 1; i < candles.length; i++) {
-            candles[i].open = candles[i - 1].close;
-            candles[i].high = Math.max(candles[i].high, candles[i].open, candles[i].close);
-            candles[i].low = Math.min(candles[i].low, candles[i].open, candles[i].close);
-        }
-    }
-
     if (candles.length < 1) return null;
+    // Note: We deliberately DONT force Open = Previous Close.
+    // TradingView handles gaps naturally. Forcing gap closures generates artificially massive wicks.
     return _fillCandleGaps(candles, intervalMs);
 }
 
