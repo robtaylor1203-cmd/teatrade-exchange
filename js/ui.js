@@ -31,24 +31,24 @@ function getOriginFlag(origin) {
 
 // Country prefix → flag ISO + display label
 const COUNTRY_MAP = {
-    KEN: { iso: 'ke', label: 'Kenya'      },
-    IND: { iso: 'in', label: 'India'      },
-    SRI: { iso: 'lk', label: 'Sri Lanka'  },
-    MLW: { iso: 'mw', label: 'Malawi'     },
-    RWA: { iso: 'rw', label: 'Rwanda'     },
-    UGA: { iso: 'ug', label: 'Uganda'     },
-    TZA: { iso: 'tz', label: 'Tanzania'   },
-    VIE: { iso: 'vn', label: 'Vietnam'    },
-    JPN: { iso: 'jp', label: 'Japan'      },
+    KEN: { iso: 'ke', label: 'Kenya' },
+    IND: { iso: 'in', label: 'India' },
+    SRI: { iso: 'lk', label: 'Sri Lanka' },
+    MLW: { iso: 'mw', label: 'Malawi' },
+    RWA: { iso: 'rw', label: 'Rwanda' },
+    UGA: { iso: 'ug', label: 'Uganda' },
+    TZA: { iso: 'tz', label: 'Tanzania' },
+    VIE: { iso: 'vn', label: 'Vietnam' },
+    JPN: { iso: 'jp', label: 'Japan' },
     BGD: { iso: 'bd', label: 'Bangladesh' },
-    IDN: { iso: 'id', label: 'Indonesia'  },
-    KOL: { iso: 'in', label: 'Kolkata'    },
-    GUW: { iso: 'in', label: 'Guwahati'   },
+    IDN: { iso: 'id', label: 'Indonesia' },
+    KOL: { iso: 'in', label: 'Kolkata' },
+    GUW: { iso: 'in', label: 'Guwahati' },
     JAL: { iso: 'in', label: 'Jalpaiguri' },
-    COC: { iso: 'in', label: 'Cochin'     },
+    COC: { iso: 'in', label: 'Cochin' },
     CMB: { iso: 'in', label: 'Coimbatore' },
-    SIL: { iso: 'in', label: 'Siliguri'   },
-    COO: { iso: 'in', label: 'Coonoor'    },
+    SIL: { iso: 'in', label: 'Siliguri' },
+    COO: { iso: 'in', label: 'Coonoor' },
 };
 
 // =============================================
@@ -218,7 +218,7 @@ function updateAuctionTable() {
         // Trading mode badge
         const tMode = tea.trading_mode || 'FULL';
         let modeBadge = '';
-        if (tMode === 'HALTED')     modeBadge = '<span class="mode-badge mode-halted" title="Circuit breaker active">HALTED</span>';
+        if (tMode === 'HALTED') modeBadge = '<span class="mode-badge mode-halted" title="Circuit breaker active">HALTED</span>';
         else if (tMode === 'CLOSE_ONLY') modeBadge = '<span class="mode-badge mode-close-only" title="Close-only mode">CLOSE ONLY</span>';
 
         const isStarred = wl.includes(tea.symbol);
@@ -424,7 +424,7 @@ function populateHubTeaSelects() {
 
 function _buildSparklineSvg(symbol, currentPrice, isUp) {
     const history = typeof getPriceHistorySync === 'function'
-        ? getPriceHistorySync(symbol, 'tea') : [];
+        ? getPriceHistorySync(symbol, 'tea', '1D') : [];
     const closes = history.slice(-20).map(c => c.close ?? c.price ?? c);
     const color = isUp ? 'var(--accent-green)' : 'var(--accent-red)';
     const w = 80, h = 28;
@@ -538,11 +538,11 @@ function switchWatchlistTab(tab) {
 // ── Macro watchlist: T212-style rows with flags + sparklines ──
 
 const MACRO_ROW_DEFS = [
-    { id: 'usdkes', key: 'usd_kes', iso: 'ke', name: 'USD / KES', desc: 'Kenyan Shilling',   prefix: '',  decimals: 2 },
-    { id: 'usdinr', key: 'usd_inr', iso: 'in', name: 'USD / INR', desc: 'Indian Rupee',       prefix: '',  decimals: 2 },
-    { id: 'usdlkr', key: 'usd_lkr', iso: 'lk', name: 'USD / LKR', desc: 'Sri Lankan Rupee',   prefix: '',  decimals: 2 },
-    { id: 'usdcny', key: 'usd_cny', iso: 'cn', name: 'USD / CNY', desc: 'Chinese Yuan',       prefix: '',  decimals: 4 },
-    { id: 'oil',    key: 'brent_crude', iso: null, name: 'Brent Crude', desc: 'Shipping & logistics', prefix: '$', decimals: 2, oilIcon: true },
+    { id: 'usdkes', key: 'usd_kes', iso: 'ke', name: 'USD / KES', desc: 'Kenyan Shilling', prefix: '', decimals: 2 },
+    { id: 'usdinr', key: 'usd_inr', iso: 'in', name: 'USD / INR', desc: 'Indian Rupee', prefix: '', decimals: 2 },
+    { id: 'usdlkr', key: 'usd_lkr', iso: 'lk', name: 'USD / LKR', desc: 'Sri Lankan Rupee', prefix: '', decimals: 2 },
+    { id: 'usdcny', key: 'usd_cny', iso: 'cn', name: 'USD / CNY', desc: 'Chinese Yuan', prefix: '', decimals: 4 },
+    { id: 'oil', key: 'brent_crude', iso: null, name: 'Brent Crude', desc: 'Shipping & logistics', prefix: '$', decimals: 2, oilIcon: true },
 ];
 
 function _buildMacroSparkline(stateKey) {
@@ -635,8 +635,8 @@ function renderMacroWatchlist() {
 // =============================================
 
 function updateMarketDepth() {
-    const bidsEl  = document.getElementById('depth-bids');
-    const asksEl  = document.getElementById('depth-asks');
+    const bidsEl = document.getElementById('depth-bids');
+    const asksEl = document.getElementById('depth-asks');
     const ratioEl = document.getElementById('depth-ratio');
     if (!bidsEl || !asksEl) return;
 
@@ -664,10 +664,10 @@ function updateMarketDepth() {
         const p = mp[sym];
         if (!p) return false;
         if (p.buy5m > 0 || p.sell5m > 0) {
-            bidVol += p.buy5m;  askVol += p.sell5m;  return true;
+            bidVol += p.buy5m; askVol += p.sell5m; return true;
         }
         if (p.buy30m > 0 || p.sell30m > 0) {
-            bidVol += p.buy30m; askVol += p.sell30m;  return true;
+            bidVol += p.buy30m; askVol += p.sell30m; return true;
         }
         return false;
     };
@@ -717,7 +717,7 @@ function updateMarketDepth() {
 
     // Colour the bars to visually signal dominance
     bidsEl.style.background = bidPct > 55 ? 'var(--accent-green)' : bidPct < 45 ? 'rgba(16,185,129,0.4)' : 'var(--accent-green)';
-    asksEl.style.background = askPct > 55 ? 'var(--accent-red)'   : askPct < 45 ? 'rgba(239,68,68,0.4)'  : 'var(--accent-red)';
+    asksEl.style.background = askPct > 55 ? 'var(--accent-red)' : askPct < 45 ? 'rgba(239,68,68,0.4)' : 'var(--accent-red)';
 
     // Format volumes
     const fmt = v => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M kg` : v >= 1000 ? `${(v / 1000).toFixed(1)}K kg` : `${v} kg`;
@@ -753,17 +753,17 @@ function _flashMacroPrice(el, direction) {
 
 function updateMacroIndicators() {
     const indicators = [
-        { key: 'usd_kes',      elId: 'macro-usdkes',  changeId: 'macro-usdkes-change',  rowId: 'macro-row-usdkes',  prefix: '',  decimals: 2 },
-        { key: 'usd_inr',      elId: 'macro-usdinr',  changeId: 'macro-usdinr-change',  rowId: 'macro-row-usdinr',  prefix: '',  decimals: 2 },
-        { key: 'usd_lkr',      elId: 'macro-usdlkr',  changeId: 'macro-usdlkr-change',  rowId: 'macro-row-usdlkr',  prefix: '',  decimals: 2 },
-        { key: 'usd_cny',      elId: 'macro-usdcny',  changeId: 'macro-usdcny-change',  rowId: 'macro-row-usdcny',  prefix: '',  decimals: 4 },
-        { key: 'brent_crude',  elId: 'macro-oil',     changeId: 'macro-oil-change',     rowId: 'macro-row-oil',     prefix: '$', decimals: 2 },
+        { key: 'usd_kes', elId: 'macro-usdkes', changeId: 'macro-usdkes-change', rowId: 'macro-row-usdkes', prefix: '', decimals: 2 },
+        { key: 'usd_inr', elId: 'macro-usdinr', changeId: 'macro-usdinr-change', rowId: 'macro-row-usdinr', prefix: '', decimals: 2 },
+        { key: 'usd_lkr', elId: 'macro-usdlkr', changeId: 'macro-usdlkr-change', rowId: 'macro-row-usdlkr', prefix: '', decimals: 2 },
+        { key: 'usd_cny', elId: 'macro-usdcny', changeId: 'macro-usdcny-change', rowId: 'macro-row-usdcny', prefix: '', decimals: 4 },
+        { key: 'brent_crude', elId: 'macro-oil', changeId: 'macro-oil-change', rowId: 'macro-row-oil', prefix: '$', decimals: 2 },
     ];
 
     const DASH = '\u2014';
 
     indicators.forEach(ind => {
-        const raw   = state.macroIndicators?.[ind.key];
+        const raw = state.macroIndicators?.[ind.key];
         const value = Number(raw);
         // Use the session-start baseline (set by startLiveForexFeed on first fetch)
         // for a meaningful "daily-style" change rather than tick-to-tick noise.
@@ -772,7 +772,7 @@ function updateMacroIndicators() {
             ? Number(baselineVal)
             : Number(state.previousMacro?.[ind.key]);
 
-        const priceEl  = document.getElementById(ind.elId);
+        const priceEl = document.getElementById(ind.elId);
         const changeEl = document.getElementById(ind.changeId);
         if (!priceEl) return;
 
@@ -798,12 +798,12 @@ function updateMacroIndicators() {
             if (!isNaN(prev) && prev !== 0) {
                 const pctChange = ((value - prev) / prev) * 100;
                 const arrow = pctChange > 0 ? '\u25B2' : pctChange < 0 ? '\u25BC' : '';
-                const sign  = pctChange > 0 ? '+' : '';
+                const sign = pctChange > 0 ? '+' : '';
                 changeEl.textContent = `${arrow} ${sign}${pctChange.toFixed(2)}%`;
-                changeEl.className   = 'macro-change ' + (pctChange > 0 ? 'up' : pctChange < 0 ? 'down' : '');
+                changeEl.className = 'macro-change ' + (pctChange > 0 ? 'up' : pctChange < 0 ? 'down' : '');
             } else {
                 changeEl.textContent = DASH;
-                changeEl.className   = 'macro-change';
+                changeEl.className = 'macro-change';
             }
         }
     });
@@ -892,11 +892,11 @@ function updateGlobalTicker() {
     const DASH = '\u2014';
 
     const macroItems = [
-        { iso: 'ke', label: 'KES',  key: 'usd_kes',     prefix: '',  decimals: 2 },
-        { iso: 'in', label: 'INR',  key: 'usd_inr',     prefix: '',  decimals: 2 },
-        { iso: 'lk', label: 'LKR',  key: 'usd_lkr',     prefix: '',  decimals: 2 },
-        { iso: 'cn', label: 'CNY',  key: 'usd_cny',     prefix: '',  decimals: 4 },
-        { iso: null, label: 'OIL',  key: 'brent_crude', prefix: '$', decimals: 2, fallback: '\uD83D\uDEE2\uFE0F' }
+        { iso: 'ke', label: 'KES', key: 'usd_kes', prefix: '', decimals: 2 },
+        { iso: 'in', label: 'INR', key: 'usd_inr', prefix: '', decimals: 2 },
+        { iso: 'lk', label: 'LKR', key: 'usd_lkr', prefix: '', decimals: 2 },
+        { iso: 'cn', label: 'CNY', key: 'usd_cny', prefix: '', decimals: 4 },
+        { iso: null, label: 'OIL', key: 'brent_crude', prefix: '$', decimals: 2, fallback: '\uD83D\uDEE2\uFE0F' }
     ];
 
     const hasData = macroItems.some(t => {
@@ -1020,7 +1020,7 @@ function updateQuoteBoard() {
     const topTeas = state.teas.slice(0, 10);
 
     board.innerHTML = topTeas.map(tea => {
-        const parts  = tea.symbol.split('-');
+        const parts = tea.symbol.split('-');
         const prefix = parts[0];
         const symbol = parts[1] || tea.symbol;
         const price = Number(tea.current_price) || 0;
@@ -1299,12 +1299,12 @@ function switchMobileSection(section) {
     document.body.classList.add('mobile-section-' + section);
 
     const viewMap = {
-        markets:   'view-markets',
-        chart:     'view-chart',
+        markets: 'view-markets',
+        chart: 'view-chart',
         portfolio: 'view-portfolio',
-        chat:      'view-chat',
-        social:    'view-social',
-        more:      'view-more'
+        chat: 'view-chat',
+        social: 'view-social',
+        more: 'view-more'
     };
     document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active'));
     const targetView = document.getElementById(viewMap[section]);
@@ -1525,7 +1525,7 @@ document.addEventListener('DOMContentLoaded', function () {
 // FORCE NATIVE MOBILE APP ROUTING & TRADE SHEET
 // ========================================================
 
-window.switchMobileSection = function(section) {
+window.switchMobileSection = function (section) {
     if (window.innerWidth > 768) return;
 
     document.body.classList.remove(
@@ -1565,13 +1565,13 @@ window.switchMobileSection = function(section) {
     }
 };
 
-window.initMobileNavigation = function() {
+window.initMobileNavigation = function () {
     const nav = document.getElementById('mobile-bottom-nav');
     if (!nav) return;
 
     // Attach click listeners strictly
     nav.querySelectorAll('.mobile-nav-btn').forEach(btn => {
-        btn.onclick = function(e) {
+        btn.onclick = function (e) {
             e.preventDefault();
             const section = this.dataset.section;
             if (section) window.switchMobileSection(section);
@@ -1593,7 +1593,7 @@ if (document.readyState === 'loading') {
 
 // Intercept asset clicks to auto-route to the Chart tab and scroll to top
 const _originalOpenHub = window.openHubForSymbol;
-window.openHubForSymbol = function(symbol) {
+window.openHubForSymbol = function (symbol) {
     if (window.innerWidth <= 768) {
         window.switchMobileSection('chart');
         var chartView = document.getElementById('view-chart');
@@ -1608,7 +1608,7 @@ window.openHubForSymbol = function(symbol) {
 };
 
 // Connect the Sticky Buy/Sell Buttons to the native Bottom Sheet
-window.openMobileTradeSheet = function(side) {
+window.openMobileTradeSheet = function (side) {
     var overlay = document.getElementById('qq-mobile-trade-overlay');
     var form = document.getElementById('qq-mobile-trade-form');
     if (!overlay || !form) return;
@@ -1620,12 +1620,12 @@ window.openMobileTradeSheet = function(side) {
         var isIdx = state.mainChartData.isIndex;
         if (isIdx) {
             var indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
-            var idx = indexes.find(function(i) { return i.symbol === sym; });
+            var idx = indexes.find(function (i) { return i.symbol === sym; });
             if (idx) {
                 tea = { symbol: idx.symbol, name: idx.name, current_price: idx.price, isIndex: true };
             }
         } else {
-            tea = (state.teas || []).find(function(t) { return t.symbol === sym; });
+            tea = (state.teas || []).find(function (t) { return t.symbol === sym; });
         }
     }
     if (!tea) tea = state.qqCurrentTea || null;
@@ -1640,10 +1640,10 @@ window.openMobileTradeSheet = function(side) {
     var marketPrice = 0;
     if (tea.isIndex || (typeof isIndexSymbol === 'function' && isIndexSymbol(tea.symbol))) {
         var idxs = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
-        var match = idxs.find(function(i) { return i.symbol === tea.symbol; });
+        var match = idxs.find(function (i) { return i.symbol === tea.symbol; });
         marketPrice = match ? match.price : (tea.current_price || 0);
     } else {
-        var liveTea = (state.teas || []).find(function(t) { return t.symbol === tea.symbol; });
+        var liveTea = (state.teas || []).find(function (t) { return t.symbol === tea.symbol; });
         marketPrice = liveTea ? liveTea.current_price : (tea.current_price || 0);
     }
     var isBuy = side === 'BUY';
@@ -1700,7 +1700,7 @@ function syncChatView() {
 }
 
 (function wireChatView() {
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         var sendBtn = document.getElementById('vchat-send');
         var input = document.getElementById('vchat-input');
         if (!sendBtn || !input) return;
@@ -1716,11 +1716,11 @@ function syncChatView() {
         }
 
         sendBtn.onclick = doSend;
-        input.addEventListener('keydown', function(e) {
+        input.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') { e.preventDefault(); doSend(); }
         });
 
-        setInterval(function() {
+        setInterval(function () {
             if (window.innerWidth <= 768 && document.getElementById('view-chat')?.classList.contains('active')) {
                 syncChatView();
             }
@@ -1745,12 +1745,12 @@ function populateSocialLeaderboard() {
     if (src && src.children.length > 0) {
         var itemSel = useMobileFormat ? '.mobile-lb-item' : '.leaderboard-item';
         var nameSel = useMobileFormat ? '.mobile-lb-name' : '.leaderboard-name';
-        var retSel  = useMobileFormat ? '.mobile-lb-return' : '.leaderboard-return';
+        var retSel = useMobileFormat ? '.mobile-lb-return' : '.leaderboard-return';
         var items = Array.from(src.querySelectorAll(itemSel));
         if (items.length === 0) items = Array.from(src.children);
 
         var html = '';
-        items.forEach(function(item, i) {
+        items.forEach(function (item, i) {
             var nameEl = item.querySelector(nameSel) || item.querySelector('.leaderboard-name') || item.querySelector('.mobile-lb-name');
             var retEl = item.querySelector(retSel) || item.querySelector('.leaderboard-return') || item.querySelector('.mobile-lb-return');
             var name = nameEl ? nameEl.textContent : '';
@@ -1779,7 +1779,7 @@ function openMoreSubScreen(screen) {
     var grid = document.getElementById('more-menu-grid');
     if (grid) grid.classList.add('hidden');
 
-    document.querySelectorAll('.more-sub-screen').forEach(function(s) { s.classList.remove('active'); });
+    document.querySelectorAll('.more-sub-screen').forEach(function (s) { s.classList.remove('active'); });
     var sub = document.getElementById('more-sub-' + screen);
     if (sub) sub.classList.add('active');
 
@@ -1791,19 +1791,19 @@ function openMoreSubScreen(screen) {
 }
 
 function closeMoreSubScreen() {
-    document.querySelectorAll('.more-sub-screen').forEach(function(s) { s.classList.remove('active'); });
+    document.querySelectorAll('.more-sub-screen').forEach(function (s) { s.classList.remove('active'); });
     var grid = document.getElementById('more-menu-grid');
     if (grid) grid.classList.remove('hidden');
 }
 
 function _weatherSvgIcon(bg) {
     var icons = {
-        sunny:  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.8"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>',
+        sunny: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.8"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>',
         cloudy: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.8"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>',
-        rain:   '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8"><path d="M17.5 17H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><line x1="8" y1="19" x2="8" y2="21"/><line x1="12" y1="19" x2="12" y2="21"/><line x1="16" y1="19" x2="16" y2="21"/></svg>',
-        snow:   '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="1.8"><path d="M17.5 17H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><line x1="8" y1="20" x2="8.01" y2="20"/><line x1="12" y1="20" x2="12.01" y2="20"/><line x1="16" y1="20" x2="16.01" y2="20"/></svg>',
-        foggy:  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.8"><path d="M17.5 17H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><line x1="4" y1="20" x2="20" y2="20"/><line x1="6" y1="23" x2="18" y2="23"/></svg>',
-        storm:  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="1.8"><path d="M17.5 17H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><polyline points="13 17 9 22 13 22 11 24"/></svg>'
+        rain: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8"><path d="M17.5 17H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><line x1="8" y1="19" x2="8" y2="21"/><line x1="12" y1="19" x2="12" y2="21"/><line x1="16" y1="19" x2="16" y2="21"/></svg>',
+        snow: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="1.8"><path d="M17.5 17H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><line x1="8" y1="20" x2="8.01" y2="20"/><line x1="12" y1="20" x2="12.01" y2="20"/><line x1="16" y1="20" x2="16.01" y2="20"/></svg>',
+        foggy: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.8"><path d="M17.5 17H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><line x1="4" y1="20" x2="20" y2="20"/><line x1="6" y1="23" x2="18" y2="23"/></svg>',
+        storm: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="1.8"><path d="M17.5 17H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><polyline points="13 17 9 22 13 22 11 24"/></svg>'
     };
     return icons[bg] || icons.cloudy;
 }
@@ -1819,7 +1819,7 @@ function populateMoreWeather() {
     }
 
     var html = '';
-    cache.forEach(function(entry, idx) {
+    cache.forEach(function (entry, idx) {
         if (!entry || entry.error || !entry.weather) return;
         var r = entry.region;
         var w = entry.weather;
@@ -1833,22 +1833,22 @@ function populateMoreWeather() {
 
         html += '<div class="ms-card" onclick="if(typeof openWeatherPopout===\'function\') openWeatherPopout(' + idx + ', this);">' +
             '<div class="ms-card-row">' +
-                '<div class="ms-weather-icon-wrap">' + svgIcon + '</div>' +
-                '<div class="ms-card-info">' +
-                    '<div class="ms-card-title">' + flag + ' ' + r.name + '</div>' +
-                    '<div class="ms-card-sub">' + cond.label + '</div>' +
-                '</div>' +
-                '<div style="text-align:right;">' +
-                    '<div class="ms-card-value">' + temp + '</div>' +
-                    '<div style="font-size:11px;color:#6b7280;">' + feels + '</div>' +
-                '</div>' +
+            '<div class="ms-weather-icon-wrap">' + svgIcon + '</div>' +
+            '<div class="ms-card-info">' +
+            '<div class="ms-card-title">' + flag + ' ' + r.name + '</div>' +
+            '<div class="ms-card-sub">' + cond.label + '</div>' +
+            '</div>' +
+            '<div style="text-align:right;">' +
+            '<div class="ms-card-value">' + temp + '</div>' +
+            '<div style="font-size:11px;color:#6b7280;">' + feels + '</div>' +
+            '</div>' +
             '</div>' +
             '<div class="ms-card-stats">' +
-                '<span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M12 2v6l3 3"/><path d="M12 22a7 7 0 0 0 0-14"/></svg> ' + humidity + '</span>' +
-                '<span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg> ' + wind + '</span>' +
-                (w.uv != null ? '<span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/></svg> UV ' + w.uv + '</span>' : '') +
+            '<span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M12 2v6l3 3"/><path d="M12 22a7 7 0 0 0 0-14"/></svg> ' + humidity + '</span>' +
+            '<span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg> ' + wind + '</span>' +
+            (w.uv != null ? '<span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/></svg> UV ' + w.uv + '</span>' : '') +
             '</div>' +
-        '</div>';
+            '</div>';
     });
     content.innerHTML = html || '<div class="ms-empty"><p>No weather data available.</p></div>';
 }
@@ -1860,7 +1860,7 @@ function populateMoreCurrency() {
     var DASH = '\u2014';
     var html = '';
 
-    MACRO_ROW_DEFS.forEach(function(def) {
+    MACRO_ROW_DEFS.forEach(function (def) {
         var raw = state.macroIndicators?.[def.key];
         var value = Number(raw);
         var baseline = state.macroBaseline?.[def.key];
@@ -1886,18 +1886,18 @@ function populateMoreCurrency() {
 
         html += '<div class="t212-market-row" style="margin:0 16px;border-radius:12px;margin-bottom:8px;background:#151d2b;border:1px solid rgba(255,255,255,0.05);" onclick="if(typeof openMacroPopout===\'function\') openMacroPopout(\'' + def.id + '\', this);">' +
             '<div class="t212-row-left">' +
-                flagCircle +
-                '<div class="t212-symbol-stack">' +
-                    '<span class="t212-symbol-name">' + def.name + '</span>' +
-                    '<span class="t212-symbol-desc">' + def.desc + '</span>' +
-                '</div>' +
+            flagCircle +
+            '<div class="t212-symbol-stack">' +
+            '<span class="t212-symbol-name">' + def.name + '</span>' +
+            '<span class="t212-symbol-desc">' + def.desc + '</span>' +
+            '</div>' +
             '</div>' +
             '<div class="t212-sparkline-wrap">' + sparkline + '</div>' +
             '<div class="t212-row-right">' +
-                '<span class="t212-price-text">' + priceStr + '</span>' +
-                '<span class="t212-change-pill ' + changeClass + '">' + changeStr + '</span>' +
+            '<span class="t212-price-text">' + priceStr + '</span>' +
+            '<span class="t212-change-pill ' + changeClass + '">' + changeStr + '</span>' +
             '</div>' +
-        '</div>';
+            '</div>';
     });
 
     content.innerHTML = '<div style="padding-top:12px;">' + html + '</div>';
@@ -1920,18 +1920,18 @@ function populateMoreLeaderboard() {
     }
 
     var html = '';
-    traders.forEach(function(t, i) {
+    traders.forEach(function (t, i) {
         var rank = i + 1;
         var medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '<span style="color:#6b7280;font-weight:600;">#' + rank + '</span>';
         var name = t.display_name || t.username || 'Trader';
         var vol = t.total_volume ? '$' + Number(t.total_volume).toLocaleString() : '--';
         html += '<div class="ms-card" style="cursor:default;">' +
             '<div class="ms-card-row">' +
-                '<div class="ms-card-icon" style="font-size:20px;width:32px;text-align:center;">' + medal + '</div>' +
-                '<div class="ms-card-info"><div class="ms-card-title">' + name + '</div></div>' +
-                '<div class="ms-card-value" style="font-size:13px;">' + vol + '</div>' +
+            '<div class="ms-card-icon" style="font-size:20px;width:32px;text-align:center;">' + medal + '</div>' +
+            '<div class="ms-card-info"><div class="ms-card-title">' + name + '</div></div>' +
+            '<div class="ms-card-value" style="font-size:13px;">' + vol + '</div>' +
             '</div>' +
-        '</div>';
+            '</div>';
     });
     content.innerHTML = html;
 }
@@ -1946,50 +1946,50 @@ function populateMoreHistory() {
         return;
     }
 
-    var sorted = trades.slice().sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
+    var sorted = trades.slice().sort(function (a, b) { return new Date(b.created_at) - new Date(a.created_at); });
 
     var totalTrades = sorted.length;
-    var buys = sorted.filter(function(t) { return t.side === 'BUY'; }).length;
+    var buys = sorted.filter(function (t) { return t.side === 'BUY'; }).length;
     var sells = totalTrades - buys;
-    var totalVolume = sorted.reduce(function(sum, t) { return sum + Math.abs(t.quantity || 0) * (t.price || 0); }, 0);
+    var totalVolume = sorted.reduce(function (sum, t) { return sum + Math.abs(t.quantity || 0) * (t.price || 0); }, 0);
 
     var uniqueSymbols = {};
-    sorted.forEach(function(t) {
+    sorted.forEach(function (t) {
         var s = t.index_symbol || '';
         if (!s && t.tea_id) {
-            var tea = (state.teas || []).find(function(x) { return x.id === t.tea_id; });
+            var tea = (state.teas || []).find(function (x) { return x.id === t.tea_id; });
             s = tea ? tea.symbol : '';
         }
         if (s) uniqueSymbols[s] = (uniqueSymbols[s] || 0) + 1;
     });
-    var topSymbol = Object.keys(uniqueSymbols).sort(function(a, b) { return uniqueSymbols[b] - uniqueSymbols[a]; })[0] || '--';
+    var topSymbol = Object.keys(uniqueSymbols).sort(function (a, b) { return uniqueSymbols[b] - uniqueSymbols[a]; })[0] || '--';
 
     var html = '<div class="ms-stats-grid">' +
         '<div class="ms-stat-card">' +
-            '<div class="ms-stat-value">' + totalTrades + '</div>' +
-            '<div class="ms-stat-label">Total Trades</div>' +
+        '<div class="ms-stat-value">' + totalTrades + '</div>' +
+        '<div class="ms-stat-label">Total Trades</div>' +
         '</div>' +
         '<div class="ms-stat-card">' +
-            '<div class="ms-stat-value" style="color:#00e676;">' + buys + ' <span style="color:#6b7280;font-size:11px;">/ </span><span style="color:#ef4444;">' + sells + '</span></div>' +
-            '<div class="ms-stat-label">Buy / Sell</div>' +
+        '<div class="ms-stat-value" style="color:#00e676;">' + buys + ' <span style="color:#6b7280;font-size:11px;">/ </span><span style="color:#ef4444;">' + sells + '</span></div>' +
+        '<div class="ms-stat-label">Buy / Sell</div>' +
         '</div>' +
         '<div class="ms-stat-card">' +
-            '<div class="ms-stat-value">$' + (totalVolume >= 1000 ? (totalVolume / 1000).toFixed(1) + 'k' : totalVolume.toFixed(0)) + '</div>' +
-            '<div class="ms-stat-label">Volume</div>' +
+        '<div class="ms-stat-value">$' + (totalVolume >= 1000 ? (totalVolume / 1000).toFixed(1) + 'k' : totalVolume.toFixed(0)) + '</div>' +
+        '<div class="ms-stat-label">Volume</div>' +
         '</div>' +
         '<div class="ms-stat-card">' +
-            '<div class="ms-stat-value" style="font-size:13px;">' + topSymbol + '</div>' +
-            '<div class="ms-stat-label">Most Traded</div>' +
+        '<div class="ms-stat-value" style="font-size:13px;">' + topSymbol + '</div>' +
+        '<div class="ms-stat-label">Most Traded</div>' +
         '</div>' +
-    '</div>';
+        '</div>';
 
     html += '<div class="ms-section-title">Recent Trades</div>';
 
-    sorted.slice(0, 30).forEach(function(t) {
+    sorted.slice(0, 30).forEach(function (t) {
         var sym = '';
         if (t.index_symbol) { sym = t.index_symbol; }
         else {
-            var tea = (state.teas || []).find(function(x) { return x.id === t.tea_id; });
+            var tea = (state.teas || []).find(function (x) { return x.id === t.tea_id; });
             sym = tea ? tea.symbol : 'Tea #' + t.tea_id;
         }
         var isBuy = t.side === 'BUY';
@@ -2002,14 +2002,14 @@ function populateMoreHistory() {
 
         html += '<div class="ms-card" style="cursor:default;">' +
             '<div class="ms-card-row">' +
-                '<div class="ms-trade-badge" style="background:' + sideColor + '15;color:' + sideColor + ';">' + t.side + '</div>' +
-                '<div class="ms-card-info">' +
-                    '<div class="ms-card-title">' + sym + (lev ? ' <span style="font-size:10px;color:#6b7280;">' + lev + '</span>' : '') + '</div>' +
-                    '<div class="ms-card-sub">' + dateStr + ' &middot; ' + qty.toLocaleString() + ' kg</div>' +
-                '</div>' +
-                '<div class="ms-card-value">' + price + '</div>' +
+            '<div class="ms-trade-badge" style="background:' + sideColor + '15;color:' + sideColor + ';">' + t.side + '</div>' +
+            '<div class="ms-card-info">' +
+            '<div class="ms-card-title">' + sym + (lev ? ' <span style="font-size:10px;color:#6b7280;">' + lev + '</span>' : '') + '</div>' +
+            '<div class="ms-card-sub">' + dateStr + ' &middot; ' + qty.toLocaleString() + ' kg</div>' +
             '</div>' +
-        '</div>';
+            '<div class="ms-card-value">' + price + '</div>' +
+            '</div>' +
+            '</div>';
     });
     content.innerHTML = html;
 }
@@ -2027,27 +2027,27 @@ function populateMoreAlerts() {
     }
 
     var html = '';
-    keys.forEach(function(sym) {
+    keys.forEach(function (sym) {
         var a = alerts[sym];
-        var tea = (state.teas || []).find(function(x) { return x.symbol === sym; });
+        var tea = (state.teas || []).find(function (x) { return x.symbol === sym; });
         var currentPx = tea ? '$' + Number(tea.current_price).toFixed(2) : '';
         var below = a.below ? '$' + Number(a.below).toFixed(2) : '--';
         var above = a.above ? '$' + Number(a.above).toFixed(2) : '--';
 
         html += '<div class="ms-card" onclick="if(typeof openPriceAlertModal===\'function\'){var t=(state.teas||[]).find(function(x){return x.symbol===\'' + sym + '\'});if(t) openPriceAlertModal(t.symbol,t.current_price);}">' +
             '<div class="ms-card-row">' +
-                '<div style="width:42px;height:42px;border-radius:10px;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
-                    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>' +
-                '</div>' +
-                '<div class="ms-card-info" style="margin-left:12px;">' +
-                    '<div class="ms-card-title">' + sym + (currentPx ? ' <span style="color:#6b7280;font-size:12px;">' + currentPx + '</span>' : '') + '</div>' +
-                    '<div class="ms-card-sub">' +
-                        '<span style="color:#ef4444;">SL ' + below + '</span> &bull; <span style="color:#00e676;">TP ' + above + '</span>' +
-                    '</div>' +
-                '</div>' +
-                '<div class="ms-card-chevron">›</div>' +
+            '<div style="width:42px;height:42px;border-radius:10px;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+            '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>' +
             '</div>' +
-        '</div>';
+            '<div class="ms-card-info" style="margin-left:12px;">' +
+            '<div class="ms-card-title">' + sym + (currentPx ? ' <span style="color:#6b7280;font-size:12px;">' + currentPx + '</span>' : '') + '</div>' +
+            '<div class="ms-card-sub">' +
+            '<span style="color:#ef4444;">SL ' + below + '</span> &bull; <span style="color:#00e676;">TP ' + above + '</span>' +
+            '</div>' +
+            '</div>' +
+            '<div class="ms-card-chevron">›</div>' +
+            '</div>' +
+            '</div>';
     });
     content.innerHTML = html;
 }
@@ -2066,7 +2066,7 @@ function populateMoreAlerts() {
         syncMobileHeaderData();
     }
 
-    window.closeMobileHeader = function() {
+    window.closeMobileHeader = function () {
         var menu = document.getElementById('mth-menu');
         var overlay = document.getElementById('mth-menu-overlay');
         if (menu) menu.classList.remove('active');
@@ -2132,7 +2132,7 @@ function populateMoreAlerts() {
         }
 
         var authItems = ['mth-item-portfolio', 'mth-item-store', 'mth-item-mode', 'mth-item-security', 'mth-item-logout'];
-        authItems.forEach(function(id) {
+        authItems.forEach(function (id) {
             var el = document.getElementById(id);
             if (el) el.style.display = isLoggedIn ? 'flex' : 'none';
         });
@@ -2149,8 +2149,8 @@ function populateMoreAlerts() {
         var lastScrollY = 0;
         var scrollThreshold = 8;
 
-        document.querySelectorAll('.app-view').forEach(function(view) {
-            view.addEventListener('scroll', function() {
+        document.querySelectorAll('.app-view').forEach(function (view) {
+            view.addEventListener('scroll', function () {
                 if (window.innerWidth > 768) return;
 
                 var currentY = this.scrollTop;
@@ -2169,7 +2169,7 @@ function populateMoreAlerts() {
         });
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         var hamburger = document.getElementById('mth-hamburger');
         if (hamburger) hamburger.onclick = openMobileHeader;
 
@@ -2181,7 +2181,7 @@ function populateMoreAlerts() {
 
         var modeToggleItem = document.getElementById('mth-item-mode');
         if (modeToggleItem) {
-            modeToggleItem.onclick = function() {
+            modeToggleItem.onclick = function () {
                 var modeToggle = document.getElementById('mode-toggle');
                 if (modeToggle) {
                     modeToggle.checked = !modeToggle.checked;
@@ -2195,7 +2195,7 @@ function populateMoreAlerts() {
 
         initScrollBehaviour();
 
-        setInterval(function() {
+        setInterval(function () {
             if (window.innerWidth > 768) return;
             var balEl = document.getElementById('user-balance');
             var mthBal = document.getElementById('mth-balance');
@@ -2222,11 +2222,11 @@ function handleMobileShare() {
     };
 
     if (navigator.share) {
-        navigator.share(payload).catch(function() {});
+        navigator.share(payload).catch(function () { });
     } else {
-        navigator.clipboard.writeText(payload.url).then(function() {
+        navigator.clipboard.writeText(payload.url).then(function () {
             _showShareToast('Link copied to clipboard');
-        }).catch(function() {
+        }).catch(function () {
             _showShareToast('Link copied to clipboard');
         });
     }
@@ -2250,14 +2250,14 @@ function _showShareToast(msg) {
         transition: 'opacity 0.3s ease, transform 0.3s ease'
     });
     document.body.appendChild(toast);
-    requestAnimationFrame(function() {
+    requestAnimationFrame(function () {
         toast.style.opacity = '1';
         toast.style.transform = 'translateY(0)';
     });
-    setTimeout(function() {
+    setTimeout(function () {
         toast.style.opacity = '0';
         toast.style.transform = 'translateY(8px)';
-        setTimeout(function() { toast.remove(); }, 300);
+        setTimeout(function () { toast.remove(); }, 300);
     }, 2000);
 }
 
@@ -2278,7 +2278,7 @@ function _showShareToast(msg) {
 
     var origExecute = window.executeTrade;
     if (typeof origExecute === 'function') {
-        window.executeTrade = function() {
+        window.executeTrade = function () {
             var result = origExecute.apply(this, arguments);
             reveal();
             return result;
@@ -2286,7 +2286,7 @@ function _showShareToast(msg) {
     }
     var origExecHub = window.executeHubTrade;
     if (typeof origExecHub === 'function') {
-        window.executeHubTrade = function() {
+        window.executeHubTrade = function () {
             var result = origExecHub.apply(this, arguments);
             reveal();
             return result;

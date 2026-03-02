@@ -192,90 +192,38 @@ async function apiFetchTradeById(tradeId) {
  * @returns {Promise<{data: Array|null, error: object|null}>}
  */
 async function apiFetchPriceHistory(symbol, limit, since) {
-    // Always use a split strategy when a time window (since) is given.
-    //
-    // The price_history table contains two distinct populations:
-    //   • is_simulated = TRUE  – one row per day per symbol (2023 → now)
-    //   • is_simulated = FALSE – one row every 5 min per symbol (live cron)
-    //
-    // A naive single DESC LIMIT query always returns the N most-recent live
-    // rows, which for a 1D window is only the last few hours, leaving most of
-    // the chart X-axis blank.  Splitting lets us bring in the full simulated
-    // history regardless of how many live rows exist.
-    //
-    //   A) ALL simulated rows in the time window  (cheap — ≤365 rows/year)
-    //   B) Most-recent 5 000 live rows in the window (covers up to ~17 days at
-    //      5-min density, or ~41 h at legacy 30-s density)
-    //
-    // After merging we sort ascending so convertToOHLC sees a clean timeline.
-
     if (since && supabaseClient.from) {
         try {
-            // Split live data into 3 time segments to stay within PostgREST's
-            // 1000-row default cap per request. 3 × 1000 = 3000 live rows,
-            // covering ~10 days at 5-min density.
-            const sinceMs = new Date(since).getTime();
-            const nowMs = Date.now();
-            const third = (nowMs - sinceMs) / 3;
-            const cut1 = new Date(sinceMs + third).toISOString();
-            const cut2 = new Date(sinceMs + third * 2).toISOString();
-
-            const [histResult, preAnchor, live1, live2, live3] = await Promise.all([
-                // Simulated rows IN the window
+            // Optimized 2-segment fetch to avoid slamming the connection pool on load.
+            // 1) Simulated history (1 row/day)
+            // 2) Live engine history (max 3000 rows requested, capped automatically by PostgREST to 1000)
+            // By sorting descending and reversing, we ensure the most recent data is caught.
+            const [histResult, liveResult] = await Promise.all([
                 supabaseClient
                     .from('price_history')
                     .select('price, recorded_at, volume')
                     .eq('symbol', symbol)
                     .eq('is_simulated', true)
                     .gte('recorded_at', since)
-                    .order('recorded_at', { ascending: true })
-                    .limit(5000),
-                // Most recent simulated row BEFORE the window — left-edge anchor
-                // so gap-fill can generate candles from the chart's left boundary
-                supabaseClient
-                    .from('price_history')
-                    .select('price, recorded_at, volume')
-                    .eq('symbol', symbol)
-                    .eq('is_simulated', true)
-                    .lt('recorded_at', since)
                     .order('recorded_at', { ascending: false })
-                    .limit(1),
+                    .limit(1000),
                 supabaseClient
                     .from('price_history')
                     .select('price, recorded_at, volume')
                     .eq('symbol', symbol)
                     .eq('is_simulated', false)
                     .gte('recorded_at', since)
-                    .lt('recorded_at', cut1)
-                    .order('recorded_at', { ascending: true })
-                    .limit(1000),
-                supabaseClient
-                    .from('price_history')
-                    .select('price, recorded_at, volume')
-                    .eq('symbol', symbol)
-                    .eq('is_simulated', false)
-                    .gte('recorded_at', cut1)
-                    .lt('recorded_at', cut2)
-                    .order('recorded_at', { ascending: true })
-                    .limit(1000),
-                supabaseClient
-                    .from('price_history')
-                    .select('price, recorded_at, volume')
-                    .eq('symbol', symbol)
-                    .eq('is_simulated', false)
-                    .gte('recorded_at', cut2)
-                    .order('recorded_at', { ascending: true })
-                    .limit(1000),
+                    .order('recorded_at', { ascending: false })
+                    .limit(1000)
             ]);
 
-            if (!histResult.error || !live1.error || !live2.error || !live3.error) {
-                const merged = [
-                    ...(preAnchor.data || []),
-                    ...(histResult.data || []),
-                    ...(live1.data || []),
-                    ...(live2.data || []),
-                    ...(live3.data || []),
-                ].sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime());
+            if (!histResult.error || !liveResult.error) {
+                // Reverse desc back to chronological asc
+                const histData = (histResult.data || []).reverse();
+                const liveData = (liveResult.data || []).reverse();
+
+                const merged = [...histData, ...liveData]
+                    .sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime());
                 return { data: merged, error: null };
             }
         } catch (_) {
@@ -432,7 +380,7 @@ function _handleChannelStatus(status, channelName, retryKey, createFn) {
 function subscribeToTicker(callback) {
     function create() {
         if (state.tickerSubscription) {
-            try { supabaseClient.removeChannel(state.tickerSubscription); } catch (_) {}
+            try { supabaseClient.removeChannel(state.tickerSubscription); } catch (_) { }
         }
         state.tickerSubscription = supabaseClient
             .channel('ticker:teas')
@@ -456,7 +404,7 @@ function subscribeToTicker(callback) {
 function subscribeToMacro(callback) {
     function create() {
         if (state.macroSubscription) {
-            try { supabaseClient.removeChannel(state.macroSubscription); } catch (_) {}
+            try { supabaseClient.removeChannel(state.macroSubscription); } catch (_) { }
         }
         state.macroSubscription = supabaseClient
             .channel('ticker:market_state')
@@ -482,7 +430,7 @@ function subscribeToMacro(callback) {
 function subscribeToMarketPressure(callback) {
     function create() {
         if (state.pressureSubscription) {
-            try { supabaseClient.removeChannel(state.pressureSubscription); } catch (_) {}
+            try { supabaseClient.removeChannel(state.pressureSubscription); } catch (_) { }
         }
         state.pressureSubscription = supabaseClient
             .channel('market:pressure')
@@ -516,7 +464,7 @@ async function apiFetchMarketPressure() {
 function subscribeToChatMessages(callback) {
     function create() {
         if (state.chatSubscription) {
-            try { supabaseClient.removeChannel(state.chatSubscription); } catch (_) {}
+            try { supabaseClient.removeChannel(state.chatSubscription); } catch (_) { }
         }
         state.chatSubscription = supabaseClient
             .channel('chat_messages')
@@ -547,7 +495,7 @@ function subscribeToPositions(userId) {
 
     function create() {
         if (state.positionsSubscription) {
-            try { supabaseClient.removeChannel(state.positionsSubscription); } catch (_) {}
+            try { supabaseClient.removeChannel(state.positionsSubscription); } catch (_) { }
         }
         state.positionsSubscription = supabaseClient
             .channel(`user:positions:${userId}`)
@@ -606,7 +554,7 @@ function subscribeToIndexPositions(userId) {
 
     function create() {
         if (state.indexPositionsSubscription) {
-            try { supabaseClient.removeChannel(state.indexPositionsSubscription); } catch (_) {}
+            try { supabaseClient.removeChannel(state.indexPositionsSubscription); } catch (_) { }
         }
         state.indexPositionsSubscription = supabaseClient
             .channel(`user:index_positions:${userId}`)
@@ -656,7 +604,7 @@ function subscribeToTrades(userId) {
 
     function create() {
         if (state.tradesSubscription) {
-            try { supabaseClient.removeChannel(state.tradesSubscription); } catch (_) {}
+            try { supabaseClient.removeChannel(state.tradesSubscription); } catch (_) { }
         }
         state.tradesSubscription = supabaseClient
             .channel(`user:trades:${userId}`)
@@ -689,7 +637,7 @@ function subscribeToProfile(userId) {
 
     function create() {
         if (state.profileSubscription) {
-            try { supabaseClient.removeChannel(state.profileSubscription); } catch (_) {}
+            try { supabaseClient.removeChannel(state.profileSubscription); } catch (_) { }
         }
         state.profileSubscription = supabaseClient
             .channel(`user:profile:${userId}`)
@@ -724,7 +672,7 @@ function subscribeToPendingOrders(userId) {
 
     function create() {
         if (state.pendingOrdersSubscription) {
-            try { supabaseClient.removeChannel(state.pendingOrdersSubscription); } catch (_) {}
+            try { supabaseClient.removeChannel(state.pendingOrdersSubscription); } catch (_) { }
         }
         state.pendingOrdersSubscription = supabaseClient
             .channel(`user:orders:${userId}`)
@@ -764,7 +712,7 @@ function subscribeToMarginNotifications(userId) {
 
     function create() {
         if (state.marginNotifSubscription) {
-            try { supabaseClient.removeChannel(state.marginNotifSubscription); } catch (_) {}
+            try { supabaseClient.removeChannel(state.marginNotifSubscription); } catch (_) { }
         }
         state.marginNotifSubscription = supabaseClient
             .channel(`user:margin:${userId}`)
@@ -840,12 +788,12 @@ function startUserSubscriptions(userId) {
  */
 function stopUserSubscriptions() {
     ['positionsSubscription', 'indexPositionsSubscription', 'tradesSubscription',
-     'profileSubscription', 'pendingOrdersSubscription', 'marginNotifSubscription'].forEach(key => {
-        if (state[key]) {
-            try { supabaseClient.removeChannel(state[key]); } catch (_) {}
-            state[key] = null;
-        }
-    });
+        'profileSubscription', 'pendingOrdersSubscription', 'marginNotifSubscription'].forEach(key => {
+            if (state[key]) {
+                try { supabaseClient.removeChannel(state[key]); } catch (_) { }
+                state[key] = null;
+            }
+        });
 }
 
 /**
@@ -891,7 +839,7 @@ async function _invokeEdgeFunction(fnName, body) {
         try {
             const { data: sessionData } = await supabaseClient.auth.getSession();
             accessToken = sessionData?.session?.access_token || null;
-        } catch (_) {}
+        } catch (_) { }
 
         const invokeOpts = { body };
         if (accessToken) {
@@ -909,12 +857,12 @@ async function _invokeEdgeFunction(fnName, body) {
         try {
             const errBody = await error.context?.json();
             serverMsg = errBody?.error || errBody?.message || '';
-        } catch (_) {}
+        } catch (_) { }
 
         if (!serverMsg) {
             try {
                 serverMsg = await error.context?.text();
-            } catch (_) {}
+            } catch (_) { }
         }
 
         const msg = serverMsg || error.message || 'Trade request failed';

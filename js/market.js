@@ -62,8 +62,8 @@ function _allIndexDefs() {
 // PRICE DATA CACHE
 // =============================================
 
-async function getPriceHistory(symbol, symbolType = 'tea') {
-    const tf = state.currentTimeframe || '1D';
+async function getPriceHistory(symbol, symbolType = 'tea', forcedTimeframe = null) {
+    const tf = forcedTimeframe || state.currentTimeframe || '1D';
     const cacheKey = (symbolType === 'index' ? `INDEX_${symbol}` : symbol) + `_${tf}`;
 
     // Return cached data if available and recently updated (within 60s)
@@ -82,17 +82,15 @@ async function getPriceHistory(symbol, symbolType = 'tea') {
     // Start loading from database
     state.priceDataCache.loading[cacheKey] = (async () => {
         try {
-            const dbData = await loadChartDataFromHistory(symbol, symbolType);
+            const dbData = await loadChartDataFromHistory(symbol, symbolType, tf);
 
             if (dbData && dbData.length >= 1) {
                 state.priceDataCache.data[cacheKey] = dbData;
                 state.priceDataCache.loaded[cacheKey] = true;
                 state.priceDataCache.lastUpdate[cacheKey] = Date.now();
-                console.log(`Loaded ${dbData.length} candles for ${cacheKey} from database`);
                 return dbData;
             }
 
-            console.log(`Insufficient price history for ${cacheKey} (${dbData ? dbData.length : 0} candles) — will retry on next request`);
             state.priceDataCache.data[cacheKey] = [];
             state.priceDataCache.loaded[cacheKey] = false;
             state.priceDataCache.lastUpdate[cacheKey] = 0;
@@ -106,8 +104,8 @@ async function getPriceHistory(symbol, symbolType = 'tea') {
 }
 
 // Synchronous version — returns cached data or empty array
-function getPriceHistorySync(symbol, symbolType = 'tea') {
-    const tf = state.currentTimeframe || '1D';
+function getPriceHistorySync(symbol, symbolType = 'tea', forcedTimeframe = null) {
+    const tf = forcedTimeframe || state.currentTimeframe || '1D';
     const cacheKey = (symbolType === 'index' ? `INDEX_${symbol}` : symbol) + `_${tf}`;
 
     if (state.priceDataCache.data[cacheKey] && state.priceDataCache.data[cacheKey].length > 0) {
@@ -115,7 +113,7 @@ function getPriceHistorySync(symbol, symbolType = 'tea') {
     }
 
     // Trigger async load in background
-    getPriceHistory(symbol, symbolType).catch(() => { });
+    getPriceHistory(symbol, symbolType, forcedTimeframe).catch(() => { });
 
     return [];
 }
@@ -198,16 +196,16 @@ async function initializePriceCache() {
     console.log('Initializing price cache from database...');
     const loadPromises = [];
 
-    // Load all tea symbols
+    // Load all tea symbols (force 1D for fast UI/sparklines on load)
     if (state.teas && state.teas.length > 0) {
         state.teas.forEach(tea => {
-            loadPromises.push(getPriceHistory(tea.symbol, 'tea'));
+            loadPromises.push(getPriceHistory(tea.symbol, 'tea', '1D'));
         });
     }
 
-    // Load all index symbols from DB
+    // Load all index symbols from DB (force 1D for fast UI/sparklines on load)
     getIndexSymbols().forEach(symbol => {
-        loadPromises.push(getPriceHistory(symbol, 'index'));
+        loadPromises.push(getPriceHistory(symbol, 'index', '1D'));
     });
 
     await Promise.allSettled(loadPromises);
@@ -272,8 +270,23 @@ async function loadChartDataFromHistory(symbol, symbolType = 'tea', timeframeOve
     // Legacy logic used to forward-fill flat candles to "now".
     // TradingView handles current-time tracking without needing padding candles.
     return result;
+}
 
-    return result;
+// Load historical price data from database
+async function loadPriceHistory(symbol, limit = 500, since = null) {
+    if (!supabaseClient) return null;
+
+    try {
+        const { data, error } = await apiFetchPriceHistory(symbol, limit, since);
+        if (error) {
+            console.debug('Price history load:', error.message);
+            return null;
+        }
+        return data;
+    } catch (e) {
+        console.debug('Price history load skipped:', e.message);
+        return null;
+    }
 }
 
 async function _loadCompositeIndexOHLC(teaSymbols, cfg, since) {
@@ -283,7 +296,7 @@ async function _loadCompositeIndexOHLC(teaSymbols, cfg, since) {
 
     const intervalMs = cfg.interval * 60000;
 
-    // Combine all ticks into a single chronologically sorted array
+    // Combine all ticks into a single array
     const allTicks = [];
     allRows.forEach((rows, teaIdx) => {
         if (!rows) return;
@@ -293,23 +306,39 @@ async function _loadCompositeIndexOHLC(teaSymbols, cfg, since) {
     });
 
     if (allTicks.length === 0) return null;
-    allTicks.sort((a, b) => a.time - b.time);
+
+    // Group ticks exactly by their millisecond timestamp
+    const timeGroups = {};
+    for (const t of allTicks) {
+        if (!timeGroups[t.time]) timeGroups[t.time] = [];
+        timeGroups[t.time].push(t);
+    }
+    const uniqueTimes = Object.keys(timeGroups).map(Number).sort((a, b) => a - b);
 
     // Track the last known price for each tea to compute rolling cross-tea averages
     const lastKnown = new Array(teaSymbols.length).fill(null);
     const averagedTicks = [];
 
-    // Pre-fill lastKnown with the earliest available price for each tea, 
-    // so the initial average isn't skewed by the order they arrive in the first few ticks
-    for (const t of allTicks) {
-        if (lastKnown[t.teaIdx] === null) {
-            lastKnown[t.teaIdx] = t.price;
+    // Pre-fill lastKnown with the earliest available price for each tea
+    for (const time of uniqueTimes) {
+        const ticks = timeGroups[time];
+        for (const t of ticks) {
+            if (lastKnown[t.teaIdx] === null) {
+                lastKnown[t.teaIdx] = t.price;
+            }
         }
+        // Once we've seen at least one price for everything, break
+        if (!lastKnown.includes(null)) break;
     }
 
     // Now walk through chronologically and generate a single average price point per timestamp
-    for (const t of allTicks) {
-        lastKnown[t.teaIdx] = t.price;
+    for (const time of uniqueTimes) {
+        const ticks = timeGroups[time];
+
+        // Update all teas that had a tick at this exact timestamp simultaneously
+        for (const t of ticks) {
+            lastKnown[t.teaIdx] = t.price;
+        }
 
         // Compute average of all currently known tea prices
         let sum = 0;
@@ -322,7 +351,7 @@ async function _loadCompositeIndexOHLC(teaSymbols, cfg, since) {
         }
 
         if (count > 0) {
-            averagedTicks.push({ time: t.time, price: sum / count });
+            averagedTicks.push({ time: time, price: sum / count });
         }
     }
 
@@ -366,23 +395,6 @@ async function _loadCompositeIndexOHLC(teaSymbols, cfg, since) {
     // Note: We deliberately DONT force Open = Previous Close.
     // TradingView handles gaps naturally. Forcing gap closures generates artificially massive wicks.
     return _fillCandleGaps(candles, intervalMs);
-}
-
-// Load historical price data from database
-async function loadPriceHistory(symbol, limit = 500, since = null) {
-    if (!supabaseClient) return null;
-
-    try {
-        const { data, error } = await apiFetchPriceHistory(symbol, limit, since);
-        if (error) {
-            console.debug('Price history load:', error.message);
-            return null;
-        }
-        return data;
-    } catch (e) {
-        console.debug('Price history load skipped:', e.message);
-        return null;
-    }
 }
 
 // Convert raw price ticks to OHLC candles for charting
