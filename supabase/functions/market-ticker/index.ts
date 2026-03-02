@@ -295,6 +295,53 @@ serve(async (req) => {
 
     const teas = teasResult.data ?? [];
 
+    // 2.5 Generate background bot volume to drive prices naturally
+    try {
+      const { data: bot } = await supabase.from('profiles').select('id').eq('is_sim_bot', true).limit(1).single();
+      if (bot && bot.id && teas.length > 0) {
+        const newTrades = [];
+        const getSide = () => Math.random() > 0.5 ? 'BUY' : 'SELL';
+
+        // Pick 4 random teas
+        const shuffledTeas = [...teas].sort(() => 0.5 - Math.random()).slice(0, 4);
+        for (const tea of shuffledTeas) {
+          if (!tea.current_price || tea.current_price <= 0) continue;
+          const qty = Math.floor(Math.random() * 2000) + 100; // 100 to 2100 kg
+          const slippage = tea.current_price * (Math.random() * 0.005 - 0.0025);
+          const price = tea.current_price + slippage;
+          newTrades.push({
+            user_id: bot.id, tea_id: tea.id, symbol: tea.symbol, side: getSide(),
+            quantity: qty, price: price, execution_price: price, total_value: qty * price,
+            status: 'FILLED', trading_mode: 'REAL', notes: 'bot_ticker_inject'
+          });
+        }
+
+        // Pick 2 random indexes
+        const { data: indices } = await supabase.from('indexes').select('symbol, current_price');
+        if (indices && indices.length > 0) {
+          const shuffledIdx = [...indices].sort(() => 0.5 - Math.random()).slice(0, 2);
+          for (const idx of shuffledIdx) {
+            if (!idx.current_price || idx.current_price <= 0) continue;
+            const qty = Math.floor(Math.random() * 50) + 10;
+            const slippage = idx.current_price * (Math.random() * 0.005 - 0.0025);
+            const price = idx.current_price + slippage;
+            newTrades.push({
+              user_id: bot.id, index_symbol: idx.symbol, symbol: idx.symbol, side: getSide(),
+              quantity: qty, price: price, execution_price: price, total_value: qty * price,
+              status: 'FILLED', trading_mode: 'REAL', notes: 'bot_ticker_inject'
+            });
+          }
+        }
+
+        if (newTrades.length > 0) {
+          await supabase.from('trades').insert(newTrades);
+          console.log(`🤖 Bot inserted ${newTrades.length} background trades`);
+        }
+      }
+    } catch (botErr) {
+      console.error('Bot injection error:', (botErr as Error).message);
+    }
+
     // 3. Fetch order flow (needs teas for id→symbol map, so slightly after)
     const orderFlow = await fetchOrderFlow(supabase, teas);
 

@@ -113,8 +113,7 @@ function _initTvChartIfNull() {
         timeScale: {
             timeVisible: true,
             secondsVisible: false,
-            fixLeftEdge: true,
-            rightOffset: 10,
+            rightOffset: 0,
             borderVisible: false
         },
         rightPriceScale: {
