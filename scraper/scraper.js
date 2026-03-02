@@ -74,7 +74,11 @@ async function scrapeTarget(target, browser) {
                 const content = await page.content();
                 const $ = cheerio.load(content);
                 rawText = $(target.selector).text();
-                if (!rawText || rawText.length < 50) throw new Error(`Could not find valid data at selector: ${target.selector}`);
+                // If it's empty (like recent ATBL updates), we will bypass instead of throwing
+                if (!rawText || rawText.length < 50) {
+                    console.warn(`[Warning] No valid data at selector: ${target.selector}`);
+                    return; // Skip this target gracefully without throwing a failure
+                }
                 break;
             }
 
@@ -97,36 +101,26 @@ async function scrapeTarget(target, browser) {
                 rawText = $('body').text(); // Grab everything, the LLM will parse it out
                 break;
             }
+            case 'custom_ceylon_html': {
+                // Ceylon embeds links to HTML report pages instead of PDFs now
+                await new Promise(r => setTimeout(r, 3000));
 
-            case 'custom_tbeal_login': {
-                // TBEAL has a login form block. We either bypass or return an auth error
-                const isLoginForm = await page.$('input[name="lusername"]');
-                if (isLoginForm) {
-                    throw new Error("Target is behind a login wall. Provide credentials to scrape.");
-                } else {
-                    const content = await page.content();
-                    rawText = cheerio.load(content)('body').text();
-                }
-                break;
-            }
-
-            case 'custom_ceylon_pdf': {
-                // Ceylon embeds a PDF downloader
-                // For now, we fetch the first PDF link found on the page
-                const pdfUrl = await page.$$eval('a', links => {
-                    const pdf = links.find(l => l.href && l.href.toLowerCase().includes('.pdf'));
-                    return pdf ? pdf.href : null;
+                const reportUrl = await page.$$eval('a', links => {
+                    const l = links.find(l => l.href && (l.href.includes('report') || l.href.includes('pdf')) && l.innerText && l.innerText.length > 5);
+                    return l ? l.href : null;
                 });
 
-                if (!pdfUrl) throw new Error("Could not find a valid PDF report link on the page.");
+                if (!reportUrl) throw new Error("Could not find a valid HTML report link on the page.");
 
-                console.log(`Downloading PDF from ${pdfUrl}...`);
-                const viewSource = await page.goto(pdfUrl);
-                const buffer = await viewSource.buffer();
+                console.log(`Navigating to report HTML at ${reportUrl}...`);
+                await page.goto(reportUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+                await new Promise(r => setTimeout(r, 2000));
 
-                console.log('Parsing Ceylon PDF...');
-                const data = await pdfParse(buffer);
-                rawText = data.text;
+                const content = await page.content();
+                const $ = cheerio.load(content);
+                rawText = $('body').text();
+
+                if (!rawText || rawText.length < 50) throw new Error("Extracted HTML report text was empty.");
                 break;
             }
 

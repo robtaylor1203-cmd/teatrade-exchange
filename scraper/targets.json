@@ -10,7 +10,7 @@
         "name": "Tea Board of India",
         "url": "https://www.teaboard.gov.in/WEEKLYPRICES/2026",
         "type": "html_table",
-        "selector": ".table-responsive"
+        "selector": "table"
     },
     {
         "id": "atb_ltd",
@@ -20,16 +20,10 @@
         "selector": "table"
     },
     {
-        "id": "tbeal",
-        "name": "Tea Brokers East Africa",
-        "url": "https://www.tbeal.net/download-category/country-averages-auction-statistics/",
-        "type": "custom_tbeal_login"
-    },
-    {
         "id": "ceylon_tea_brokers",
         "name": "Ceylon Tea Brokers",
         "url": "https://ceylonteabrokers.com/market-reports/",
-        "type": "custom_ceylon_pdf"
+        "type": "custom_ceylon_html"
     },
     {
         "id": "van_rees",
