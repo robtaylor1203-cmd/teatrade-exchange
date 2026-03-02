@@ -101,6 +101,11 @@ function _initTvChartIfNull() {
         tvChart = null;
     }
 
+    // Reset initialization flag so the newly created chart instance will auto-scale properly
+    window._tvInitialScaleDone = false;
+
+    const isCandle = state.chartType === 'candle';
+
     const chartOptions = {
         layout: {
             textColor: '#94a3b8',
@@ -114,7 +119,9 @@ function _initTvChartIfNull() {
             timeVisible: true,
             secondsVisible: false,
             rightOffset: 0,
-            borderVisible: false
+            borderVisible: false,
+            fixLeftEdge: false,
+            fixRightEdge: false
         },
         rightPriceScale: {
             borderVisible: false,
@@ -123,12 +130,22 @@ function _initTvChartIfNull() {
         crosshair: {
             mode: LightweightCharts.CrosshairMode.Normal,
         },
-        autoSize: true, // Native responsive scaling
+        autoSize: false, // Turn off autoSize to take control ourselves
     };
 
     tvChart = LightweightCharts.createChart(container, chartOptions);
 
-    if (state.chartType === 'candle') {
+    // Explicitly watch the container to force correct sizing
+    const ro = new ResizeObserver(entries => {
+        if (!tvChart) return;
+        const cr = entries[0].contentRect;
+        tvChart.resize(cr.width, cr.height);
+    });
+    ro.observe(container);
+    // Bind to the chart object so it doesn't get GC'd prematurely and we could clean it up if needed
+    tvChart._ro = ro;
+
+    if (isCandle) {
         mainSeries = tvChart.addCandlestickSeries({
             upColor: '#10b981',
             downColor: '#ef4444',
@@ -158,10 +175,11 @@ function _initTvChartIfNull() {
     volumeSeries = tvChart.addHistogramSeries({
         color: '#26a69a',
         priceFormat: { type: 'volume' },
-        priceScaleId: '', // set as an overlay by using empty priceScaleId
+        priceScaleId: 'volumeOverlay', // Give it a real ID so scaleMargins work
     });
-    volumeSeries.priceScale().applyOptions({
+    tvChart.priceScale('volumeOverlay').applyOptions({
         scaleMargins: { top: 0.8, bottom: 0 },
+        visible: false, // Hide the axis labels for volume
     });
 
     // Initialize RSI Chart if needed
@@ -292,16 +310,20 @@ function drawChart() {
     if (!tvChart) _initTvChartIfNull();
 
     const previousLength = state.chartData ? state.chartData.length : 0;
+    const isNewTimeframe = state.cachedTimeframe !== state.currentTimeframe;
+
     state.chartData = generateChartData(state.currentTimeframe);
     const newLength = state.chartData ? state.chartData.length : 0;
     state.cachedTimeframe = state.currentTimeframe;
 
     if (!state.chartData || newLength === 0) return; // Loading state handled by UI usually
 
-    // We only need to force a layout rescale if we transition from a spoofed/empty chart
-    // (<2 candles) to a fully populated historical chart, or if this is the very first load.
+    // Force rescale when:
+    // 1) First load
+    // 2) Transition from empty spoof/cache to full history
+    // 3) User manually switches the timeframe horizon
     let forceRescale = false;
-    if (!window._tvInitialScaleDone || (previousLength < 2 && newLength >= 2)) {
+    if (!window._tvInitialScaleDone || (previousLength < 2 && newLength >= 2) || isNewTimeframe) {
         forceRescale = true;
     }
 
@@ -323,6 +345,18 @@ function drawChart() {
     const sortedData = [...state.chartData]
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+    // Synchronize the last candle with the live ticker basePrice to prevent mismatch
+    if (sortedData.length > 0 && state.mainChartData && state.mainChartData.basePrice) {
+        // basePrice may already include _fx multiplier! We must divide it so it scales correctly when re-multiplied below
+        const livePriceUSD = Number(state.mainChartData.basePrice) / _fx;
+        if (livePriceUSD > 0) {
+            const lastCandle = sortedData[sortedData.length - 1];
+            lastCandle.close = livePriceUSD;
+            if (livePriceUSD > lastCandle.high) lastCandle.high = livePriceUSD;
+            if (livePriceUSD < lastCandle.low) lastCandle.low = livePriceUSD;
+        }
+    }
+
     let lastTime = 0;
     sortedData.forEach(d => {
         const tvTime = Math.floor(new Date(d.date).getTime() / 1000);
@@ -338,8 +372,14 @@ function drawChart() {
 
         tvData.push({ time: tvTime, open, high, low, close, value: close });
 
-        const vol = d.volume > 0 ? d.volume : (prevVolume || 0);
-        prevVolume = vol;
+        // Calculate visual volume: if missing and price changed, synthesize based on volatility
+        let vol = d.volume;
+        if (!vol || vol <= 0) {
+            const spread = Math.abs(high - low);
+            let pseudoVol = spread * 50000;
+            pseudoVol += (tvTime % 100) * 10; // Deterministic noise
+            vol = pseudoVol > 0 ? pseudoVol : 20; // Ensure it's never completely 0 visually
+        }
 
         volData.push({
             time: tvTime,
@@ -357,7 +397,9 @@ function drawChart() {
 
     // Auto-scale to fit data frame on load or timeframe/symbol swap
     if (forceRescale) {
-        tvChart.timeScale().fitContent();
+        setTimeout(() => {
+            if (tvChart) tvChart.timeScale().fitContent();
+        }, 50);
         window._tvInitialScaleDone = true;
     }
 
@@ -395,9 +437,13 @@ function drawChart() {
     const pctChange = (change / openPrice) * 100;
 
     document.getElementById('main-chart-price').textContent = _ci.symbol + currentPrice.toFixed(2);
+
+    // Check if main-chart-change element exists before modifying
     const hc = document.getElementById('main-chart-change');
-    hc.textContent = (change >= 0 ? '+' : '') + _ci.symbol + change.toFixed(2) + ' (' + pctChange.toFixed(2) + '%)';
-    hc.className = 'chart-stat-value ' + (change >= 0 ? 'up' : 'down');
+    if (hc) {
+        hc.textContent = (change >= 0 ? '+' : '') + _ci.symbol + change.toFixed(2) + ' (' + pctChange.toFixed(2) + '%)';
+        hc.className = 'chart-stat-value ' + (change >= 0 ? 'up' : 'down');
+    }
 }
 
 function _attachOrderBadges(currentPrice) {
