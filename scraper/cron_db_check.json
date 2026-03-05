@@ -1,44 +1,44 @@
 {
   "prices": [
     {
-      "symbol": "BGD-BOP",
-      "recorded_at": "2026-03-02T20:58:03.640851+00:00"
+      "symbol": "COC-OP",
+      "recorded_at": "2026-03-05T20:42:02.328217+00:00"
     },
     {
-      "symbol": "IDN-BOP",
-      "recorded_at": "2026-03-02T20:58:03.572757+00:00"
+      "symbol": "SIL-DRJ",
+      "recorded_at": "2026-03-05T20:42:02.211719+00:00"
     },
     {
-      "symbol": "KEN-PD",
-      "recorded_at": "2026-03-02T20:58:03.484647+00:00"
+      "symbol": "IDN-PF",
+      "recorded_at": "2026-03-05T20:42:01.946084+00:00"
     },
     {
-      "symbol": "KOL-SF",
-      "recorded_at": "2026-03-02T20:58:03.324081+00:00"
+      "symbol": "CMB-BP",
+      "recorded_at": "2026-03-05T20:42:01.608532+00:00"
     },
     {
-      "symbol": "JAL-BOP",
-      "recorded_at": "2026-03-02T20:58:03.145238+00:00"
+      "symbol": "SRI-FBOP",
+      "recorded_at": "2026-03-05T20:42:01.502256+00:00"
     },
     {
-      "symbol": "SRI-BOP",
-      "recorded_at": "2026-03-02T20:58:02.928441+00:00"
-    },
-    {
-      "symbol": "CMB-DUST",
-      "recorded_at": "2026-03-02T20:58:02.844081+00:00"
-    },
-    {
-      "symbol": "KEN-PF1",
-      "recorded_at": "2026-03-02T20:58:02.750459+00:00"
+      "symbol": "SIL-DRJ",
+      "recorded_at": "2026-03-05T20:42:01.292706+00:00"
     },
     {
       "symbol": "BGD-DUST",
-      "recorded_at": "2026-03-02T20:58:02.67776+00:00"
+      "recorded_at": "2026-03-05T20:41:02.52281+00:00"
     },
     {
-      "symbol": "SIL-BOP",
-      "recorded_at": "2026-03-02T20:58:02.413874+00:00"
+      "symbol": "CMB-BP",
+      "recorded_at": "2026-03-05T20:41:02.433717+00:00"
+    },
+    {
+      "symbol": "COO-BOP",
+      "recorded_at": "2026-03-05T20:41:02.358642+00:00"
+    },
+    {
+      "symbol": "GUW-BOP",
+      "recorded_at": "2026-03-05T20:41:02.273737+00:00"
     }
   ],
   "logs": [
