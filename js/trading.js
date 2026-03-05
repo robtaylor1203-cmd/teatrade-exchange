@@ -166,6 +166,7 @@ function updateTradeButton() {
     const margin = (price * qty) / leverage;
 
     btn.classList.remove('btn-halted', 'btn-close-only');
+    btn.title = ''; // Reset tooltip
 
     if (!state.currentUser) {
         btn.textContent = 'Sign in to Trade';
@@ -196,6 +197,7 @@ function updateTradeButton() {
 
     if (tradingMode === 'HALTED') {
         btn.textContent = 'MARKET HALTED';
+        btn.title = 'Trading Paused: Live auction in progress';
         btn.disabled = true;
         btn.classList.add('btn-halted');
         return;
@@ -355,8 +357,8 @@ async function executeTrade() {
 
             if (stopLoss || takeProfit) {
                 const slTpPayload = {};
-                if (stopLoss)   slTpPayload.stop_loss   = stopLoss;
-                if (takeProfit) slTpPayload.take_profit  = takeProfit;
+                if (stopLoss) slTpPayload.stop_loss = stopLoss;
+                if (takeProfit) slTpPayload.take_profit = takeProfit;
 
                 const { error: slTpErr } = await supabaseClient
                     .from('positions')

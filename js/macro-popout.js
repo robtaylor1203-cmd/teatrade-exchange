@@ -467,9 +467,29 @@ function updateAuctionCalendars() {
 
         if (statusEl) {
             if (isLive) {
+                // Calculate dynamic progress if inside the schedule window
+                let progressPct = 85;
+                let startWindow = new Date();
+                startWindow.setUTCHours(sched.hour, sched.minute, 0, 0);
+
+                let currentUtcDay2 = startWindow.getUTCDay();
+                let dayOffset2 = sched.day - currentUtcDay2;
+
+                // Find nearest past start time
+                if (dayOffset2 > 0 || (dayOffset2 === 0 && now.getTime() < startWindow.getTime())) {
+                    dayOffset2 -= 7;
+                }
+                startWindow.setUTCDate(startWindow.getUTCDate() + dayOffset2);
+
+                if (now.getTime() >= startWindow.getTime()) {
+                    let elapsedMs = now.getTime() - startWindow.getTime();
+                    let totalMs = sched.durationHours * 3600000;
+                    progressPct = Math.min((elapsedMs / totalMs) * 100, 99); // Cap at 99% until officially cleared by scraper
+                }
+
                 statusEl.className = 'calendar-status live';
                 statusEl.textContent = 'LIVE';
-                if (progressFill) progressFill.style.width = '85%';
+                if (progressFill) progressFill.style.width = progressPct.toFixed(1) + '%';
             } else {
                 statusEl.className = 'calendar-status upcoming';
                 statusEl.textContent = sched.localString;
