@@ -1,0 +1,76 @@
+{
+  "prices": [
+    {
+      "symbol": "BGD-BOP",
+      "recorded_at": "2026-03-02T20:58:03.640851+00:00"
+    },
+    {
+      "symbol": "IDN-BOP",
+      "recorded_at": "2026-03-02T20:58:03.572757+00:00"
+    },
+    {
+      "symbol": "KEN-PD",
+      "recorded_at": "2026-03-02T20:58:03.484647+00:00"
+    },
+    {
+      "symbol": "KOL-SF",
+      "recorded_at": "2026-03-02T20:58:03.324081+00:00"
+    },
+    {
+      "symbol": "JAL-BOP",
+      "recorded_at": "2026-03-02T20:58:03.145238+00:00"
+    },
+    {
+      "symbol": "SRI-BOP",
+      "recorded_at": "2026-03-02T20:58:02.928441+00:00"
+    },
+    {
+      "symbol": "CMB-DUST",
+      "recorded_at": "2026-03-02T20:58:02.844081+00:00"
+    },
+    {
+      "symbol": "KEN-PF1",
+      "recorded_at": "2026-03-02T20:58:02.750459+00:00"
+    },
+    {
+      "symbol": "BGD-DUST",
+      "recorded_at": "2026-03-02T20:58:02.67776+00:00"
+    },
+    {
+      "symbol": "SIL-BOP",
+      "recorded_at": "2026-03-02T20:58:02.413874+00:00"
+    }
+  ],
+  "logs": [
+    {
+      "id": "f76fec01-6d15-4048-8d71-da270ea34576",
+      "target_id": "j_thomas_india",
+      "error_message": "page.waitForTimeout is not a function",
+      "run_time": "2026-02-28T19:46:40.962116+00:00"
+    },
+    {
+      "id": "b05e3687-76a5-48e7-b12e-4a8d3cf8e3ce",
+      "target_id": "tea_board_india",
+      "error_message": "Could not find valid data at selector: .table-responsive",
+      "run_time": "2026-02-28T19:46:47.991348+00:00"
+    },
+    {
+      "id": "e4d6d625-89f1-41d3-804c-1137c0e30fc1",
+      "target_id": "atb_ltd",
+      "error_message": "Could not find valid data at selector: table",
+      "run_time": "2026-02-28T19:46:51.237231+00:00"
+    },
+    {
+      "id": "9695ac18-29a1-448a-b7e3-a641927caa64",
+      "target_id": "tbeal",
+      "error_message": "Target is behind a login wall. Provide credentials to scrape.",
+      "run_time": "2026-02-28T19:47:04.40189+00:00"
+    },
+    {
+      "id": "8629e8ae-0f62-412d-9ed9-67691f21dce4",
+      "target_id": "ceylon_tea_brokers",
+      "error_message": "Could not find a valid PDF report link on the page.",
+      "run_time": "2026-02-28T19:47:09.345387+00:00"
+    }
+  ]
+}

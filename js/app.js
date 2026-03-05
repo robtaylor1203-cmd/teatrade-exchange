@@ -35,14 +35,14 @@ const TT_CACHE_INDEXES = 'tt_cache_indexes';
 const TT_CACHE_TTL = 300000; // 5 min
 
 function _writeCache(key, data) {
-    try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), d: data })); } catch {}
+    try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), d: data })); } catch { }
 }
 
 function _readCache(key) {
     try {
         var raw = JSON.parse(localStorage.getItem(key));
         if (raw && raw.d && (Date.now() - raw.ts < TT_CACHE_TTL)) return raw.d;
-    } catch {}
+    } catch { }
     return null;
 }
 
@@ -136,27 +136,27 @@ async function loadIndexPairs() {
         console.error('Failed to load index pairs:', error);
         state.indexPairs = [
             // Country vs Country
-            { id: 'idx-kenya-india',     base_symbol: 'KENYA',      quote_symbol: 'INDIA',      isIndex: true },
-            { id: 'idx-kenya-ceylon',    base_symbol: 'KENYA',      quote_symbol: 'CEYLON',     isIndex: true },
-            { id: 'idx-india-ceylon',    base_symbol: 'INDIA',      quote_symbol: 'CEYLON',     isIndex: true },
-            { id: 'idx-indo-bangla',     base_symbol: 'INDONESIA',  quote_symbol: 'BANGLADESH', isIndex: true },
-            { id: 'idx-africa-asia',     base_symbol: 'AFRICA',     quote_symbol: 'ASIA',       isIndex: true },
+            { id: 'idx-kenya-india', base_symbol: 'KENYA', quote_symbol: 'INDIA', isIndex: true },
+            { id: 'idx-kenya-ceylon', base_symbol: 'KENYA', quote_symbol: 'CEYLON', isIndex: true },
+            { id: 'idx-india-ceylon', base_symbol: 'INDIA', quote_symbol: 'CEYLON', isIndex: true },
+            { id: 'idx-indo-bangla', base_symbol: 'INDONESIA', quote_symbol: 'BANGLADESH', isIndex: true },
+            { id: 'idx-africa-asia', base_symbol: 'AFRICA', quote_symbol: 'ASIA', isIndex: true },
             // Auction Centre Cross-Region
-            { id: 'idx-mom-col',         base_symbol: 'MOMBASA',    quote_symbol: 'COLOMBO',    isIndex: true },
-            { id: 'idx-mom-kol',         base_symbol: 'MOMBASA',    quote_symbol: 'KOLKATA',    isIndex: true },
-            { id: 'idx-kol-col',         base_symbol: 'KOLKATA',    quote_symbol: 'COLOMBO',    isIndex: true },
-            { id: 'idx-kol-guw',         base_symbol: 'KOLKATA',    quote_symbol: 'GUWAHATI',   isIndex: true },
-            { id: 'idx-col-jak',         base_symbol: 'COLOMBO',    quote_symbol: 'JAKARTA',    isIndex: true },
-            { id: 'idx-chi-jak',         base_symbol: 'CHITTAGONG', quote_symbol: 'JAKARTA',    isIndex: true },
-            { id: 'idx-guw-jal',         base_symbol: 'GUWAHATI',   quote_symbol: 'JALPAIGURI', isIndex: true },
-            { id: 'idx-coc-cmb',         base_symbol: 'COCHIN',     quote_symbol: 'COIMBATORE', isIndex: true },
-            { id: 'idx-sil-coo',         base_symbol: 'SILIGURI',   quote_symbol: 'COONOOR',    isIndex: true },
-            { id: 'idx-lim-mom',         base_symbol: 'LIMBE',      quote_symbol: 'MOMBASA',    isIndex: true },
+            { id: 'idx-mom-col', base_symbol: 'MOMBASA', quote_symbol: 'COLOMBO', isIndex: true },
+            { id: 'idx-mom-kol', base_symbol: 'MOMBASA', quote_symbol: 'KOLKATA', isIndex: true },
+            { id: 'idx-kol-col', base_symbol: 'KOLKATA', quote_symbol: 'COLOMBO', isIndex: true },
+            { id: 'idx-kol-guw', base_symbol: 'KOLKATA', quote_symbol: 'GUWAHATI', isIndex: true },
+            { id: 'idx-col-jak', base_symbol: 'COLOMBO', quote_symbol: 'JAKARTA', isIndex: true },
+            { id: 'idx-chi-jak', base_symbol: 'CHITTAGONG', quote_symbol: 'JAKARTA', isIndex: true },
+            { id: 'idx-guw-jal', base_symbol: 'GUWAHATI', quote_symbol: 'JALPAIGURI', isIndex: true },
+            { id: 'idx-coc-cmb', base_symbol: 'COCHIN', quote_symbol: 'COIMBATORE', isIndex: true },
+            { id: 'idx-sil-coo', base_symbol: 'SILIGURI', quote_symbol: 'COONOOR', isIndex: true },
+            { id: 'idx-lim-mom', base_symbol: 'LIMBE', quote_symbol: 'MOMBASA', isIndex: true },
             // Composite
-            { id: 'idx-fut-africa',      base_symbol: 'FUTURES',    quote_symbol: 'AFRICA',     isIndex: true },
-            { id: 'idx-fut-asia',        base_symbol: 'FUTURES',    quote_symbol: 'ASIA',       isIndex: true },
-            { id: 'idx-fut-kenya',       base_symbol: 'FUTURES',    quote_symbol: 'KENYA',      isIndex: true },
-            { id: 'idx-fut-india',       base_symbol: 'FUTURES',    quote_symbol: 'INDIA',      isIndex: true },
+            { id: 'idx-fut-africa', base_symbol: 'FUTURES', quote_symbol: 'AFRICA', isIndex: true },
+            { id: 'idx-fut-asia', base_symbol: 'FUTURES', quote_symbol: 'ASIA', isIndex: true },
+            { id: 'idx-fut-kenya', base_symbol: 'FUTURES', quote_symbol: 'KENYA', isIndex: true },
+            { id: 'idx-fut-india', base_symbol: 'FUTURES', quote_symbol: 'INDIA', isIndex: true },
         ];
     }
 }
@@ -303,3 +303,45 @@ setInterval(async () => {
     await loadLeaderboard();
     loadTopTraders();
 }, 60000);
+
+
+
+// =============================================
+// FCA COMPLIANCE INTERCEPTOR (EMERGENCY PATCH)
+// =============================================
+document.addEventListener('DOMContentLoaded', () => {
+    // Locate the Virtual/Real mode toggle switch from your top bar
+    const modeToggle = document.getElementById('mode-toggle');
+    const fcaModal = document.getElementById('fca-warning-modal');
+    const closeBtn = document.getElementById('close-fca-modal');
+
+    if (modeToggle) {
+        modeToggle.addEventListener('click', (e) => {
+            // In a click event, .checked reflects the NEW state. 
+            // If true, they are trying to activate REAL mode.
+            if (modeToggle.checked === true) {
+                e.preventDefault(); // Physically stop the switch from moving
+                if (fcaModal) fcaModal.style.display = 'flex'; // Trigger the brick wall
+            }
+        });
+    }
+
+    // Catch-all for any other buttons that might try to upgrade the account
+    document.addEventListener('click', (e) => {
+        const target = e.target.closest('button, a');
+        if (!target) return;
+
+        const text = target.textContent.toLowerCase();
+        if (text.includes('upgrade to real') || text.includes('convert to real')) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (fcaModal) fcaModal.style.display = 'flex';
+        }
+    });
+
+    if (closeBtn && fcaModal) {
+        closeBtn.addEventListener('click', () => {
+            fcaModal.style.display = 'none';
+        });
+    }
+});

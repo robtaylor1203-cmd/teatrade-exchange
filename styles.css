@@ -17094,3 +17094,85 @@ a.user-dropdown-item {
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+
+
+
+
+
+
+/* =========================================
+   FCA COMPLIANCE MODAL STYLES
+   ========================================= */
+.fca-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(5, 5, 5, 0.85);
+    backdrop-filter: blur(4px);
+    z-index: 99999;
+    /* Forces it above all other modals */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.fca-modal-content {
+    background: #0a0a0a;
+    border: 1px solid #ff3344;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 450px;
+    padding: 24px;
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    box-shadow: 0 10px 40px rgba(255, 51, 68, 0.15);
+}
+
+.fca-modal-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid #1f1f1f;
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+}
+
+.fca-modal-header h2 {
+    margin: 0;
+    font-size: 18px;
+    color: #ff3344;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.fca-icon {
+    font-size: 24px;
+}
+
+.fca-modal-body p {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #d1d5db;
+    margin-bottom: 16px;
+}
+
+.fca-close-btn {
+    width: 100%;
+    padding: 14px;
+    background: #1f1f1f;
+    color: #fff;
+    border: 1px solid #333;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.fca-close-btn:hover {
+    background: #ff3344;
+    border-color: #ff3344;
+}

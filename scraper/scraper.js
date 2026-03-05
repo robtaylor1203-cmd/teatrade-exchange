@@ -85,20 +85,26 @@ async function scrapeTarget(target, browser) {
             case 'custom_jthomas': {
                 // J Thomas requires cascading dropdown selections
                 console.log("WAITING for JThomas dropdowns...");
-                // Note: Without knowing exactly which dropdown values to select for the specific report, 
-                // we will extract the available options and attempt to pull the first valid report.
                 await page.waitForSelector('#cbocentre');
                 const centres = await page.$$eval('#cbocentre option', opts => opts.map(o => o.value).filter(v => v !== '0'));
-                if (centres.length > 0) {
-                    await page.select('#cbocentre', centres[0]);
+
+                rawText = "";
+                for (let i = 0; i < centres.length; i++) {
+                    console.log(`Selecting J Thomas centre: ${centres[i]}`);
+                    await page.select('#cbocentre', centres[i]);
                     await new Promise(r => setTimeout(r, 2000)); // Wait for AJAX cascade
-                    // Assuming 'cbosale' cascades next
+
                     const sales = await page.$$eval('#cbosale option', opts => opts.map(o => o.value).filter(v => v !== '0'));
-                    if (sales.length > 0) await page.select('#cbosale', sales[0]);
+                    if (sales.length > 0) {
+                        await page.select('#cbosale', sales[0]);
+                        await new Promise(r => setTimeout(r, 2000)); // Wait for report to load
+
+                        const content = await page.content();
+                        const $ = cheerio.load(content);
+                        // Append this centre's data to the rawText
+                        rawText += `\n--- Centre: ${centres[i]} ---\n` + $('body').text();
+                    }
                 }
-                const content = await page.content();
-                const $ = cheerio.load(content);
-                rawText = $('body').text(); // Grab everything, the LLM will parse it out
                 break;
             }
             case 'custom_ceylon_html': {
