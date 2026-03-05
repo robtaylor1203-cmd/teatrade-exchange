@@ -142,20 +142,31 @@ async function _getHistory(def) {
     } else if (def.type === 'commodity' && def.stateKey === 'brent_crude') {
         // Brent crude: try to fetch 5-day chart from Yahoo Finance
         try {
-            const url = 'https://query1.finance.yahoo.com/v8/finance/chart/BZ=F?interval=1d&range=5d';
-            const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-            if (resp.ok) {
-                const data = await resp.json();
-                const result = data?.chart?.result?.[0];
-                const timestamps = result?.timestamp ?? [];
-                let closes = [];
-                if (result?.indicators?.quote?.[0]?.close) {
-                    closes = result.indicators.quote[0].close;
-                }
-                history = timestamps.map((ts, i) => ({
-                    date: new Date(ts * 1000).toISOString().split('T')[0],
-                    rate: closes[i] ?? null
-                })).filter(d => d.rate != null);
+            // Rather than fetching from Yahoo Finance directly (which blocks frontend CORS),
+            // the Supabase market-ticker now saves "brent_crude" directly to the price_history table.
+            // We fetch the latest 5 days (1440 rows at 5-minute intervals) and downsample
+            // to daily closing prices for the sparkline.
+
+            const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
+            const { data, error } = await apiFetchPriceHistory('brent_crude', 1500, fiveDaysAgo);
+
+            if (!error && data && data.length > 0) {
+                // We have 5-min candles. We just need 1 per day for the sparkline.
+                // Group by day (YYYY-MM-DD):
+                const dailyMap = {};
+                data.forEach(row => {
+                    const dateRaw = row.recorded_at ? row.recorded_at.split('T')[0] : null;
+                    if (dateRaw && row.price) {
+                        // The last row processed for a given date will natural act as the 'close' price
+                        dailyMap[dateRaw] = row.price;
+                    }
+                });
+
+                // Convert back to sorted array
+                history = Object.keys(dailyMap).sort().map(d => ({
+                    date: d,
+                    rate: dailyMap[d]
+                }));
             }
         } catch (e) {
             console.error('[MacroPopout] Brent crude fetch error:', e);

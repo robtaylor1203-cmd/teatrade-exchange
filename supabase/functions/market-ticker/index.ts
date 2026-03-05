@@ -566,6 +566,15 @@ serve(async (req) => {
         is_simulated: false,
       }));
 
+      // Dynamically inject Brent Crude history to power the macro dashboard
+      historyRows.push({
+        symbol: 'brent_crude',
+        price: brentPrice,
+        volume: 0,
+        recorded_at: timestamp,
+        is_simulated: !liveBrent,
+      });
+
       const { error: histError } = await supabase
         .from('price_history')
         .insert(historyRows);
