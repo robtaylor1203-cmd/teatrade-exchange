@@ -50,11 +50,11 @@ ${rawText.substring(0, 15000)}
 `;
 
     const response = await openai.chat.completions.create({
-        model: "gpt-4-turbo-preview",
+        model: "gpt-4o",
         messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" }
+        response_format: { type: "json_object" },
+        temperature: 0,
     });
-
     const parsedContent = JSON.parse(response.choices[0].message.content);
     const dataArray = Array.isArray(parsedContent) ? parsedContent : (parsedContent.data || Object.values(parsedContent)[0]);
     return Array.isArray(dataArray) ? dataArray : [];
