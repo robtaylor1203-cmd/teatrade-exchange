@@ -435,7 +435,13 @@ async function closePosition(teaId, quantity, teaSymbol) {
 
     const isShort = position.quantity < 0;
     const closeSide = isShort ? 'BUY' : 'SELL';
-    const closeQty = Math.abs(quantity);
+
+    // Safety clamp: ensure we never close more than our active net position, 
+    // to prevent floating-point mismatches from accidentally flipping the trade side.
+    let closeQty = Math.abs(quantity);
+    if (closeQty > Math.abs(position.quantity)) {
+        closeQty = Math.abs(position.quantity);
+    }
 
     try {
         const tea = state.teas.find(t => t.id === teaId);
@@ -507,7 +513,14 @@ async function closeIndexPosition(indexSymbol, quantity, tradeId) {
 
     const isShort = position.quantity < 0;
     const closeSide = isShort ? 'BUY' : 'SELL';
-    const closeQty = Math.abs(quantity);
+
+    // Safety clamp: ensure we never close more than our active net position, 
+    // to prevent floating-point mismatches from accidentally flipping the trade side.
+    let closeQty = Math.abs(quantity);
+    if (closeQty > Math.abs(position.quantity)) {
+        closeQty = Math.abs(position.quantity);
+    }
+
     const price = index.price;
 
     try {

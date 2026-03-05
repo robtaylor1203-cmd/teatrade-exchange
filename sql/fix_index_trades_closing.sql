@@ -141,7 +141,7 @@ BEGIN
                 RETURN jsonb_build_object('success', false, 'error', 'Insufficient balance to complete this trade');
             END IF;
             v_new_qty := v_existing_qty + p_quantity;
-            IF v_new_qty = 0 THEN
+            IF ABS(v_new_qty) < 0.00001 THEN
                 DELETE FROM index_positions WHERE id = v_position.id;
             ELSIF v_new_qty > 0 THEN
                 UPDATE index_positions SET quantity = v_new_qty, avg_entry_price = v_exec_price,
@@ -206,7 +206,7 @@ BEGIN
                 RETURN jsonb_build_object('success', false, 'error', 'Insufficient balance to complete this trade');
             END IF;
             v_new_qty := v_existing_qty - p_quantity;
-            IF v_new_qty = 0 THEN
+            IF ABS(v_new_qty) < 0.00001 THEN
                 DELETE FROM index_positions WHERE id = v_position.id;
             ELSIF v_new_qty > 0 THEN
                 UPDATE index_positions SET quantity = v_new_qty,
