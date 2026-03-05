@@ -148,13 +148,18 @@ async function _getHistory(def) {
                 const data = await resp.json();
                 const result = data?.chart?.result?.[0];
                 const timestamps = result?.timestamp ?? [];
-                const closes = result?.indicators?.quote?.[0]?.close ?? [];
+                let closes = [];
+                if (result?.indicators?.quote?.[0]?.close) {
+                    closes = result.indicators.quote[0].close;
+                }
                 history = timestamps.map((ts, i) => ({
                     date: new Date(ts * 1000).toISOString().split('T')[0],
                     rate: closes[i] ?? null
                 })).filter(d => d.rate != null);
             }
-        } catch (_) { /* fall through to empty */ }
+        } catch (e) {
+            console.error('[MacroPopout] Brent crude fetch error:', e);
+        }
     }
     _macroHistoryCache[def.stateKey] = { fetchedAt: Date.now(), history };
     return history;
