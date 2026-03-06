@@ -122,18 +122,36 @@ serve(async (req) => {
       if (teasInIndex.length > 0) {
         const { data: teaPrices } = await supabaseAdmin
           .from('teas')
-          .select('current_price')
+          .select('current_price, volume_24h')
           .in('symbol', teasInIndex)
 
         if (teaPrices && teaPrices.length > 0) {
-          const valid = teaPrices
-            .map((t: { current_price: number }) => Number(t.current_price))
-            .filter((p: number) => p > 0)
-          if (valid.length > 0) {
-            executionPrice = valid.reduce((a: number, b: number) => a + b, 0) / valid.length
+          let sum = 0
+          let totalVol = 0
+
+          teaPrices.forEach((t: any) => {
+            const px = Number(t.current_price)
+            const vol = Number(t.volume_24h)
+            if (px > 0 && vol > 0) {
+              sum += (px * vol)
+              totalVol += vol
+            }
+          })
+
+          if (totalVol > 0) {
+            executionPrice = sum / totalVol
+          } else {
+            // Fallback to simple average if no volume data exists
+            const valid = teaPrices
+              .map((t: any) => Number(t.current_price))
+              .filter((p: number) => p > 0)
+            if (valid.length > 0) {
+              executionPrice = valid.reduce((a: number, b: number) => a + b, 0) / valid.length
+            }
           }
         }
       }
+
 
       // Fallback: recent price_history for the index symbol itself
       if (executionPrice === null) {
@@ -314,25 +332,30 @@ serve(async (req) => {
 
       if (!symbol || typeof symbol !== 'string') {
         return new Response(JSON.stringify({ success: false, error: 'Missing symbol' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400
+        })
       }
       if (!side || !['BUY', 'SELL'].includes(side)) {
         return new Response(JSON.stringify({ success: false, error: 'Side must be BUY or SELL' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400
+        })
       }
       if (!order_type || !['LIMIT', 'STOP'].includes(order_type)) {
         return new Response(JSON.stringify({ success: false, error: 'Order type must be LIMIT or STOP' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400
+        })
       }
       const qty = Number(quantity)
       if (!qty || qty <= 0 || !isFinite(qty)) {
         return new Response(JSON.stringify({ success: false, error: 'Quantity must be a positive number' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400
+        })
       }
       const tp = Number(target_price)
       if (!tp || tp <= 0 || !isFinite(tp)) {
         return new Response(JSON.stringify({ success: false, error: 'Target price must be a positive number' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400
+        })
       }
 
       const { data, error } = await supabaseAdmin.rpc('place_order', {
@@ -350,7 +373,8 @@ serve(async (req) => {
       if (error) {
         console.error('place_order RPC error:', error.message)
         return new Response(JSON.stringify({ success: false, error: error.message }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 })
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500
+        })
       }
       const result = data as Record<string, unknown>
       return new Response(JSON.stringify(result), {
@@ -364,7 +388,8 @@ serve(async (req) => {
       const { order_id } = body
       if (!order_id) {
         return new Response(JSON.stringify({ success: false, error: 'Missing order_id' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400
+        })
       }
 
       const { data, error } = await supabaseAdmin.rpc('cancel_order', {
@@ -375,7 +400,8 @@ serve(async (req) => {
       if (error) {
         console.error('cancel_order RPC error:', error.message)
         return new Response(JSON.stringify({ success: false, error: error.message }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 })
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500
+        })
       }
       const result = data as Record<string, unknown>
       return new Response(JSON.stringify(result), {
