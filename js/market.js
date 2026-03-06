@@ -887,9 +887,20 @@ function _liveIndexPrice(indexSymbol) {
     if (!idxDef?.teas?.length) return null;
     const teaMap = {};
     state.teas.forEach(t => { teaMap[t.symbol] = t; });
-    const prices = idxDef.teas.map(s => teaMap[s]?.current_price || 0).filter(p => p > 0);
-    if (prices.length === 0) return null;
-    return prices.reduce((a, b) => a + b, 0) / prices.length;
+
+    let sum = 0;
+    let totalVol = 0;
+
+    idxDef.teas.forEach(s => {
+        const tea = teaMap[s];
+        if (tea && tea.current_price > 0 && tea.volume_24h > 0) {
+            sum += (tea.current_price * tea.volume_24h);
+            totalVol += tea.volume_24h;
+        }
+    });
+
+    if (totalVol === 0) return null;
+    return sum / totalVol;
 }
 
 /**

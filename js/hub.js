@@ -723,9 +723,15 @@ function syncHubChartToTradeSymbol(selectId) {
  * Sync the main chart to the trade-tea-select dropdown on the main page.
  * Values are numeric tea IDs (e.g. "3") or "INDEX_KENYA".
  */
-function syncChartToTradeSelect() {
-    const select = document.getElementById('trade-tea-select');
-    const val = select?.value;
+function syncChartToTradeSelect(passedVal) {
+    let val = passedVal;
+
+    // If no argument provided, fallback to the desktop dropdown value
+    if (!val) {
+        const select = document.getElementById('trade-tea-select');
+        val = select?.value;
+    }
+
     if (!val) return;
 
     let symbol, name, price, isIdx, currency, forexKey;

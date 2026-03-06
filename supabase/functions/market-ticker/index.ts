@@ -1,6 +1,10 @@
 // TeaTrade Exchange — Global Market Engine (Hybrid: Live API + Simulation)
+// @ts-ignore
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+// @ts-ignore
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+
+declare const Deno: any;
 
 // H1 FIX: Restrict CORS to production domain
 const ALLOWED_ORIGIN = Deno.env.get('ALLOWED_ORIGIN') || '*'
@@ -238,7 +242,7 @@ async function fetchBrentCrude(): Promise<number | null> {
     if (!price || isNaN(price)) throw new Error('No price in response');
     console.log(`✅ LIVE BRENT: $${price}/bbl`);
     return price;
-  } catch (err) {
+  } catch (err: any) {
     console.warn(`⚠️  Brent API unavailable: ${err.message} — using simulation`);
     return null;
   }
@@ -254,7 +258,7 @@ let lastTickTimestamp = 0;
 
 // ── MAIN SERVER ───────────────────────────────────────────────────────────────
 
-serve(async (req) => {
+serve(async (req: any) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
@@ -698,7 +702,7 @@ serve(async (req) => {
       status: 200,
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('CRITICAL ERROR:', error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500,
