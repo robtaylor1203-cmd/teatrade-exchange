@@ -6,7 +6,7 @@
 
 // Supabase
 const SUPABASE_URL = 'https://uznxzyuknigzlxecjgtb.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6bnh6eXVrbmlnemx4ZWNqZ3RiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5Mzc5ODUsImV4cCI6MjA4NjUxMzk4NX0.BVOTqZ9kn2KCrNeF5675PNmMi9oJN3F6OoUnTtbpuIg';
+const SUPABASE_ANON_KEY = 'sb_publishable_7mtRyeHCS65NpDfz8EqcRg_F5-6G3MI';
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Central mutable state (replaces all scattered globals)

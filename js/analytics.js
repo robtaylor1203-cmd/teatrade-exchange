@@ -5,8 +5,8 @@
  * Single fetchBatch() for all data; 30s auto-refresh.
  */
 
-const SUPABASE_URL  = 'https://uznxzyuknigzlxecjgtb.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6bnh6eXVrbmlnemx4ZWNqZ3RiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5Mzc5ODUsImV4cCI6MjA4NjUxMzk4NX0.BVOTqZ9kn2KCrNeF5675PNmMi9oJN3F6OoUnTtbpuIg';
+const SUPABASE_URL = 'https://uznxzyuknigzlxecjgtb.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_7mtRyeHCS65NpDfz8EqcRg_F5-6G3MI';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 // ─── State ───────────────────────────────────────────────────────
@@ -29,20 +29,20 @@ const S = {
 };
 
 const ORIGIN_META = {
-    KEN: { iso: 'ke', label: 'Kenya',      region: 'Africa', filter: 'kenya' },
-    IND: { iso: 'in', label: 'India',      region: 'Asia',   filter: 'india' },
-    SRI: { iso: 'lk', label: 'Sri Lanka',  region: 'Asia',   filter: 'srilanka' },
-    IDN: { iso: 'id', label: 'Indonesia',  region: 'Asia',   filter: 'all' },
-    BGD: { iso: 'bd', label: 'Bangladesh', region: 'Asia',   filter: 'all' },
-    MLW: { iso: 'mw', label: 'Malawi',     region: 'Africa', filter: 'all' },
-    RWA: { iso: 'rw', label: 'Rwanda',     region: 'Africa', filter: 'all' },
-    KOL: { iso: 'in', label: 'India (Kolkata)',    region: 'Asia', filter: 'india' },
-    GUW: { iso: 'in', label: 'India (Guwahati)',   region: 'Asia', filter: 'india' },
+    KEN: { iso: 'ke', label: 'Kenya', region: 'Africa', filter: 'kenya' },
+    IND: { iso: 'in', label: 'India', region: 'Asia', filter: 'india' },
+    SRI: { iso: 'lk', label: 'Sri Lanka', region: 'Asia', filter: 'srilanka' },
+    IDN: { iso: 'id', label: 'Indonesia', region: 'Asia', filter: 'all' },
+    BGD: { iso: 'bd', label: 'Bangladesh', region: 'Asia', filter: 'all' },
+    MLW: { iso: 'mw', label: 'Malawi', region: 'Africa', filter: 'all' },
+    RWA: { iso: 'rw', label: 'Rwanda', region: 'Africa', filter: 'all' },
+    KOL: { iso: 'in', label: 'India (Kolkata)', region: 'Asia', filter: 'india' },
+    GUW: { iso: 'in', label: 'India (Guwahati)', region: 'Asia', filter: 'india' },
     JAL: { iso: 'in', label: 'India (Jalpaiguri)', region: 'Asia', filter: 'india' },
-    COC: { iso: 'in', label: 'India (Cochin)',     region: 'Asia', filter: 'india' },
+    COC: { iso: 'in', label: 'India (Cochin)', region: 'Asia', filter: 'india' },
     CMB: { iso: 'in', label: 'India (Coimbatore)', region: 'Asia', filter: 'india' },
-    SIL: { iso: 'in', label: 'India (Siliguri)',   region: 'Asia', filter: 'india' },
-    COO: { iso: 'in', label: 'India (Coonoor)',    region: 'Asia', filter: 'india' },
+    SIL: { iso: 'in', label: 'India (Siliguri)', region: 'Asia', filter: 'india' },
+    COO: { iso: 'in', label: 'India (Coonoor)', region: 'Asia', filter: 'india' },
 };
 
 const MACRO_KEYS = [
@@ -342,7 +342,7 @@ function renderHeatmap() {
             '<div class="hm-prc">$' + price.toFixed(2) + '</div>' +
             '<div class="hm-chg" style="color:' + chgColor + ';">' + chgStr + '</div>' +
             '<div class="hm-vol-strip" style="width:' + volPct + '%;background:' + volColor + ';"></div>' +
-        '</div>';
+            '</div>';
     }).join('') + '</div>';
 }
 
@@ -629,19 +629,19 @@ function renderNewsFeed() {
 
         return '<div class="news-item-row" onclick="openDrawer(' + i + ')">' +
             '<div class="news-row-top">' +
-                '<div class="news-title">' + esc(item.title) + '</div>' +
-                '<div class="news-time">' + time + '</div>' +
+            '<div class="news-title">' + esc(item.title) + '</div>' +
+            '<div class="news-time">' + time + '</div>' +
             '</div>' +
             '<div class="news-excerpt">' + esc(item.snippet || '') + '</div>' +
             '<div class="sentiment-bar-track"><div class="sentiment-bar-fill" style="width:' + barPct + '%;background:' + barColor + ';"></div></div>' +
             '<div class="news-tags-row">' +
-                tags.map(t => {
-                    const cls = t.toLowerCase().includes('bullish') ? 'ntag-bull' : t.toLowerCase().includes('bearish') ? 'ntag-bear' : 'ntag-neut';
-                    return '<span class="ntag ' + cls + '">' + esc(t) + '</span>';
-                }).join('') +
-                '<button class="news-digest-btn" onclick="event.stopPropagation();openDrawer(' + i + ')">DIGEST</button>' +
+            tags.map(t => {
+                const cls = t.toLowerCase().includes('bullish') ? 'ntag-bull' : t.toLowerCase().includes('bearish') ? 'ntag-bear' : 'ntag-neut';
+                return '<span class="ntag ' + cls + '">' + esc(t) + '</span>';
+            }).join('') +
+            '<button class="news-digest-btn" onclick="event.stopPropagation();openDrawer(' + i + ')">DIGEST</button>' +
             '</div>' +
-        '</div>';
+            '</div>';
     }).join('');
 }
 
@@ -741,8 +741,8 @@ function openDrawer(index) {
         '<div style="font-family:var(--text-mono);font-size:9px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">Impact Analysis</div>' +
         impacts.map(imp =>
             '<div class="ai-impact-row">' +
-                '<div class="ai-impact-dot ' + (imp.type || 'neut') + '"></div>' +
-                '<div class="ai-impact-text">' + imp.text + '</div>' +
+            '<div class="ai-impact-dot ' + (imp.type || 'neut') + '"></div>' +
+            '<div class="ai-impact-text">' + imp.text + '</div>' +
             '</div>'
         ).join('');
 
@@ -843,7 +843,7 @@ function renderRSI() {
                 '<td class="' + cls7d + '">' + (r.change7d >= 0 ? '+' : '') + r.change7d.toFixed(2) + '%</td>' +
                 '<td>' + r.volIdx.toFixed(1) + '</td>' +
                 '<td><div class="rsi-bar-cell"><div class="rsi-bar-track"><div class="rsi-bar-fill" style="width:' + barW + '%;background:' + barColor + ';"></div></div><span>' + volFmt + '</span></div></td>' +
-            '</tr>';
+                '</tr>';
         }).join('') +
         '</tbody></table>';
 
@@ -867,9 +867,9 @@ function renderQuant() {
     if (!S.user) {
         container.innerHTML =
             '<div class="qt-empty">' +
-                '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.5"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a7.5 7.5 0 0 1 13 0"/></svg>' +
-                '<p>Sign in to see your personal quant analytics.</p>' +
-                '<a href="/">Back to Terminal</a>' +
+            '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.5"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a7.5 7.5 0 0 1 13 0"/></svg>' +
+            '<p>Sign in to see your personal quant analytics.</p>' +
+            '<a href="/">Back to Terminal</a>' +
             '</div>';
         return;
     }
@@ -877,9 +877,9 @@ function renderQuant() {
     if (!S.trades.length) {
         container.innerHTML =
             '<div class="qt-empty">' +
-                '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.5"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-6"/></svg>' +
-                '<p>No trades yet. Start trading to build your analytics profile.</p>' +
-                '<a href="/">Start Trading</a>' +
+            '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.5"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-6"/></svg>' +
+            '<p>No trades yet. Start trading to build your analytics profile.</p>' +
+            '<a href="/">Start Trading</a>' +
             '</div>';
         return;
     }
@@ -938,17 +938,17 @@ function renderQuant() {
         const [sym, data] = bestGrade;
         const wr = data.count > 0 ? ((data.wins / data.count) * 100).toFixed(0) : 0;
         const gradeType = sym.includes('DUST') || sym.includes('D1') ? 'Dust' :
-                          sym.includes('BP') ? 'BP' :
-                          sym.includes('PF') ? 'PF' :
-                          sym.includes('FAN') ? 'Fannings' :
-                          sym.split('-').pop() || sym;
+            sym.includes('BP') ? 'BP' :
+                sym.includes('PF') ? 'PF' :
+                    sym.includes('FAN') ? 'Fannings' :
+                        sym.split('-').pop() || sym;
         html += '<div class="qt-badge">' +
             '<div class="qt-badge-icon">\u03B1</div>' +
             '<div class="qt-badge-info">' +
-                '<div class="qt-badge-title">"' + esc(gradeType) + ' Specialist"</div>' +
-                '<div class="qt-badge-sub">' + esc(sym) + ' | ' + wr + '% WR | P&L $' + data.pnl.toFixed(2) + '</div>' +
+            '<div class="qt-badge-title">"' + esc(gradeType) + ' Specialist"</div>' +
+            '<div class="qt-badge-sub">' + esc(sym) + ' | ' + wr + '% WR | P&L $' + data.pnl.toFixed(2) + '</div>' +
             '</div>' +
-        '</div>';
+            '</div>';
     }
 
     // Avg hold time
@@ -974,12 +974,12 @@ function renderQuant() {
     const ddColor = currentDD < 10 ? '#00ff88' : currentDD < 15 ? '#f59e0b' : '#ff3344';
     html += '<div class="qt-dd">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-            '<div class="qt-label" style="margin:0;">Drawdown</div>' +
-            '<div style="font-family:var(--text-mono);font-size:11px;font-weight:600;color:' + ddColor + ';">' + currentDD.toFixed(1) + '% / ' + ddLimit + '%</div>' +
+        '<div class="qt-label" style="margin:0;">Drawdown</div>' +
+        '<div style="font-family:var(--text-mono);font-size:11px;font-weight:600;color:' + ddColor + ';">' + currentDD.toFixed(1) + '% / ' + ddLimit + '%</div>' +
         '</div>' +
         '<div class="qt-dd-bar-bg"><div class="qt-dd-bar-fill" style="width:' + ddPct + '%;background:' + ddColor + ';"></div></div>' +
         '<div class="qt-dd-ticks"><span>Safe</span><span>Caution</span><span>Danger</span></div>' +
-    '</div>';
+        '</div>';
 
     // Max DD
     html += '<div class="qt-card"><div class="qt-label">Max Drawdown</div><div class="qt-value ' + (maxDD > 15 ? 'red' : '') + '">' + maxDD.toFixed(1) + '%</div><div class="qt-sub">Peak $' + peak.toFixed(0) + ' | Current $' + equity.toFixed(0) + '</div></div>';
@@ -996,7 +996,7 @@ function renderQuant() {
                 '<span class="qt-grade-sym">' + esc(sym) + '</span>' +
                 '<div class="qt-grade-bar-bg"><div class="qt-grade-bar" style="width:' + barW + '%;background:' + barColor + ';"></div></div>' +
                 '<span class="qt-grade-pnl" style="color:' + barColor + ';">' + (isProfitable ? '+' : '') + '$' + data.pnl.toFixed(2) + '</span>' +
-            '</div>';
+                '</div>';
         });
         html += '</div>';
     }
