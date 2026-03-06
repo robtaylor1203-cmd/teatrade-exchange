@@ -124,10 +124,19 @@ async function _fetchForexHistory(base, quote, days = 7) {
         d.setDate(d.getDate() - (days - 1 - i));
         const dateStr = d.toISOString().split('T')[0];
         const url = `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${dateStr}/v1/currencies/${base}.min.json`;
-        return fetch(url)
-            .then(r => r.json())
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+        return fetch(url, { signal: controller.signal })
+            .then(r => {
+                clearTimeout(timeoutId);
+                return r.json();
+            })
             .then(data => ({ date: dateStr, rate: data?.[base]?.[quote] ?? null }))
-            .catch(() => ({ date: dateStr, rate: null }));
+            .catch(() => {
+                clearTimeout(timeoutId);
+                return { date: dateStr, rate: null };
+            });
     });
     return Promise.all(fetches);
 }
