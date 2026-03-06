@@ -309,8 +309,11 @@ async function executeTrade() {
     // reflects the most recent Realtime tick (avoids stale-form entry).
     updateTradeSummary();
 
+    // ── Debounce guard: prevent double-click / double-submit ──────────────
+    if (btn.disabled) return;
     btn.disabled = true;
     btn.textContent = 'Executing...';
+    const _originalBtnText = state.tradeType === 'BUY' ? 'Buy' : 'Sell';
 
     try {
         if (isIndexTrade) {
@@ -384,7 +387,6 @@ async function executeTrade() {
         // Brief success flash on the button
         btn.textContent = '✓ Trade Executed';
         btn.classList.add('trade-success');
-        btn.disabled = false;
 
         if (typeof completeFirstTradeMissionTrade === 'function') {
             completeFirstTradeMissionTrade();
@@ -409,14 +411,19 @@ async function executeTrade() {
     } catch (error) {
         console.error('Trade error:', error);
         showToast('Trade Failed', error.message, true);
+    } finally {
+        // ── Always re-enable the button — even if the network call threw ──
+        btn.disabled = false;
+        btn.classList.remove('trade-success');
+        updateTradeButton();
     }
-
-    updateTradeButton();
 }
 
-// =============================================
-// POSITION CLOSE FUNCTIONS
-// =============================================
+
+// Module-level debounce guard: tracks closing operations in flight.
+// Keyed by a string ID (teaId, indexSymbol, or pairTradeId).
+// Prevents double-click on Close buttons from firing duplicate API requests.
+const _closingInProgress = new Set();
 
 /**
  * Close a tea position at the current market price.
@@ -424,30 +431,38 @@ async function executeTrade() {
  * @param {number} teaId     - The tea instrument ID.
  * @param {number} quantity  - Signed quantity from position (positive=long, negative=short).
  * @param {string} teaSymbol - Display symbol (e.g. 'KEN-BP1').
+ * @param {HTMLElement} [btn] - Optional close button element to debounce.
  */
-async function closePosition(teaId, quantity, teaSymbol) {
+async function closePosition(teaId, quantity, teaSymbol, btn) {
     if (!state.currentUser) {
         openAuthModal();
         return;
     }
 
-    const position = state.positions.find(p => p.tea_id === teaId);
-    if (!position) {
-        showToast('Error', 'Position not found', true);
-        return;
-    }
-
-    const isShort = position.quantity < 0;
-    const closeSide = isShort ? 'BUY' : 'SELL';
-
-    // Safety clamp: ensure we never close more than our active net position, 
-    // to prevent floating-point mismatches from accidentally flipping the trade side.
-    let closeQty = Math.abs(quantity);
-    if (closeQty > Math.abs(position.quantity)) {
-        closeQty = Math.abs(position.quantity);
-    }
+    // ── Debounce guard ────────────────────────────────────────────────────
+    const _guardKey = `tea_${teaId}`;
+    if (_closingInProgress.has(_guardKey)) return;
+    _closingInProgress.add(_guardKey);
+    const _origBtnText = btn?.textContent;
+    if (btn) { btn.disabled = true; btn.textContent = 'Closing...'; }
 
     try {
+        const position = state.positions.find(p => p.tea_id === teaId);
+        if (!position) {
+            showToast('Error', 'Position not found', true);
+            return;
+        }
+
+        const isShort = position.quantity < 0;
+        const closeSide = isShort ? 'BUY' : 'SELL';
+
+        // Safety clamp: ensure we never close more than our active net position,
+        // to prevent floating-point mismatches from accidentally flipping the trade side.
+        let closeQty = Math.abs(quantity);
+        if (closeQty > Math.abs(position.quantity)) {
+            closeQty = Math.abs(position.quantity);
+        }
+
         const tea = state.teas.find(t => t.id === teaId);
         const expectedPrice = tea?.current_price || 0;
         const slippageTolerance = expectedPrice * 0.01;
@@ -486,6 +501,10 @@ async function closePosition(teaId, quantity, teaSymbol) {
     } catch (error) {
         console.error('Close position error:', error);
         showToast('Error', error.message, true);
+    } finally {
+        // ── Always re-enable the button and clear the guard ──────────────
+        _closingInProgress.delete(_guardKey);
+        if (btn) { btn.disabled = false; btn.textContent = _origBtnText || 'Close'; }
     }
 }
 
@@ -495,39 +514,46 @@ async function closePosition(teaId, quantity, teaSymbol) {
  * @param {string} indexSymbol - e.g. 'KENYA'
  * @param {number} quantity    - Signed quantity from position.
  * @param {string} tradeId     - Original trade row ID (for reference).
+ * @param {HTMLElement} [btn]  - Optional close button element to debounce.
  */
-async function closeIndexPosition(indexSymbol, quantity, tradeId) {
+async function closeIndexPosition(indexSymbol, quantity, tradeId, btn) {
     if (!state.currentUser) {
         openAuthModal();
         return;
     }
 
-    const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
-    const index = indexes.find(idx => idx.symbol === indexSymbol);
-    if (!index) {
-        showToast('Error', 'Index not found', true);
-        return;
-    }
-
-    const position = state.indexPositions[indexSymbol];
-    if (!position) {
-        showToast('Error', 'Index position not found', true);
-        return;
-    }
-
-    const isShort = position.quantity < 0;
-    const closeSide = isShort ? 'BUY' : 'SELL';
-
-    // Safety clamp: ensure we never close more than our active net position, 
-    // to prevent floating-point mismatches from accidentally flipping the trade side.
-    let closeQty = Math.abs(quantity);
-    if (closeQty > Math.abs(position.quantity)) {
-        closeQty = Math.abs(position.quantity);
-    }
-
-    const price = index.price;
+    // ── Debounce guard ────────────────────────────────────────────────────
+    const _guardKey = `idx_${indexSymbol}`;
+    if (_closingInProgress.has(_guardKey)) return;
+    _closingInProgress.add(_guardKey);
+    const _origBtnText = btn?.textContent;
+    if (btn) { btn.disabled = true; btn.textContent = 'Closing...'; }
 
     try {
+        const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
+        const index = indexes.find(idx => idx.symbol === indexSymbol);
+        if (!index) {
+            showToast('Error', 'Index not found', true);
+            return;
+        }
+
+        const position = state.indexPositions[indexSymbol];
+        if (!position) {
+            showToast('Error', 'Index position not found', true);
+            return;
+        }
+
+        const isShort = position.quantity < 0;
+        const closeSide = isShort ? 'BUY' : 'SELL';
+
+        // Safety clamp: ensure we never close more than our active net position,
+        // to prevent floating-point mismatches from accidentally flipping the trade side.
+        let closeQty = Math.abs(quantity);
+        if (closeQty > Math.abs(position.quantity)) {
+            closeQty = Math.abs(position.quantity);
+        }
+
+        const price = index.price;
         const result = await apiExecuteIndexTrade(indexSymbol, closeSide, closeQty, price);
 
         if (!result.success) {
@@ -556,19 +582,31 @@ async function closeIndexPosition(indexSymbol, quantity, tradeId) {
     } catch (error) {
         console.error('Close index position error:', error);
         showToast('Error', error.message, true);
+    } finally {
+        // ── Always re-enable the button and clear the guard ──────────────
+        _closingInProgress.delete(_guardKey);
+        if (btn) { btn.disabled = false; btn.textContent = _origBtnText || 'Close'; }
     }
 }
 
 /**
  * Close a pair-trade position by its trade record ID.
  * Calculates the current ratio, derives P/L, and records the closing leg.
- * @param {string} tradeId - The original pair-trade row UUID.
+ * @param {string} tradeId    - The original pair-trade row UUID.
+ * @param {HTMLElement} [btn] - Optional close button element to debounce.
  */
-async function closePairPosition(tradeId) {
+async function closePairPosition(tradeId, btn) {
     if (!state.currentUser) {
         openAuthModal();
         return;
     }
+
+    // ── Debounce guard ────────────────────────────────────────────────────
+    const _guardKey = `pair_${tradeId}`;
+    if (_closingInProgress.has(_guardKey)) return;
+    _closingInProgress.add(_guardKey);
+    const _origBtnText = btn?.textContent;
+    if (btn) { btn.disabled = true; btn.textContent = 'Closing...'; }
 
     try {
         // Fetch original trade record
@@ -668,5 +706,9 @@ async function closePairPosition(tradeId) {
     } catch (error) {
         console.error('Close pair position error:', error);
         showToast('Error', error.message, true);
+    } finally {
+        // ── Always re-enable the button and clear the guard ──────────────
+        _closingInProgress.delete(_guardKey);
+        if (btn) { btn.disabled = false; btn.textContent = _origBtnText || 'Close'; }
     }
 }
