@@ -664,20 +664,19 @@ function calculateRegionalIndexes() {
 
         idx.teas.forEach(s => {
             const tea = teaMap[s];
-            if (tea && tea.current_price > 0) {
-                count++;
-                sum += tea.current_price;
-                totalVol += (tea.volume_24h || 0);
+            if (tea && tea.current_price > 0 && tea.volume_24h > 0) {
+                sum += (tea.current_price * tea.volume_24h);
+                totalVol += tea.volume_24h;
 
                 if (tea.previous_price > 0) {
-                    prevCount++;
-                    prevSum += tea.previous_price;
+                    prevSum += (tea.previous_price * tea.volume_24h);
                 }
             }
         });
 
-        const avgPrice = count > 0 ? sum / count : 0;
-        const avgPrevPrice = prevCount > 0 ? prevSum / prevCount : avgPrice;
+        // Volume-weighted average calculation
+        const avgPrice = totalVol > 0 ? (sum / totalVol) : 0;
+        const avgPrevPrice = totalVol > 0 && prevSum > 0 ? (prevSum / totalVol) : avgPrice;
         const change = avgPrevPrice > 0 ? ((avgPrice - avgPrevPrice) / avgPrevPrice) * 100 : 0;
 
         return {

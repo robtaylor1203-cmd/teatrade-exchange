@@ -591,12 +591,31 @@ serve(async (req) => {
     // Same 5-minute gate as the tea price history above.
     if (writeHistory && updates.length > 0) {
       const priceMap: Record<string, number> = {};
-      for (const u of updates) priceMap[u.symbol] = u.current_price;
+      const volMap: Record<string, number> = {};
 
-      const avgOf = (symbols: string[]): number | null => {
-        const prices = symbols.map(s => priceMap[s]).filter(p => p != null && p > 0);
-        if (!prices.length) return null;
-        return prices.reduce((a: number, b: number) => a + b, 0) / prices.length;
+      // Use the raw payload sent from the database trigger to construct maps
+      for (const u of updates) {
+        priceMap[u.symbol] = u.current_price;
+        // The volume_24h column is included in the webhook payload from the teas table
+        volMap[u.symbol] = Number(u.volume_24h) || 0;
+      }
+
+      // Calculate a Volume-Weighted Average
+      const vwAvgOf = (symbols: string[]): number | null => {
+        let sum = 0;
+        let totalVol = 0;
+
+        for (const s of symbols) {
+          const p = priceMap[s];
+          const v = volMap[s];
+          if (p != null && p > 0 && v > 0) {
+            sum += (p * v);
+            totalVol += v;
+          }
+        }
+
+        if (totalVol === 0) return null;
+        return sum / totalVol;
       };
 
       // Fetch all index definitions from DB — same source the client uses
@@ -606,7 +625,7 @@ serve(async (req) => {
 
       const indexRows: Array<{ symbol: string; price: number; volume: number; recorded_at: string; is_simulated: boolean }> = [];
       for (const idx of (allIndexes || [])) {
-        const avg = avgOf(idx.teas || []);
+        const avg = vwAvgOf(idx.teas || []);
         if (avg !== null && isFinite(avg) && avg > 0) {
           indexRows.push({ symbol: idx.symbol, price: avg, volume: 0, recorded_at: timestamp, is_simulated: false });
         }

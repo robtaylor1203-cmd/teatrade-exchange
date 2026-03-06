@@ -8336,6 +8336,96 @@ body.modal-open {
     line-height: 1.5;
 }
 
+.early-access-features li svg {
+    flex-shrink: 0;
+    margin-right: 12px;
+    margin-top: 2px;
+}
+
+/* ── First Trade Mission Modal ────────────────────────────────────────── */
+.first-trade-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(10, 14, 23, 0.85);
+    backdrop-filter: blur(8px);
+    z-index: 100000;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.first-trade-overlay.visible {
+    display: flex;
+    opacity: 1;
+}
+
+.first-trade-content {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 440px;
+    padding: 32px 24px;
+    text-align: center;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    transform: translateY(20px);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.first-trade-overlay.visible .first-trade-content {
+    transform: translateY(0);
+}
+
+.first-trade-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--accent-blue);
+    margin-bottom: 20px;
+}
+
+.first-trade-content h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 12px 0;
+}
+
+.first-trade-content p {
+    font-size: 15px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin: 0 0 28px 0;
+}
+
+.first-trade-btn {
+    background: var(--accent-blue);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    padding: 14px 24px;
+    width: 100%;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.first-trade-btn:hover {
+    background: #2563eb;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
 .early-access-features {
     text-align: left;
     margin: 0 0 28px 0;
