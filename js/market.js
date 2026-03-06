@@ -345,8 +345,15 @@ async function _loadCompositeIndexOHLC(teaSymbols, cfg, since) {
         for (let i = 0; i < lastKnown.length; i++) {
             if (lastKnown[i] !== null && lastKnown[i] > 0) {
                 const teaSymbol = teaSymbols[i];
-                const tea = state.teas.find(t => t.symbol === teaSymbol);
-                const vol = tea ? (tea.volume_24h || 0) : 0;
+                const tea = state.teas?.find(t => t.symbol === teaSymbol);
+                let vol = tea ? (tea.volume_24h || 0) : 0;
+
+                // Fallback to static volume weights if live volume hasn't loaded yet
+                if (vol <= 0) {
+                    vol = typeof teaDisplayData !== 'undefined' && teaDisplayData[teaSymbol]
+                        ? (teaDisplayData[teaSymbol].qty || 10000)
+                        : 10000;
+                }
 
                 if (vol > 0) {
                     sum += (lastKnown[i] * vol);
@@ -358,7 +365,7 @@ async function _loadCompositeIndexOHLC(teaSymbols, cfg, since) {
         if (totalVol > 0) {
             averagedTicks.push({ time: time, price: sum / totalVol });
         } else {
-            // Fallback to simple average if no volumes are available during initialization
+            // Ultimate fallback to simple average (should rarely hit this now)
             let sSum = 0;
             let sCount = 0;
             for (let i = 0; i < lastKnown.length; i++) {

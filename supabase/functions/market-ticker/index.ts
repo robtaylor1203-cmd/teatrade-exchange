@@ -593,11 +593,15 @@ serve(async (req) => {
       const priceMap: Record<string, number> = {};
       const volMap: Record<string, number> = {};
 
-      // Use the raw payload sent from the database trigger to construct maps
+      // Build volume map independently from the original DB-fetched 'teas' array
+      // because the 'updates' payload does not carry volume_24h.
+      for (const t of teas) {
+        volMap[t.symbol] = Number((t as any).volume_24h) || 0;
+      }
+
+      // Use the raw payload sent from the database trigger to construct price maps
       for (const u of updates) {
         priceMap[u.symbol] = u.current_price;
-        // The volume_24h column is included in the webhook payload from the teas table
-        volMap[u.symbol] = Number((u as any).volume_24h) || 0;
       }
 
       // Calculate a Volume-Weighted Average

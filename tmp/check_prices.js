@@ -5,14 +5,12 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 
 async function run() {
     const { data, error } = await supabase
-        .from('price_history')
-        .select('*')
-        .eq('symbol', 'INDEX_KENYA')
-        .order('recorded_at', { ascending: false })
-        .limit(5);
+        .from('teas')
+        .select('symbol, current_price, volume_24h, anchor_price')
+        .like('symbol', 'KEN-%');
 
     if (error) {
-        console.error('Error fetching:', error);
+        console.error('Error:', error);
     } else {
         console.log(JSON.stringify(data, null, 2));
     }
