@@ -305,6 +305,11 @@ function _getChartCurrencyInfo() {
 // =============================================
 // MAIN DRAW / BINDING
 // =============================================
+// Tracks the last known chart symbol/timeframe so we know when we must call setData vs update
+let _chartLastSymbol = null;
+let _chartLastTimeframe = null;
+let _chartLastDataLength = 0;
+
 function drawChart() {
     if (!document.getElementById('tv-chart')) return;
     if (!tvChart) _initTvChartIfNull();
@@ -316,14 +321,22 @@ function drawChart() {
     const newLength = state.chartData ? state.chartData.length : 0;
     state.cachedTimeframe = state.currentTimeframe;
 
-    if (!state.chartData || newLength === 0) return; // Loading state handled by UI usually
+    if (!state.chartData || newLength === 0) return;
+
+    // Determine if this is a full reload (new symbol, new timeframe, or first load)
+    // vs a live-tick update (same symbol/timeframe, data grew by ≤1 candle)
+    const currentSymbol = state.mainChartData?.symbol || '';
+    const currentTimeframe = state.currentTimeframe;
+    const isNewSymbol = currentSymbol !== _chartLastSymbol;
+    const isSameState = !isNewSymbol && !isNewTimeframe;
+    const isLiveTick = isSameState && newLength > 0 && (newLength - _chartLastDataLength) <= 1 && _chartLastDataLength > 2;
 
     // Force rescale when:
     // 1) First load
     // 2) Transition from empty spoof/cache to full history
-    // 3) User manually switches the timeframe horizon
+    // 3) User manually switches the timeframe horizon / symbol
     let forceRescale = false;
-    if (!window._tvInitialScaleDone || (previousLength < 2 && newLength >= 2) || isNewTimeframe) {
+    if (!window._tvInitialScaleDone || (previousLength < 2 && newLength >= 2) || isNewTimeframe || isNewSymbol) {
         forceRescale = true;
     }
 
@@ -339,7 +352,6 @@ function drawChart() {
     // Convert to TV Format Data
     const tvData = [];
     const volData = [];
-    let prevVolume = 0;
 
     // Ensure data is strictly ascending and unique by timestamp (required by TV)
     const sortedData = [...state.chartData]
@@ -347,7 +359,6 @@ function drawChart() {
 
     // Synchronize the last candle with the live ticker basePrice to prevent mismatch
     if (sortedData.length > 0 && state.mainChartData && state.mainChartData.basePrice) {
-        // basePrice may already include _fx multiplier! We must divide it so it scales correctly when re-multiplied below
         const livePriceUSD = Number(state.mainChartData.basePrice) / _fx;
         if (livePriceUSD > 0) {
             const lastCandle = sortedData[sortedData.length - 1];
@@ -360,8 +371,6 @@ function drawChart() {
     let lastTime = 0;
     sortedData.forEach(d => {
         const tvTime = Math.floor(new Date(d.date).getTime() / 1000);
-
-        // Skip duplicate timestamps
         if (tvTime <= lastTime && lastTime !== 0) return;
         lastTime = tvTime;
 
@@ -372,13 +381,12 @@ function drawChart() {
 
         tvData.push({ time: tvTime, open, high, low, close, value: close });
 
-        // Calculate visual volume: if missing and price changed, synthesize based on volatility
         let vol = d.volume;
         if (!vol || vol <= 0) {
             const spread = Math.abs(high - low);
             let pseudoVol = spread * 50000;
-            pseudoVol += (tvTime % 100) * 10; // Deterministic noise
-            vol = pseudoVol > 0 ? pseudoVol : 20; // Ensure it's never completely 0 visually
+            pseudoVol += (tvTime % 100) * 10;
+            vol = pseudoVol > 0 ? pseudoVol : 20;
         }
 
         volData.push({
@@ -390,10 +398,31 @@ function drawChart() {
 
     if (tvData.length === 0) return;
 
-    // Apply data to series
-    mainSeries.setData(tvData);
-    if (mainSeries._linkedArea) mainSeries._linkedArea.setData(tvData);
-    volumeSeries.setData(volData);
+    // ── SMART UPDATE: live tick → use .update() to avoid wiping chart history ──
+    if (isLiveTick) {
+        const lastCandle = tvData[tvData.length - 1];
+        const lastVol = volData[volData.length - 1];
+        try {
+            mainSeries.update(lastCandle);
+            if (mainSeries._linkedArea) mainSeries._linkedArea.update({ time: lastCandle.time, value: lastCandle.close });
+            volumeSeries.update(lastVol);
+        } catch (e) {
+            // Fallback to full setData if update fails (e.g. time went backwards)
+            mainSeries.setData(tvData);
+            if (mainSeries._linkedArea) mainSeries._linkedArea.setData(tvData);
+            volumeSeries.setData(volData);
+        }
+    } else {
+        // Full reload: new symbol, new timeframe, or initial load
+        mainSeries.setData(tvData);
+        if (mainSeries._linkedArea) mainSeries._linkedArea.setData(tvData);
+        volumeSeries.setData(volData);
+    }
+
+    // Update tracking state
+    _chartLastSymbol = currentSymbol;
+    _chartLastTimeframe = currentTimeframe;
+    _chartLastDataLength = newLength;
 
     // Auto-scale to fit data frame on load or timeframe/symbol swap
     if (forceRescale) {
@@ -427,23 +456,10 @@ function drawChart() {
         rsiSeries.setData(rsiPts);
     }
 
-    // Draw Open Positions
+    // Draw Open Positions (price lines — lightweight, no DOM thrash)
     _attachOrderBadges(tvData[tvData.length - 1].close);
-
-    // Update Header Stats
-    const currentPrice = tvData[tvData.length - 1].close;
-    const openPrice = tvData[0].open;
-    const change = currentPrice - openPrice;
-    const pctChange = (change / openPrice) * 100;
-
-    document.getElementById('main-chart-price').textContent = _ci.symbol + currentPrice.toFixed(2);
-
-    // Check if main-chart-change element exists before modifying
-    const hc = document.getElementById('main-chart-change');
-    if (hc) {
-        hc.textContent = (change >= 0 ? '+' : '') + _ci.symbol + change.toFixed(2) + ' (' + pctChange.toFixed(2) + '%)';
-        hc.className = 'chart-stat-value ' + (change >= 0 ? 'up' : 'down');
-    }
+    // NOTE: Header price/change DOM is owned by market.js → updateMainChartStats()
+    // Do NOT write to #main-chart-price or #main-chart-change here.
 }
 
 function _attachOrderBadges(currentPrice) {
@@ -459,7 +475,9 @@ function _attachOrderBadges(currentPrice) {
     const trades = getOpenTradesForSymbol(symbol);
 
     trades.forEach(trade => {
-        const pnl = (trade.trade_type === 'BUY' ? 1 : -1) * (currentPrice - trade.entry_price) * trade.quantity * trade.leverage;
+        // PnL = direction × (currentPrice − entryPrice) × quantity
+        // Leverage reduces required margin; it does NOT multiply physical quantity in PnL.
+        const pnl = (trade.trade_type === 'BUY' ? 1 : -1) * (currentPrice - trade.entry_price) * trade.quantity;
         const pnlStr = (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2);
 
         const pl = mainSeries.createPriceLine({

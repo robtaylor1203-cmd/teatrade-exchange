@@ -196,56 +196,88 @@ function updateAuctionTable() {
         state.previousAuctionPrices[tea.symbol] = tea.current_price;
     });
 
-    tbody.innerHTML = items.map(({ tea, origin }) => {
+    // ── First render: build full HTML (happens once, or on filter/sort change) ──
+    const existingSymbols = new Set(
+        Array.from(tbody.querySelectorAll('[data-tea]')).map(el => el.dataset.tea)
+    );
+    const expectedSymbols = new Set(items.map(({ tea }) => tea.symbol));
+    const needsFullRebuild = existingSymbols.size !== expectedSymbols.size ||
+        ![...expectedSymbols].every(s => existingSymbols.has(s));
+
+    if (needsFullRebuild) {
+        tbody.innerHTML = items.map(({ tea, origin }) => {
+            const price = Number(tea.current_price) || 0;
+            const prev = Number(tea.previous_price) || price;
+            const change = prev > 0 ? ((price - prev) / prev * 100) : 0;
+            const changeStr = change !== 0 ? `${change >= 0 ? '+' : ''}${change.toFixed(1)}%` : '\u2014';
+            const changeClass = change > 0 ? 'up' : change < 0 ? 'down' : '';
+            const volume = Number(tea.volume_24h) || 0;
+            const volStr = volume >= 1000 ? `${Math.round(volume / 1000)}K` : String(volume);
+            const bSpread = Number(tea.base_spread) || 0.01;
+            const vMult = Number(tea.volatility_multiplier) || 1.0;
+            const dynSpread = bSpread * vMult;
+            const askPrice = price * (1 + dynSpread / 2);
+            const bidPrice = price * (1 - dynSpread / 2);
+            const spreadVal = askPrice - bidPrice;
+            const spreadElevated = vMult > 1.05;
+            const tMode = tea.trading_mode || 'FULL';
+            let modeBadge = '';
+            if (tMode === 'HALTED') modeBadge = '<span class="mode-badge mode-halted" title="Circuit breaker active">HALTED</span>';
+            else if (tMode === 'CLOSE_ONLY') modeBadge = '<span class="mode-badge mode-close-only" title="Close-only mode">CLOSE ONLY</span>';
+            const isStarred = wl.includes(tea.symbol);
+            const parts = tea.symbol.split('-');
+            const shortSym = parts[1] || tea.symbol;
+            const prefix = parts[0];
+            return `
+                <tr onclick="openHubForSymbol('${escapeHtml(tea.symbol)}')" style="cursor:pointer;" class="${tMode === 'HALTED' ? 'row-halted' : ''}">
+                    <td style="font-family:'JetBrains Mono',monospace;font-weight:600;white-space:nowrap;">
+                        <span style="color:var(--text-muted);font-size:10px;vertical-align:baseline;">${escapeHtml(prefix)}-</span>${escapeHtml(shortSym)}
+                        ${modeBadge}
+                    </td>
+                    <td>${escapeHtml(tea.name || tea.symbol)}</td>
+                    <td class="auction-center">${escapeHtml(origin)}</td>
+                    <td class="price-cell ${changeClass}" data-tea="${escapeHtml(tea.symbol)}">$${price.toFixed(2)}</td>
+                    <td class="${changeClass}" data-change="${escapeHtml(tea.symbol)}">${changeStr}</td>
+                    <td style="color:var(--text-muted);" data-vol="${escapeHtml(tea.symbol)}">${volStr}</td>
+                    <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:${spreadElevated ? 'var(--accent-orange)' : 'var(--text-muted)'};">$${spreadVal.toFixed(3)}${spreadElevated ? ' (' + vMult.toFixed(1) + 'x)' : ''}</td>
+                    <td style="text-align:center;">
+                        <button class="watchlist-star-btn ${isStarred ? 'starred' : ''}" onclick="event.stopPropagation(); toggleTeaWatchlist('${escapeHtml(tea.symbol)}')" title="${isStarred ? 'Remove from watchlist' : 'Add to watchlist'}">
+                            ${isStarred ? '\u2605' : '\u2606'}
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        return;
+    }
+
+    // ── Subsequent ticks: surgical cell updates only ──
+    items.forEach(({ tea }) => {
         const price = Number(tea.current_price) || 0;
         const prev = Number(tea.previous_price) || price;
         const change = prev > 0 ? ((price - prev) / prev * 100) : 0;
         const changeStr = change !== 0 ? `${change >= 0 ? '+' : ''}${change.toFixed(1)}%` : '\u2014';
         const changeClass = change > 0 ? 'up' : change < 0 ? 'down' : '';
-        const flashClass = changedTeas[tea.symbol] ? `flash-${changedTeas[tea.symbol]}` : '';
         const volume = Number(tea.volume_24h) || 0;
         const volStr = volume >= 1000 ? `${Math.round(volume / 1000)}K` : String(volume);
 
-        // Dynamic spread from risk management columns
-        const bSpread = Number(tea.base_spread) || 0.01;
-        const vMult = Number(tea.volatility_multiplier) || 1.0;
-        const dynSpread = bSpread * vMult;
-        const askPrice = price * (1 + dynSpread / 2);
-        const bidPrice = price * (1 - dynSpread / 2);
-        const spreadVal = askPrice - bidPrice;
-        const spreadElevated = vMult > 1.05;
-
-        // Trading mode badge
-        const tMode = tea.trading_mode || 'FULL';
-        let modeBadge = '';
-        if (tMode === 'HALTED') modeBadge = '<span class="mode-badge mode-halted" title="Circuit breaker active">HALTED</span>';
-        else if (tMode === 'CLOSE_ONLY') modeBadge = '<span class="mode-badge mode-close-only" title="Close-only mode">CLOSE ONLY</span>';
-
-        const isStarred = wl.includes(tea.symbol);
-        const parts = tea.symbol.split('-');
-        const shortSym = parts[1] || tea.symbol;
-        const prefix = parts[0];
-
-        return `
-            <tr onclick="openHubForSymbol('${escapeHtml(tea.symbol)}')" style="cursor:pointer;" class="${tMode === 'HALTED' ? 'row-halted' : ''}">
-                <td style="font-family:'JetBrains Mono',monospace;font-weight:600;white-space:nowrap;">
-                    <span style="color:var(--text-muted);font-size:10px;vertical-align:baseline;">${escapeHtml(prefix)}-</span>${escapeHtml(shortSym)}
-                    ${modeBadge}
-                </td>
-                <td>${escapeHtml(tea.name || tea.symbol)}</td>
-                <td class="auction-center">${escapeHtml(origin)}</td>
-                <td class="price-cell ${changeClass} ${flashClass}" data-tea="${escapeHtml(tea.symbol)}">$${price.toFixed(2)}</td>
-                <td class="${changeClass}">${changeStr}</td>
-                <td style="color:var(--text-muted);">${volStr}</td>
-                <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:${spreadElevated ? 'var(--accent-orange)' : 'var(--text-muted)'};">$${spreadVal.toFixed(3)}${spreadElevated ? ' (' + vMult.toFixed(1) + 'x)' : ''}</td>
-                <td style="text-align:center;">
-                    <button class="watchlist-star-btn ${isStarred ? 'starred' : ''}" onclick="event.stopPropagation(); toggleTeaWatchlist('${escapeHtml(tea.symbol)}')" title="${isStarred ? 'Remove from watchlist' : 'Add to watchlist'}">
-                        ${isStarred ? '\u2605' : '\u2606'}
-                    </button>
-                </td>
-            </tr>
-        `;
-    }).join('');
+        const priceCell = tbody.querySelector(`[data-tea="${CSS.escape(tea.symbol)}"]`);
+        if (priceCell) {
+            priceCell.textContent = `$${price.toFixed(2)}`;
+            priceCell.className = `price-cell ${changeClass}`;
+            if (changedTeas[tea.symbol]) {
+                priceCell.classList.add(`flash-${changedTeas[tea.symbol]}`);
+                setTimeout(() => priceCell.classList.remove(`flash-${changedTeas[tea.symbol]}`), 600);
+            }
+        }
+        const changeCell = tbody.querySelector(`[data-change="${CSS.escape(tea.symbol)}"]`);
+        if (changeCell) {
+            changeCell.textContent = changeStr;
+            changeCell.className = changeClass;
+        }
+        const volCell = tbody.querySelector(`[data-vol="${CSS.escape(tea.symbol)}"]`);
+        if (volCell) volCell.textContent = volStr;
+    });
 }
 
 // =============================================
@@ -1059,40 +1091,80 @@ function updateQuoteBoard() {
     // Show 10 teas for 2 complete rows of 5
     const topTeas = state.teas.slice(0, 10);
 
-    board.innerHTML = topTeas.map(tea => {
-        const parts = tea.symbol.split('-');
-        const prefix = parts[0];
-        const symbol = parts[1] || tea.symbol;
+    // ── First render: build full HTML ──
+    const existingCards = board.querySelectorAll('[data-symbol]');
+    const needsFullRebuild = existingCards.length !== topTeas.length ||
+        !topTeas.every((tea, i) => existingCards[i]?.dataset.symbol === tea.symbol);
+
+    if (needsFullRebuild) {
+        board.innerHTML = topTeas.map(tea => {
+            const parts = tea.symbol.split('-');
+            const prefix = parts[0];
+            const symbol = parts[1] || tea.symbol;
+            const price = Number(tea.current_price) || 0;
+            const prev = Number(tea.previous_price) || price;
+            const change = prev > 0 ? ((price - prev) / prev * 100) : 0;
+            const volume = Number(tea.volume_24h) || 0;
+            const isUp = change >= 0;
+            state.previousQuotePrices[tea.symbol] = price;
+            const volDisplay = volume >= 1000 ? `${Math.round(volume / 1000)}K` : volume.toString();
+            const country = COUNTRY_MAP[prefix];
+            const countryHtml = country
+                ? `<div class="quote-country" title="${country.label}"><span class="quote-country-flag">${flagImg(country.iso, 16)}</span><span class="quote-country-code">${prefix}</span></div>`
+                : `<div class="quote-country" style="visibility:hidden;"><span class="quote-country-code">${prefix}</span></div>`;
+            return `
+                <div class="quote-card" data-symbol="${escapeHtml(tea.symbol)}" onclick="selectTeaForTrading('${escapeHtml(tea.symbol)}')">
+                    <div class="quote-symbol">${escapeHtml(symbol)}</div>
+                    ${countryHtml}
+                    <div class="quote-price ${isUp ? 'up' : 'down'}" data-qprice="${escapeHtml(tea.symbol)}">$${price.toFixed(2)}</div>
+                    <div class="quote-change ${isUp ? 'up' : 'down'}" data-qchange="${escapeHtml(tea.symbol)}">${isUp ? '\u25B2' : '\u25BC'} ${change >= 0 ? '+' : ''}${change.toFixed(1)}%</div>
+                    <div class="quote-volume" data-qvol="${escapeHtml(tea.symbol)}">Vol: ${volDisplay}</div>
+                </div>
+            `;
+        }).join('');
+        return;
+    }
+
+    // ── Subsequent ticks: surgical updates only ──
+    topTeas.forEach(tea => {
         const price = Number(tea.current_price) || 0;
         const prev = Number(tea.previous_price) || price;
         const change = prev > 0 ? ((price - prev) / prev * 100) : 0;
         const volume = Number(tea.volume_24h) || 0;
         const isUp = change >= 0;
-        const prevPrice = state.previousQuotePrices[tea.symbol];
-        let flashClass = '';
-        const selectedClass = state.selectedQuoteSymbol === tea.symbol ? 'selected' : '';
+        const volDisplay = volume >= 1000 ? `${Math.round(volume / 1000)}K` : volume.toString();
 
-        if (prevPrice !== undefined && prevPrice !== price) {
-            flashClass = price > prevPrice ? 'flash-green' : 'flash-red';
-        }
+        const prevPrice = state.previousQuotePrices[tea.symbol];
+        const priceChanged = prevPrice !== undefined && prevPrice !== price;
         state.previousQuotePrices[tea.symbol] = price;
 
-        const volDisplay = volume >= 1000 ? `${Math.round(volume / 1000)}K` : volume.toString();
-        const country = COUNTRY_MAP[prefix];
-        const countryHtml = country
-            ? `<div class="quote-country" title="${country.label}"><span class="quote-country-flag">${flagImg(country.iso, 16)}</span><span class="quote-country-code">${prefix}</span></div>`
-            : `<div class="quote-country" style="visibility:hidden;"><span class="quote-country-code">${prefix}</span></div>`;
+        // Update price cell
+        const priceEl = board.querySelector(`[data-qprice="${CSS.escape(tea.symbol)}"]`);
+        if (priceEl) {
+            priceEl.textContent = `$${price.toFixed(2)}`;
+            priceEl.className = `quote-price ${isUp ? 'up' : 'down'}`;
+            if (priceChanged) {
+                const flashClass = price > prevPrice ? 'flash-green' : 'flash-red';
+                priceEl.classList.add(flashClass);
+                setTimeout(() => priceEl.classList.remove(flashClass), 600);
+            }
+        }
 
-        return `
-            <div class="quote-card ${flashClass} ${selectedClass}" onclick="selectTeaForTrading('${escapeHtml(tea.symbol)}')">
-                <div class="quote-symbol">${escapeHtml(symbol)}</div>
-                ${countryHtml}
-                <div class="quote-price ${isUp ? 'up' : 'down'}">$${price.toFixed(2)}</div>
-                <div class="quote-change ${isUp ? 'up' : 'down'}">${isUp ? '\u25B2' : '\u25BC'} ${change >= 0 ? '+' : ''}${change.toFixed(1)}%</div>
-                <div class="quote-volume">Vol: ${volDisplay}</div>
-            </div>
-        `;
-    }).join('');
+        // Update change cell
+        const changeEl = board.querySelector(`[data-qchange="${CSS.escape(tea.symbol)}"]`);
+        if (changeEl) {
+            changeEl.textContent = `${isUp ? '\u25B2' : '\u25BC'} ${change >= 0 ? '+' : ''}${change.toFixed(1)}%`;
+            changeEl.className = `quote-change ${isUp ? 'up' : 'down'}`;
+        }
+
+        // Update volume cell
+        const volEl = board.querySelector(`[data-qvol="${CSS.escape(tea.symbol)}"]`);
+        if (volEl) volEl.textContent = `Vol: ${volDisplay}`;
+
+        // Toggle 'selected' class on card
+        const card = board.querySelector(`[data-symbol="${CSS.escape(tea.symbol)}"]`);
+        if (card) card.classList.toggle('selected', state.selectedQuoteSymbol === tea.symbol);
+    });
 }
 
 function selectTeaForTrading(symbol) {
