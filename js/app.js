@@ -30,8 +30,8 @@
 // LOCAL STORAGE CACHE (instant hydration for return visitors)
 // =============================================
 
-const TT_CACHE_TEAS = 'tt_cache_teas';
-const TT_CACHE_INDEXES = 'tt_cache_indexes';
+const TT_CACHE_TEAS = 'tt_cache_teas_v2';
+const TT_CACHE_INDEXES = 'tt_cache_indexes_v2';
 const TT_CACHE_TTL = 300000; // 5 min
 
 function _writeCache(key, data) {

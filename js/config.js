@@ -32,7 +32,7 @@ const state = {
     chartData: [],
     teaHistoricalData: {},
     indexHistoricalData: {},
-    mainChartData: { name: 'Kenyan Tea Price Index', symbol: 'KENYA', basePrice: 3.42, change: 2.4, currency: '$', volume: '8.2M', isIndex: true, isTea: false },
+    mainChartData: { name: 'Kenyan Tea Price Index', symbol: 'KENYA', basePrice: 0, change: 0, currency: '$', volume: '0', isIndex: true, isTea: false },
     chartMetrics: {},
     cachedTimeframe: null,
     activeStudies: { sma10: false, sma20: false, sma50: false, ema10: false, ema20: false, bollinger: false, rsi: false },
