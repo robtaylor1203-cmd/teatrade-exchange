@@ -597,7 +597,7 @@ serve(async (req) => {
       for (const u of updates) {
         priceMap[u.symbol] = u.current_price;
         // The volume_24h column is included in the webhook payload from the teas table
-        volMap[u.symbol] = Number(u.volume_24h) || 0;
+        volMap[u.symbol] = Number((u as any).volume_24h) || 0;
       }
 
       // Calculate a Volume-Weighted Average

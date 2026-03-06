@@ -341,16 +341,35 @@ async function _loadCompositeIndexOHLC(teaSymbols, cfg, since) {
 
         // Compute average of all currently known tea prices
         let sum = 0;
-        let count = 0;
+        let totalVol = 0;
         for (let i = 0; i < lastKnown.length; i++) {
             if (lastKnown[i] !== null && lastKnown[i] > 0) {
-                sum += lastKnown[i];
-                count++;
+                const teaSymbol = teaSymbols[i];
+                const tea = state.teas.find(t => t.symbol === teaSymbol);
+                const vol = tea ? (tea.volume_24h || 0) : 0;
+
+                if (vol > 0) {
+                    sum += (lastKnown[i] * vol);
+                    totalVol += vol;
+                }
             }
         }
 
-        if (count > 0) {
-            averagedTicks.push({ time: time, price: sum / count });
+        if (totalVol > 0) {
+            averagedTicks.push({ time: time, price: sum / totalVol });
+        } else {
+            // Fallback to simple average if no volumes are available during initialization
+            let sSum = 0;
+            let sCount = 0;
+            for (let i = 0; i < lastKnown.length; i++) {
+                if (lastKnown[i] !== null && lastKnown[i] > 0) {
+                    sSum += lastKnown[i];
+                    sCount++;
+                }
+            }
+            if (sCount > 0) {
+                averagedTicks.push({ time: time, price: sSum / sCount });
+            }
         }
     }
 
