@@ -590,6 +590,7 @@ function displayUserTrades(trades) {
             }
         } else if (isIndexTrade) {
             teaSymbol = trade.index_symbol + ' IDX';
+            // FIX #1: Use trade.price (server execution price) as the cost basis — no spread adjustment.
             const idxNotional = trade.quantity * trade.price;
             total = idxNotional / leverage;
             const isShortIdx = trade.side === 'SELL';
@@ -607,15 +608,13 @@ function displayUserTrades(trades) {
                 const index = idxList.find(idx => idx.symbol === trade.index_symbol);
 
                 if (index) {
-                    const spreadMargin = index.price * 0.002;
-                    const idxExit = isShortIdx
-                        ? index.price + spreadMargin
-                        : index.price - spreadMargin;
+                    // FIX #2: No additional display spread. Spread was paid at entry.
+                    // P/L = direct diff between live market price and actual execution price.
                     const notionalValue = total * leverage;
                     const units = notionalValue / trade.price;
                     pnl = isShortIdx
-                        ? (trade.price - idxExit) * units
-                        : (idxExit - trade.price) * units;
+                        ? (trade.price - index.price) * units
+                        : (index.price - trade.price) * units;
                     if (pnl < -total) pnl = -total;
                     pnlPct = total > 0 ? (pnl / total * 100) : 0;
                 } else {
@@ -645,15 +644,13 @@ function displayUserTrades(trades) {
                 }
                 pnlPct = total > 0 ? (pnl / total * 100) : 0;
             } else if (tea) {
-                const spreadMargin = tea.current_price * 0.002;
-                const teaExit = isShortTrade
-                    ? tea.current_price + spreadMargin
-                    : tea.current_price - spreadMargin;
+                // FIX #2: No additional display spread. Spread was paid at entry.
+                // P/L = direct diff between live market price and actual execution price.
                 const notionalValue = total * leverage;
                 const units = notionalValue / trade.price;
                 pnl = isShortTrade
-                    ? (trade.price - teaExit) * units
-                    : (teaExit - trade.price) * units;
+                    ? (trade.price - tea.current_price) * units
+                    : (tea.current_price - trade.price) * units;
                 if (pnl < -total) pnl = -total;
                 pnlPct = total > 0 ? (pnl / total * 100) : 0;
             } else {

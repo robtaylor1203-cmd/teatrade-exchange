@@ -94,8 +94,11 @@ function updateTradeSummary() {
     let volMultiplier = 1.0;
     let tradingMode = 'FULL';
 
+    let isIndexSelected = false;
+
     if (selectValue) {
         if (selectValue.startsWith('INDEX_')) {
+            isIndexSelected = true;
             const indexSymbol = selectValue.replace('INDEX_', '');
             const indexes = typeof calculateRegionalIndexes === 'function'
                 ? calculateRegionalIndexes() : [];
@@ -121,7 +124,11 @@ function updateTradeSummary() {
     const SPREAD_PCT = baseSpread * volMultiplier;
 
     const isBuy = state.tradeType === 'BUY';
-    const execPrice = price > 0 ? (isBuy ? price * (1 + SPREAD_PCT / 2) : price * (1 - SPREAD_PCT / 2)) : 0;
+    // FIX #3: For index trades show the unadjusted market price — the server applies
+    // its own spread at execution. For tea trades keep the spread-adjusted ask/bid.
+    const execPrice = isIndexSelected
+        ? price
+        : (price > 0 ? (isBuy ? price * (1 + SPREAD_PCT / 2) : price * (1 - SPREAD_PCT / 2)) : 0);
     priceInput.value = execPrice > 0 ? execPrice.toFixed(3) : '';
 
     const priceLabel = document.getElementById('trade-price-label');
@@ -331,6 +338,10 @@ async function executeTrade() {
             }
 
             setActiveBalance(result.new_balance);
+
+            // FIX #4: Immediately fetch trades so the server-confirmed row
+            // replaces any optimistic/estimated row in the UI.
+            await loadUserTrades();
 
             const idxSideLabel = state.tradeType === 'BUY' ? 'Bought' : 'Shorted';
             const _sc = result.spread_cost ? ` — Spread: $${Number(result.spread_cost).toFixed(4)}` : '';
