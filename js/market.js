@@ -910,24 +910,32 @@ function _liveIndexPrice(indexSymbol) {
  * Rendering is batched via updateChartsWithNewPrices() (debounced).
  */
 function _pushPriceToActiveCharts(symbol, newPrice) {
-    // ── Main chart (data stored in USD; forex applied at render) ──────────
+    // NOTE: state.chartData is populated exclusively by generateChartData() in drawChart(),
+    // which reads from priceDataCache via getPriceHistorySync(). We must NOT independently
+    // push to state.chartData here — doing so causes every tick to insert the same candle
+    // twice (once from priceDataCache + once from this direct push), producing duplicate
+    // timestamps that TradingView rejects with errors.
+    //
+    // updatePriceCache() (called just before this in handleTickerUpdate) already updated
+    // priceDataCache. That is the single source of truth for the main chart.
+    //
+    // We only update index price caches here (for indexes dependent on this tea tick).
+
     const mainSymbol = _getMainChartSymbol();
     const mainType = _getMainChartSymbolType();
 
-    if (mainType === 'tea' && mainSymbol === symbol) {
-        _seedOrAppendChart(state, 'chartData', newPrice);
-    } else if (mainType === 'index') {
+    if (mainType === 'index') {
         const idxDef = _findIndexDef(mainSymbol);
         if (idxDef?.teas?.includes(symbol)) {
             const idxPrice = _liveIndexPrice(mainSymbol);
             if (idxPrice > 0) {
-                _seedOrAppendChart(state, 'chartData', idxPrice);
+                // Update the index's own priceDataCache — drawChart will read this.
                 updatePriceCache(mainSymbol, idxPrice, 'index');
             }
         }
     }
 
-    // ── Hub fullscreen chart (data stored in USD; forex applied at render) ──
+    // ── Hub fullscreen chart: same principle — update priceDataCache only ──
     const hubSection = document.getElementById('chart-section');
     if (hubSection?.classList.contains('panel-maximized')) {
         const hubRaw = document.getElementById('hub-buy-symbol')?.value || '';
@@ -935,21 +943,18 @@ function _pushPriceToActiveCharts(symbol, newPrice) {
         const hubSymbol = _cardMap[hubRaw] || hubRaw;
         const hubIsIdx = typeof isIndexSymbol === 'function' && isIndexSymbol(hubSymbol);
 
-        if (!hubIsIdx && hubSymbol === symbol) {
-            _seedOrAppendChart(state, 'hubChartData', newPrice);
-        } else if (hubIsIdx) {
+        if (hubIsIdx) {
             const idxDef = _findIndexDef(hubSymbol);
             if (idxDef?.teas?.includes(symbol)) {
                 const idxPrice = _liveIndexPrice(hubSymbol);
                 if (idxPrice > 0) {
-                    _seedOrAppendChart(state, 'hubChartData', idxPrice);
                     updatePriceCache(hubSymbol, idxPrice, 'index');
                 }
             }
         }
     }
 
-    // ── Quick-quote modal ─────────────────────────────────────────────────
+    // ── Quick-quote modal: this reads/writes priceDataCache directly, which is correct ──
     const qqModal = document.getElementById('quick-quote-modal');
     if (state.qqCurrentTea && qqModal?.classList.contains('active')) {
         const qqSym = state.qqCurrentTea.symbol;

@@ -379,13 +379,35 @@ function displayUserTrades(trades) {
                 entry.rem -= closeQty;
                 remaining -= closeQty;
 
+                // ── Accumulate realized PnL per chunk (fixes partial-close overwrite bug) ──
+                // Each matched chunk contributes: direction × (exitPrice − entryPrice) × chunkQty
+                // This is summed cumulatively so multiple partial exits are all accounted for.
+                if (!closingInfo[entry.trade.id]) {
+                    closingInfo[entry.trade.id] = {
+                        // Legacy fields kept for pair/index trade compatibility
+                        sellPrice: trade.price,
+                        sellTime: trade.created_at,
+                        coverPrice: trade.price,
+                        coverTime: trade.created_at,
+                        // New cumulative fields
+                        realizedPnl: 0,
+                        closedQty: 0,
+                    };
+                }
+                const info = closingInfo[entry.trade.id];
+                const direction = entryIsBuy ? 1 : -1;
+                info.realizedPnl += direction * (trade.price - entry.trade.price) * closeQty;
+                info.closedQty += closeQty;
+                // Keep sellPrice as the latest exit price (for legacy pair/index path fallback)
+                info.sellPrice = trade.price;
+                info.sellTime = trade.created_at;
+                if (!entryIsBuy) {
+                    info.coverPrice = trade.price;
+                    info.coverTime = trade.created_at;
+                }
+
                 if (entry.rem <= 0) {
                     closedTradeIds.add(entry.trade.id);
-                    if (entryIsBuy) {
-                        closingInfo[entry.trade.id] = { sellPrice: trade.price, sellTime: trade.created_at };
-                    } else {
-                        closingInfo[entry.trade.id] = { coverPrice: trade.price, coverTime: trade.created_at };
-                    }
                 }
             }
 
@@ -397,6 +419,7 @@ function displayUserTrades(trades) {
             }
         });
     });
+
 
     // ── Pair trade matching (unchanged) ──
     const closedPairIds = new Set();
@@ -608,11 +631,17 @@ function displayUserTrades(trades) {
             const isShortTrade = trade.side === 'SELL';
 
             if (isClosed && closing) {
-                const closePrice = closing.sellPrice ?? closing.coverPrice;
-                if (isShortTrade) {
-                    pnl = (trade.price - closePrice) * trade.quantity;
+                if (closing.realizedPnl !== undefined) {
+                    // Cumulative PnL from all matched chunks (correct for partial closes)
+                    pnl = closing.realizedPnl;
                 } else {
-                    pnl = (closePrice - trade.price) * trade.quantity;
+                    // Legacy fallback: single-exit-price formula
+                    const closePrice = closing.sellPrice ?? closing.coverPrice;
+                    if (isShortTrade) {
+                        pnl = (trade.price - closePrice) * trade.quantity;
+                    } else {
+                        pnl = (closePrice - trade.price) * trade.quantity;
+                    }
                 }
                 pnlPct = total > 0 ? (pnl / total * 100) : 0;
             } else if (tea) {
