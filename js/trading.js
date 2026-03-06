@@ -339,13 +339,15 @@ async function executeTrade() {
 
             setActiveBalance(result.new_balance);
 
-            // FIX #4: Immediately fetch trades so the server-confirmed row
+            // Immediately fetch trades so the server-confirmed row
             // replaces any optimistic/estimated row in the UI.
             await loadUserTrades();
 
+            // Use the server-confirmed execution price for the toast.
+            const confirmedIdxPrice = result.execution_price ?? executionPrice;
             const idxSideLabel = state.tradeType === 'BUY' ? 'Bought' : 'Shorted';
             const _sc = result.spread_cost ? ` — Spread: $${Number(result.spread_cost).toFixed(4)}` : '';
-            showToast('Trade Executed!', `${idxSideLabel} ${qty.toLocaleString()} kg of ${productName} at $${(result.execution_price || executionPrice).toFixed(4)}/kg (${leverage}x)${_sc}`);
+            showToast('Trade Executed!', `${idxSideLabel} ${qty.toLocaleString()} kg of ${productName} at $${confirmedIdxPrice.toFixed(4)}/kg (${leverage}x)${_sc}`);
 
             await loadIndexPositions();
 
@@ -361,8 +363,12 @@ async function executeTrade() {
 
             setActiveBalance(result.new_balance);
 
+            // Immediately fetch trades so the server-confirmed row appears
+            // in the table before the toast fires — prevents stale estimated rows.
+            await loadUserTrades();
+
+            // Use the server-confirmed price for the toast (source of truth).
             const serverPrice = result.price;
-            const serverTotal = result.total;
 
             const sideLabel = state.tradeType === 'BUY' ? 'Bought' : 'Shorted';
             const _sc = result.spread_cost ? ` — Spread: $${Number(result.spread_cost).toFixed(4)}` : '';
