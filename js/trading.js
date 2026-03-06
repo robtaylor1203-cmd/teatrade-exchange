@@ -339,12 +339,28 @@ async function executeTrade() {
 
             setActiveBalance(result.new_balance);
 
+            // Immediately patch local indexPositions state with the server-confirmed
+            // execution price BEFORE loadUserTrades() renders the table.
+            // This prevents the client's stale volume-weighted average (volume_24h
+            // may not be up-to-date) from causing a P/L offset on first render.
+            const confirmedIdxPrice = result.execution_price ?? executionPrice;
+            if (state.indexPositions) {
+                if (state.indexPositions[indexSymbol]) {
+                    state.indexPositions[indexSymbol].avg_entry_price = confirmedIdxPrice;
+                } else {
+                    state.indexPositions[indexSymbol] = {
+                        avg_entry_price: confirmedIdxPrice,
+                        quantity: state.tradeType === 'BUY' ? qty : -qty,
+                        leverage
+                    };
+                }
+            }
+
             // Immediately fetch trades so the server-confirmed row
             // replaces any optimistic/estimated row in the UI.
             await loadUserTrades();
 
-            // Use the server-confirmed execution price for the toast.
-            const confirmedIdxPrice = result.execution_price ?? executionPrice;
+            // confirmedIdxPrice already declared above — reuse for toast.
             const idxSideLabel = state.tradeType === 'BUY' ? 'Bought' : 'Shorted';
             const _sc = result.spread_cost ? ` — Spread: $${Number(result.spread_cost).toFixed(4)}` : '';
             showToast('Trade Executed!', `${idxSideLabel} ${qty.toLocaleString()} kg of ${productName} at $${confirmedIdxPrice.toFixed(4)}/kg (${leverage}x)${_sc}`);
