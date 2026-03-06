@@ -1786,8 +1786,11 @@ async function executeHubTrade(side) {
             setActiveBalance(result.new_balance);
             const execP = result.execution_price || price;
             const _sc = result.spread_cost ? ` | Spread: $${Number(result.spread_cost).toFixed(2)}` : '';
-            const _mu = result.margin_used ? ` | Margin: $${Number(result.margin_used).toFixed(2)}` : '';
             showToast(`${side.toUpperCase()} filled: ${symbol} ${quantity}kg @ $${execP.toFixed(2)} (${leverage}x)${_sc}${_mu}`, 'success');
+        }
+
+        if (typeof completeFirstTradeMissionTrade === 'function') {
+            completeFirstTradeMissionTrade();
         }
 
         addTradeToLog({

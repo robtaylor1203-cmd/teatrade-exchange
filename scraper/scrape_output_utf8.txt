@@ -1,0 +1,80 @@
+﻿Fetching Google News RSS for Tea Commodities...
+Found 49 news articles.
+Processing: Secret GRAS: How 100+ food chemicals bypassed government safety review
+node : OpenAI 
+processing failed: 429 
+You exceeded your 
+current quota, please 
+check your plan and 
+billing details. For 
+more information on 
+this error, read the 
+docs: https://platform.
+openai.com/docs/guides/
+error-codes/api-errors.
+At line:1 char:1
++ node news_scraper.js 
+> scrape_output.txt 
+2>&1
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (OpenAI proces   
+ si...des/api-error    
+s.:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+Processing: India's Tea Market Report 2026 - Prices, Size, Forecast, and Companies - IndexBox
+OpenAI processing 
+failed: 429 You 
+exceeded your current 
+quota, please check 
+your plan and billing 
+details. For more 
+information on this 
+error, read the docs: h
+ttps://platform.openai.
+com/docs/guides/error-c
+odes/api-errors.
+Processing: Local Women Leaders Will Share Insights at Annual 'Spill the Tea'
+OpenAI processing 
+failed: 429 You 
+exceeded your current 
+quota, please check 
+your plan and billing 
+details. For more 
+information on this 
+error, read the docs: h
+ttps://platform.openai.
+com/docs/guides/error-c
+odes/api-errors.
+Processing: East India Company
+OpenAI processing 
+failed: 429 You 
+exceeded your current 
+quota, please check 
+your plan and billing 
+details. For more 
+information on this 
+error, read the docs: h
+ttps://platform.openai.
+com/docs/guides/error-c
+odes/api-errors.
+Processing: Cardio Slim Tea Homocysteine Claims Evaluated in 2026 Consumer Report on Blood Pressure Support, Ingredient Transparency, and Weight Management Marketing Trends
+OpenAI processing 
+failed: 429 You 
+exceeded your current 
+quota, please check 
+your plan and billing 
+details. For more 
+information on this 
+error, read the docs: h
+ttps://platform.openai.
+com/docs/guides/error-c
+odes/api-errors.
+News scraping complete.

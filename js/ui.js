@@ -249,87 +249,127 @@ function updateAuctionTable() {
 }
 
 // =============================================
-// TEA SELECT (Trade Form)
+// TEA SELECT (Trade Form & Mobile Header)
 // =============================================
 
 function populateTeaSelect() {
-    const select = document.getElementById('trade-tea-select');
+    const selects = [
+        document.getElementById('trade-tea-select'),
+        document.getElementById('mobile-trade-tea-select')
+    ].filter(Boolean); // Only work with elements that exist
 
-    // Preserve current selection
-    const currentValue = select.value;
+    if (selects.length === 0) return;
+
+    // Use the first select to check state, assuming they sync
+    const firstSelect = selects[0];
+    const currentValue = firstSelect.value;
     const currentQty = document.getElementById('trade-qty')?.value;
 
     // Skip full rebuild if user is actively using the form
     if (state.isTradeFormActive && currentValue) {
         // Just update the prices in existing options without rebuilding
-        state.teas.forEach(tea => {
-            const option = select.querySelector(`option[value="${tea.id}"]`);
-            if (option) {
-                const change = tea.previous_price ? ((tea.current_price - tea.previous_price) / tea.previous_price * 100).toFixed(1) : '0.0';
-                const changeSign = change >= 0 ? '+' : '';
-                option.textContent = `${tea.symbol} - $${tea.current_price.toFixed(2)} (${changeSign}${change}%)`;
-                option.dataset.price = tea.current_price;
-            }
-        });
-
-        // Also update index prices (crucial for live trading)
-        const indexes = calculateRegionalIndexes();
-        if (indexes && indexes.length > 0) {
-            indexes.forEach(idx => {
-                const option = select.querySelector(`option[value="INDEX_${idx.symbol}"]`);
+        selects.forEach(select => {
+            state.teas.forEach(tea => {
+                const option = select.querySelector(`option[value="${tea.id}"]`);
                 if (option) {
-                    const changeSign = idx.change >= 0 ? '+' : '';
-                    option.textContent = `${idx.symbol} Index - $${idx.price.toFixed(2)} (${changeSign}${idx.change.toFixed(1)}%)`;
-                    option.dataset.price = idx.price;
+                    const change = tea.previous_price ? ((tea.current_price - tea.previous_price) / tea.previous_price * 100).toFixed(1) : '0.0';
+                    const changeSign = change >= 0 ? '+' : '';
+                    option.textContent = `${tea.symbol} - $${tea.current_price.toFixed(2)} (${changeSign}${change}%)`;
+                    option.dataset.price = tea.current_price;
                 }
             });
-        }
+
+            // Also update index prices (crucial for live trading)
+            const indexes = calculateRegionalIndexes();
+            if (indexes && indexes.length > 0) {
+                indexes.forEach(idx => {
+                    const option = select.querySelector(`option[value="INDEX_${idx.symbol}"]`);
+                    if (option) {
+                        const changeSign = idx.change >= 0 ? '+' : '';
+                        option.textContent = `${idx.symbol} Index - $${idx.price.toFixed(2)} (${changeSign}${idx.change.toFixed(1)}%)`;
+                        option.dataset.price = idx.price;
+                    }
+                });
+            }
+        });
 
         updateTradeSummary();
         return;
     }
 
-    select.innerHTML = '<option value="">Select Tea...</option>';
+    // Full rebuild for both selects
+    const optionsHTML = [];
+    optionsHTML.push('<option value="">Select Asset...</option>');
 
-    // Add teas
-    const teaOptgroup = document.createElement('optgroup');
-    teaOptgroup.label = 'Teas';
+    // Build the optgroup for Teas
+    optionsHTML.push('<optgroup label="Teas">');
     state.teas.forEach(tea => {
         const change = tea.previous_price ? ((tea.current_price - tea.previous_price) / tea.previous_price * 100).toFixed(1) : '0.0';
         const changeSign = change >= 0 ? '+' : '';
-        const option = document.createElement('option');
-        option.value = tea.id;
-        option.textContent = `${tea.symbol} - $${tea.current_price.toFixed(2)} (${changeSign}${change}%)`;
-        option.dataset.price = tea.current_price;
-        option.dataset.type = 'tea';
-        teaOptgroup.appendChild(option);
+        optionsHTML.push(`<option value="${tea.id}" data-price="${tea.current_price}">${tea.symbol} - $${tea.current_price.toFixed(2)} (${changeSign}${change}%)</option>`);
     });
-    select.appendChild(teaOptgroup);
+    optionsHTML.push('</optgroup>');
 
-    // Add regional indexes
+    // Build the optgroup for Indexes
     const indexes = calculateRegionalIndexes();
     if (indexes && indexes.length > 0) {
-        const indexOptgroup = document.createElement('optgroup');
-        indexOptgroup.label = 'Indexes';
+        optionsHTML.push('<optgroup label="Regional Indexes">');
         indexes.forEach(idx => {
+            if (!idx.teas || idx.teas.length === 0) return;
             const changeSign = idx.change >= 0 ? '+' : '';
-            const option = document.createElement('option');
-            option.value = `INDEX_${idx.symbol}`;
-            option.textContent = `${idx.symbol} Index - $${idx.price.toFixed(2)} (${changeSign}${idx.change.toFixed(1)}%)`;
-            option.dataset.price = idx.price;
-            option.dataset.type = 'index';
-            indexOptgroup.appendChild(option);
+            optionsHTML.push(`<option value="INDEX_${idx.symbol}" data-price="${idx.price}">${idx.symbol} Index - $${idx.price.toFixed(2)} (${changeSign}${idx.change.toFixed(1)}%)</option>`);
         });
-        select.appendChild(indexOptgroup);
+        optionsHTML.push('</optgroup>');
     }
 
-    // Restore selection if it still exists
-    if (currentValue) {
-        select.value = currentValue;
-        if (currentQty && document.getElementById('trade-qty')) {
-            document.getElementById('trade-qty').value = currentQty;
+    // Apply the exact same built HTML to all selects simultaneously
+    const joinedHTML = optionsHTML.join('');
+    selects.forEach(select => {
+        select.innerHTML = joinedHTML;
+        if (currentValue) select.value = currentValue;
+    });
+
+    // Determine the main chart symbol
+    const _CARD_TO_INDEX = { 'KENYAN': 'KENYA' };
+    const mainSym = state.mainChartData ? (_CARD_TO_INDEX[state.mainChartData.symbol] || state.mainChartData.symbol) : null;
+    const isIdx = state.mainChartData ? !!state.mainChartData.isIndex : false;
+
+    // Helper to find correct option value
+    let valToSelect = null;
+    if (mainSym) {
+        if (isIdx) {
+            valToSelect = 'INDEX_' + mainSym;
+        } else {
+            const t = state.teas?.find(x => x.symbol === mainSym);
+            if (t) valToSelect = String(t.id);
         }
-        updateTradeSummary();
+    }
+
+    // Ensure selects display the current chart focus on first load/re-build
+    if (valToSelect && select) { // fallback check if we don't have current value
+        selects.forEach(sel => {
+            if (sel.querySelector(`option[value="${valToSelect}"]`)) {
+                sel.value = valToSelect;
+            }
+        });
+    }
+
+    updateTradeSummary();
+
+    // The rest of this function handles event listeners for the desktop panel only
+    // Mobile select has an inline onchange in HTML to sync the chart.
+    const firstSelectElement = document.getElementById('trade-tea-select');
+    if (firstSelectElement && !firstSelectElement._hasListener) {
+        firstSelectElement.addEventListener('change', () => {
+            const qtyInput = document.getElementById('trade-qty');
+            if (!qtyInput.value) qtyInput.value = '100'; // Default 100kg
+            updateTradeSummary();
+            // Important: Change main chart dynamically when user selects a tea in the desktop trade form
+            if (typeof syncChartToTradeSelect === 'function') {
+                syncChartToTradeSelect();
+            }
+        });
+        firstSelectElement._hasListener = true;
     }
 }
 
@@ -2293,3 +2333,62 @@ function _showShareToast(msg) {
         };
     }
 })();
+
+// =============================================
+// FIRST TRADE MISSION
+// =============================================
+
+function startFirstTradeMission() {
+    if (localStorage.getItem('firstTradeMissionDone')) return;
+
+    // Show intercept modal
+    const modal = document.getElementById('first-trade-modal');
+    if (modal) modal.classList.add('visible');
+
+    // Add pulse animation to main BUY buttons
+    const tradeBtn = document.getElementById('trade-execute-btn');
+    if (tradeBtn) tradeBtn.classList.add('pulse-animation');
+
+    const hubBuyBtn = document.getElementById('btn-trade-buy'); // The buy toggle button in the main panel
+    if (hubBuyBtn) hubBuyBtn.classList.add('pulse-animation');
+
+    // Pre-fill the standard order ticket (Assam, 100kg, 1x leverage)
+    const teaSelect = document.getElementById('trade-tea-select');
+    if (teaSelect && typeof setTradeType === 'function') {
+        const assamOptions = Array.from(teaSelect.options).filter(opt => opt.text.toLowerCase().includes('assam'));
+        if (assamOptions.length > 0) {
+            teaSelect.value = assamOptions[0].value;
+        } else if (teaSelect.options.length > 1) {
+            teaSelect.value = teaSelect.options[1].value;
+        }
+    }
+
+    const qtyInput = document.getElementById('trade-qty');
+    if (qtyInput) qtyInput.value = '100';
+
+    const levSelect = document.getElementById('trade-leverage');
+    if (levSelect) levSelect.value = '1';
+
+    if (typeof updateTradeSummary === 'function') {
+        updateTradeSummary();
+    }
+    if (typeof setTradeType === 'function') {
+        setTradeType('BUY'); // Force BUY side
+    }
+}
+
+function completeFirstTradeMissionAck() {
+    const modal = document.getElementById('first-trade-modal');
+    if (modal) modal.classList.remove('visible');
+}
+
+function completeFirstTradeMissionTrade() {
+    if (localStorage.getItem('firstTradeMissionDone')) return;
+    localStorage.setItem('firstTradeMissionDone', 'true');
+
+    const tradeBtn = document.getElementById('trade-execute-btn');
+    if (tradeBtn) tradeBtn.classList.remove('pulse-animation');
+
+    const hubBuyBtn = document.getElementById('btn-trade-buy');
+    if (hubBuyBtn) hubBuyBtn.classList.remove('pulse-animation');
+}

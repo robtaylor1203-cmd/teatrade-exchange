@@ -386,6 +386,10 @@ async function executeTrade() {
         btn.classList.add('trade-success');
         btn.disabled = false;
 
+        if (typeof completeFirstTradeMissionTrade === 'function') {
+            completeFirstTradeMissionTrade();
+        }
+
         // Refresh data from server (source of truth)
         await Promise.all([loadPositions(), loadUserTrades(), loadUserProfile()]);
         updateUIForLoggedInUser();

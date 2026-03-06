@@ -639,7 +639,10 @@ function renderNewsFeed() {
                 const cls = t.toLowerCase().includes('bullish') ? 'ntag-bull' : t.toLowerCase().includes('bearish') ? 'ntag-bear' : 'ntag-neut';
                 return '<span class="ntag ' + cls + '">' + esc(t) + '</span>';
             }).join('') +
+            '<div style="margin-left:auto; display:flex; gap:6px;">' +
+            (item.url ? '<a href="' + esc(item.url) + '" target="_blank" rel="noopener noreferrer" class="news-digest-btn" style="text-decoration:none; color:inherit;" onclick="event.stopPropagation();">READ ARTICLE ↗</a>' : '') +
             '<button class="news-digest-btn" onclick="event.stopPropagation();openDrawer(' + i + ')">DIGEST</button>' +
+            '</div>' +
             '</div>' +
             '</div>';
     }).join('');

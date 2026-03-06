@@ -656,26 +656,28 @@ function calculateRegionalIndexes() {
         : defaultDbIndexes;
 
     return indexes.map(idx => {
+        let count = 0;
+        let sum = 0;
+        let prevCount = 0;
+        let prevSum = 0;
         let totalVol = 0;
-        let weightedSum = 0;
-        let prevTotalVol = 0;
-        let prevWeightedSum = 0;
 
         idx.teas.forEach(s => {
             const tea = teaMap[s];
-            if (tea && tea.current_price > 0 && tea.volume_24h > 0) {
-                totalVol += tea.volume_24h;
-                weightedSum += tea.current_price * tea.volume_24h;
+            if (tea && tea.current_price > 0) {
+                count++;
+                sum += tea.current_price;
+                totalVol += (tea.volume_24h || 0);
 
                 if (tea.previous_price > 0) {
-                    prevTotalVol += tea.volume_24h;
-                    prevWeightedSum += tea.previous_price * tea.volume_24h;
+                    prevCount++;
+                    prevSum += tea.previous_price;
                 }
             }
         });
 
-        const avgPrice = totalVol > 0 ? weightedSum / totalVol : 0;
-        const avgPrevPrice = prevTotalVol > 0 ? prevWeightedSum / prevTotalVol : avgPrice;
+        const avgPrice = count > 0 ? sum / count : 0;
+        const avgPrevPrice = prevCount > 0 ? prevSum / prevCount : avgPrice;
         const change = avgPrevPrice > 0 ? ((avgPrice - avgPrevPrice) / avgPrevPrice) * 100 : 0;
 
         return {
@@ -750,16 +752,28 @@ function syncMobileHeader() {
     const isUp = change >= 0;
     const m = state.chartMetrics || {};
 
-    const sym = document.getElementById('mobile-header-symbol');
-    const name = document.getElementById('mobile-header-name');
+    const sym = document.getElementById('mobile-trade-tea-select');
     const priceEl = document.getElementById('mobile-header-price');
     const changeEl = document.getElementById('mobile-header-change');
     const volEl = document.getElementById('mobile-header-vol');
     const highEl = document.getElementById('mobile-header-high');
     const lowEl = document.getElementById('mobile-header-low');
 
-    if (sym) sym.textContent = d.symbol || '---';
-    if (name) name.textContent = d.name || 'Select an Asset';
+    // Update the dropdown selection to match the currently viewed asset
+    if (sym) {
+        let valToSelect = null;
+        if (d.isIndex) {
+            valToSelect = 'INDEX_' + (d.symbol === 'KENYAN' ? 'KENYA' : d.symbol);
+        } else {
+            const t = state.teas?.find(x => x.symbol === d.symbol);
+            if (t) valToSelect = String(t.id);
+        }
+
+        if (valToSelect && sym.querySelector(`option[value="${valToSelect}"]`)) {
+            sym.value = valToSelect;
+        }
+    }
+
     if (priceEl) priceEl.textContent = formatIndexPrice(price, curr, d.symbol);
     if (changeEl) {
         const pct = `${isUp ? '+' : ''}${change.toFixed(2)}%`;

@@ -178,7 +178,12 @@ async function handleLogin(e) {
             updateUIForLoggedInUser();
             if (typeof startUserSubscriptions === 'function') startUserSubscriptions(data.user.id);
             if (typeof _ensureTradeNotificationChannel === 'function') _ensureTradeNotificationChannel();
-            showToast('Welcome back!', `Good to see you, ${state.userProfile?.username || 'trader'}!`);
+
+            if (typeof startFirstTradeMission === 'function' && !localStorage.getItem('firstTradeMissionDone')) {
+                startFirstTradeMission();
+            } else {
+                showToast('Welcome back!', `Good to see you, ${state.userProfile?.username || 'trader'}!`);
+            }
         }
 
     } catch (error) {
@@ -297,19 +302,19 @@ function submitEarlyAccess(e) {
         body: formData,
         mode: 'no-cors'
     })
-    .then(() => {
-        form.innerHTML = `
+        .then(() => {
+            form.innerHTML = `
             <div class="early-access-success">
                 <div class="early-access-success-icon">&#10003;</div>
                 <p>You're on the list! We'll notify you at <strong>${email}</strong> when TeaTrade Exchange launches.</p>
             </div>
         `;
-    })
-    .catch(() => {
-        btn.disabled = false;
-        btn.textContent = 'Get Early Access';
-        alert('Something went wrong. Please try again.');
-    });
+        })
+        .catch(() => {
+            btn.disabled = false;
+            btn.textContent = 'Get Early Access';
+            alert('Something went wrong. Please try again.');
+        });
 }
 
 // =============================================
@@ -471,7 +476,7 @@ async function cancelMfaEnroll() {
     if (_mfaEnrollFactorId) {
         try {
             await supabaseClient.auth.mfa.unenroll({ factorId: _mfaEnrollFactorId });
-        } catch (_) {}
+        } catch (_) { }
         _mfaEnrollFactorId = null;
     }
     showMfaState('unenrolled');
@@ -564,7 +569,12 @@ async function submitMfaChallenge() {
         await loadUserProfile();
         updateUIForLoggedInUser();
         if (typeof startUserSubscriptions === 'function') startUserSubscriptions(state.currentUser.id);
-        showToast('Welcome back!', `Good to see you, ${state.userProfile?.username || 'trader'}!`);
+
+        if (typeof startFirstTradeMission === 'function' && !localStorage.getItem('firstTradeMissionDone')) {
+            startFirstTradeMission();
+        } else {
+            showToast('Welcome back!', `Good to see you, ${state.userProfile?.username || 'trader'}!`);
+        }
     } catch (err) {
         console.error('MFA challenge error:', err);
         errorDiv.textContent = err.message || 'Invalid code. Please try again.';
@@ -611,7 +621,7 @@ document.addEventListener('keydown', (e) => {
 
 // Wire focus traps when modals open
 const _openAuthModal = openAuthModal;
-openAuthModal = function() {
+openAuthModal = function () {
     _openAuthModal();
     const content = document.querySelector('#auth-modal .auth-content');
     if (content) {

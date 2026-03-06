@@ -1215,9 +1215,11 @@
                 <div class="chart-section" id="chart-section">
                     <div class="t212-pro-header">
                         <div class="pro-header-main">
-                            <div class="pro-asset-info">
-                                <h1 id="mobile-header-symbol">---</h1>
-                                <span id="mobile-header-name">Select an Asset</span>
+                            <div class="pro-asset-info" style="flex: 1; max-width: 60%;">
+                                <select id="mobile-trade-tea-select" class="mobile-trade-select"
+                                    onchange="if(typeof syncChartToTradeSelect === 'function') { syncChartToTradeSelect(this.value); }">
+                                    <option value="">Select an Asset</option>
+                                </select>
                             </div>
                             <div class="pro-price-info">
                                 <div id="mobile-header-price" class="pro-live-price">$0.00</div>
@@ -2754,6 +2756,23 @@
         </div>
     </div>
 
+    <!-- First Trade Mission Modal -->
+    <div id="first-trade-modal" class="modal" role="dialog" aria-modal="true">
+        <div class="modal-content" style="max-width: 440px; text-align: center; padding: 32px 24px;">
+            <div style="font-size: 48px; margin-bottom: 16px;">🎯</div>
+            <h2 style="font-size: 20px; margin-bottom: 12px; font-weight: 600;">Welcome to the Trading Floor</h2>
+            <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.5; margin-bottom: 24px;">
+                Your account is funded with <strong>$10,000</strong> in virtual capital. Your first mission: Execute a
+                trade on any active tea contract to unlock your portfolio dashboard.
+            </p>
+            <button class="trade-execute-btn buy"
+                style="width: 100%; border-radius: 6px; padding: 12px; font-weight: 600;"
+                onclick="completeFirstTradeMissionAck()">
+                Acknowledge Mission
+            </button>
+        </div>
+    </div>
+
     <!-- MFA Setup Modal (account security settings) -->
     <div class="mfa-modal" id="mfa-setup-modal" role="dialog" aria-modal="true" aria-labelledby="mfa-setup-title">
         <div class="mfa-backdrop" onclick="closeMfaSetupModal()"></div>
@@ -3088,12 +3107,19 @@
 
     <!-- Rotate prompt for fullscreen charts on mobile -->
     <div class="rotate-prompt" id="rotate-prompt">
+        <button class="rotate-prompt-close"
+            onclick="if(typeof toggleMaximize === 'function') toggleMaximize('chart-section');"
+            aria-label="Close fullscreen">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+        </button>
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <rect x="4" y="2" width="16" height="20" rx="2" />
             <path d="M12 18h.01" />
         </svg>
         <div>Rotate your phone for the best chart experience</div>
-        <div class="rotate-prompt-sub">Tap the chart's close button or press back to exit</div>
+        <div class="rotate-prompt-sub">Or tap the X above to exit fullscreen</div>
     </div>
 
     <div id="fca-warning-modal" style="display: none;" class="fca-overlay">
