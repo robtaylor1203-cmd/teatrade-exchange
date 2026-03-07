@@ -330,12 +330,16 @@ async function executeTrade() {
 
     try {
         if (isIndexTrade) {
-            // ── INDEX TRADE (C4 FIX: server-side atomic execution) ──
-            // Use the live price from calculateRegionalIndexes (not the form
-            // field) to ensure it matches the server's current reality.
-            const executionPrice = (_liveIndex?.price && _liveIndex.price > 0)
-                ? _liveIndex.price
-                : price;
+            // ── INDEX TRADE ─────────────────────────────────────────────────────
+            // Send exactly the price the user sees in the form (Ask for BUY,
+            // Bid for SELL — already spread-adjusted). The Edge Function will
+            // store this exact price; no further spread is added server-side.
+            // spread = +1% for BUY (Ask), -1% for SELL (Bid)
+            const SPREAD = 0.01; // 1% per side
+            const midPrice = (_liveIndex?.price && _liveIndex.price > 0) ? _liveIndex.price : price;
+            const executionPrice = state.tradeType === 'BUY'
+                ? midPrice * (1 + SPREAD)   // user sees and buys at Ask
+                : midPrice * (1 - SPREAD);  // user sees and sells at Bid
 
             const result = await apiExecuteIndexTrade(indexSymbol, state.tradeType, qty, executionPrice, leverage);
 

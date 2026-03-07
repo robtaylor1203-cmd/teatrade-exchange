@@ -106,72 +106,13 @@ serve(async (req) => {
         })
       }
 
-      // ── Server-authoritative price ─────────────────────────────────────────
-      // The server ALWAYS computes the index price from the DB. Client-sent
-      // price is ignored entirely — this eliminates all deviation errors.
-      let executionPrice: number | null = null
-
-      const { data: indexRow } = await supabaseAdmin
-        .from('indexes')
-        .select('teas')
-        .eq('symbol', symbol)
-        .single()
-
-      const teasInIndex: string[] = indexRow?.teas || []
-
-      if (teasInIndex.length > 0) {
-        const { data: teaPrices } = await supabaseAdmin
-          .from('teas')
-          .select('current_price, volume_24h')
-          .in('symbol', teasInIndex)
-
-        if (teaPrices && teaPrices.length > 0) {
-          let sum = 0
-          let totalVol = 0
-
-          teaPrices.forEach((t: any) => {
-            const px = Number(t.current_price)
-            const vol = Number(t.volume_24h)
-            if (px > 0 && vol > 0) {
-              sum += (px * vol)
-              totalVol += vol
-            }
-          })
-
-          if (totalVol > 0) {
-            executionPrice = sum / totalVol
-          } else {
-            // Fallback to simple average if no volume data exists
-            const valid = teaPrices
-              .map((t: any) => Number(t.current_price))
-              .filter((p: number) => p > 0)
-            if (valid.length > 0) {
-              executionPrice = valid.reduce((a: number, b: number) => a + b, 0) / valid.length
-            }
-          }
-        }
-      }
-
-
-      // Fallback: recent price_history for the index symbol itself
-      if (executionPrice === null) {
-        const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
-        const { data: latestPrice } = await supabaseAdmin
-          .from('price_history')
-          .select('price')
-          .eq('symbol', symbol)
-          .gte('recorded_at', tenMinAgo)
-          .order('recorded_at', { ascending: false })
-          .limit(1)
-          .single()
-
-        if (latestPrice && Number(latestPrice.price) > 0) {
-          executionPrice = Number(latestPrice.price)
-        }
-      }
-
-      if (executionPrice === null || executionPrice <= 0) {
-        return new Response(JSON.stringify({ success: false, error: 'Could not determine server price for ' + symbol }), {
+      // ── Use client-provided price directly ─────────────────────────────────
+      // The client sends the Ask (for BUY) or Bid (for SELL) exactly as shown
+      // in the trade form — already spread-adjusted. We store this price as-is.
+      // This guarantees the order table shows exactly what the user saw in the UI.
+      const executionPrice = Number(body.price)
+      if (!executionPrice || executionPrice <= 0 || !isFinite(executionPrice)) {
+        return new Response(JSON.stringify({ success: false, error: 'Invalid price supplied by client' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400,
         })
@@ -198,6 +139,7 @@ serve(async (req) => {
       const result = data as Record<string, unknown>
       return new Response(JSON.stringify({
         ...result,
+        // Keep execution_price consistent with result.price (the stored value).
         execution_price: executionPrice,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
