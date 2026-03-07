@@ -935,10 +935,12 @@ function _pushPriceToActiveCharts(symbol, newPrice) {
         }
     }
 
-    // ── Hub fullscreen chart: same principle — update priceDataCache only ──
-    const hubSection = document.getElementById('chart-section');
-    if (hubSection?.classList.contains('panel-maximized')) {
-        const hubRaw = document.getElementById('hub-buy-symbol')?.value || '';
+    // ── Hub fullscreen chart: update index priceDataCache on every tick ──
+    // Previously gated on panel-maximized, which meant the hub chart would NOT
+    // receive live price updates if the panel was opened after a period of ticks.
+    // Always update the cache so that when the user opens fullscreen, the data is fresh.
+    const hubRaw = document.getElementById('hub-buy-symbol')?.value || '';
+    if (hubRaw) {
         const _cardMap = { 'KENYAN': 'KENYA' };
         const hubSymbol = _cardMap[hubRaw] || hubRaw;
         const hubIsIdx = typeof isIndexSymbol === 'function' && isIndexSymbol(hubSymbol);
@@ -951,6 +953,9 @@ function _pushPriceToActiveCharts(symbol, newPrice) {
                     updatePriceCache(hubSymbol, idxPrice, 'index');
                 }
             }
+        } else if (hubSymbol === symbol) {
+            // For tea charts: push tea's own new price into hub chart cache too
+            updatePriceCache(hubSymbol, newPrice, 'tea');
         }
     }
 

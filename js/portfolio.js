@@ -116,10 +116,12 @@ function updatePortfolioDisplay() {
         const absQty = Math.abs(pos.quantity);
         const currentValue = absQty * index.price;
         const costBasis = absQty * pos.avg_entry_price;
-        const spreadMargin = index.price * 0.002;
+        // Server SQL (execute_index_trade, 20260222180000): v_spread from platform_config,
+        // default 0.01 (1% total = 0.5% per side). Exit at Bid (long) or Ask (short).
+        const IDX_HALF_SPREAD = 0.005;
         const exitPrice = isShort
-            ? index.price + spreadMargin
-            : index.price - spreadMargin;
+            ? index.price * (1 + IDX_HALF_SPREAD)  // short closes at Ask
+            : index.price * (1 - IDX_HALF_SPREAD); // long closes at Bid
         const lev = Number(pos.leverage) || 1;
         const margin = costBasis / lev;
         const notionalValue = margin * lev;
