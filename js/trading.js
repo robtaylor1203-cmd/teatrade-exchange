@@ -96,6 +96,11 @@ function updateTradeSummary() {
 
     let isIndexSelected = false;
 
+    // Index spread: fixed 0.2% (0.1% per side) — the house margin per index trade.
+    // This mirrors Trading212's model: BUY at Ask (mid + half spread),
+    // SELL at Bid (mid − half spread). The spread is the guaranteed house revenue.
+    const INDEX_SPREAD_PCT = 0.002;
+
     if (selectValue) {
         if (selectValue.startsWith('INDEX_')) {
             isIndexSelected = true;
@@ -121,14 +126,16 @@ function updateTradeSummary() {
 
     const qty = parseFloat(qtyInput.value) || 0;
     const leverage = clampLeverage(parseFloat(document.getElementById('trade-leverage')?.value) || 10);
-    const SPREAD_PCT = baseSpread * volMultiplier;
+
+    // Spread: index → fixed 0.2%; tea → base_spread × volatility_multiplier
+    const SPREAD_PCT = isIndexSelected ? INDEX_SPREAD_PCT : (baseSpread * volMultiplier);
 
     const isBuy = state.tradeType === 'BUY';
-    // FIX #3: For index trades show the unadjusted market price — the server applies
-    // its own spread at execution. For tea trades keep the spread-adjusted ask/bid.
-    const execPrice = isIndexSelected
-        ? price
-        : (price > 0 ? (isBuy ? price * (1 + SPREAD_PCT / 2) : price * (1 - SPREAD_PCT / 2)) : 0);
+    // BUY at Ask (mid + half-spread), SELL at Bid (mid − half-spread).
+    // This is the T212 model: spread is the cost of entry visible in the form.
+    const execPrice = price > 0
+        ? (isBuy ? price * (1 + SPREAD_PCT / 2) : price * (1 - SPREAD_PCT / 2))
+        : 0;
     priceInput.value = execPrice > 0 ? execPrice.toFixed(3) : '';
 
     const priceLabel = document.getElementById('trade-price-label');
@@ -339,10 +346,30 @@ async function executeTrade() {
 
             setActiveBalance(result.new_balance);
 
+            // ── Sync volume_24h from DB ─────────────────────────────────────────
+            // The server computes its index VWA using live DB volume_24h weights.
+            // Our client's state.teas[].volume_24h may be stale (only updated via
+            // Realtime when the volume column changes). A stale VWA causes the client's
+            // calculateRegionalIndexes() to return a different price than the server
+            // computed, making open P/L appear incorrect immediately after execution.
+            // Fix: fetch fresh current_price + volume_24h for all teas before rendering.
+            try {
+                const { data: freshTeas } = await supabaseClient
+                    .from('teas')
+                    .select('id, current_price, volume_24h');
+                if (freshTeas && freshTeas.length > 0 && state.teas) {
+                    freshTeas.forEach(ft => {
+                        const idx = state.teas.findIndex(t => t.id === ft.id);
+                        if (idx >= 0) {
+                            if (ft.current_price > 0) state.teas[idx].current_price = ft.current_price;
+                            if (ft.volume_24h != null) state.teas[idx].volume_24h = ft.volume_24h;
+                        }
+                    });
+                }
+            } catch (_) { /* non-fatal: stale weights are better than crashing */ }
+
             // Immediately patch local indexPositions state with the server-confirmed
             // execution price BEFORE loadUserTrades() renders the table.
-            // This prevents the client's stale volume-weighted average (volume_24h
-            // may not be up-to-date) from causing a P/L offset on first render.
             const confirmedIdxPrice = result.execution_price ?? executionPrice;
             if (state.indexPositions) {
                 if (state.indexPositions[indexSymbol]) {

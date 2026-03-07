@@ -608,13 +608,18 @@ function displayUserTrades(trades) {
                 const index = idxList.find(idx => idx.symbol === trade.index_symbol);
 
                 if (index) {
-                    // FIX #2: No additional display spread. Spread was paid at entry.
-                    // P/L = direct diff between live market price and actual execution price.
+                    // T212 model: entry was at Ask (mid + spread/2), exit at Bid (mid - spread/2).
+                    // A freshly opened BUY starts slightly negative = the spread cost.
+                    // This is correct: the spread is the house revenue per trade.
+                    const IDX_SPREAD = 0.001; // half of 0.2% index spread
+                    const exitPrice = isShortIdx
+                        ? index.price * (1 + IDX_SPREAD)  // short closes by buying at Ask
+                        : index.price * (1 - IDX_SPREAD); // long closes by selling at Bid
                     const notionalValue = total * leverage;
                     const units = notionalValue / trade.price;
                     pnl = isShortIdx
-                        ? (trade.price - index.price) * units
-                        : (index.price - trade.price) * units;
+                        ? (trade.price - exitPrice) * units
+                        : (exitPrice - trade.price) * units;
                     if (pnl < -total) pnl = -total;
                     pnlPct = total > 0 ? (pnl / total * 100) : 0;
                 } else {
@@ -644,13 +649,17 @@ function displayUserTrades(trades) {
                 }
                 pnlPct = total > 0 ? (pnl / total * 100) : 0;
             } else if (tea) {
-                // FIX #2: No additional display spread. Spread was paid at entry.
-                // P/L = direct diff between live market price and actual execution price.
+                // T212 model: entry at Ask, exit at Bid → starts negative by the spread.
+                // Use half the tea's spread as the exit price adjustment.
+                const teaHalfSpread = (Number(tea.base_spread) || 0.01) * (Number(tea.volatility_multiplier) || 1.0) / 2;
+                const exitPrice = isShortTrade
+                    ? tea.current_price * (1 + teaHalfSpread)  // short closes at Ask
+                    : tea.current_price * (1 - teaHalfSpread); // long closes at Bid
                 const notionalValue = total * leverage;
                 const units = notionalValue / trade.price;
                 pnl = isShortTrade
-                    ? (trade.price - tea.current_price) * units
-                    : (tea.current_price - trade.price) * units;
+                    ? (trade.price - exitPrice) * units
+                    : (exitPrice - trade.price) * units;
                 if (pnl < -total) pnl = -total;
                 pnlPct = total > 0 ? (pnl / total * 100) : 0;
             } else {
