@@ -608,10 +608,10 @@ function displayUserTrades(trades) {
                 const index = idxList.find(idx => idx.symbol === trade.index_symbol);
 
                 if (index) {
-                    // T212 model: entry was at Ask (mid + spread/2), exit at Bid (mid - spread/2).
-                    // A freshly opened BUY starts slightly negative = the spread cost.
-                    // This is correct: the spread is the house revenue per trade.
-                    const IDX_SPREAD = 0.001; // half of 0.2% index spread
+                    // T212 model: entry at Ask (mid + 0.5%), exit at Bid (mid - 0.5%).
+                    // Server uses v_spread = 0.01 (1% total, 0.5% per side).
+                    // A freshly opened BUY starts negative by ~1% = the full spread cost.
+                    const IDX_SPREAD = 0.005; // 0.5% per side — matches server SQL v_spread=0.01
                     const exitPrice = isShortIdx
                         ? index.price * (1 + IDX_SPREAD)  // short closes by buying at Ask
                         : index.price * (1 - IDX_SPREAD); // long closes by selling at Bid

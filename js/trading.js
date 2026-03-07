@@ -96,10 +96,11 @@ function updateTradeSummary() {
 
     let isIndexSelected = false;
 
-    // Index spread: fixed 0.2% (0.1% per side) — the house margin per index trade.
-    // This mirrors Trading212's model: BUY at Ask (mid + half spread),
-    // SELL at Bid (mid − half spread). The spread is the guaranteed house revenue.
-    const INDEX_SPREAD_PCT = 0.002;
+    // Index spread: must match the server SQL (execute_index_trade: v_spread = 0.01).
+    // Server: BUY at mid * 1.005, SELL at mid * 0.995 (0.5% per side = 1% total).
+    // The form must show the SAME spread the server will apply so the user sees
+    // the correct Ask/Bid price before confirming.
+    const INDEX_SPREAD_PCT = 0.01; // 1% total = 0.5% per side — matches server SQL
 
     if (selectValue) {
         if (selectValue.startsWith('INDEX_')) {
@@ -389,8 +390,12 @@ async function executeTrade() {
 
             // confirmedIdxPrice already declared above — reuse for toast.
             const idxSideLabel = state.tradeType === 'BUY' ? 'Bought' : 'Shorted';
+            // Use result.price (the spread-adjusted Ask/Bid stored in DB by the RPC).
+            // The Edge Function also returns 'execution_price' but overwrites it with
+            // the raw mid price — NOT what's stored in the DB or shown in the orders table.
+            const toastPrice = result.price ?? confirmedIdxPrice;
             const _sc = result.spread_cost ? ` — Spread: $${Number(result.spread_cost).toFixed(4)}` : '';
-            showToast('Trade Executed!', `${idxSideLabel} ${qty.toLocaleString()} kg of ${productName} at $${confirmedIdxPrice.toFixed(4)}/kg (${leverage}x)${_sc}`);
+            showToast('Trade Executed!', `${idxSideLabel} ${qty.toLocaleString()} kg of ${productName} at $${Number(toastPrice).toFixed(4)}/kg (${leverage}x)${_sc}`);
 
             await loadIndexPositions();
 
