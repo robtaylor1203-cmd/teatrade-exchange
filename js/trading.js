@@ -96,11 +96,9 @@ function updateTradeSummary() {
 
     let isIndexSelected = false;
 
-    // Index spread: must match the server SQL (execute_index_trade: v_spread = 0.01).
-    // Server: BUY at mid * 1.005, SELL at mid * 0.995 (0.5% per side = 1% total).
-    // The form must show the SAME spread the server will apply so the user sees
-    // the correct Ask/Bid price before confirming.
-    const INDEX_SPREAD_PCT = 0.01; // 1% total = 0.5% per side — matches server SQL
+    // Index spread: 1% per side (2% total) to match platform_config.spread_pct = 0.02.
+    // BUY at Ask = mid × 1.01, SELL at Bid = mid × 0.99.
+    const INDEX_SPREAD_PCT = 0.02; // 2% total = 1% per side — matches order table
 
     if (selectValue) {
         if (selectValue.startsWith('INDEX_')) {

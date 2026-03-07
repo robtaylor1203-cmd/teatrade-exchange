@@ -116,9 +116,8 @@ function updatePortfolioDisplay() {
         const absQty = Math.abs(pos.quantity);
         const currentValue = absQty * index.price;
         const costBasis = absQty * pos.avg_entry_price;
-        // Server SQL (execute_index_trade, 20260222180000): v_spread from platform_config,
-        // default 0.01 (1% total = 0.5% per side). Exit at Bid (long) or Ask (short).
-        const IDX_HALF_SPREAD = 0.005;
+        // Spread matches platform_config.spread_pct = 0.02 (2% total, 1% per side).
+        const IDX_HALF_SPREAD = 0.01;
         const exitPrice = isShort
             ? index.price * (1 + IDX_HALF_SPREAD)  // short closes at Ask
             : index.price * (1 - IDX_HALF_SPREAD); // long closes at Bid
@@ -610,10 +609,9 @@ function displayUserTrades(trades) {
                 const index = idxList.find(idx => idx.symbol === trade.index_symbol);
 
                 if (index) {
-                    // T212 model: entry at Ask (mid + 0.5%), exit at Bid (mid - 0.5%).
-                    // Server uses v_spread = 0.01 (1% total, 0.5% per side).
-                    // A freshly opened BUY starts negative by ~1% = the full spread cost.
-                    const IDX_SPREAD = 0.005; // 0.5% per side — matches server SQL v_spread=0.01
+                    // 1% per side matches platform_config.spread_pct = 0.02 (2% total).
+                    // Entry was at Ask (mid + 1%), exit at Bid (mid - 1%).
+                    const IDX_SPREAD = 0.01; // 1% per side — matches order table spread
                     const exitPrice = isShortIdx
                         ? index.price * (1 + IDX_SPREAD)  // short closes by buying at Ask
                         : index.price * (1 - IDX_SPREAD); // long closes by selling at Bid
