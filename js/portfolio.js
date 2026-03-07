@@ -116,11 +116,9 @@ function updatePortfolioDisplay() {
         const absQty = Math.abs(pos.quantity);
         const currentValue = absQty * index.price;
         const costBasis = absQty * pos.avg_entry_price;
-        // Spread matches platform_config.spread_pct = 0.02 (2% total, 1% per side).
-        const IDX_HALF_SPREAD = 0.01;
-        const exitPrice = isShort
-            ? index.price * (1 + IDX_HALF_SPREAD)  // short closes at Ask
-            : index.price * (1 - IDX_HALF_SPREAD); // long closes at Bid
+        // No spread on close — spread was already paid at entry (ask price).
+        // Close price = mid price exactly as shown in the portfolio.
+        const exitPrice = index.price; // long closes at mid; short covers at mid
         const lev = Number(pos.leverage) || 1;
         const margin = costBasis / lev;
         const notionalValue = margin * lev;
@@ -609,12 +607,9 @@ function displayUserTrades(trades) {
                 const index = idxList.find(idx => idx.symbol === trade.index_symbol);
 
                 if (index) {
-                    // 1% per side matches platform_config.spread_pct = 0.02 (2% total).
-                    // Entry was at Ask (mid + 1%), exit at Bid (mid - 1%).
-                    const IDX_SPREAD = 0.01; // 1% per side — matches order table spread
-                    const exitPrice = isShortIdx
-                        ? index.price * (1 + IDX_SPREAD)  // short closes by buying at Ask
-                        : index.price * (1 - IDX_SPREAD); // long closes by selling at Bid
+                    // No spread on close — T212 model: spread paid once at entry only.
+                    // Exit price = mid price as shown in the portfolio display.
+                    const exitPrice = index.price; // same price user sees in UI
                     const notionalValue = total * leverage;
                     const units = notionalValue / trade.price;
                     pnl = isShortIdx

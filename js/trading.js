@@ -625,9 +625,10 @@ async function closeIndexPosition(indexSymbol, quantity, tradeId, btn) {
 
         setActiveBalance(result.new_balance);
 
-        // Use the server-confirmed close price (spread-adjusted Bid/Ask) for P/L.
-        // result.price = v_exec_price from execute_index_trade SQL (Bid for closing a long,
-        // Ask for covering a short). Using raw index.price (mid) gave the wrong P/L.
+        // Close price = mid price. Server no longer applies spread on close
+        // (see migration 20260307000000_index_close_no_spread.sql).
+        // result.price now equals p_price (the mid we sent), so the balance
+        // adjustment, the orders table, and the toast all show the same figure.
         const closePrice = result.price ?? price;
         let pnl;
         if (isShort) {
@@ -637,7 +638,7 @@ async function closeIndexPosition(indexSymbol, quantity, tradeId, btn) {
         }
         const pnlText = pnl >= 0 ? `Profit: +$${pnl.toFixed(2)}` : `Loss: -$${Math.abs(pnl).toFixed(2)}`;
         const action = isShort ? 'Covered' : 'Sold';
-        showToast('Position Closed!', `${action} ${closeQty.toLocaleString()} kg of ${indexSymbol} Index. ${pnlText}`);
+        showToast('Position Closed!', `${action} ${closeQty.toLocaleString()} kg of ${indexSymbol} Index at $${Number(closePrice).toFixed(4)}/kg. ${pnlText}`);
 
         await Promise.all([loadPositions(), loadIndexPositions(), loadUserProfile()]);
         await new Promise(r => setTimeout(r, 400));
