@@ -625,11 +625,15 @@ async function closeIndexPosition(indexSymbol, quantity, tradeId, btn) {
 
         setActiveBalance(result.new_balance);
 
+        // Use the server-confirmed close price (spread-adjusted Bid/Ask) for P/L.
+        // result.price = v_exec_price from execute_index_trade SQL (Bid for closing a long,
+        // Ask for covering a short). Using raw index.price (mid) gave the wrong P/L.
+        const closePrice = result.price ?? price;
         let pnl;
         if (isShort) {
-            pnl = (position.avg_entry_price - price) * closeQty;
+            pnl = (position.avg_entry_price - closePrice) * closeQty;
         } else {
-            pnl = (price - position.avg_entry_price) * closeQty;
+            pnl = (closePrice - position.avg_entry_price) * closeQty;
         }
         const pnlText = pnl >= 0 ? `Profit: +$${pnl.toFixed(2)}` : `Loss: -$${Math.abs(pnl).toFixed(2)}`;
         const action = isShort ? 'Covered' : 'Sold';
