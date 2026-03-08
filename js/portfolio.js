@@ -607,9 +607,10 @@ function displayUserTrades(trades) {
                 const index = idxList.find(idx => idx.symbol === trade.index_symbol);
 
                 if (index) {
-                    // No spread on close — T212 model: spread paid once at entry only.
-                    // Exit price = mid price as shown in the portfolio display.
-                    const exitPrice = index.price; // same price user sees in UI
+                    // P/L = (currentMid − entryPrice) × qty. Simple direct diff.
+                    // entry = trade.price (Ask for BUY, Bid for SELL, spread already in it)
+                    // exit  = raw mid (no further adjustment on close)
+                    const exitPrice = index.price;
                     const notionalValue = total * leverage;
                     const units = notionalValue / trade.price;
                     pnl = isShortIdx
@@ -644,12 +645,10 @@ function displayUserTrades(trades) {
                 }
                 pnlPct = total > 0 ? (pnl / total * 100) : 0;
             } else if (tea) {
-                // T212 model: entry at Ask, exit at Bid → starts negative by the spread.
-                // Use half the tea's spread as the exit price adjustment.
-                const teaHalfSpread = (Number(tea.base_spread) || 0.01) * (Number(tea.volatility_multiplier) || 1.0) / 2;
-                const exitPrice = isShortTrade
-                    ? tea.current_price * (1 + teaHalfSpread)  // short closes at Ask
-                    : tea.current_price * (1 - teaHalfSpread); // long closes at Bid
+                // P/L = (currentMid - entryPrice) × units. Simple direct diff.
+                // trade.price = Ask/Bid already (spread already baked in at entry).
+                // exitPrice = raw tea.current_price — exactly what user sees in UI.
+                const exitPrice = tea.current_price;
                 const notionalValue = total * leverage;
                 const units = notionalValue / trade.price;
                 pnl = isShortTrade
@@ -2782,7 +2781,7 @@ function renderStoreTab() {
             : 'Prove you are an elite trader. Get a $50,000 challenge account. Make 50% profit in 30 days without a 5% daily drawdown to earn the Funded Trader badge.'}
             </div>
             <button class="store-card-btn" onclick="purchaseCombineEntry()" ${inCombine ? 'disabled' : ''}>
-                ${inCombine ? 'Challenge In Progress' : 'Enter Combine &mdash; &pound;49.00'}
+                ${inCombine ? 'Challenge In Progress' : 'Enter Combine &mdash; Start Free Beta'}
             </button>
         </div>
 

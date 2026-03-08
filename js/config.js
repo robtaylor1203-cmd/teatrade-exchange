@@ -599,16 +599,19 @@ async function claimFreeBailout() {
 async function purchaseCombineEntry() {
     _showCheckoutOverlay();
     try {
-        const result = await apiCreateCheckout('COMBINE_ENTRY');
-        if (result?.url) {
-            window.location.href = result.url;
-            return;
-        }
-        _hideCheckoutOverlay();
-        if (result?.error) showToast('Checkout Error', result.error, true);
+        // Call our new Free Combine database function directly
+        const { data, error } = await supabase.rpc('start_free_combine');
+
+        if (error) throw error;
+
+        // Success! Reload the page so the $50k balance and new tier show up
+        showToast('Success', 'Free Beta Combine Started! Good luck.', false);
+        setTimeout(() => window.location.reload(), 1500);
+
     } catch (e) {
+        showToast('Error', e.message || 'Could not start combine', true);
+    } finally {
         _hideCheckoutOverlay();
-        showToast('Error', 'Could not start checkout', true);
     }
 }
 

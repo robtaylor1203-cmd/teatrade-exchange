@@ -1,15 +1,12 @@
 // TeaTrade Exchange — Atomic Trade Execution (Server-Side)
 // ========================================================
-// This Edge Function is the ONLY way to execute trades.
-// The frontend sends { symbol, side, quantity } and this function:
+// Frontend is the SOURCE OF TRUTH for the execution price.
+// The client sends the Ask (BUY) or Bid (SELL) already spread-adjusted.
+// This function:
 //   1. Validates the JWT (user identity)
-//   2. Calls the Postgres execute_trade() function which:
-//      - Locks the tea row + profile row (prevents races)
-//      - Validates balance (BUY) or holdings (SELL)
-//      - Uses the REAL server-side market price (not client-provided)
-//      - Debits/credits balance, upserts position, records trade
-//      - All in ONE atomic transaction
-//   3. Returns the result
+//   2. Sanity-checks the client price is within ±2% of the DB price
+//   3. Calls execute_trade_secure with the CLIENT's exact price
+//   4. Returns the result
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
@@ -49,7 +46,7 @@ function decodeJWTPayload(token: string): Record<string, unknown> | null {
   }
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -80,7 +77,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Look up user via admin API (avoids getUser(jwt) "Invalid JWT" issue)
     const { data: { user }, error: authError } = await supabaseAdmin.auth.admin.getUserById(userId)
     if (authError || !user) {
       return new Response(JSON.stringify({ success: false, error: 'User not found' }), {
@@ -105,11 +101,9 @@ serve(async (req) => {
 
     // ── 2. PARSE REQUEST ───────────────────────────────────────────
     const body = await req.json()
-    const { symbol, side, quantity, mode, leverage, expected_price, slippage_tolerance } = body
+    const { symbol, side, quantity, mode, leverage } = body
     const tradingMode = (mode === 'REAL') ? 'REAL' : 'VIRTUAL'
     const lev = Math.max(1, Math.min(25, Number(leverage) || 1))
-    const expectedPrice = (expected_price != null && Number(expected_price) > 0) ? Number(expected_price) : null
-    const slippageTol = Number(slippage_tolerance) > 0 ? Number(slippage_tolerance) : 0.05
 
     if (!symbol || typeof symbol !== 'string') {
       return new Response(JSON.stringify({ success: false, error: 'Missing or invalid symbol' }), {
@@ -131,7 +125,34 @@ serve(async (req) => {
       })
     }
 
-    // ── 3. EXECUTE ATOMIC TRADE (secure: row-locked, slippage-guarded) ──
+    // ── 3. CLIENT PRICE VALIDATION ─────────────────────────────────
+    // Frontend is source of truth: it sends the exact Ask (BUY) or Bid (SELL)
+    // the user saw in the trade form. We only fetch DB price to guard against
+    // API manipulation (reject if > 2% off current market).
+    const clientPrice = (body.price != null && Number(body.price) > 0) ? Number(body.price) : null
+
+    if (clientPrice) {
+      const { data: teaRow } = await supabaseAdmin
+        .from('teas')
+        .select('current_price')
+        .eq('symbol', symbol)
+        .single()
+      const dbPrice = teaRow ? Number((teaRow as any).current_price) : 0
+      if (dbPrice > 0) {
+        const deviation = Math.abs(clientPrice - dbPrice) / dbPrice
+        if (deviation > 0.02) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: `Price rejected: $${clientPrice.toFixed(4)} deviates more than 2% from market $${dbPrice.toFixed(4)}`
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 409,
+          })
+        }
+      }
+    }
+
+    // ── 4. EXECUTE ATOMIC TRADE ────────────────────────────────────
     const { data, error } = await supabaseAdmin.rpc('execute_trade_secure', {
       p_user_id: user.id,
       p_tea_symbol: symbol,
@@ -139,13 +160,11 @@ serve(async (req) => {
       p_quantity: qty,
       p_mode: tradingMode,
       p_leverage: lev,
-      p_expected_price: expectedPrice,
-      p_slippage_tolerance: slippageTol,
+      p_expected_price: clientPrice,   // client's Ask/Bid — stored as-is if within tolerance
+      p_slippage_tolerance: 0.02,      // 2% — matches the sanity check above
     })
 
     if (error) {
-      // RAISE EXCEPTION in execute_trade_secure surfaces here as an RPC error.
-      // The message contains the human-readable rejection reason.
       const msg = error.message || 'Trade execution failed'
       const isSlippage = msg.includes('Price moved') || msg.includes('tolerance')
       console.error('execute_trade_secure RPC error:', msg)
@@ -164,14 +183,15 @@ serve(async (req) => {
       })
     }
 
-    // ── 4. RETURN SUCCESS ──────────────────────────────────────────
+    // ── 5. RETURN SUCCESS ──────────────────────────────────────────
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
 
-  } catch (err) {
-    console.error('execute-trade error:', err.message)
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Internal server error'
+    console.error('execute-trade error:', msg)
     return new Response(JSON.stringify({ success: false, error: 'Internal server error' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
