@@ -599,8 +599,8 @@ async function claimFreeBailout() {
 async function purchaseCombineEntry() {
     _showCheckoutOverlay();
     try {
-        // Call our new Free Combine database function directly
-        const { data, error } = await supabase.rpc('start_free_combine');
+        // Use the correct client name: supabaseClient
+        const { data, error } = await supabaseClient.rpc('start_free_combine');
 
         if (error) throw error;
 
