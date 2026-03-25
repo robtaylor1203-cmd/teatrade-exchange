@@ -1306,7 +1306,7 @@
                                         <path d="M3 3v18h18" />
                                         <path d="M7 16l4-8 4 4 5-9" />
                                     </svg>
-                                    Studies
+                                    Indicators
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                                         width="12" height="12">
                                         <path d="M6 9l6 6 6-6" />
@@ -1451,7 +1451,7 @@
                                                         <path d="M3 3v18h18" />
                                                         <path d="M7 16l4-8 4 4 5-9" />
                                                     </svg>
-                                                    Studies
+                                                    Indicators
                                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                                         stroke-width="2" width="12" height="12">
                                                         <path d="M6 9l6 6 6-6" />
@@ -1518,14 +1518,40 @@
                                 <canvas id="hubRsiChart" class="trading-hub-rsi-canvas"></canvas>
                             </div>
 
-                            <!-- Live Trade Log -->
-                            <div class="trading-hub-log">
-                                <div class="trading-hub-log-header">
-                                    <h4>Live Trade Tape</h4>
-                                    <span style="font-size: 10px; color: var(--text-muted);">Auto-updating</span>
+                            <!-- Bottom Metrics: Trade Tape and Market Depth -->
+                            <div class="trading-hub-bottom-metrics">
+                                <!-- Live Trade Log -->
+                                <div class="trading-hub-log">
+                                    <div class="trading-hub-log-header">
+                                        <h4>Live Trade Tape</h4>
+                                        <span class="live-pulse">Auto-updating</span>
+                                    </div>
+                                    <div class="trading-hub-log-content" id="trade-log-content">
+                                        <!-- Populated by JS -->
+                                    </div>
                                 </div>
-                                <div class="trading-hub-log-content" id="trade-log-content">
-                                    <!-- Populated by JS -->
+                                
+                                <!-- Market Depth Heatmap (Hub Version) -->
+                                <div class="market-depth-hub" id="market-depth-hub">
+                                    <div class="market-depth-header">
+                                        <h4>Market Depth</h4>
+                                        <span class="market-depth-ratio" id="depth-ratio">Bid/Ask: 1.12</span>
+                                    </div>
+                                    <div class="market-depth-content">
+                                        <div class="market-depth-bar">
+                                            <div class="depth-bids" id="depth-bids" style="width: 52%;">
+                                                <span class="depth-label">BIDS 52%</span>
+                                            </div>
+                                            <div class="depth-asks" id="depth-asks" style="width: 48%;">
+                                                <span class="depth-label">ASKS 48%</span>
+                                            </div>
+                                        </div>
+                                        <div class="market-depth-levels">
+                                            <span class="depth-stat" id="depth-bid-volume">Vol: 12,450 kg</span>
+                                            <span class="depth-stat mid-price" id="depth-mid-price">Mid: $4.82</span>
+                                            <span class="depth-stat" id="depth-ask-volume">Vol: 11,200 kg</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1738,27 +1764,6 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- Market Depth Heatmap -->
-                    <div class="market-depth-container" id="market-depth-container">
-                        <div class="market-depth-header">
-                            <span class="market-depth-title">Market Depth</span>
-                            <span class="market-depth-ratio" id="depth-ratio">Bid/Ask: 1.12</span>
-                        </div>
-                        <div class="market-depth-bar">
-                            <div class="depth-bids" id="depth-bids" style="width: 52%;">
-                                <span class="depth-label">BIDS 52%</span>
-                            </div>
-                            <div class="depth-asks" id="depth-asks" style="width: 48%;">
-                                <span class="depth-label">ASKS 48%</span>
-                            </div>
-                        </div>
-                        <div class="market-depth-levels">
-                            <span id="depth-bid-volume">Vol: 12,450 kg</span>
-                            <span id="depth-mid-price">Mid: $4.82</span>
-                            <span id="depth-ask-volume">Vol: 11,200 kg</span>
                         </div>
                     </div>
                 </div>

@@ -266,7 +266,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         adjustViewportScale();
     });
     adjustViewportScale();
-    setupRSIHover();
 
     window.addEventListener('online', () => {
         console.log('[Network] Back online - reconnecting Realtime channels');

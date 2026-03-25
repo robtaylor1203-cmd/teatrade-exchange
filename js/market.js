@@ -38,6 +38,17 @@ const _IDX_ALIASES = {
     'MALAWI': 'LIMBE', 'LIMBE': 'MALAWI',
 };
 
+const _CARD_TO_INDEX = {
+    'MOMBASA': 'KENYA', 
+    'KOLKATA': 'INDIA', 
+    'COLOMBO': 'CEYLON', 
+    'JAKARTA': 'INDONESIA', 
+    'CHITTAGONG': 'BANGLADESH', 
+    'LIMBE': 'MALAWI', 
+    'FUTURES': 'ASIA',
+    'KENYAN': 'KENYA' // Handle legacy 'KENYAN'
+};
+
 function _findIndexDef(symbol) {
     const db = state.dbIndexes?.length ? state.dbIndexes : [];
     const all = [...db];
@@ -859,8 +870,6 @@ function handleTickerUpdate(payload) {
  * Resolve the symbol currently shown on the main chart.
  * Returns the symbol string (e.g. 'KENYA', 'KEN-BP1') or null.
  */
-const _CARD_TO_INDEX = { 'KENYAN': 'KENYA' };
-
 function _getMainChartSymbol() {
     const sym = state.mainChartData?.symbol;
     if (!sym) return null;

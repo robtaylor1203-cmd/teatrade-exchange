@@ -2472,18 +2472,28 @@ body.modal-open {
     text-transform: uppercase;
 }
 
-/* Live Trade Log */
-.trading-hub-log {
+/* Bottom Metrics Container */
+.trading-hub-bottom-metrics {
+    display: flex;
+    gap: 12px;
+    height: 160px;
+    min-height: 160px;
+    flex-shrink: 0;
+}
+
+/* Live Trade Log and Market Depth */
+.trading-hub-log,
+.market-depth-hub {
     background: var(--bg-card);
     border-radius: 8px;
-    height: 140px;
-    min-height: 140px;
-    flex-shrink: 0;
+    flex: 1;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-width: 0;
 }
 
+.market-depth-header,
 .trading-hub-log-header {
     display: flex;
     justify-content: space-between;
@@ -2494,6 +2504,7 @@ body.modal-open {
     flex-shrink: 0;
 }
 
+.market-depth-header h4,
 .trading-hub-log-header h4 {
     font-size: 12px;
     font-weight: 600;
@@ -2501,6 +2512,107 @@ body.modal-open {
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--text-muted);
+}
+
+.live-pulse {
+    font-size: 10px;
+    color: var(--accent-green);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.live-pulse::before {
+    content: '';
+    display: block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--accent-green);
+    animation: pulse 2s infinite ease-in-out;
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.8); opacity: 0.5; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 0 4px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.8); opacity: 0.5; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.market-depth-ratio {
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.market-depth-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 20px;
+}
+
+.market-depth-bar {
+    display: flex;
+    height: 24px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+.depth-bids {
+    background: rgba(16, 185, 129, 0.2);
+    border-right: 1px solid var(--bg-card);
+    display: flex;
+    align-items: center;
+    padding-left: 10px;
+    border-left: 2px solid var(--accent-green);
+    transition: width 0.3s ease;
+}
+
+.depth-asks {
+    background: rgba(239, 68, 68, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 10px;
+    border-right: 2px solid var(--accent-red);
+    transition: width 0.3s ease;
+}
+
+.depth-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.depth-bids .depth-label {
+    color: var(--accent-green);
+}
+
+.depth-asks .depth-label {
+    color: var(--accent-red);
+}
+
+.market-depth-levels {
+    display: flex;
+    justify-content: space-between;
+}
+
+.depth-stat {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.depth-stat.mid-price {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-size: 13px;
 }
 
 .trading-hub-log-content {

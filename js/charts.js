@@ -15,6 +15,12 @@ let bbUpperSeries = null;
 let bbLowerSeries = null;
 let bbMiddleSeries = null;
 
+let sma10Series = null;
+let sma20Series = null;
+let sma50Series = null;
+let ema10Series = null;
+let ema20Series = null;
+
 let activePriceLines = [];
 
 // =============================================
@@ -97,6 +103,9 @@ function _initTvChartIfNull() {
     if (!container) return;
 
     if (tvChart) {
+        if (tvChart._ro) {
+            tvChart._ro.disconnect();
+        }
         tvChart.remove();
         tvChart = null;
     }
@@ -241,13 +250,12 @@ function generateChartData(timeframe) {
     if (!config) return [];
 
     let symbol, symbolType;
-    const _cardToIndex = { 'KENYAN': 'KENYA' };
 
     if (state.mainChartData?.isTea) {
         symbol = state.mainChartData.symbol;
         symbolType = 'tea';
     } else if (state.mainChartData?.isIndex) {
-        symbol = _cardToIndex[state.mainChartData.symbol] || state.mainChartData.symbol;
+        symbol = _CARD_TO_INDEX[state.mainChartData.symbol] || state.mainChartData.symbol;
         symbolType = 'index';
     } else {
         const select = document.getElementById('trade-tea-select');
@@ -309,6 +317,7 @@ function _getChartCurrencyInfo() {
 let _chartLastSymbol = null;
 let _chartLastTimeframe = null;
 let _chartLastDataLength = 0;
+let _chartLastType = null;
 
 function drawChart() {
     if (!document.getElementById('tv-chart')) return;
@@ -328,7 +337,7 @@ function drawChart() {
     const currentSymbol = state.mainChartData?.symbol || '';
     const currentTimeframe = state.currentTimeframe;
     const isNewSymbol = currentSymbol !== _chartLastSymbol;
-    const isSameState = !isNewSymbol && !isNewTimeframe;
+    const isSameState = !isNewSymbol && !isNewTimeframe && state.chartType === _chartLastType;
     const isLiveTick = isSameState && newLength > 0 && (newLength - _chartLastDataLength) <= 1 && _chartLastDataLength > 2;
 
     // Force rescale when:
@@ -379,7 +388,11 @@ function drawChart() {
         const high = d.high * _fx;
         const low = d.low * _fx;
 
-        tvData.push({ time: tvTime, open, high, low, close, value: close });
+        if (state.chartType === 'candle') {
+            tvData.push({ time: tvTime, open, high, low, close });
+        } else {
+            tvData.push({ time: tvTime, value: close });
+        }
 
         let vol = d.volume;
         if (!vol || vol <= 0) {
@@ -423,11 +436,21 @@ function drawChart() {
     _chartLastSymbol = currentSymbol;
     _chartLastTimeframe = currentTimeframe;
     _chartLastDataLength = newLength;
+    _chartLastType = state.chartType;
 
     // Auto-scale to fit data frame on load or timeframe/symbol swap
     if (forceRescale) {
         setTimeout(() => {
-            if (tvChart) tvChart.timeScale().fitContent();
+            if (tvChart) {
+                if (tvData.length < 15) {
+                    tvChart.timeScale().setVisibleLogicalRange({
+                        from: tvData.length - 30,
+                        to: tvData.length + 2
+                    });
+                } else {
+                    tvChart.timeScale().fitContent();
+                }
+            }
         }, 50);
         window._tvInitialScaleDone = true;
     }
@@ -449,6 +472,8 @@ function drawChart() {
         tvChart.removeSeries(bbMiddleSeries);
         bbUpperSeries = null;
     }
+    // Draw Moving Averages
+    _drawMovingAverages(tvData);
 
     // Apply Technicals: RSI
     if (state.activeStudies.rsi && rsiSeries) {
@@ -521,14 +546,39 @@ function calculateSMA(data, period = 20) {
     for (let i = 0; i < data.length; i++) {
         if (i < period - 1) continue;
         let sum = 0;
-        for (let j = 0; j < period; j++) sum += data[i - j].close;
+        for (let j = 0; j < period; j++) {
+            const val = data[i - j].close !== undefined ? data[i - j].close : data[i - j].value;
+            sum += val;
+        }
         sma.push({ time: data[i].time, value: sum / period });
     }
     return sma;
 }
 
+function calculateEMA(data, period = 20) {
+    if (data.length < period) return [];
+    const ema = [];
+    const k = 2 / (period + 1);
+
+    let sum = 0;
+    for (let i = 0; i < period; i++) {
+        const val = data[i].close !== undefined ? data[i].close : data[i].value;
+        sum += val;
+    }
+    let prevEma = sum / period;
+    ema.push({ time: data[period - 1].time, value: prevEma });
+
+    for (let i = period; i < data.length; i++) {
+        const val = data[i].close !== undefined ? data[i].close : data[i].value;
+        prevEma = val * k + prevEma * (1 - k);
+        ema.push({ time: data[i].time, value: prevEma });
+    }
+    return ema;
+}
+
 function calculateBollingerBands(data, period = 20, stdDev = 2) {
     const upper = [], lower = [], middle = [];
+    if (data.length < period) return { upper, lower, middle };
     const sma = calculateSMA(data, period);
 
     const smaMap = {};
@@ -540,7 +590,8 @@ function calculateBollingerBands(data, period = 20, stdDev = 2) {
         if (sValue !== undefined) {
             let sumSquares = 0;
             for (let j = 0; j < period; j++) {
-                sumSquares += Math.pow(data[i - j].close - sValue, 2);
+                const val = data[i - j].close !== undefined ? data[i - j].close : data[i - j].value;
+                sumSquares += Math.pow(val - sValue, 2);
             }
             const std = Math.sqrt(sumSquares / period);
             upper.push({ time: t, value: sValue + stdDev * std });
@@ -552,29 +603,90 @@ function calculateBollingerBands(data, period = 20, stdDev = 2) {
 }
 
 function calculateRSI(data, period = 14) {
+    if (data.length <= period) return [];
+
     const rsi = [];
-    let gains = [], losses = [];
+    let avgGain = 0;
+    let avgLoss = 0;
 
-    for (let i = 1; i < data.length; i++) {
-        const change = data[i].close - data[i - 1].close;
-        gains.push(change > 0 ? change : 0);
-        losses.push(change < 0 ? Math.abs(change) : 0);
-
-        if (i < period) continue;
-
-        if (i === period) {
-            const avgGain = gains.reduce((a, b) => a + b, 0) / period;
-            const avgLoss = losses.reduce((a, b) => a + b, 0) / period;
-            const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-            rsi.push({ time: data[i].time, value: 100 - (100 / (1 + rs)) });
-        } else {
-            const prevAvgGain = gains.slice(-period - 1, -1).reduce((a, b) => a + b, 0) / period;
-            const prevAvgLoss = losses.slice(-period - 1, -1).reduce((a, b) => a + b, 0) / period;
-            const avgGain = (prevAvgGain * (period - 1) + gains[gains.length - 1]) / period;
-            const avgLoss = (prevAvgLoss * (period - 1) + losses[losses.length - 1]) / period;
-            const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-            rsi.push({ time: data[i].time, value: 100 - (100 / (1 + rs)) });
-        }
+    for (let i = 1; i <= period; i++) {
+        const val = data[i].close !== undefined ? data[i].close : data[i].value;
+        const prevVal = data[i - 1].close !== undefined ? data[i - 1].close : data[i - 1].value;
+        const change = val - prevVal;
+        avgGain += change > 0 ? change : 0;
+        avgLoss += change < 0 ? Math.abs(change) : 0;
     }
+
+    avgGain /= period;
+    avgLoss /= period;
+
+    let rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+    rsi.push({
+        time: data[period].time,
+        value: avgLoss === 0 ? 100 : 100 - (100 / (1 + rs))
+    });
+
+    for (let i = period + 1; i < data.length; i++) {
+        const val = data[i].close !== undefined ? data[i].close : data[i].value;
+        const prevVal = data[i - 1].close !== undefined ? data[i - 1].close : data[i - 1].value;
+        const change = val - prevVal;
+
+        const currentGain = change > 0 ? change : 0;
+        const currentLoss = change < 0 ? Math.abs(change) : 0;
+
+        avgGain = (avgGain * (period - 1) + currentGain) / period;
+        avgLoss = (avgLoss * (period - 1) + currentLoss) / period;
+
+        rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+        rsi.push({
+            time: data[i].time,
+            value: avgLoss === 0 ? 100 : 100 - (100 / (1 + rs))
+        });
+    }
+
     return rsi;
+}
+
+function _drawMovingAverages(tvData) {
+    if (!tvChart) return;
+
+    if (state.activeStudies.sma10) {
+        if (!sma10Series) sma10Series = tvChart.addLineSeries({ color: 'rgba(234, 179, 8, 0.8)', lineWidth: 1, crosshairMarkerVisible: false });
+        sma10Series.setData(calculateSMA(tvData, 10));
+    } else if (sma10Series) {
+        tvChart.removeSeries(sma10Series);
+        sma10Series = null;
+    }
+
+    if (state.activeStudies.sma20) {
+        if (!sma20Series) sma20Series = tvChart.addLineSeries({ color: 'rgba(56, 189, 248, 0.8)', lineWidth: 1, crosshairMarkerVisible: false });
+        sma20Series.setData(calculateSMA(tvData, 20));
+    } else if (sma20Series) {
+        tvChart.removeSeries(sma20Series);
+        sma20Series = null;
+    }
+
+    if (state.activeStudies.sma50) {
+        if (!sma50Series) sma50Series = tvChart.addLineSeries({ color: 'rgba(168, 85, 247, 0.8)', lineWidth: 1, crosshairMarkerVisible: false });
+        sma50Series.setData(calculateSMA(tvData, 50));
+    } else if (sma50Series) {
+        tvChart.removeSeries(sma50Series);
+        sma50Series = null;
+    }
+
+    if (state.activeStudies.ema10) {
+        if (!ema10Series) ema10Series = tvChart.addLineSeries({ color: 'rgba(239, 68, 68, 0.8)', lineWidth: 1, crosshairMarkerVisible: false });
+        ema10Series.setData(calculateEMA(tvData, 10));
+    } else if (ema10Series) {
+        tvChart.removeSeries(ema10Series);
+        ema10Series = null;
+    }
+
+    if (state.activeStudies.ema20) {
+        if (!ema20Series) ema20Series = tvChart.addLineSeries({ color: 'rgba(34, 197, 94, 0.8)', lineWidth: 1, crosshairMarkerVisible: false });
+        ema20Series.setData(calculateEMA(tvData, 20));
+    } else if (ema20Series) {
+        tvChart.removeSeries(ema20Series);
+        ema20Series = null;
+    }
 }

@@ -595,11 +595,15 @@ function displayUserTrades(trades) {
             const isShortIdx = trade.side === 'SELL';
 
             if (isClosed && closing) {
-                const closePrice = closing.sellPrice ?? closing.coverPrice;
-                if (isShortIdx) {
-                    pnl = (trade.price - closePrice) * trade.quantity;
+                if (closing.realizedPnl !== undefined) {
+                    pnl = closing.realizedPnl;
                 } else {
-                    pnl = (closePrice - trade.price) * trade.quantity;
+                    const closePrice = closing.sellPrice ?? closing.coverPrice;
+                    if (isShortIdx) {
+                        pnl = (trade.price - closePrice) * trade.quantity;
+                    } else {
+                        pnl = (closePrice - trade.price) * trade.quantity;
+                    }
                 }
                 pnlPct = total > 0 ? (pnl / total * 100) : 0;
             } else {

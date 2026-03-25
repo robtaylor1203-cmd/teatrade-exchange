@@ -362,7 +362,6 @@ function populateTeaSelect() {
     });
 
     // Determine the main chart symbol
-    const _CARD_TO_INDEX = { 'KENYAN': 'KENYA' };
     const mainSym = state.mainChartData ? (_CARD_TO_INDEX[state.mainChartData.symbol] || state.mainChartData.symbol) : null;
     const isIdx = state.mainChartData ? !!state.mainChartData.isIndex : false;
 
@@ -712,11 +711,11 @@ function updateMarketDepth() {
     const ratioEl = document.getElementById('depth-ratio');
     if (!bidsEl || !asksEl) return;
 
-    // Resolve the focused symbol — dropdown values may be numeric tea IDs
-    // (e.g. "3") or prefixed indexes (e.g. "INDEX_KENYA").  Normalise to
-    // the plain symbol that market_pressure uses as its key.
+    // Resolve the focused symbol — check hub first if maximized
+    const isHubOpen = document.getElementById('chart-section')?.classList.contains('panel-maximized');
     const select = document.getElementById('trade-tea-select');
-    let focusedSymbol = state.selectedQuoteSymbol || select?.value || null;
+    const hubSelect = document.getElementById('hub-buy-symbol');
+    let focusedSymbol = state.selectedQuoteSymbol || (isHubOpen ? hubSelect?.value : select?.value) || null;
     if (focusedSymbol) {
         if (focusedSymbol.startsWith('INDEX_')) {
             focusedSymbol = focusedSymbol.replace('INDEX_', '');
@@ -769,7 +768,8 @@ function updateMarketDepth() {
         }
         state.marketDepthBids = Math.max(25, Math.min(75, state.marketDepthBids));
         bidPct = state.marketDepthBids;
-        const totalVol = state.teas.reduce((sum, t) => sum + (t.volume_24h || 0), 0);
+        let totalVol = state.teas.reduce((sum, t) => sum + (t.volume_24h || 0), 0);
+        if (totalVol === 0) totalVol = 14300000; // Mock fallback if DB volumes aren't hydrated yet
         bidVol = Math.round(totalVol * (bidPct / 100));
         askVol = Math.round(totalVol * ((100 - bidPct) / 100));
     }
@@ -796,6 +796,31 @@ function updateMarketDepth() {
     document.getElementById('depth-bid-volume').textContent = `Vol: ${fmt(bidVol)}`;
     document.getElementById('depth-ask-volume').textContent = `Vol: ${fmt(askVol)}`;
 
+    // Update Hub Elements
+    const hubBidsEl = document.getElementById('hub-market-depth-buy');
+    if (hubBidsEl) {
+        hubBidsEl.style.width = `${bidPct}%`;
+        hubBidsEl.textContent = `BIDS ${Math.round(bidPct)}%`;
+        hubBidsEl.style.background = bidPct > 55 ? 'var(--accent-green)' : bidPct < 45 ? 'rgba(16,185,129,0.4)' : 'var(--accent-green)';
+    }
+
+    const hubAsksEl = document.getElementById('hub-market-depth-sell');
+    if (hubAsksEl) {
+        const askStr = `ASKS ${Math.round(askPct)}%`;
+        hubAsksEl.style.width = `${askPct}%`;
+        hubAsksEl.textContent = askStr;
+        hubAsksEl.style.background = askPct > 55 ? 'var(--accent-red)' : askPct < 45 ? 'rgba(239,68,68,0.4)' : 'var(--accent-red)';
+    }
+
+    const hubRatioEl = document.getElementById('hub-bid-ask-ratio');
+    if (hubRatioEl) hubRatioEl.textContent = ratio;
+
+    const hubBidVolEl = document.getElementById('hub-market-vol-buy');
+    if (hubBidVolEl) hubBidVolEl.textContent = `Vol: ${fmt(bidVol)}`;
+
+    const hubAskVolEl = document.getElementById('hub-market-vol-sell');
+    if (hubAskVolEl) hubAskVolEl.textContent = `Vol: ${fmt(askVol)}`;
+
     // Show LIVE badge on depth title when driven by real order flow
     const titleEl = document.getElementById('depth-title') || document.querySelector('.market-depth-title');
     if (titleEl) {
@@ -810,10 +835,26 @@ function updateMarketDepth() {
         }
     }
 
-    // Mid price from selected tea
+    // Mid price from selected tea or index
+    let midPriceVal = 0;
     const selectedTea = state.teas.find(t => t.symbol === (focusedSymbol || select?.value));
-    const midPrice = (selectedTea?.current_price || 0).toFixed(2);
+    if (selectedTea) {
+        midPriceVal = selectedTea.current_price;
+    } else {
+        const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
+        const selectedIdx = indexes.find(idx => idx.symbol === (focusedSymbol || select?.value));
+        if (selectedIdx) {
+            midPriceVal = selectedIdx.price;
+            if (midPriceVal <= 0 && typeof _liveIndexPrice === 'function') {
+                midPriceVal = _liveIndexPrice(selectedIdx.symbol);
+            }
+        }
+    }
+    const midPrice = (midPriceVal || 0).toFixed(2);
     document.getElementById('depth-mid-price').textContent = `Mid: $${midPrice}`;
+
+    const hubMidPriceEl = document.getElementById('hub-market-mid-price');
+    if (hubMidPriceEl) hubMidPriceEl.textContent = `Mid: $${midPrice}`;
 }
 
 function _flashMacroPrice(el, direction) {

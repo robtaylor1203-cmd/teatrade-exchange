@@ -316,6 +316,9 @@ function initTradingHub() {
     // Update position info
     updateHubPositionInfo();
 
+    // Update market depth for the hub
+    if (typeof updateMarketDepth === 'function') updateMarketDepth();
+
     // Initialize RSI section visibility
     const rsiSection = document.getElementById('hub-rsi-section');
     if (state.hubStudies.rsi) {
@@ -716,6 +719,7 @@ function syncHubChartToTradeSymbol(selectId) {
         updateHubPriceDisplay();
         drawChart();
         drawHubChart();
+        if (typeof updateMarketDepth === 'function') updateMarketDepth();
     }).catch(() => { });
 }
 
@@ -1168,6 +1172,34 @@ function drawHubChart() {
             ctx.fillRect(x - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
         });
     }
+
+    // Draw Volume Histogram at the bottom
+    const volArray = displayData.map(d => {
+        let vol = d.volume || 0;
+        if (vol <= 0) {
+            const tvTime = Math.floor(new Date(d.date || 0).getTime() / 1000);
+            const spread = Math.abs((d.high || 0) - (d.low || 0));
+            let pseudoVol = spread * 50000;
+            pseudoVol += (tvTime % 100) * 10;
+            vol = pseudoVol > 0 ? pseudoVol : 20;
+        }
+        return vol;
+    });
+
+    const maxVol = Math.max(...volArray, 1);
+    const volHeightMax = chartHeight * 0.25; // Take up bottom 25% of chart
+    const volCandleWidth = Math.max(2, (chartWidth / displayData.length) - 2);
+
+    displayData.forEach((d, i) => {
+        const x = getX(i);
+        const isUp = d.close >= d.open;
+        const vol = volArray[i];
+        
+        const barH = (vol / maxVol) * volHeightMax;
+        
+        ctx.fillStyle = isUp ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)';
+        ctx.fillRect(x - volCandleWidth / 2, height - padding.bottom - barH, volCandleWidth, barH);
+    });
 
     // Draw price labels on right axis
     ctx.fillStyle = '#9ca3af';
