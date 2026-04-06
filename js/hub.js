@@ -100,8 +100,12 @@ function openHubForSymbol(teaOrSymbol) {
     }
 
     currency = typeof getCurrencyForSymbol === 'function' ? getCurrencyForSymbol(symbol) : '$';
-    const dbIdx = state.dbIndexes?.find(i => i.symbol === symbol);
+    
+    // Borrow forex config from the market card if the index itself lacks it
+    const cardSym = (typeof _TRADE_TO_CARD !== 'undefined' && _TRADE_TO_CARD[symbol]) ? _TRADE_TO_CARD[symbol] : symbol;
+    const dbIdx = state.dbIndexes?.find(i => i.symbol === cardSym) || state.dbIndexes?.find(i => i.symbol === symbol);
     forexKey = dbIdx?.forexKey || null;
+    const multiplier = dbIdx?.multiplier || 1;
 
     state.mainChartData = {
         name: name,
@@ -109,6 +113,7 @@ function openHubForSymbol(teaOrSymbol) {
         basePrice: price,
         currency: currency,
         forexKey: forexKey,
+        multiplier: multiplier,
         change: 0,
         isIndex: isIndex,
         isTea: !isIndex
@@ -649,11 +654,16 @@ function syncHubChartToTradeSymbol(selectId) {
 
     const tea = !isIdx ? state.teas?.find(t => t.symbol === rawSym) : null;
     const dbIdx = _findIndexDef(lookupSymbol);
+    const cardSym = (typeof _TRADE_TO_CARD !== 'undefined' && _TRADE_TO_CARD[lookupSymbol]) ? _TRADE_TO_CARD[lookupSymbol] : lookupSymbol;
+    const fxIdx = _findIndexDef(cardSym) || dbIdx;
+    
     const name = tea
         ? (tea.name || rawSym)
         : (dbIdx?.name || lookupSymbol + ' Index');
     const currency = typeof getCurrencyForSymbol === 'function' ? getCurrencyForSymbol(lookupSymbol) : '$';
-    const forexKey = dbIdx?.forexKey || null;
+    const forexKey = fxIdx?.forexKey || null;
+    const multiplier = fxIdx?.multiplier || 1;
+
     let price;
     if (tea) {
         price = tea.current_price || 0;
@@ -661,13 +671,13 @@ function syncHubChartToTradeSymbol(selectId) {
         const rawUsd = _liveIndexPrice(lookupSymbol) || 0;
         const fxRate = (forexKey && state.macroIndicators?.[forexKey])
             ? Number(state.macroIndicators[forexKey])
-            : (dbIdx?.multiplier || 1);
+            : multiplier;
         price = rawUsd * fxRate;
     }
 
     state.mainChartData = {
         name, symbol: lookupSymbol, basePrice: price,
-        currency, forexKey, change: 0,
+        currency, forexKey, multiplier, change: 0,
         isIndex: isIdx, isTea: !isIdx
     };
     if (typeof updateMobileTradePrices === 'function') updateMobileTradePrices();
@@ -738,19 +748,24 @@ function syncChartToTradeSelect(passedVal) {
 
     if (!val) return;
 
-    let symbol, name, price, isIdx, currency, forexKey;
+    let symbol, name, price, isIdx, currency, forexKey, multiplier = 1;
 
     if (val.startsWith('INDEX_')) {
         symbol = val.replace('INDEX_', '');
         isIdx = true;
+        
         const dbIdx = _findIndexDef(symbol);
+        const cardSym = (typeof _TRADE_TO_CARD !== 'undefined' && _TRADE_TO_CARD[symbol]) ? _TRADE_TO_CARD[symbol] : symbol;
+        const fxIdx = _findIndexDef(cardSym) || dbIdx;
+        
         name = dbIdx?.name || symbol + ' Index';
         const rawUsd = _liveIndexPrice(symbol) || 0;
         currency = typeof getCurrencyForSymbol === 'function' ? getCurrencyForSymbol(symbol) : '$';
-        forexKey = dbIdx?.forexKey || null;
+        forexKey = fxIdx?.forexKey || null;
+        multiplier = fxIdx?.multiplier || 1;
         const fxRate = (forexKey && state.macroIndicators?.[forexKey])
             ? Number(state.macroIndicators[forexKey])
-            : (dbIdx?.multiplier || 1);
+            : multiplier;
         price = rawUsd * fxRate;
     } else {
         const tea = state.teas?.find(t => String(t.id) === val);
@@ -765,7 +780,7 @@ function syncChartToTradeSelect(passedVal) {
 
     state.mainChartData = {
         name, symbol, basePrice: price,
-        currency, forexKey, change: 0,
+        currency, forexKey, multiplier, change: 0,
         isIndex: isIdx, isTea: !isIdx
     };
     if (typeof updateMobileTradePrices === 'function') updateMobileTradePrices();

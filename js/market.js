@@ -584,21 +584,22 @@ function updateAllMarketIndexes() {
     const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
     if (!indexes || indexes.length === 0) return;
 
-    const _getLiveMultiplier = (idx) => {
-        if (idx.forexKey && state.macroIndicators[idx.forexKey]) {
-            return Number(state.macroIndicators[idx.forexKey]) || idx.multiplier || 1;
+    const _getLiveMultiplier = (sourceObj) => {
+        if (sourceObj && sourceObj.forexKey && state.macroIndicators[sourceObj.forexKey]) {
+            return Number(state.macroIndicators[sourceObj.forexKey]) || sourceObj.multiplier || 1;
         }
-        return idx.multiplier || 1;
+        return sourceObj?.multiplier || 1;
     };
 
     const idxMap = {};
     indexes.forEach(idx => idxMap[idx.symbol] = idx);
 
-    // Update main chart if it's showing a KENYA-equivalent symbol
+    // Update main chart if it's showing an index
     const mainIdxSym = _CARD_TO_INDEX[state.mainChartData.symbol] || state.mainChartData.symbol;
     if (idxMap[mainIdxSym]) {
         const _idx = idxMap[mainIdxSym];
-        state.mainChartData.basePrice = _idx.price * _getLiveMultiplier(_idx);
+        const forexSource = state.mainChartData.forexKey ? state.mainChartData : _idx;
+        state.mainChartData.basePrice = _idx.price * _getLiveMultiplier(forexSource);
         state.mainChartData.change = _idx.change;
     }
 
@@ -606,7 +607,8 @@ function updateAllMarketIndexes() {
     cardData.forEach((card, i) => {
         const idx = idxMap[card.symbol];
         if (idx) {
-            card.basePrice = idx.price * _getLiveMultiplier(idx);
+            const forexSource = card.forexKey ? card : idx;
+            card.basePrice = idx.price * _getLiveMultiplier(forexSource);
             card.change = idx.change;
         }
     });
@@ -771,24 +773,41 @@ function updateMainChartWithRealData() {
     if (!state.teas || state.teas.length === 0) return;
 
     const indexes = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];
-    const kenyaIndex = indexes.find(idx => idx.symbol === 'KENYA');
-
     const resolvedMainSym = _CARD_TO_INDEX[state.mainChartData.symbol] || state.mainChartData.symbol;
-    if (kenyaIndex && resolvedMainSym === 'KENYA') {
-        state.mainChartData.basePrice = kenyaIndex.price;
-        state.mainChartData.change = kenyaIndex.change;
+    const targetIndex = indexes.find(idx => idx.symbol === resolvedMainSym);
 
-        const priceEl = document.getElementById('main-chart-price');
-        if (priceEl) {
-            priceEl.textContent = formatIndexPrice(kenyaIndex.price, state.mainChartData.currency || '$');
-            priceEl.className = 'chart-stat-value ' + (kenyaIndex.change >= 0 ? 'up' : 'down');
+    if (targetIndex) {
+        const forexSource = state.mainChartData.forexKey ? state.mainChartData : targetIndex;
+        let activeMultiplier = forexSource?.multiplier || 1;
+        if (forexSource?.forexKey && state.macroIndicators?.[forexSource.forexKey]) {
+            activeMultiplier = Number(state.macroIndicators[forexSource.forexKey]) || activeMultiplier;
         }
 
+        const calculatedPrice = targetIndex.price * activeMultiplier;
+        
+        state.mainChartData.basePrice = calculatedPrice;
+        state.mainChartData.change = targetIndex.change;
+
+        const priceEl = document.getElementById('main-chart-price');
         const changeEl = document.getElementById('main-chart-change');
+        const curr = state.mainChartData.currency || '$';
+
+        if (priceEl) {
+            priceEl.textContent = formatIndexPrice(calculatedPrice, curr, state.mainChartData.symbol);
+            priceEl.className = 'chart-stat-value ' + (targetIndex.change >= 0 ? 'up' : 'down');
+            
+            const labelEl = priceEl.nextElementSibling;
+            if (labelEl && labelEl.classList.contains('chart-stat-label')) {
+                const codeMap = { '₹': 'INR', 'Rs': 'LKR', 'Rp': 'IDR', '৳': 'BDT' };
+                const currencyCode = codeMap[curr] || 'USD';
+                labelEl.textContent = `Last Trade Price (${currencyCode}/kg)`;
+            }
+        }
+
         if (changeEl) {
-            const chg = kenyaIndex.change >= 0 ? `+${kenyaIndex.change.toFixed(2)}` : kenyaIndex.change.toFixed(2);
+            const chg = targetIndex.change >= 0 ? `+${targetIndex.change.toFixed(2)}` : targetIndex.change.toFixed(2);
             changeEl.textContent = `${chg}%`;
-            changeEl.className = 'chart-stat-value ' + (kenyaIndex.change >= 0 ? 'up' : 'down');
+            changeEl.className = 'chart-stat-value ' + (targetIndex.change >= 0 ? 'up' : 'down');
         }
 
         // Force the chart to redraw if the latest live price updated
@@ -810,6 +829,13 @@ function updateMainChartStats() {
 
         priceEl.textContent = formatIndexPrice(price, curr, state.mainChartData.symbol);
         priceEl.className = 'chart-stat-value ' + (isUp ? 'up' : 'down');
+
+        const labelEl = priceEl.nextElementSibling;
+        if (labelEl && labelEl.classList.contains('chart-stat-label')) {
+            const codeMap = { '₹': 'INR', 'Rs': 'LKR', 'Rp': 'IDR', '৳': 'BDT' };
+            const currencyCode = codeMap[curr] || 'USD';
+            labelEl.textContent = `Last Trade Price (${currencyCode}/kg)`;
+        }
 
         if (changeEl) {
             const changeAmt = (price * change / 100).toFixed(2);
