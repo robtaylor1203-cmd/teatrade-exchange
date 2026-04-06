@@ -232,16 +232,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     startTickerSubscription();
 
     // ── Phase 3: Non-blocking secondary data ──
+    Promise.allSettled([
+        loadTeaPairs(),
+        loadUserTrades(),
+    ]);
+
+    // Wait for reference data to finish before we consider bootstrap done
+    // This MUST happen before we initialize price cache so that state.teas is
+    // populated, otherwise composite index OHLCs use fallback dummy weights.
+    await refPromise;
+
     // Price cache starts streaming; sparklines fill as data arrives.
     const priceCachePromise = initializePriceCache().then(() => {
         state.cachedTimeframe = null;
         drawChart();
     });
-
-    Promise.allSettled([
-        loadTeaPairs(),
-        loadUserTrades(),
-    ]);
 
     // ── Phase 4: Heavy / non-critical — lazy-loaded ──
     setTimeout(() => {
@@ -256,8 +261,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         _buildNotifyProfileCache();
     }
 
-    // Wait for reference data to finish before we consider bootstrap done
-    // (individual loaders already painted their sections as they resolved)
     await refPromise;
 
     // ── Phase 5: Responsive handlers & reconnect logic ──

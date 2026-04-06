@@ -401,11 +401,19 @@ async function _loadCompositeIndexOHLC(teaSymbols, cfg, since) {
 
         if (currentBucket !== bucketStart) {
             if (bucketData.length > 0) {
+                let high = Math.max(...bucketData);
+                let low = Math.min(...bucketData);
+                
+                if (bucketData.length === 1 && high === low) {
+                    high = high * 1.002;
+                    low = low * 0.998;
+                }
+
                 candles.push({
                     date: new Date(currentBucket),
                     open: bucketData[0],
-                    high: Math.max(...bucketData),
-                    low: Math.min(...bucketData),
+                    high: high,
+                    low: low,
                     close: bucketData[bucketData.length - 1],
                     volume: 0
                 });
@@ -417,11 +425,19 @@ async function _loadCompositeIndexOHLC(teaSymbols, cfg, since) {
     });
 
     if (bucketData.length > 0) {
+        let high = Math.max(...bucketData);
+        let low = Math.min(...bucketData);
+        
+        if (bucketData.length === 1 && high === low) {
+            high = high * 1.002;
+            low = low * 0.998;
+        }
+
         candles.push({
             date: new Date(currentBucket),
             open: bucketData[0],
-            high: Math.max(...bucketData),
-            low: Math.min(...bucketData),
+            high: high,
+            low: low,
             close: bucketData[bucketData.length - 1],
             volume: 0
         });
@@ -450,12 +466,24 @@ function convertToOHLC(priceData, intervalMinutes = 60) {
         if (currentBucket !== bucketStart) {
             if (bucketData.length > 0) {
                 const prices = bucketData.map(d => d.price);
+                const open = prices[0];
+                const close = prices[prices.length - 1];
+                let high = Math.max(...prices);
+                let low = Math.min(...prices);
+
+                // If only 1 tick exists, TradingView renders an invisible flat line.
+                // Apply a tiny simulated wick to give the candle visible structure on sparse timeframes (like 1Y).
+                if (prices.length === 1 && high === low) {
+                    high = high * 1.002;
+                    low = low * 0.998;
+                }
+
                 candles.push({
                     date: new Date(currentBucket),
-                    open: prices[0],
-                    high: Math.max(...prices),
-                    low: Math.min(...prices),
-                    close: prices[prices.length - 1],
+                    open: open,
+                    high: high,
+                    low: low,
+                    close: close,
                     volume: bucketData.reduce((sum, d) => sum + (d.volume || 0), 0)
                 });
             }
@@ -469,12 +497,22 @@ function convertToOHLC(priceData, intervalMinutes = 60) {
     // Last bucket
     if (bucketData.length > 0) {
         const prices = bucketData.map(d => d.price);
+        const open = prices[0];
+        const close = prices[prices.length - 1];
+        let high = Math.max(...prices);
+        let low = Math.min(...prices);
+
+        if (prices.length === 1 && high === low) {
+            high = high * 1.002;
+            low = low * 0.998;
+        }
+
         candles.push({
             date: new Date(currentBucket),
-            open: prices[0],
-            high: Math.max(...prices),
-            low: Math.min(...prices),
-            close: prices[prices.length - 1],
+            open: open,
+            high: high,
+            low: low,
+            close: close,
             volume: bucketData.reduce((sum, d) => sum + (d.volume || 0), 0)
         });
     }
@@ -606,7 +644,8 @@ function updateAllMarketIndexes() {
 
     // Incrementally update index price caches (do NOT wipe history).
     Object.entries(idxMap).forEach(([symbol]) => {
-        const usdPrice = typeof _liveIndexPrice === 'function' ? _liveIndexPrice(symbol) : null;
+        // Fix: Assign the correct calculated index price to usdPrice
+        const usdPrice = idxMap[symbol].price;
         if (usdPrice && usdPrice > 0) {
             updatePriceCache(symbol, usdPrice, 'index');
         }
@@ -747,11 +786,15 @@ function updateMainChartWithRealData() {
 
         const changeEl = document.getElementById('main-chart-change');
         if (changeEl) {
-            const chg = kenyaIndex.change;
-            changeEl.textContent = `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`;
-            changeEl.style.color = chg >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+            const chg = kenyaIndex.change >= 0 ? `+${kenyaIndex.change.toFixed(2)}` : kenyaIndex.change.toFixed(2);
+            changeEl.textContent = `${chg}%`;
+            changeEl.className = 'chart-stat-value ' + (kenyaIndex.change >= 0 ? 'up' : 'down');
         }
 
+        // Force the chart to redraw if the latest live price updated
+        if (typeof drawChart === 'function') {
+            drawChart();
+        }
     }
 }
 

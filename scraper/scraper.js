@@ -170,6 +170,17 @@ async function scrapeTarget(target, browser) {
         if (error) throw error;
         console.log(`Successfully completed: ${target.name}`);
 
+        // Log the success to the database so admin dashboard knows it worked
+        try {
+            await supabase.from('scraper_logs').insert([{
+                target_id: target.id,
+                records_updated: extractedData.length,
+                error_message: null
+            }]);
+        } catch (e) {
+            console.error('Failed to log success to Supabase:', e.message);
+        }
+
     } catch (error) {
         await logError(target.id, error.message);
     } finally {
@@ -191,6 +202,9 @@ async function run() {
         }
     } catch (error) {
         console.error('Fatal Scraper Error:', error);
+        try {
+            await supabase.from('scraper_logs').insert([{ target_id: 'SYSTEM_FATAL', error_message: error.message }]);
+        } catch (e) {}
     } finally {
         if (browser) await browser.close();
         console.log('\nScraping Script Finished.');

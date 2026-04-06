@@ -1124,7 +1124,19 @@ function drawHubChart() {
     }
 
     if (state.hubStudies.sma20) {
-        drawHubSMA(ctx, 20, '#f59e0b', getX, getY, displayData);
+        drawHubSMA(ctx, 20, '#38bdf8', getX, getY, displayData);
+    }
+
+    if (state.hubStudies.sma50) {
+        drawHubSMA(ctx, 50, '#a855f7', getX, getY, displayData);
+    }
+
+    if (state.hubStudies.ema10) {
+        drawHubEMA(ctx, 10, '#ef4444', getX, getY, displayData);
+    }
+
+    if (state.hubStudies.ema20) {
+        drawHubEMA(ctx, 20, '#22c55e', getX, getY, displayData);
     }
 
     // Draw price line or candles
@@ -1301,6 +1313,30 @@ function drawHubSMA(ctx, period, color, getX, getY, chartData) {
             started = true;
         } else {
             ctx.lineTo(getX(i), getY(avg));
+        }
+    }
+    ctx.stroke();
+}
+
+function drawHubEMA(ctx, period, color, getX, getY, chartData) {
+    const src = chartData || state.hubChartData;
+    if (src.length < period) return;
+
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+
+    const k = 2 / (period + 1);
+    let started = false;
+    let prevEma = src.slice(0, period).reduce((a, b) => a + b.close, 0) / period;
+
+    for (let i = period - 1; i < src.length; i++) {
+        if (i === period - 1) {
+            ctx.moveTo(getX(i), getY(prevEma));
+            started = true;
+        } else {
+            prevEma = src[i].close * k + prevEma * (1 - k);
+            ctx.lineTo(getX(i), getY(prevEma));
         }
     }
     ctx.stroke();
