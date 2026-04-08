@@ -4,7 +4,7 @@ const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
 const pdfParse = require('pdf-parse');
 const { createClient } = require('@supabase/supabase-js');
-const { OpenAI } = require('openai');
+// OpenAI removed — extraction is now 100% free via deterministic Cheerio parsing.
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -13,10 +13,6 @@ if (!supabaseUrl || !supabaseKey) {
     process.exit(1);
 }
 const supabase = createClient(supabaseUrl, supabaseKey);
-
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
 
 const targets = JSON.parse(fs.readFileSync('./targets.json', 'utf8'));
 
@@ -29,35 +25,84 @@ async function logError(targetId, errorMsg) {
     }
 }
 
-async function extractWithLLM(rawText, targetId) {
-    const prompt = `
-You are a reliable data extractor for a tea trading platform. Extract the tea auction data from the following raw text.
-Return ONLY a strictly formatted JSON array containing objects that match the following schema.
-If a data point is missing, try to estimate based on table headers or context, otherwise return null.
+/**
+ * Deterministic, zero-cost extraction using Cheerio.
+ * Each source has a targeted parsing block keyed by target.id.
+ * Add a new else-if block when onboarding a new auction source.
+ */
+async function extractDeterministically(rawHtml, targetId) {
+    const $ = cheerio.load(rawHtml);
+    const results = [];
+    const today = new Date().toISOString().split('T')[0];
 
-Schema:
-{
-  "symbol": "string (e.g., KEN-BP1, IND-ASM)",
-  "price": number (the average, average closing, or sold price),
-  "volume": number (total volume sold in kg),
-  "auction_date": "YYYY-MM-DD"
-}
+    const parseNum = (str) => parseFloat((str || '').replace(/[^0-9.]/g, '')) || null;
+    const parseVol = (str) => parseInt((str || '').replace(/[^0-9]/g, ''), 10) || null;
 
-Raw Text from ${targetId}:
----
-${rawText.substring(0, 15000)}
----
-`;
+    if (targetId === 'tea_board_india') {
+        // Tea Board India: HTML table — cols: Symbol | Avg Price (INR/kg) | Volume (kg)
+        $('table tr').each((i, row) => {
+            if (i === 0) return; // skip header
+            const cols = $(row).find('td');
+            if (cols.length < 2) return;
+            const symbol = $(cols[0]).text().trim();
+            const price = parseNum($(cols[1]).text());
+            const volume = cols.length >= 3 ? parseVol($(cols[2]).text()) : null;
+            if (symbol && price) results.push({ symbol, price, volume, auction_date: today });
+        });
 
-    const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-        temperature: 0,
-    });
-    const parsedContent = JSON.parse(response.choices[0].message.content);
-    const dataArray = Array.isArray(parsedContent) ? parsedContent : (parsedContent.data || Object.values(parsedContent)[0]);
-    return Array.isArray(dataArray) ? dataArray : [];
+    } else if (targetId === 'atb_ltd') {
+        // ATBL: same general HTML table structure
+        $('table tr').each((i, row) => {
+            if (i === 0) return;
+            const cols = $(row).find('td');
+            if (cols.length < 2) return;
+            const symbol = $(cols[0]).text().trim();
+            const price = parseNum($(cols[1]).text());
+            const volume = cols.length >= 3 ? parseVol($(cols[2]).text()) : null;
+            if (symbol && price) results.push({ symbol, price, volume, auction_date: today });
+        });
+
+    } else if (targetId === 'j_thomas_india') {
+        // J Thomas: cascaded report page — each centre's table follows the same pattern
+        $('table tr').each((i, row) => {
+            if (i === 0) return;
+            const cols = $(row).find('td');
+            if (cols.length < 2) return;
+            const symbol = $(cols[0]).text().trim();
+            const price = parseNum($(cols[1]).text());
+            const volume = cols.length >= 3 ? parseVol($(cols[2]).text()) : null;
+            if (symbol && price) results.push({ symbol, price, volume, auction_date: today });
+        });
+
+    } else if (targetId === 'ceylon_tea_brokers') {
+        // Ceylon Tea Brokers: HTML report — look for rows with a valid price column
+        $('table tr').each((i, row) => {
+            if (i === 0) return;
+            const cols = $(row).find('td');
+            if (cols.length < 2) return;
+            const symbol = $(cols[0]).text().trim();
+            const price = parseNum($(cols[1]).text());
+            const volume = cols.length >= 3 ? parseVol($(cols[2]).text()) : null;
+            if (symbol && price) results.push({ symbol, price, volume, auction_date: today });
+        });
+
+    } else if (targetId === 'van_rees') {
+        // Van Rees: generic table fallback after cookie acceptance
+        $('table tr').each((i, row) => {
+            if (i === 0) return;
+            const cols = $(row).find('td');
+            if (cols.length < 2) return;
+            const symbol = $(cols[0]).text().trim();
+            const price = parseNum($(cols[1]).text());
+            const volume = cols.length >= 3 ? parseVol($(cols[2]).text()) : null;
+            if (symbol && price) results.push({ symbol, price, volume, auction_date: today });
+        });
+
+    } else {
+        console.warn(`[${targetId}] No deterministic parser defined for this target. Skipping.`);
+    }
+
+    return results.filter(r => r.symbol && r.price !== null && !isNaN(r.price));
 }
 
 async function scrapeTarget(target, browser) {
@@ -155,22 +200,41 @@ async function scrapeTarget(target, browser) {
             throw new Error('Extracted text was empty or failed.');
         }
 
-        console.log(`Extracted ${rawText.length} characters. Sending to LLM...`);
-        const extractedData = await extractWithLLM(rawText, target.id);
+        // Grab the full HTML for deterministic parsing (rawText is plain-text for jthomas multi-centre)
+        const pageContent = target.type === 'custom_jthomas' ? rawText : await page.content();
+        console.log(`Extracted ${rawText.length} chars. Running deterministic parser...`);
+        const extractedData = await extractDeterministically(pageContent, target.id);
 
         if (!extractedData || extractedData.length === 0) {
-            throw new Error('LLM returned no usable JSON data.');
+            throw new Error('Deterministic parser returned no usable data. Check table selectors for this source.');
         }
 
-        console.log(`LLM extracted ${extractedData.length} records. Injecting to Supabase...`);
+        console.log(`Parsed ${extractedData.length} records. Injecting to Supabase...`);
         const { error } = await supabase
             .from('price_history')
             .upsert(extractedData, { onConflict: 'symbol,auction_date' });
 
         if (error) throw error;
-        console.log(`Successfully completed: ${target.name}`);
+        console.log(`Successfully upserted data for: ${target.name}`);
 
-        // Log the success to the database so admin dashboard knows it worked
+        // FIX: Lift the HALTED trading mode for symbols that were just scraped.
+        // Without this, the cron-imposed HALT is never reversed and the market
+        // stays frozen even after fresh auction prices have been published.
+        const symbolsScraped = extractedData.map(d => d.symbol).filter(Boolean);
+        if (symbolsScraped.length > 0) {
+            console.log(`Lifting HALT for ${symbolsScraped.length} symbols: ${symbolsScraped.slice(0, 5).join(', ')}...`);
+            const { error: resumeError } = await supabase
+                .from('teas')
+                .update({ trading_mode: 'FULL' })
+                .in('symbol', symbolsScraped);
+            if (resumeError) {
+                console.error('Failed to lift HALT:', resumeError.message);
+            } else {
+                console.log('Market HALT lifted. Trading resumed for scraped symbols.');
+            }
+        }
+
+        // Log success to the database so the admin dashboard knows it worked
         try {
             await supabase.from('scraper_logs').insert([{
                 target_id: target.id,

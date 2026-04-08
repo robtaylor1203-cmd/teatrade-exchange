@@ -1147,6 +1147,8 @@ function updateQuoteBoard() {
             const change = prev > 0 ? ((price - prev) / prev * 100) : 0;
             const volume = Number(tea.volume_24h) || 0;
             const isUp = change >= 0;
+            const tMode = tea.trading_mode || 'FULL';
+            const isHalted = tMode === 'HALTED';
             state.previousQuotePrices[tea.symbol] = price;
             const volDisplay = volume >= 1000 ? `${Math.round(volume / 1000)}K` : volume.toString();
             const country = COUNTRY_MAP[prefix];
@@ -1154,10 +1156,13 @@ function updateQuoteBoard() {
                 ? `<div class="quote-country" title="${country.label}"><span class="quote-country-flag">${flagImg(country.iso, 16)}</span><span class="quote-country-code">${prefix}</span></div>`
                 : `<div class="quote-country" style="visibility:hidden;"><span class="quote-country-code">${prefix}</span></div>`;
             return `
-                <div class="quote-card" data-symbol="${escapeHtml(tea.symbol)}" onclick="selectTeaForTrading('${escapeHtml(tea.symbol)}')">
-                    <div class="quote-symbol">${escapeHtml(symbol)}</div>
+                <div class="quote-card${isHalted ? ' halted-card' : ''}" data-symbol="${escapeHtml(tea.symbol)}" onclick="${isHalted ? '' : `selectTeaForTrading('${escapeHtml(tea.symbol)}')`}">
+                    <div class="quote-symbol">
+                        ${escapeHtml(symbol)}
+                        ${isHalted ? '<span class="mode-badge mode-halted" style="font-size:8px;padding:2px 4px;vertical-align:middle;">HALTED</span>' : ''}
+                    </div>
                     ${countryHtml}
-                    <div class="quote-price ${isUp ? 'up' : 'down'}" data-qprice="${escapeHtml(tea.symbol)}">$${price.toFixed(2)}</div>
+                    <div class="quote-price ${isUp ? 'up' : 'down'}" data-qprice="${escapeHtml(tea.symbol)}">${isHalted ? '🔒' : `$${price.toFixed(2)}`}</div>
                     <div class="quote-change ${isUp ? 'up' : 'down'}" data-qchange="${escapeHtml(tea.symbol)}">${isUp ? '\u25B2' : '\u25BC'} ${change >= 0 ? '+' : ''}${change.toFixed(1)}%</div>
                     <div class="quote-volume" data-qvol="${escapeHtml(tea.symbol)}">Vol: ${volDisplay}</div>
                 </div>
@@ -1173,18 +1178,28 @@ function updateQuoteBoard() {
         const change = prev > 0 ? ((price - prev) / prev * 100) : 0;
         const volume = Number(tea.volume_24h) || 0;
         const isUp = change >= 0;
+        const tMode = tea.trading_mode || 'FULL';
+        const isHalted = tMode === 'HALTED';
         const volDisplay = volume >= 1000 ? `${Math.round(volume / 1000)}K` : volume.toString();
 
         const prevPrice = state.previousQuotePrices[tea.symbol];
         const priceChanged = prevPrice !== undefined && prevPrice !== price;
         state.previousQuotePrices[tea.symbol] = price;
 
+        // Update the card's halted class
+        const card = board.querySelector(`[data-symbol="${CSS.escape(tea.symbol)}"]`);
+        if (card) {
+            card.classList.toggle('halted-card', isHalted);
+            card.classList.toggle('selected', !isHalted && state.selectedQuoteSymbol === tea.symbol);
+            card.onclick = isHalted ? null : () => selectTeaForTrading(tea.symbol);
+        }
+
         // Update price cell
         const priceEl = board.querySelector(`[data-qprice="${CSS.escape(tea.symbol)}"]`);
         if (priceEl) {
-            priceEl.textContent = `$${price.toFixed(2)}`;
+            priceEl.textContent = isHalted ? '🔒' : `$${price.toFixed(2)}`;
             priceEl.className = `quote-price ${isUp ? 'up' : 'down'}`;
-            if (priceChanged) {
+            if (!isHalted && priceChanged) {
                 const flashClass = price > prevPrice ? 'flash-green' : 'flash-red';
                 priceEl.classList.add(flashClass);
                 setTimeout(() => priceEl.classList.remove(flashClass), 600);
@@ -1201,10 +1216,6 @@ function updateQuoteBoard() {
         // Update volume cell
         const volEl = board.querySelector(`[data-qvol="${CSS.escape(tea.symbol)}"]`);
         if (volEl) volEl.textContent = `Vol: ${volDisplay}`;
-
-        // Toggle 'selected' class on card
-        const card = board.querySelector(`[data-symbol="${CSS.escape(tea.symbol)}"]`);
-        if (card) card.classList.toggle('selected', state.selectedQuoteSymbol === tea.symbol);
     });
 }
 

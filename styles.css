@@ -2790,6 +2790,13 @@ body.modal-open {
     animation: flashQuoteRed 0.5s ease;
 }
 
+.quote-card.halted-card {
+    opacity: 0.5;
+    pointer-events: none;
+    border-color: #ef4444;
+    cursor: not-allowed;
+}
+
 @keyframes flashQuoteGreen {
 
     0%,
