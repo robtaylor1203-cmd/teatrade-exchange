@@ -766,7 +766,16 @@ function updateMarketDepth() {
             const targetBids = (ups / total) * 100;
             state.marketDepthBids = state.marketDepthBids * 0.8 + targetBids * 0.2;
         }
-        state.marketDepthBids = Math.max(25, Math.min(75, state.marketDepthBids));
+
+        // Add time-based oscillation to simulate live HFT quoting activity.
+        // Three overlapping sine waves with different frequencies/phases give
+        // an organic drift of ±3–5% that won't look mechanically repetitive.
+        const t = Date.now() / 1000; // seconds
+        const osc = (Math.sin(t * 0.12) * 2.8)       // slow drift ~25s period
+                  + (Math.sin(t * 0.37 + 1.1) * 1.4)  // medium wave ~17s period
+                  + (Math.sin(t * 0.71 + 2.5) * 0.8); // fast jitter ~9s period
+        state.marketDepthBids = Math.max(25, Math.min(75, state.marketDepthBids + osc));
+
         bidPct = state.marketDepthBids;
         let totalVol = state.teas.reduce((sum, t) => sum + (t.volume_24h || 0), 0);
         if (totalVol === 0) totalVol = 14300000; // Mock fallback if DB volumes aren't hydrated yet

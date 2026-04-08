@@ -30,6 +30,13 @@ let _hubStudySeries = {}; // keyed by study name
 let _hubTvRsiChart = null;
 let _hubTvRsiSeries = null;
 
+// Live-tick tracking (mirrors charts.js _chartLastSymbol pattern)
+let _hubLastSymbol = null;
+let _hubLastTimeframe = null;
+let _hubLastDataLen = 0;
+let _hubLastType = null;
+let _activeHubPriceLines = []; // open-trade dashed price lines
+
 /**
  * Resolve the currency symbol and forex multiplier for the hub chart's
  * currently selected instrument.
@@ -954,7 +961,8 @@ function _toHubTvData(rawData) {
 /**
  * The hub chart draw function. Called in place of the old canvas drawHubChart().
  * On first call it creates the TradingView instance. On subsequent calls it
- * just updates the data — the chart is never torn down between ticks.
+ * uses .update() for live ticks (preserving zoom/pan) and only calls .setData()
+ * on full symbol/timeframe/type swaps.
  */
 function drawHubChart() {
     const container = document.getElementById('hub-tv-chart');
@@ -975,38 +983,73 @@ function drawHubChart() {
     const tvData = _toHubTvData(state.hubChartData);
     if (tvData.length === 0) return;
 
-    // Feed price data to main series
-    try {
-        _hubMainSeries.setData(tvData);
-    } catch (e) {
-        // Occasionally TV throws on setData if series was just replaced — retry once
-        _initHubTvChart();
-        if (_hubMainSeries) _hubMainSeries.setData(tvData);
+    // ── SMART UPDATE vs FULL RELOAD ──────────────────────────────────────────
+    const currentSymbol = state.mainChartData?.symbol || '';
+    const currentTf = state.hubTimeframe || state.currentTimeframe || '1W';
+    const newLen = tvData.length;
+    const isNewSymbol = currentSymbol !== _hubLastSymbol;
+    const isNewTf = currentTf !== _hubLastTimeframe;
+    const isNewType = state.hubChartType !== _hubLastType;
+    const isSameState = !isNewSymbol && !isNewTf && !isNewType;
+    const isLiveTick = isSameState && newLen > 0 && (newLen - _hubLastDataLen) <= 1 && _hubLastDataLen > 2;
+
+    if (isLiveTick) {
+        // Buttery-smooth live tick: only push the last candle
+        const lastCandle = tvData[tvData.length - 1];
+        const lastVol = {
+            time: lastCandle.time,
+            value: lastCandle.volume || 0,
+            color: lastCandle.close >= lastCandle.open ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)',
+        };
+        try {
+            _hubMainSeries.update(lastCandle);
+            if (_hubVolumeSeries) _hubVolumeSeries.update(lastVol);
+        } catch (e) {
+            // Time went backwards or series mismatch — fall back to full reload
+            _hubMainSeries.setData(tvData);
+            if (_hubVolumeSeries) _hubVolumeSeries.setData(
+                tvData.map(d => ({ time: d.time, value: d.volume || 0, color: d.close >= d.open ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)' }))
+            );
+        }
+    } else {
+        // Full reload: new symbol, timeframe, type, or initial load
+        try {
+            _hubMainSeries.setData(tvData);
+        } catch (e) {
+            // Series was just replaced — retry once after reinit
+            _initHubTvChart();
+            if (_hubMainSeries) _hubMainSeries.setData(tvData);
+        }
+
+        if (_hubVolumeSeries) {
+            const volData = tvData.map(d => ({
+                time: d.time,
+                value: d.volume || 0,
+                color: d.close >= d.open ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)',
+            }));
+            try { _hubVolumeSeries.setData(volData); } catch (e) {}
+        }
+
+        // Only fit content on full reloads — not on ticks (would reset user zoom)
+        try { _hubTvChart.timeScale().fitContent(); } catch (e) {}
     }
 
-    // Feed volume data
-    if (_hubVolumeSeries) {
-        const volData = tvData.map(d => ({
-            time: d.time,
-            value: d.volume || 0,
-            color: d.close >= d.open ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)',
-        }));
-        try { _hubVolumeSeries.setData(volData); } catch (e) {}
-    }
+    // Update tracking state
+    _hubLastSymbol = currentSymbol;
+    _hubLastTimeframe = currentTf;
+    _hubLastDataLen = newLen;
+    _hubLastType = state.hubChartType;
 
-    // Draw overlays (studies)
+    // Always refresh overlays and order badges (lightweight — these are just price lines)
     _applyHubStudyOverlays(tvData);
 
-    // Draw RSI sub-chart if enabled
     if (state.hubStudies?.rsi) {
         drawHubRsi(tvData);
     }
 
-    // Draw entry-price line if the user has a position
-    _applyHubEntryPriceLine();
-
-    // Fit chart to all content
-    try { _hubTvChart.timeScale().fitContent(); } catch (e) {}
+    // Draw open trade entry-price lines (replaces the old single-position line)
+    const lastPrice = tvData[tvData.length - 1]?.close || 0;
+    _attachHubOrderBadges(lastPrice);
 
     // Update the price display header
     updateHubPriceDisplay();
@@ -1106,34 +1149,61 @@ function _applyHubStudyOverlays(tvData) {
 }
 
 /**
- * Draw (or remove) the user's entry-price marker as a TV price line.
+ * Attach dashed entry-price lines for all open trades on the current hub symbol.
+ * Mirrors _attachOrderBadges() in charts.js. Each line shows the trade type,
+ * quantity, and running P&L. Previous lines are cleaned up to prevent memory leaks.
  */
-function _applyHubEntryPriceLine() {
+function _attachHubOrderBadges(currentPrice) {
     if (!_hubMainSeries) return;
 
-    // Remove any existing entry price line
-    if (window._hubEntryPriceLine) {
-        try { _hubMainSeries.removePriceLine(window._hubEntryPriceLine); } catch (e) {}
-        window._hubEntryPriceLine = null;
-    }
+    // Clean up old price lines
+    _activeHubPriceLines.forEach(pl => { try { _hubMainSeries.removePriceLine(pl); } catch (e) {} });
+    _activeHubPriceLines = [];
 
+    // Resolve the hub symbol — normalize KENYAN → KENYA for lookup
+    const rawSymbol = document.getElementById('hub-buy-symbol')?.value || state.mainChartData?.symbol || '';
+    const symbol = rawSymbol === 'KENYAN' ? 'KENYA' : rawSymbol;
+    if (!symbol) return;
+
+    // Get the forex multiplier so entry prices display in local currency
     const _fxInfo = _getHubCurrencyInfo();
     const _fx = _fxInfo.multiplier || 1;
-    const _displayEntry = (window.hubEntryPrice && isFinite(window.hubEntryPrice))
-        ? window.hubEntryPrice * _fx : null;
-    if (!_displayEntry) return;
 
-    const lastClose = state.hubChartData?.[state.hubChartData.length - 1]?.close * _fx || 0;
-    const isProfit = lastClose >= _displayEntry;
-
-    window._hubEntryPriceLine = _hubMainSeries.createPriceLine({
-        price: _displayEntry,
-        color: isProfit ? '#10b981' : '#ef4444',
-        lineWidth: 1,
-        lineStyle: 2, // dashed
-        axisLabelVisible: true,
-        title: 'Entry',
+    // Collect all open trades for this symbol (same logic as getOpenTradesForSymbol in charts.js)
+    const trades = [];
+    (state.positions || []).forEach(p => {
+        const teaSym = p.teas?.symbol || state.teas?.find(t => t.id === p.tea_id)?.symbol || '';
+        if (teaSym === symbol || (isIndexSymbol(symbol) && teaSym === symbol)) {
+            trades.push({
+                entry_price: (p.avg_entry_price || p.entry_price || 0) * _fx,
+                trade_type: (p.quantity >= 0) ? 'BUY' : 'SELL',
+                quantity: Math.abs(p.quantity),
+            });
+        }
     });
+
+    trades.forEach(trade => {
+        const pnl = (trade.trade_type === 'BUY' ? 1 : -1) * (currentPrice - trade.entry_price) * trade.quantity;
+        const pnlStr = (pnl >= 0 ? '+' : '') + '$' + Math.abs(pnl).toFixed(2);
+        const pl = _hubMainSeries.createPriceLine({
+            price: trade.entry_price,
+            color: trade.trade_type === 'BUY' ? '#10b981' : '#ef4444',
+            lineWidth: 2,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: `${trade.trade_type} ${trade.quantity}kg [${pnlStr}]`,
+        });
+        _activeHubPriceLines.push(pl);
+    });
+}
+
+// Legacy stub — replaced by _attachHubOrderBadges
+function _applyHubEntryPriceLine() {
+    // Clean up any entry price line left over from the old single-position approach
+    if (window._hubEntryPriceLine) {
+        try { _hubMainSeries?.removePriceLine(window._hubEntryPriceLine); } catch (e) {}
+        window._hubEntryPriceLine = null;
+    }
 }
 
 /**
