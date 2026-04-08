@@ -1501,7 +1501,15 @@ function updateChartsWithNewPrices() {
     }
 
     if (mainPrice && mainPrice > 0) {
-        state.mainChartData.basePrice = mainPrice;
+        // Store the RAW USD price in basePrice so charts.js can apply the forex
+        // multiplier itself (charts.js divides basePrice by _fx at render time).
+        // For USD indexes, rawUsd === mainPrice so this is a no-op.
+        const fkForStore = state.mainChartData?.forexKey;
+        const multForStore = (fkForStore && state.macroIndicators?.[fkForStore])
+            ? Number(state.macroIndicators[fkForStore]) : 1;
+        const rawUsdForStore = multForStore > 1 ? mainPrice / multForStore : mainPrice;
+        state.mainChartData.basePrice = rawUsdForStore > 0 ? rawUsdForStore : mainPrice;
+
         const priceEl = document.getElementById('main-chart-price');
         if (priceEl) {
             priceEl.textContent = formatIndexPrice(mainPrice, state.mainChartData.currency || '$');
@@ -1509,7 +1517,9 @@ function updateChartsWithNewPrices() {
     }
 
     // ── Redraw all active charts exactly once per batch ────────────────────
-    if (typeof drawChart === 'function' && document.getElementById('priceChart')) {
+    // FIX: The old guard checked for 'priceChart' (legacy canvas ID that no longer
+    // exists). The app now uses TradingView via 'tv-chart', so guard against that instead.
+    if (typeof drawChart === 'function' && document.getElementById('tv-chart')) {
         drawChart();
     }
 
