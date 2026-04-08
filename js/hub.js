@@ -22,6 +22,14 @@ let tradingHubChart = null;
 let isResizingRsi = false;
 let tradeLogEntries = [];
 
+// TradingView hub chart state
+let _hubTvChart = null;
+let _hubMainSeries = null;
+let _hubVolumeSeries = null;
+let _hubStudySeries = {}; // keyed by study name
+let _hubTvRsiChart = null;
+let _hubTvRsiSeries = null;
+
 /**
  * Resolve the currency symbol and forex multiplier for the hub chart's
  * currently selected instrument.
@@ -367,14 +375,10 @@ function initTradingHub() {
         resizeObserver.observe(canvasWrapper);
     }
 
-    // Draw hub chart with multiple attempts for layout using requestAnimationFrame
-    requestAnimationFrame(() => {
-        drawHubChart();
-        setTimeout(drawHubChart, 100);
-        setTimeout(drawHubChart, 300);
-        setTimeout(drawHubChart, 600);
-        setTimeout(drawHubChart, 1000);
-    });
+    // Draw hub chart with TradingView — destroys and recreates the instance
+    // to ensure a clean slate any time the hub opens for a new symbol.
+    _destroyHubTvChart();
+    drawHubChart();
 
     // Setup hub chart crosshair and tooltip events
     setupHubChartCrosshair();
@@ -385,126 +389,12 @@ function initTradingHub() {
 // =============================================
 
 function setupHubChartCrosshair() {
-    const canvas = document.getElementById('hubPriceChart');
-    const wrapper = document.getElementById('hub-canvas-wrapper');
-    const crosshair = document.getElementById('hub-crosshair');
-    const tooltip = document.getElementById('hub-tooltip');
-
-    if (!canvas || !wrapper || !crosshair || !tooltip) return;
-
-    // Remove old listeners if any (prevent duplicates)
-    canvas.removeEventListener('mousemove', hubChartMouseMove);
-    canvas.removeEventListener('mouseleave', hubChartMouseLeave);
-    wrapper.removeEventListener('mouseleave', hubChartMouseLeave);
-
-    // Add event listeners
-    canvas.addEventListener('mousemove', hubChartMouseMove);
-    canvas.addEventListener('mouseleave', hubChartMouseLeave);
-    wrapper.addEventListener('mouseleave', hubChartMouseLeave);
+    // TradingView provides native crosshair — no manual canvas events needed.
+    // This function is intentionally a no-op kept for call-site compatibility.
 }
 
-function hubChartMouseMove(e) {
-    const canvas = document.getElementById('hubPriceChart');
-    const crosshair = document.getElementById('hub-crosshair');
-    const tooltip = document.getElementById('hub-tooltip');
-    const meta = window.hubChartMeta;
-
-    if (!canvas || !crosshair || !tooltip || !meta || !meta.data || meta.data.length === 0) {
-        return;
-    }
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const { padding, chartWidth, chartHeight, width, height, minPrice, maxPrice } = meta;
-
-    // Check if mouse is in chart area
-    if (x < padding.left || x > width - padding.right ||
-        y < padding.top || y > padding.top + chartHeight) {
-        crosshair.style.display = 'none';
-        tooltip.classList.remove('visible');
-        return;
-    }
-
-    // Find data point
-    const relX = x - padding.left;
-    const index = Math.round((relX / chartWidth) * (meta.data.length - 1));
-    const dataPoint = meta.data[Math.max(0, Math.min(index, meta.data.length - 1))];
-
-    if (!dataPoint || !dataPoint.date) return;
-
-    // Show crosshair
-    crosshair.style.display = 'block';
-    crosshair.querySelector('.hub-crosshair-v').style.left = x + 'px';
-    crosshair.querySelector('.hub-crosshair-h').style.top = y + 'px';
-
-    // Format date
-    const date = dataPoint.date instanceof Date ? dataPoint.date : new Date(dataPoint.date);
-    const dateStr = date.toLocaleDateString('en-GB', {
-        weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
-    });
-
-    // Calculate change (safe against NaN/undefined)
-    const dpOpen = Number(dataPoint.open) || 0;
-    const dpHigh = Number(dataPoint.high) || 0;
-    const dpLow = Number(dataPoint.low) || 0;
-    const dpClose = Number(dataPoint.close) || 0;
-    const change = dpOpen > 0 ? ((dpClose - dpOpen) / dpOpen * 100) : 0;
-    const changeClass = change >= 0 ? 'up' : 'down';
-    const changeSign = change >= 0 ? '+' : '';
-
-    // Build tooltip content
-    const _htc = _getHubCurrencyInfo().symbol;
-    const _htf = (v) => v >= 100 ? _htc + v.toFixed(1) : _htc + v.toFixed(3);
-    tooltip.innerHTML = `
-        <div class="hub-tooltip-date">${dateStr}</div>
-        <div class="hub-tooltip-row">
-            <span class="hub-tooltip-label">Open</span>
-            <span class="hub-tooltip-value">${_htf(dpOpen)}</span>
-        </div>
-        <div class="hub-tooltip-row">
-            <span class="hub-tooltip-label">High</span>
-            <span class="hub-tooltip-value up">${_htf(dpHigh)}</span>
-        </div>
-        <div class="hub-tooltip-row">
-            <span class="hub-tooltip-label">Low</span>
-            <span class="hub-tooltip-value down">${_htf(dpLow)}</span>
-        </div>
-        <div class="hub-tooltip-row">
-            <span class="hub-tooltip-label">Close</span>
-            <span class="hub-tooltip-value">${_htf(dpClose)}</span>
-        </div>
-        <div class="hub-tooltip-row">
-            <span class="hub-tooltip-label">Change</span>
-            <span class="hub-tooltip-value ${changeClass}">${changeSign}${change.toFixed(2)}%</span>
-        </div>
-        <div class="hub-tooltip-row">
-            <span class="hub-tooltip-label">Volume</span>
-            <span class="hub-tooltip-value">${dataPoint.volume ? formatVolume(dataPoint.volume) + ' kg' : '—'}</span>
-        </div>
-    `;
-
-    // Position tooltip
-    let tooltipX = x + 15;
-    let tooltipY = y - 10;
-
-    // Keep tooltip in bounds
-    if (tooltipX + 190 > width) tooltipX = x - 185;
-    if (tooltipY + 180 > height) tooltipY = y - 170;
-    if (tooltipY < 10) tooltipY = 10;
-
-    tooltip.style.left = tooltipX + 'px';
-    tooltip.style.top = tooltipY + 'px';
-    tooltip.classList.add('visible');
-}
-
-function hubChartMouseLeave() {
-    const crosshair = document.getElementById('hub-crosshair');
-    const tooltip = document.getElementById('hub-tooltip');
-
-    if (crosshair) crosshair.style.display = 'none';
-    if (tooltip) tooltip.classList.remove('visible');
-}
+function hubChartMouseMove() {}
+function hubChartMouseLeave() {}
 
 // =============================================
 // HUB CHART DATA
@@ -939,515 +829,372 @@ function setupRsiResizer() {
 // HUB CHART DRAWING
 // =============================================
 
-function drawHubChart() {
-    const canvas = document.getElementById('hubPriceChart');
-    const wrapper = document.getElementById('hub-canvas-wrapper');
+// =============================================
+// HUB CHART — TRADINGVIEW ENGINE
+// =============================================
 
-    if (!canvas || !wrapper) {
-        return;
+/**
+ * Tear down the existing TradingView hub chart instance, if any.
+ * Must be called before creating a new one to avoid DOM memory leaks.
+ */
+function _destroyHubTvChart() {
+    if (_hubTvChart) {
+        try { _hubTvChart.remove(); } catch (e) {}
+        _hubTvChart = null;
     }
+    _hubMainSeries = null;
+    _hubVolumeSeries = null;
+    _hubStudySeries = {};
+    if (_hubTvRsiChart) {
+        try { _hubTvRsiChart.remove(); } catch (e) {}
+        _hubTvRsiChart = null;
+        _hubTvRsiSeries = null;
+    }
+}
+
+/**
+ * Initialize (or re-initialize) the TradingView chart for the hub.
+ * Mirrors the configuration of the main screen TV chart in charts.js
+ * so both views look identical.
+ */
+function _initHubTvChart() {
+    const container = document.getElementById('hub-tv-chart');
+    if (!container || typeof LightweightCharts === 'undefined') return;
+
+    _destroyHubTvChart();
+
+    _hubTvChart = LightweightCharts.createChart(container, {
+        layout: {
+            textColor: '#94a3b8',
+            background: { type: 'solid', color: 'transparent' }
+        },
+        grid: {
+            vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
+            horzLines: { color: 'rgba(255, 255, 255, 0.05)' }
+        },
+        rightPriceScale: { borderVisible: false, autoScale: true },
+        leftPriceScale: { visible: false },
+        timeScale: { timeVisible: true, borderVisible: false, secondsVisible: false },
+        crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+        handleScroll: true,
+        handleScale: true,
+        autoSize: true,
+    });
+
+    // Create the main price series
+    if (state.hubChartType === 'candle') {
+        _hubMainSeries = _hubTvChart.addCandlestickSeries({
+            upColor: '#10b981',
+            downColor: '#ef4444',
+            borderVisible: false,
+            wickUpColor: '#10b981',
+            wickDownColor: '#ef4444',
+        });
+    } else {
+        _hubMainSeries = _hubTvChart.addAreaSeries({
+            lineColor: '#1a73e8',
+            topColor: 'rgba(26, 115, 232, 0.25)',
+            bottomColor: 'rgba(26, 115, 232, 0.02)',
+            lineWidth: 2,
+            crosshairMarkerVisible: true,
+        });
+    }
+
+    // Volume histogram (pane 1)
+    _hubVolumeSeries = _hubTvChart.addHistogramSeries({
+        priceFormat: { type: 'volume' },
+        priceScaleId: 'vol',
+        color: 'rgba(100, 116, 139, 0.35)',
+        lastValueVisible: false,
+        priceLineVisible: false,
+    });
+    _hubTvChart.priceScale('vol').applyOptions({
+        scaleMargins: { top: 0.80, bottom: 0 },
+    });
+}
+
+/**
+ * Convert hub chart data (which uses Date objects) to TradingView's
+ * required { time, open, high, low, close, value } format.
+ * Applies the forex multiplier exactly as the main chart does in charts.js.
+ */
+function _toHubTvData(rawData) {
+    if (!rawData || rawData.length === 0) return [];
+
+    // Forex multiplier (same double-conversion guard as before)
+    const _fxInfo = _getHubCurrencyInfo();
+    let _fx = _fxInfo.multiplier || 1;
+    if (_fx > 1) {
+        const closes = rawData.map(d => Number(d.close) || 0).filter(p => p > 0).sort((a, b) => a - b);
+        const median = closes.length > 0 ? closes[Math.floor(closes.length / 2)] : 0;
+        if (median > 50) _fx = 1; // Data already in local currency
+    }
+
+    const tvData = rawData.map(d => {
+        const t = d.date instanceof Date ? d.date : new Date(d.date);
+        const ts = Math.floor(t.getTime() / 1000);
+        const vol = d.volume > 0 ? d.volume : Math.abs((d.high - d.low) * 50000);
+        return {
+            time: ts,
+            open: (Number(d.open) || 0) * _fx,
+            high: (Number(d.high) || 0) * _fx,
+            low: (Number(d.low) || 0) * _fx,
+            close: (Number(d.close) || 0) * _fx,
+            value: (Number(d.close) || 0) * _fx, // for area/line series
+            volume: vol,
+        };
+    });
+
+    // Deduplicate by timestamp and sort ascending (TV requirement)
+    return [...new Map(tvData.map(d => [d.time, d])).values()]
+        .filter(d => d.close > 0)
+        .sort((a, b) => a.time - b.time);
+}
+
+/**
+ * The hub chart draw function. Called in place of the old canvas drawHubChart().
+ * On first call it creates the TradingView instance. On subsequent calls it
+ * just updates the data — the chart is never torn down between ticks.
+ */
+function drawHubChart() {
+    const container = document.getElementById('hub-tv-chart');
+    if (!container) return;
 
     // Ensure we have data
     if (!state.hubChartData || state.hubChartData.length === 0) {
         state.hubChartData = generateHubChartData();
     }
 
-    // Get dimensions - try multiple methods
-    let width = wrapper.offsetWidth;
-    let height = wrapper.offsetHeight;
-
-    // If still no dimensions, use getBoundingClientRect
-    if (width < 100 || height < 100) {
-        const rect = wrapper.getBoundingClientRect();
-        width = rect.width;
-        height = rect.height;
+    // Create chart if not yet initialised (or if type changed via setHubChartType)
+    if (!_hubTvChart || !_hubMainSeries) {
+        _initHubTvChart();
     }
 
-    // Final fallback - use viewport-based dimensions
-    if (width < 100) width = (window.innerWidth - 400) * 0.9;
-    if (height < 100) height = 350;
+    if (!_hubMainSeries) return; // Safety: init may fail if TV is not loaded yet
 
-    // Set canvas size
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.floor(width * dpr);
-    canvas.height = Math.floor(height * dpr);
-    canvas.style.width = Math.floor(width) + 'px';
-    canvas.style.height = Math.floor(height) + 'px';
+    const tvData = _toHubTvData(state.hubChartData);
+    if (tvData.length === 0) return;
 
-    const ctx = canvas.getContext('2d');
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.scale(dpr, dpr);
-
-    const padding = { top: 25, right: 65, bottom: 35, left: 25 };
-
-    // Clear canvas and fill with background
-    ctx.fillStyle = '#0d1117';
-    ctx.fillRect(0, 0, width, height);
-
-    // Safety check for data validity
-    if (!state.hubChartData || state.hubChartData.length === 0) {
-        ctx.fillStyle = '#888';
-        ctx.font = '14px sans-serif';
-        ctx.fillText('No chart data available', width / 2 - 80, height / 2);
-        return;
+    // Feed price data to main series
+    try {
+        _hubMainSeries.setData(tvData);
+    } catch (e) {
+        // Occasionally TV throws on setData if series was just replaced — retry once
+        _initHubTvChart();
+        if (_hubMainSeries) _hubMainSeries.setData(tvData);
     }
 
-    // Forex multiplier: data is USD, display in local currency
-    const _fxInfo = _getHubCurrencyInfo();
-    let _fx = _fxInfo.multiplier || 1;
-
-    // Sanity guard: if raw data is already in local currency (median > $50),
-    // skip the forex multiplication to prevent double-conversion.
-    if (_fx > 1) {
-        const _rawCloses = state.hubChartData.map(d => Number(d.close) || 0).filter(p => p > 0).sort((a, b) => a - b);
-        const _rawMedian = _rawCloses.length > 0 ? _rawCloses[Math.floor(_rawCloses.length / 2)] : 0;
-        if (_rawMedian > 50) {
-            _fx = 1;
-        }
+    // Feed volume data
+    if (_hubVolumeSeries) {
+        const volData = tvData.map(d => ({
+            time: d.time,
+            value: d.volume || 0,
+            color: d.close >= d.open ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)',
+        }));
+        try { _hubVolumeSeries.setData(volData); } catch (e) {}
     }
 
-    // Build display-currency data (source stays in USD)
-    const displayData = state.hubChartData.map(d => ({
-        ...d,
-        open: d.open * _fx, high: d.high * _fx, low: d.low * _fx, close: d.close * _fx
-    }));
+    // Draw overlays (studies)
+    _applyHubStudyOverlays(tvData);
 
-    // Calculate price range with Y-axis stabilization + outlier guard
-    const _hubCloses = displayData.map(d => Number(d.close) || 0).filter(p => p > 0).sort((a, b) => a - b);
-    const _hubMedian = _hubCloses.length > 0 ? _hubCloses[Math.floor(_hubCloses.length / 2)] : 0;
-    const _hubCeil = _hubMedian > 0 ? _hubMedian * 10 : Infinity;
-    let dataMinPrice = Infinity, dataMaxPrice = -Infinity;
-    displayData.forEach(d => {
-        if (d && typeof d.low === 'number' && typeof d.high === 'number') {
-            if (d.high < _hubCeil) {
-                dataMinPrice = Math.min(dataMinPrice, d.low);
-                dataMaxPrice = Math.max(dataMaxPrice, d.high);
+    // Draw RSI sub-chart if enabled
+    if (state.hubStudies?.rsi) {
+        drawHubRsi(tvData);
+    }
+
+    // Draw entry-price line if the user has a position
+    _applyHubEntryPriceLine();
+
+    // Fit chart to all content
+    try { _hubTvChart.timeScale().fitContent(); } catch (e) {}
+
+    // Update the price display header
+    updateHubPriceDisplay();
+}
+
+/**
+ * Apply/remove studies (SMA, EMA, Bollinger) as TV line/band series overlays.
+ */
+function _applyHubStudyOverlays(tvData) {
+    if (!_hubTvChart || !tvData || tvData.length === 0) return;
+
+    const closes = tvData.map(d => d.close);
+
+    const smaLine = (period, color, key) => {
+        if (!state.hubStudies?.[key]) {
+            if (_hubStudySeries[key]) {
+                try { _hubTvChart.removeSeries(_hubStudySeries[key]); } catch (e) {}
+                delete _hubStudySeries[key];
             }
+            return;
         }
-    });
-
-    // Expand range to include entry price if user has a position
-    const _displayEntry = (window.hubEntryPrice && isFinite(window.hubEntryPrice)) ? window.hubEntryPrice * _fx : null;
-    if (_displayEntry) {
-        dataMinPrice = Math.min(dataMinPrice, _displayEntry);
-        dataMaxPrice = Math.max(dataMaxPrice, _displayEntry);
-    }
-
-    // Fallback if prices are invalid
-    if (!isFinite(dataMinPrice) || !isFinite(dataMaxPrice) || dataMinPrice === dataMaxPrice) {
-        dataMinPrice = 3.0 * _fx;
-        dataMaxPrice = 4.0 * _fx;
-    }
-
-    // Y-AXIS STABILIZATION: Use wider, stable range to prevent frequent rescaling
-    const dataRange = dataMaxPrice - dataMinPrice;
-    const midPrice = (dataMaxPrice + dataMinPrice) / 2;
-
-    // Minimum range is 10% of mid price (prevents tiny ranges from zooming in too much)
-    const minRange = midPrice * 0.10;
-    const stableRange = Math.max(dataRange, minRange);
-
-    // Add extra padding (20% on each side) for headroom
-    let minPrice = midPrice - (stableRange * 0.7);
-    let maxPrice = midPrice + (stableRange * 0.7);
-
-    // Use cached Y-axis bounds if data is within 80% of current range (prevents flickering)
-    const hubSymbol = document.getElementById('hub-buy-symbol')?.value || 'KENYA';
-    if (!window.hubYAxisCache) window.hubYAxisCache = {};
-
-    if (window.hubYAxisCache[hubSymbol]) {
-        const cached = window.hubYAxisCache[hubSymbol];
-        const cachedRange = cached.max - cached.min;
-        if (dataMinPrice >= cached.min + cachedRange * 0.1 &&
-            dataMaxPrice <= cached.max - cachedRange * 0.1) {
-            minPrice = cached.min;
-            maxPrice = cached.max;
-        } else {
-            window.hubYAxisCache[hubSymbol] = { min: minPrice, max: maxPrice };
+        if (!_hubStudySeries[key]) {
+            _hubStudySeries[key] = _hubTvChart.addLineSeries({
+                color, lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false,
+            });
         }
-    } else {
-        window.hubYAxisCache[hubSymbol] = { min: minPrice, max: maxPrice };
-    }
-
-    const chartWidth = width - padding.left - padding.right;
-    const chartHeight = height - padding.top - padding.bottom;
-
-    const getX = (i) => padding.left + (i / (displayData.length - 1)) * chartWidth;
-    const getY = (price) => padding.top + (1 - (price - minPrice) / (maxPrice - minPrice)) * chartHeight;
-
-    // Draw grid
-    ctx.strokeStyle = '#1a2332';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 4; i++) {
-        const y = padding.top + (i / 4) * chartHeight;
-        ctx.beginPath();
-        ctx.moveTo(padding.left, y);
-        ctx.lineTo(width - padding.right, y);
-        ctx.stroke();
-    }
-
-    // Draw average price line (dashed)
-    const avgPrice = displayData.reduce((sum, d) => sum + d.close, 0) / displayData.length;
-    const avgY = getY(avgPrice);
-    ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(padding.left, avgY);
-    ctx.lineTo(width - padding.right, avgY);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Draw studies
-    if (state.hubStudies.bollinger) {
-        const period = 20;
-        const multiplier = 2;
-
-        if (displayData.length >= period) {
-            ctx.fillStyle = 'rgba(96, 165, 250, 0.1)';
-            ctx.beginPath();
-
-            for (let i = period - 1; i < displayData.length; i++) {
-                const slice = displayData.slice(i - period + 1, i + 1);
-                const avg = slice.reduce((a, b) => a + b.close, 0) / period;
-                const stdDev = Math.sqrt(slice.reduce((a, b) => a + Math.pow(b.close - avg, 2), 0) / period);
-                const upper = avg + multiplier * stdDev;
-
-                const x = getX(i);
-                if (i === period - 1) {
-                    ctx.moveTo(x, getY(upper));
-                } else {
-                    ctx.lineTo(x, getY(upper));
-                }
-            }
-
-            for (let i = displayData.length - 1; i >= period - 1; i--) {
-                const slice = displayData.slice(i - period + 1, i + 1);
-                const avg = slice.reduce((a, b) => a + b.close, 0) / period;
-                const stdDev = Math.sqrt(slice.reduce((a, b) => a + Math.pow(b.close - avg, 2), 0) / period);
-                const lower = avg - multiplier * stdDev;
-                ctx.lineTo(getX(i), getY(lower));
-            }
-
-            ctx.closePath();
-            ctx.fill();
+        const data = [];
+        for (let i = period - 1; i < closes.length; i++) {
+            const avg = closes.slice(i - period + 1, i + 1).reduce((a, b) => a + b, 0) / period;
+            data.push({ time: tvData[i].time, value: avg });
         }
-    }
-
-    if (state.hubStudies.sma10) {
-        drawHubSMA(ctx, 10, '#facc15', getX, getY, displayData);
-    }
-
-    if (state.hubStudies.sma20) {
-        drawHubSMA(ctx, 20, '#38bdf8', getX, getY, displayData);
-    }
-
-    if (state.hubStudies.sma50) {
-        drawHubSMA(ctx, 50, '#a855f7', getX, getY, displayData);
-    }
-
-    if (state.hubStudies.ema10) {
-        drawHubEMA(ctx, 10, '#ef4444', getX, getY, displayData);
-    }
-
-    if (state.hubStudies.ema20) {
-        drawHubEMA(ctx, 20, '#22c55e', getX, getY, displayData);
-    }
-
-    // Draw price line or candles
-    if (state.hubChartType === 'line') {
-        ctx.beginPath();
-        displayData.forEach((d, i) => {
-            if (i === 0) {
-                ctx.moveTo(getX(i), getY(d.close));
-            } else {
-                ctx.lineTo(getX(i), getY(d.close));
-            }
-        });
-        ctx.strokeStyle = '#1a73e8';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        // Draw subtle area fill matching main chart
-        ctx.lineTo(getX(displayData.length - 1), height - padding.bottom);
-        ctx.lineTo(getX(0), height - padding.bottom);
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(26, 115, 232, 0.15)';
-        ctx.fill();
-    } else {
-        // Draw candles
-        const candleWidth = Math.max(2, (chartWidth / displayData.length) - 2);
-
-        displayData.forEach((d, i) => {
-            const x = getX(i);
-            const isUp = d.close >= d.open;
-
-            ctx.fillStyle = isUp ? '#10b981' : '#ef4444';
-            ctx.strokeStyle = isUp ? '#10b981' : '#ef4444';
-
-            // Draw wick
-            ctx.beginPath();
-            ctx.moveTo(x, getY(d.high));
-            ctx.lineTo(x, getY(d.low));
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Draw body
-            const bodyTop = getY(Math.max(d.open, d.close));
-            const bodyBottom = getY(Math.min(d.open, d.close));
-            const bodyHeight = Math.max(1, bodyBottom - bodyTop);
-            ctx.fillRect(x - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
-        });
-    }
-
-    // Draw Volume Histogram at the bottom
-    const volArray = displayData.map(d => {
-        let vol = d.volume || 0;
-        if (vol <= 0) {
-            const tvTime = Math.floor(new Date(d.date || 0).getTime() / 1000);
-            const spread = Math.abs((d.high || 0) - (d.low || 0));
-            let pseudoVol = spread * 50000;
-            pseudoVol += (tvTime % 100) * 10;
-            vol = pseudoVol > 0 ? pseudoVol : 20;
-        }
-        return vol;
-    });
-
-    const maxVol = Math.max(...volArray, 1);
-    const volHeightMax = chartHeight * 0.25; // Take up bottom 25% of chart
-    const volCandleWidth = Math.max(2, (chartWidth / displayData.length) - 2);
-
-    displayData.forEach((d, i) => {
-        const x = getX(i);
-        const isUp = d.close >= d.open;
-        const vol = volArray[i];
-        
-        const barH = (vol / maxVol) * volHeightMax;
-        
-        ctx.fillStyle = isUp ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)';
-        ctx.fillRect(x - volCandleWidth / 2, height - padding.bottom - barH, volCandleWidth, barH);
-    });
-
-    // Draw price labels on right axis
-    ctx.fillStyle = '#9ca3af';
-    ctx.font = '10px JetBrains Mono, monospace';
-    ctx.textAlign = 'left';
-    for (let i = 0; i <= 4; i++) {
-        const price = maxPrice - (i / 4) * (maxPrice - minPrice);
-        const y = padding.top + (i / 4) * chartHeight;
-        ctx.fillText(_hubFmtPrice(price), width - padding.right + 5, y + 3);
-    }
-
-    // Draw last price callout
-    const lastPrice = displayData[displayData.length - 1].close;
-    const lastY = getY(lastPrice);
-    const isUp = displayData.length > 1 && displayData[displayData.length - 1].close >= displayData[displayData.length - 2].close;
-
-    ctx.fillStyle = isUp ? '#10b981' : '#ef4444';
-    ctx.fillRect(width - padding.right, lastY - 10, padding.right, 20);
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 11px JetBrains Mono, monospace';
-    ctx.fillText(_hubFmtPrice(lastPrice), width - padding.right + 5, lastY + 4);
-
-    // Draw user's entry price line if they have a position
-    if (_displayEntry && _displayEntry >= minPrice && _displayEntry <= maxPrice) {
-        const entryY = getY(_displayEntry);
-        const isProfit = lastPrice >= _displayEntry;
-        const pnlColor = isProfit ? '#10b981' : '#ef4444';
-
-        // Draw dotted entry line
-        ctx.strokeStyle = pnlColor;
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(padding.left, entryY);
-        ctx.lineTo(width - padding.right, entryY);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // Draw entry price label on left side
-        const pnlDiff = lastPrice - _displayEntry;
-        const pnlPercent = ((_displayEntry > 0 ? (lastPrice / _displayEntry) - 1 : 0) * 100);
-        const labelText = `Entry ${_hubFmtPrice(_displayEntry)}`;
-        const pnlText = `${pnlDiff >= 0 ? '+' : ''}${pnlPercent.toFixed(1)}%`;
-
-        // Draw label background on left
-        ctx.fillStyle = pnlColor;
-        const labelWidth = 85;
-        ctx.fillRect(0, entryY - 10, labelWidth, 20);
-
-        // Draw text
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 9px JetBrains Mono, monospace';
-        ctx.textAlign = 'left';
-        ctx.fillText(labelText, 4, entryY + 3);
-
-        // Draw P/L badge on right side of entry line
-        ctx.fillStyle = pnlColor;
-        ctx.fillRect(width - padding.right, entryY - 10, padding.right, 20);
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 10px JetBrains Mono, monospace';
-        ctx.fillText(pnlText, width - padding.right + 8, entryY + 4);
-    }
-
-    // Draw hub RSI if enabled
-    if (state.hubStudies.rsi) {
-        drawHubRsi();
-    }
-
-    // Store chart metadata for crosshair interaction
-    window.hubChartMeta = {
-        data: displayData,
-        padding: padding,
-        minPrice: minPrice,
-        maxPrice: maxPrice,
-        chartWidth: chartWidth,
-        chartHeight: chartHeight,
-        width: width,
-        height: height,
-        getX: getX,
-        getY: getY
+        try { _hubStudySeries[key].setData(data); } catch (e) {}
     };
-}
 
-function drawHubSMA(ctx, period, color, getX, getY, chartData) {
-    const src = chartData || state.hubChartData;
-    if (src.length < period) return;
-
-    ctx.beginPath();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
-
-    let started = false;
-    for (let i = period - 1; i < src.length; i++) {
-        const slice = src.slice(i - period + 1, i + 1);
-        const avg = slice.reduce((a, b) => a + b.close, 0) / period;
-
-        if (!started) {
-            ctx.moveTo(getX(i), getY(avg));
-            started = true;
-        } else {
-            ctx.lineTo(getX(i), getY(avg));
+    const emaLine = (period, color, key) => {
+        if (!state.hubStudies?.[key]) {
+            if (_hubStudySeries[key]) {
+                try { _hubTvChart.removeSeries(_hubStudySeries[key]); } catch (e) {}
+                delete _hubStudySeries[key];
+            }
+            return;
         }
-    }
-    ctx.stroke();
-}
-
-function drawHubEMA(ctx, period, color, getX, getY, chartData) {
-    const src = chartData || state.hubChartData;
-    if (src.length < period) return;
-
-    ctx.beginPath();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
-
-    const k = 2 / (period + 1);
-    let started = false;
-    let prevEma = src.slice(0, period).reduce((a, b) => a + b.close, 0) / period;
-
-    for (let i = period - 1; i < src.length; i++) {
-        if (i === period - 1) {
-            ctx.moveTo(getX(i), getY(prevEma));
-            started = true;
-        } else {
-            prevEma = src[i].close * k + prevEma * (1 - k);
-            ctx.lineTo(getX(i), getY(prevEma));
+        if (!_hubStudySeries[key]) {
+            _hubStudySeries[key] = _hubTvChart.addLineSeries({
+                color, lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false,
+            });
         }
+        const k = 2 / (period + 1);
+        let ema = closes.slice(0, period).reduce((a, b) => a + b, 0) / period;
+        const data = [];
+        for (let i = period - 1; i < closes.length; i++) {
+            if (i > period - 1) ema = closes[i] * k + ema * (1 - k);
+            data.push({ time: tvData[i].time, value: ema });
+        }
+        try { _hubStudySeries[key].setData(data); } catch (e) {}
+    };
+
+    smaLine(10, '#facc15', 'sma10');
+    smaLine(20, '#38bdf8', 'sma20');
+    smaLine(50, '#a855f7', 'sma50');
+    emaLine(10, '#ef4444', 'ema10');
+    emaLine(20, '#22c55e', 'ema20');
+
+    // Bollinger Bands (upper + lower as two line series)
+    const bbKey = 'bollinger';
+    if (!state.hubStudies?.[bbKey]) {
+        ['_bbUpper', '_bbLower', '_bbMid'].forEach(k => {
+            if (_hubStudySeries[k]) {
+                try { _hubTvChart.removeSeries(_hubStudySeries[k]); } catch (e) {}
+                delete _hubStudySeries[k];
+            }
+        });
+    } else {
+        const period = 20, mult = 2;
+        ['_bbUpper', '_bbLower', '_bbMid'].forEach(k => {
+            if (!_hubStudySeries[k]) {
+                _hubStudySeries[k] = _hubTvChart.addLineSeries({
+                    color: 'rgba(96,165,250,0.7)', lineWidth: 1,
+                    priceLineVisible: false, lastValueVisible: false,
+                    lineStyle: k === '_bbMid' ? 1 : 0, // dashed mid
+                });
+            }
+        });
+        const upper = [], lower = [], mid = [];
+        for (let i = period - 1; i < closes.length; i++) {
+            const slice = closes.slice(i - period + 1, i + 1);
+            const avg = slice.reduce((a, b) => a + b, 0) / period;
+            const std = Math.sqrt(slice.reduce((a, b) => a + (b - avg) ** 2, 0) / period);
+            upper.push({ time: tvData[i].time, value: avg + mult * std });
+            lower.push({ time: tvData[i].time, value: avg - mult * std });
+            mid.push({ time: tvData[i].time, value: avg });
+        }
+        try { _hubStudySeries['_bbUpper'].setData(upper); } catch (e) {}
+        try { _hubStudySeries['_bbLower'].setData(lower); } catch (e) {}
+        try { _hubStudySeries['_bbMid'].setData(mid); } catch (e) {}
     }
-    ctx.stroke();
 }
 
-function drawHubRsi() {
-    const canvas = document.getElementById('hubRsiChart');
-    if (!canvas || state.hubChartData.length < 15) return;
+/**
+ * Draw (or remove) the user's entry-price marker as a TV price line.
+ */
+function _applyHubEntryPriceLine() {
+    if (!_hubMainSeries) return;
 
-    const container = canvas.parentElement;
-    canvas.style.height = `${state.hubRsiHeight}px`;
+    // Remove any existing entry price line
+    if (window._hubEntryPriceLine) {
+        try { _hubMainSeries.removePriceLine(window._hubEntryPriceLine); } catch (e) {}
+        window._hubEntryPriceLine = null;
+    }
 
-    const dpr = window.devicePixelRatio || 1;
-    const width = container.offsetWidth;
-    const height = state.hubRsiHeight;
+    const _fxInfo = _getHubCurrencyInfo();
+    const _fx = _fxInfo.multiplier || 1;
+    const _displayEntry = (window.hubEntryPrice && isFinite(window.hubEntryPrice))
+        ? window.hubEntryPrice * _fx : null;
+    if (!_displayEntry) return;
 
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-    canvas.style.width = width + 'px';
+    const lastClose = state.hubChartData?.[state.hubChartData.length - 1]?.close * _fx || 0;
+    const isProfit = lastClose >= _displayEntry;
 
-    const ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
+    window._hubEntryPriceLine = _hubMainSeries.createPriceLine({
+        price: _displayEntry,
+        color: isProfit ? '#10b981' : '#ef4444',
+        lineWidth: 1,
+        lineStyle: 2, // dashed
+        axisLabelVisible: true,
+        title: 'Entry',
+    });
+}
 
-    const padding = { top: 10, right: 60, bottom: 10, left: 20 };
-    const chartWidth = width - padding.left - padding.right;
-    const chartHeight = height - padding.top - padding.bottom;
+/**
+ * Draw the RSI sub-chart in the hub-tv-rsi-chart container using a
+ * separate small TradingView chart (line series, RSI values 0-100).
+ */
+function drawHubRsi(tvData) {
+    const container = document.getElementById('hub-tv-rsi-chart');
+    if (!container) return;
+    if (!tvData || tvData.length < 16) return;
 
-    // Calculate RSI values
-    const rsiValues = [];
+    if (!_hubTvRsiChart) {
+        _hubTvRsiChart = LightweightCharts.createChart(container, {
+            layout: {
+                textColor: '#6b7280',
+                background: { type: 'solid', color: 'transparent' }
+            },
+            grid: {
+                vertLines: { color: 'rgba(255,255,255,0.03)' },
+                horzLines: { color: 'rgba(255,255,255,0.03)' }
+            },
+            rightPriceScale: { borderVisible: false, autoScale: false,
+                minimum: 0, maximum: 100 },
+            leftPriceScale: { visible: false },
+            timeScale: { visible: false, borderVisible: false },
+            crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+            autoSize: true,
+        });
+        _hubTvRsiSeries = _hubTvRsiChart.addLineSeries({
+            color: '#ec4899', lineWidth: 2,
+            priceLineVisible: false, lastValueVisible: true,
+        });
+        // Overbought / oversold lines
+        _hubTvRsiChart.addLineSeries({ color: 'rgba(239,68,68,0.4)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false })
+            .setData(tvData.map(d => ({ time: d.time, value: 70 })));
+        _hubTvRsiChart.addLineSeries({ color: 'rgba(16,185,129,0.4)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false })
+            .setData(tvData.map(d => ({ time: d.time, value: 30 })));
+    }
+
+    // Calculate RSI(14)
     const period = 14;
-
-    for (let i = period; i < state.hubChartData.length; i++) {
+    const closes = tvData.map(d => d.close);
+    const rsiData = [];
+    for (let i = period; i < closes.length; i++) {
         let gains = 0, losses = 0;
         for (let j = i - period + 1; j <= i; j++) {
-            const change = state.hubChartData[j].close - state.hubChartData[j - 1].close;
-            if (change > 0) gains += change;
-            else losses -= change;
+            const chg = closes[j] - closes[j - 1];
+            if (chg > 0) gains += chg; else losses -= chg;
         }
         const avgGain = gains / period;
         const avgLoss = losses / period;
         const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
         const rsi = 100 - (100 / (1 + rs));
-        rsiValues.push({ index: i, rsi });
+        rsiData.push({ time: tvData[i].time, value: rsi });
     }
 
-    // Clear canvas
-    ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = 'var(--bg-card)';
-    ctx.fillRect(0, 0, width, height);
-
-    // Draw overbought/oversold zones
-    const getY = (rsi) => padding.top + (1 - rsi / 100) * chartHeight;
-    const getX = (i) => padding.left + ((i - period) / (state.hubChartData.length - period - 1)) * chartWidth;
-
-    // Overbought zone (70-100)
-    ctx.fillStyle = 'rgba(239, 68, 68, 0.1)';
-    ctx.fillRect(padding.left, getY(100), chartWidth, getY(70) - getY(100));
-
-    // Oversold zone (0-30)
-    ctx.fillStyle = 'rgba(16, 185, 129, 0.1)';
-    ctx.fillRect(padding.left, getY(30), chartWidth, getY(0) - getY(30));
-
-    // Draw horizontal lines
-    ctx.strokeStyle = '#2a2a3e';
-    ctx.lineWidth = 1;
-    [30, 50, 70].forEach(level => {
-        const y = getY(level);
-        ctx.beginPath();
-        ctx.moveTo(padding.left, y);
-        ctx.lineTo(width - padding.right, y);
-        ctx.stroke();
-
-        ctx.fillStyle = '#6b7280';
-        ctx.font = '9px JetBrains Mono';
-        ctx.fillText(level.toString(), width - padding.right + 5, y + 3);
-    });
-
-    // Draw RSI line
-    ctx.beginPath();
-    ctx.strokeStyle = '#ec4899';
-    ctx.lineWidth = 2;
-
-    rsiValues.forEach((r, i) => {
-        const x = getX(r.index);
-        const y = getY(r.rsi);
-        if (i === 0) {
-            ctx.moveTo(x, y);
-        } else {
-            ctx.lineTo(x, y);
-        }
-    });
-    ctx.stroke();
+    try { _hubTvRsiSeries.setData(rsiData); } catch (e) {}
 
     // Update RSI value display
-    if (rsiValues.length > 0) {
-        const lastRsi = rsiValues[rsiValues.length - 1].rsi;
+    if (rsiData.length > 0) {
+        const lastRsi = rsiData[rsiData.length - 1].value;
         const rsiValueEl = document.getElementById('hub-rsi-value');
         if (rsiValueEl) {
             rsiValueEl.textContent = lastRsi.toFixed(1);
@@ -1455,6 +1202,10 @@ function drawHubRsi() {
         }
     }
 }
+
+// Legacy stubs — kept only to avoid ReferenceErrors in any lingering call sites
+function drawHubSMA() {}
+function drawHubEMA() {}
 
 // =============================================
 // HUB CONTROLS
@@ -1567,6 +1318,8 @@ function setHubChartType(type) {
     state.hubChartType = type;
     document.getElementById('hub-btn-line').classList.toggle('active', type === 'line');
     document.getElementById('hub-btn-candle').classList.toggle('active', type === 'candle');
+    // TV requires a different series type for line vs candle — force full reinit
+    _destroyHubTvChart();
     drawHubChart();
 }
 
