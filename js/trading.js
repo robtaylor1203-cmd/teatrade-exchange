@@ -620,29 +620,30 @@ async function closeIndexPosition(indexSymbol, quantity, tradeId, btn) {
             closeQty = Math.abs(position.quantity);
         }
 
-        const price = index.price;
-        const result = await apiExecuteIndexTrade(indexSymbol, closeSide, closeQty, price);
-
+        // Apply the standard 1% half-spread to the close price (T212 model).
+        // Longs sell at Bid (mid × 0.99), shorts cover at Ask (mid × 1.01).
+        // This mirrors the spread cost paid at entry — the house captures spread on both legs.
+        const CLOSE_SPREAD = 0.01; // 1% per side
+        const closePrice = isShort
+            ? index.price * (1 + CLOSE_SPREAD)   // short covers at Ask
+            : index.price * (1 - CLOSE_SPREAD);  // long sells at Bid
+        const result = await apiExecuteIndexTrade(indexSymbol, closeSide, closeQty, closePrice);
         if (!result.success) {
             throw new Error(result.error || 'Close failed');
         }
 
         setActiveBalance(result.new_balance);
 
-        // Close price = mid price. Server no longer applies spread on close
-        // (see migration 20260307000000_index_close_no_spread.sql).
-        // result.price now equals p_price (the mid we sent), so the balance
-        // adjustment, the orders table, and the toast all show the same figure.
-        const closePrice = result.price ?? price;
+        const confirmedClosePrice = result.price ?? closePrice;
         let pnl;
         if (isShort) {
-            pnl = (position.avg_entry_price - closePrice) * closeQty;
+            pnl = (position.avg_entry_price - confirmedClosePrice) * closeQty;
         } else {
-            pnl = (closePrice - position.avg_entry_price) * closeQty;
+            pnl = (confirmedClosePrice - position.avg_entry_price) * closeQty;
         }
         const pnlText = pnl >= 0 ? `Profit: +$${pnl.toFixed(2)}` : `Loss: -$${Math.abs(pnl).toFixed(2)}`;
         const action = isShort ? 'Covered' : 'Sold';
-        showToast('Position Closed!', `${action} ${closeQty.toLocaleString()} kg of ${indexSymbol} Index at $${Number(closePrice).toFixed(4)}/kg. ${pnlText}`);
+        showToast('Position Closed!', `${action} ${closeQty.toLocaleString()} kg of ${indexSymbol} Index at $${Number(confirmedClosePrice).toFixed(4)}/kg. ${pnlText}`);
 
         await Promise.all([loadPositions(), loadIndexPositions(), loadUserProfile()]);
         await new Promise(r => setTimeout(r, 400));

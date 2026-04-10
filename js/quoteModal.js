@@ -235,7 +235,6 @@ function closeMobileQQTradeForm() {
 }
 
 function updateMobileQQSummary() {
-    const SPREAD_PCT = 0.01;
     const tea = state.qqCurrentTea;
     let marketPrice = 0;
 
@@ -249,6 +248,12 @@ function updateMobileQQSummary() {
             marketPrice = liveTea?.current_price || tea.current_price || 0;
         }
     }
+
+    // Dynamic spread — mirrors trading.js exactly
+    const _isIndex = !!(tea?.isIndex || (typeof isIndexSymbol === 'function' && isIndexSymbol(tea?.symbol)));
+    const SPREAD_PCT = _isIndex
+        ? 0.02
+        : (Number(tea?.base_spread) || 0.01) * (Number(tea?.volatility_multiplier) || 1.0);
 
     const isBuy = state.qqTradeType === 'BUY';
     const execPrice = marketPrice > 0
@@ -556,7 +561,6 @@ function setQuickTradeType(type) {
 function updateQuickTradeSummary() {
     const qty = parseFloat(document.getElementById('qq-qty')?.value) || 0;
     const leverage = parseFloat(document.getElementById('qq-leverage')?.value) || 10;
-    const SPREAD_PCT = 0.01;
 
     const tea = state.qqCurrentTea;
     let marketPrice = 0;
@@ -570,6 +574,12 @@ function updateQuickTradeSummary() {
             marketPrice = liveTea?.current_price || tea.current_price || 0;
         }
     }
+
+    // Dynamic spread — mirrors trading.js exactly
+    const _isIndex = !!(tea?.isIndex || (typeof isIndexSymbol === 'function' && isIndexSymbol(tea?.symbol)));
+    const SPREAD_PCT = _isIndex
+        ? 0.02
+        : (Number(tea?.base_spread) || 0.01) * (Number(tea?.volatility_multiplier) || 1.0);
 
     const isBuy = state.qqTradeType === 'BUY';
     const execPrice = isBuy ? marketPrice * (1 + SPREAD_PCT / 2) : marketPrice * (1 - SPREAD_PCT / 2);
@@ -586,10 +596,11 @@ function updateQuickTradeSummary() {
     const priceEl = document.getElementById('qq-trade-price');
     if (priceEl) priceEl.textContent = `$${execPrice.toFixed(3)}/kg`;
 
+    const halfSpreadPct = (SPREAD_PCT / 2 * 100).toFixed(2);
     const labelEl = document.getElementById('qq-exec-price-label');
     if (labelEl) labelEl.innerHTML = isBuy
-        ? 'Your Price <small style="color:var(--text-muted)">(+0.5% spread)</small>'
-        : 'Your Price <small style="color:var(--text-muted)">(-0.5% spread)</small>';
+        ? `Your Price <small style="color:var(--text-muted)">(+${halfSpreadPct}% spread)</small>`
+        : `Your Price <small style="color:var(--text-muted)">(-${halfSpreadPct}% spread)</small>`;
 
     const orderEl = document.getElementById('qq-order-value');
     if (orderEl) orderEl.textContent = _fmt(notional);
@@ -1232,7 +1243,13 @@ async function executeQuickTrade() {
     }
 
     const qqLeverage = parseFloat(document.getElementById('qq-leverage')?.value) || 10;
-    const SPREAD_PCT = 0.01;
+
+    // Dynamic spread — mirrors trading.js / updateQuickTradeSummary exactly
+    const _qqIsIndex = !!state.qqCurrentTea?.isIndex;
+    const SPREAD_PCT = _qqIsIndex
+        ? 0.02
+        : (Number(state.qqCurrentTea?.base_spread) || 0.01) * (Number(state.qqCurrentTea?.volatility_multiplier) || 1.0);
+
     const isBuy = state.qqTradeType === 'BUY';
     const execPrice = isBuy ? price * (1 + SPREAD_PCT / 2) : price * (1 - SPREAD_PCT / 2);
     const notional = execPrice * qty;

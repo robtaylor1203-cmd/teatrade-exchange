@@ -70,10 +70,12 @@ function updatePortfolioDisplay() {
         const absQty = Math.abs(pos.quantity);
         const currentValue = absQty * tea.current_price;
         const costBasis = absQty * pos.avg_entry_price;
-        const spreadMargin = tea.current_price * 0.002;
+        // True Bid/Ask exit price — T212 model:
+        // Longs sell at Bid (mid − half-spread), shorts cover at Ask (mid + half-spread).
+        const spreadPct = (Number(tea.base_spread) || 0.01) * (Number(tea.volatility_multiplier) || 1.0);
         const exitPrice = isShort
-            ? tea.current_price + spreadMargin
-            : tea.current_price - spreadMargin;
+            ? tea.current_price * (1 + spreadPct / 2)
+            : tea.current_price * (1 - spreadPct / 2);
         const lev = Number(pos.leverage) || 1;
         const margin = costBasis / lev;
         const notionalValue = margin * lev;
@@ -116,9 +118,12 @@ function updatePortfolioDisplay() {
         const absQty = Math.abs(pos.quantity);
         const currentValue = absQty * index.price;
         const costBasis = absQty * pos.avg_entry_price;
-        // No spread on close — spread was already paid at entry (ask price).
-        // Close price = mid price exactly as shown in the portfolio.
-        const exitPrice = index.price; // long closes at mid; short covers at mid
+        // True Bid/Ask exit price — T212 model:
+        // INDEX spread = 2% total (1% per side).
+        // Longs sell at Bid (mid × 0.99), shorts cover at Ask (mid × 1.01).
+        const exitPrice = isShort
+            ? index.price * 1.01
+            : index.price * 0.99;
         const lev = Number(pos.leverage) || 1;
         const margin = costBasis / lev;
         const notionalValue = margin * lev;
@@ -165,8 +170,10 @@ function updatePortfolioDisplay() {
         const tea = pos.teas || state.teas.find(t => t.id === pos.tea_id);
         if (tea) {
             const isShort = pos.quantity < 0;
-            const sm = tea.current_price * 0.002;
-            const ep = isShort ? tea.current_price + sm : tea.current_price - sm;
+            const spreadPct = (Number(tea.base_spread) || 0.01) * (Number(tea.volatility_multiplier) || 1.0);
+            const ep = isShort
+                ? tea.current_price * (1 + spreadPct / 2)
+                : tea.current_price * (1 - spreadPct / 2);
             const nv = posMargin * lev;
             const units = nv / pos.avg_entry_price;
             let posPnl = isShort
@@ -184,8 +191,8 @@ function updatePortfolioDisplay() {
         const index = indexes.find(idx => idx.symbol === symbol);
         if (index && pos && pos.quantity !== 0) {
             const isShort = pos.quantity < 0;
-            const ism = index.price * 0.002;
-            const iep = isShort ? index.price + ism : index.price - ism;
+            // INDEX spread = 2% total (1% per side) for margin metrics consistency
+            const iep = isShort ? index.price * 1.01 : index.price * 0.99;
             const inv = idxMargin * idxLev;
             const units = inv / pos.avg_entry_price;
             let idxPnl = isShort
@@ -611,10 +618,9 @@ function displayUserTrades(trades) {
                 const index = idxList.find(idx => idx.symbol === trade.index_symbol);
 
                 if (index) {
-                    // P/L = (currentMid − entryPrice) × qty. Simple direct diff.
-                    // entry = trade.price (Ask for BUY, Bid for SELL, spread already in it)
-                    // exit  = raw mid (no further adjustment on close)
-                    const exitPrice = index.price;
+                    // True Bid/Ask exit: INDEX spread = 2% total (1% per side)
+                    // Longs sell at Bid (mid × 0.99), shorts cover at Ask (mid × 1.01)
+                    const exitPrice = isShortIdx ? index.price * 1.01 : index.price * 0.99;
                     const notionalValue = total * leverage;
                     const units = notionalValue / trade.price;
                     pnl = isShortIdx
@@ -649,10 +655,12 @@ function displayUserTrades(trades) {
                 }
                 pnlPct = total > 0 ? (pnl / total * 100) : 0;
             } else if (tea) {
-                // P/L = (currentMid - entryPrice) × units. Simple direct diff.
-                // trade.price = Ask/Bid already (spread already baked in at entry).
-                // exitPrice = raw tea.current_price — exactly what user sees in UI.
-                const exitPrice = tea.current_price;
+                // True Bid/Ask exit price — T212 model:
+                // Longs sell at Bid (mid − half-spread), shorts cover at Ask (mid + half-spread).
+                const spreadPct = (Number(tea.base_spread) || 0.01) * (Number(tea.volatility_multiplier) || 1.0);
+                const exitPrice = isShortTrade
+                    ? tea.current_price * (1 + spreadPct / 2)
+                    : tea.current_price * (1 - spreadPct / 2);
                 const notionalValue = total * leverage;
                 const units = notionalValue / trade.price;
                 pnl = isShortTrade
