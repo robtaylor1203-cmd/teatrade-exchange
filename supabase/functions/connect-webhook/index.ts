@@ -1,8 +1,10 @@
 // TeaTrade Exchange — Stripe Connect Webhook Handler
 // ===================================================
 // Receives Connect-related webhook events from Stripe:
-//   - account.updated → KYC status changes
-//   - transfer.created / transfer.paid → payout tracking
+//   - account.updated  → KYC status changes
+//   - transfer.created → payout completed (funds sent to connected account)
+//   - transfer.reversed → payout clawed back
+//   - transfer.updated → payout metadata/status change
 //
 // This needs its own webhook endpoint in Stripe Dashboard
 // configured to receive Connect events.
@@ -104,8 +106,8 @@ serve(async (req) => {
       }
     }
 
-    else if (event.type === 'transfer.paid') {
-      // A transfer to a connected account was paid out
+    else if (event.type === 'transfer.created') {
+      // A transfer to a connected account was created (funds sent)
       const transfer = event.data.object as Stripe.Transfer
       const payoutRequestId = transfer.metadata?.payout_request_id
 
@@ -121,6 +123,30 @@ serve(async (req) => {
 
         console.log(`Payout completed: request=${payoutRequestId} transfer=${transfer.id}`)
       }
+    }
+
+    else if (event.type === 'transfer.reversed') {
+      // A transfer was reversed (clawback)
+      const transfer = event.data.object as Stripe.Transfer
+      const payoutRequestId = transfer.metadata?.payout_request_id
+
+      if (payoutRequestId) {
+        await supabaseAdmin
+          .from('payout_requests')
+          .update({
+            status: 'failed',
+            rejection_reason: 'Transfer reversed by Stripe',
+          })
+          .eq('id', payoutRequestId)
+
+        console.log(`Payout reversed: request=${payoutRequestId} transfer=${transfer.id}`)
+      }
+    }
+
+    else if (event.type === 'transfer.updated') {
+      // Transfer metadata or description updated — log only
+      const transfer = event.data.object as Stripe.Transfer
+      console.log(`Transfer updated: ${transfer.id}`, transfer.metadata)
     }
 
     // Always return 200 to acknowledge receipt
