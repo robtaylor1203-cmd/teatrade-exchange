@@ -106,10 +106,10 @@ serve(async (req) => {
         })
       }
 
-      // ── Use client-provided price directly ─────────────────────────────────
-      // The client sends the Ask (for BUY) or Bid (for SELL) exactly as shown
-      // in the trade form — already spread-adjusted. We store this price as-is.
-      // This guarantees the order table shows exactly what the user saw in the UI.
+      // ── Use client-provided MID price ──────────────────────────────────────
+      // The client sends the raw mid-market price. The SQL RPC is the single
+      // source of truth for spread calculation — it applies the platform_config
+      // spread to p_price once and returns the spread-adjusted execution price.
       const executionPrice = Number(body.price)
       if (!executionPrice || executionPrice <= 0 || !isFinite(executionPrice)) {
         return new Response(JSON.stringify({ success: false, error: 'Invalid price supplied by client' }), {

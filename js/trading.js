@@ -615,13 +615,9 @@ async function closeIndexPosition(indexSymbol, quantity, tradeId, btn) {
             closeQty = Math.abs(position.quantity);
         }
 
-        // Apply the standard 1% half-spread to the close price (T212 model).
-        // Longs sell at Bid (mid × 0.99), shorts cover at Ask (mid × 1.01).
-        // This mirrors the spread cost paid at entry — the house captures spread on both legs.
-        const CLOSE_SPREAD = 0.01; // 1% per side
-        const closePrice = isShort
-            ? index.price * (1 + CLOSE_SPREAD)   // short covers at Ask
-            : index.price * (1 - CLOSE_SPREAD);  // long sells at Bid
+        // Send the raw MID price. The SQL RPC is the single source of truth
+        // for spread — it applies the spread from platform_config once.
+        const closePrice = index.price;
         const result = await apiExecuteIndexTrade(indexSymbol, closeSide, closeQty, closePrice);
         if (!result.success) {
             throw new Error(result.error || 'Close failed');
