@@ -1,5 +1,26 @@
 User-agent: *
 Allow: /
 Disallow: /supabase/
+Disallow: /scraper/
+Disallow: /scripts/
+Disallow: /sql/
+Disallow: /tmp/
+Disallow: /tools/
+Disallow: /test_data/
+Disallow: /debug.json
+Disallow: /err.txt
+Disallow: /err_utf8.txt
+Disallow: /push_error.txt
+Disallow: /push_error_utf8.txt
+
+# Crawl-delay for polite bots
+User-agent: AhrefsBot
+Crawl-delay: 10
+
+User-agent: SemrushBot
+Crawl-delay: 10
+
+User-agent: MJ12bot
+Crawl-delay: 10
 
 Sitemap: https://exchange.teatrade.co.uk/sitemap.xml

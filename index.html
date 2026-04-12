@@ -39,27 +39,113 @@
         content="Pass the TeaTrade Evaluation and trade with up to GBP50,000 in simulated capital. Up to 80% profit split.">
     <meta name="twitter:image" content="https://exchange.teatrade.co.uk/images/preview.png">
 
-    <!-- Structured Data -->
+    <!-- Structured Data: WebApplication -->
     <script type="application/ld+json">
     {
         "@context": "https://schema.org",
         "@type": "WebApplication",
         "name": "TeaTrade Exchange",
         "url": "https://exchange.teatrade.co.uk",
-        "description": "Simulated tea trading platform with funded evaluation accounts. Prove your skills and earn performance rewards.",
+        "description": "Simulated tea trading platform with funded evaluation accounts. Prove your skills and earn performance rewards of up to 80% profit split.",
         "applicationCategory": "FinanceApplication",
         "operatingSystem": "Web",
-        "offers": {
-            "@type": "Offer",
-            "price": "49",
-            "priceCurrency": "GBP",
-            "description": "Evaluation Challenge entry - trade with simulated capital"
-        },
+        "image": "https://exchange.teatrade.co.uk/images/preview.png",
+        "offers": [
+            {
+                "@type": "Offer",
+                "name": "10K Evaluation Challenge",
+                "price": "49",
+                "priceCurrency": "GBP",
+                "description": "Trade with £10,000 in simulated capital. 8% profit target, 5% max daily loss.",
+                "url": "https://exchange.teatrade.co.uk/login.html"
+            },
+            {
+                "@type": "Offer",
+                "name": "25K Evaluation Challenge",
+                "price": "119",
+                "priceCurrency": "GBP",
+                "description": "Trade with £25,000 in simulated capital. 8% profit target, 5% max daily loss.",
+                "url": "https://exchange.teatrade.co.uk/login.html"
+            },
+            {
+                "@type": "Offer",
+                "name": "50K Evaluation Challenge",
+                "price": "199",
+                "priceCurrency": "GBP",
+                "description": "Trade with £50,000 in simulated capital. 8% profit target, 5% max daily loss.",
+                "url": "https://exchange.teatrade.co.uk/login.html"
+            }
+        ],
         "creator": {
             "@type": "Organization",
             "name": "TeaTrade",
-            "url": "https://teatrade.co.uk"
+            "url": "https://teatrade.co.uk",
+            "logo": "https://exchange.teatrade.co.uk/images/favicon-nb.png"
+        },
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "ratingCount": "124",
+            "bestRating": "5"
         }
+    }
+    </script>
+
+    <!-- Structured Data: FAQPage -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@type": "Question",
+                "name": "What is TeaTrade Exchange?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "TeaTrade Exchange is the world's first simulated tea commodity trading platform. We offer funded evaluation accounts where traders can prove their skills using real market data and earn up to 80% of simulated profits as performance rewards."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "How does the funded trader evaluation work?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Purchase an evaluation challenge (£49–£199), trade tea commodities in a simulated environment, hit the 8% profit target without breaching risk limits, and earn a funded account with up to 80% profit split."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "What markets can I trade on TeaTrade Exchange?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Trade live-priced tea from Mombasa, Kolkata, Colombo, and other global auction centres, plus tea market indices, with up to 25x leverage on simulated accounts."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "How do I receive payouts from TeaTrade?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Once funded, complete KYC verification via Stripe Connect, then claim your performance rewards directly from the Payouts tab. Payouts are processed via bank transfer."
+                }
+            }
+        ]
+    }
+    </script>
+
+    <!-- Structured Data: BreadcrumbList -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Home",
+                "item": "https://exchange.teatrade.co.uk/"
+            }
+        ]
     }
     </script>
 
