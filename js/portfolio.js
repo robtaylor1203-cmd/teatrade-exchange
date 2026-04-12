@@ -1975,11 +1975,14 @@ function switchPortfolioModalTab(tab) {
     if (badgesTab) badgesTab.style.display = tab === 'badges' ? 'block' : 'none';
     const storeTab = document.getElementById('portfolio-tab-store');
     if (storeTab) storeTab.style.display = tab === 'store' ? 'block' : 'none';
+    const payoutsTab = document.getElementById('portfolio-tab-payouts');
+    if (payoutsTab) payoutsTab.style.display = tab === 'payouts' ? 'block' : 'none';
     if (tab === 'financial') renderFinancialTab();
     if (tab === 'history') renderHistoryTab();
     if (tab === 'social') renderPortfolioModal();
     if (tab === 'badges') renderBadgesTab();
     if (tab === 'store') renderStoreTab();
+    if (tab === 'payouts') renderPayoutsTab();
 }
 
 function renderFinancialTab() {
@@ -2971,6 +2974,268 @@ async function requestPayout() {
         renderStoreTab();
     } catch (err) {
         showToast('Error', 'Failed to claim performance reward. Please try again.', true);
+    }
+}
+
+// =============================================
+// PAYOUTS TAB (KYC + Stripe Connect + History)
+// =============================================
+
+async function renderPayoutsTab() {
+    const panel = document.getElementById('payouts-panel');
+    if (!panel) return;
+
+    panel.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary);">Loading payout information...</div>';
+
+    if (!state.currentUser) {
+        panel.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary);">Please log in to view payouts.</div>';
+        return;
+    }
+
+    try {
+        const { data, error } = await supabaseClient.rpc('get_kyc_payout_status', {
+            p_user_id: state.currentUser.id,
+        });
+
+        if (error) throw error;
+
+        const kycStatus = data?.kyc_status || 'none';
+        const hasConnect = data?.has_connect_account || false;
+        const acctStatus = data?.account_status || 'ACTIVE';
+        const isFunded = acctStatus === 'FUNDED';
+        const totalPaidPence = data?.total_paid_pence || 0;
+        const payouts = data?.payout_requests || [];
+
+        const kycBadge = _getKycBadge(kycStatus);
+        const fmtGBP = (pence) => '£' + (pence / 100).toFixed(2);
+
+        let html = `
+            <div class="payouts-header">
+                <div class="payouts-header-title">
+                    <span class="store-card-icon" style="font-size:28px;">&#128179;</span>
+                    <div>
+                        <div style="font-size:18px;font-weight:700;color:var(--text-primary);">Performance Rewards & Payouts</div>
+                        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">Complete verification to receive your trading performance rewards</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KYC Status Card -->
+            <div class="store-card" style="margin-top:16px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <span style="font-size:24px;">&#128100;</span>
+                        <div>
+                            <div style="font-weight:700;color:var(--text-primary);">Identity Verification (KYC)</div>
+                            <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">Required before any payout can be processed</div>
+                        </div>
+                    </div>
+                    ${kycBadge}
+                </div>
+                <div class="store-card-details">
+                    <div class="store-detail-row"><span>ID Verification</span><span>${kycStatus === 'verified' ? '✓ Passed' : kycStatus === 'pending' ? '⏳ In Review' : kycStatus === 'requires_info' ? '⚠️ Info Needed' : '○ Not Started'}</span></div>
+                    <div class="store-detail-row"><span>Bank Details</span><span>${kycStatus === 'verified' ? '✓ Connected' : '○ Added via Stripe'}</span></div>
+                    <div class="store-detail-row"><span>Tax Information</span><span>${kycStatus === 'verified' ? '✓ Submitted' : '○ Collected by Stripe'}</span></div>
+                </div>
+                ${kycStatus === 'none' ? `
+                    <button class="store-card-btn" onclick="startKycOnboarding()" ${!isFunded ? 'disabled title="Complete your evaluation to unlock verification"' : ''}>
+                        ${isFunded ? 'Start Verification →' : 'Complete Evaluation First'}
+                    </button>
+                    <p class="store-card-legal">Stripe handles identity verification securely. We never see your ID documents or bank details.</p>
+                ` : kycStatus === 'requires_info' ? `
+                    <button class="store-card-btn" onclick="startKycOnboarding()">Complete Verification →</button>
+                    <p class="store-card-legal">Additional information is required. Click above to continue on Stripe's secure platform.</p>
+                ` : kycStatus === 'pending' ? `
+                    <div style="text-align:center;padding:12px;background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.3);border-radius:8px;margin-top:12px;">
+                        <span style="color:#eab308;font-weight:600;">⏳ Verification in review</span>
+                        <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">This typically takes a few minutes. Refresh to check status.</div>
+                    </div>
+                ` : kycStatus === 'rejected' ? `
+                    <div style="text-align:center;padding:12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;margin-top:12px;">
+                        <span style="color:#ef4444;font-weight:600;">✗ Verification failed</span>
+                        <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">Please contact support at contact@teatrade.co.uk for assistance.</div>
+                    </div>
+                ` : `
+                    <div style="text-align:center;padding:12px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:8px;margin-top:12px;">
+                        <span style="color:#10b981;font-weight:600;">✓ Verified — ready to receive payouts</span>
+                    </div>
+                `}
+            </div>
+
+            <!-- Payout Summary Card -->
+            <div class="store-card" style="margin-top:16px;">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+                    <span style="font-size:24px;">&#128176;</span>
+                    <div>
+                        <div style="font-weight:700;color:var(--text-primary);">Claim Performance Reward</div>
+                        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">80% trader / 20% platform split</div>
+                    </div>
+                </div>
+                <div class="store-card-details">
+                    <div class="store-detail-row"><span>Total Paid Out</span><span style="font-weight:700;color:var(--accent-green);">${fmtGBP(totalPaidPence)}</span></div>
+                    <div class="store-detail-row"><span>Reward Split</span><span>80% to you</span></div>
+                    <div class="store-detail-row"><span>Payout Method</span><span>Direct to your bank via Stripe</span></div>
+                    <div class="store-detail-row"><span>Processing Time</span><span>1-3 business days</span></div>
+                </div>
+                <button class="store-card-btn" onclick="requestPayoutWithKyc()" ${!(isFunded && kycStatus === 'verified') ? 'disabled' : ''}>
+                    ${!isFunded ? 'Account Not Funded' : kycStatus !== 'verified' ? 'Complete Verification First' : 'Claim Performance Reward'}
+                </button>
+                <p class="store-card-legal">Performance rewards are independent contractor payments for generating successful simulated trading data. Not withdrawals of financial market profits.</p>
+            </div>
+        `;
+
+        // Payout History
+        if (payouts.length > 0) {
+            html += `
+                <div class="store-card" style="margin-top:16px;">
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+                        <span style="font-size:24px;">&#128203;</span>
+                        <div style="font-weight:700;color:var(--text-primary);">Payout History</div>
+                    </div>
+                    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                        <thead>
+                            <tr style="border-bottom:1px solid var(--border);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">
+                                <th style="padding:8px 4px;text-align:left;">Date</th>
+                                <th style="padding:8px 4px;text-align:right;">Amount</th>
+                                <th style="padding:8px 4px;text-align:center;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${payouts.map(p => `
+                                <tr style="border-bottom:1px solid var(--border);">
+                                    <td style="padding:8px 4px;color:var(--text-secondary);">${new Date(p.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                                    <td style="padding:8px 4px;text-align:right;font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--text-primary);">${fmtGBP(p.amount_pence)}</td>
+                                    <td style="padding:8px 4px;text-align:center;">${_getPayoutStatusBadge(p.status)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        html += `
+            <div class="simulated-env-notice" style="margin-top:16px;">
+                <strong>&#9888;&#65039; How Payouts Work</strong><br>
+                1. Pass the evaluation challenge to earn a funded simulated account<br>
+                2. Complete identity verification (KYC) via Stripe<br>
+                3. Trade profitably for 14+ days meeting all rules<br>
+                4. Claim your 80% performance reward — paid directly to your bank
+            </div>
+        `;
+
+        panel.innerHTML = html;
+
+    } catch (err) {
+        console.error('Payouts tab error:', err);
+        panel.innerHTML = '<div style="text-align:center;padding:40px;color:var(--accent-red);">Failed to load payout information. Please try again.</div>';
+    }
+}
+
+function _getKycBadge(status) {
+    const badges = {
+        none: '<span style="display:inline-block;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;background:rgba(100,116,139,0.15);color:#94a3b8;">Not Started</span>',
+        pending: '<span style="display:inline-block;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;background:rgba(234,179,8,0.15);color:#eab308;">In Review</span>',
+        requires_info: '<span style="display:inline-block;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;background:rgba(249,115,22,0.15);color:#f97316;">Info Needed</span>',
+        verified: '<span style="display:inline-block;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;background:rgba(16,185,129,0.15);color:#10b981;">Verified ✓</span>',
+        rejected: '<span style="display:inline-block;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;background:rgba(239,68,68,0.15);color:#ef4444;">Rejected</span>',
+    };
+    return badges[status] || badges.none;
+}
+
+function _getPayoutStatusBadge(status) {
+    const badges = {
+        pending: '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:rgba(234,179,8,0.15);color:#eab308;">Pending</span>',
+        approved: '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:rgba(59,130,246,0.15);color:#3b82f6;">Approved</span>',
+        processing: '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:rgba(59,130,246,0.15);color:#3b82f6;">Processing</span>',
+        completed: '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:rgba(16,185,129,0.15);color:#10b981;">Paid ✓</span>',
+        rejected: '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:rgba(239,68,68,0.15);color:#ef4444;">Rejected</span>',
+        failed: '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:rgba(239,68,68,0.15);color:#ef4444;">Failed</span>',
+    };
+    return badges[status] || badges.pending;
+}
+
+// ── KYC Onboarding (redirects to Stripe hosted page) ──
+
+async function startKycOnboarding() {
+    if (!state.currentUser) {
+        showToast('Error', 'Please log in first.', true);
+        return;
+    }
+
+    showToast('Setting up verification...', 'Redirecting to Stripe for secure identity verification.');
+
+    try {
+        const result = await _invokeEdgeFunction('create-connect-account', {});
+
+        if (result?.url) {
+            window.location.href = result.url;
+        } else {
+            const errMsg = result?.error || 'Failed to create verification session';
+            showToast('Verification Error', errMsg, true);
+        }
+    } catch (err) {
+        console.error('KYC onboarding error:', err);
+        showToast('Error', 'Failed to start verification. Please try again.', true);
+    }
+}
+
+// ── Payout with KYC check ──
+
+async function requestPayoutWithKyc() {
+    if (!state.currentUser) {
+        showToast('Error', 'Please log in first.', true);
+        return;
+    }
+
+    if (!confirm('Claim Performance Reward?\n\nThis will:\n• Calculate your 80% performance reward\n• Transfer funds to your verified bank account\n• Reset your balance to the initial amount\n• Reset your trading day count\n\nAll positions must be closed.')) {
+        return;
+    }
+
+    try {
+        showToast('Processing...', 'Calculating and transferring your performance reward.');
+
+        const result = await _invokeEdgeFunction('request-payout', {});
+
+        if (result?.success) {
+            showToast('Reward Paid! 🎉',
+                `£${result.payout_amount} transferred to your bank account (${result.trader_share} of £${result.gross_profit} profit).`);
+            await loadUserProfile();
+            renderPayoutsTab();
+        } else {
+            const errMsg = result?.error || 'Payout request failed';
+            showToast('Payout Failed', errMsg, true);
+        }
+    } catch (err) {
+        console.error('Payout request error:', err);
+        showToast('Error', 'Failed to process payout. Please try again.', true);
+    }
+}
+
+// ── Handle Connect return/refresh from Stripe onboarding ──
+
+function handleConnectReturn() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('connect_return') === '1') {
+        showToast('Verification Submitted', 'Your identity verification has been submitted. We\'ll update your status shortly.');
+        window.history.replaceState({}, '', window.location.pathname);
+        // Open payouts tab to show updated status
+        setTimeout(() => {
+            if (typeof openPortfolioModal === 'function') {
+                openPortfolioModal();
+                switchPortfolioModalTab('payouts');
+            }
+        }, 500);
+    }
+    if (params.get('connect_refresh') === '1') {
+        showToast('Verification Incomplete', 'Please complete the verification process to enable payouts.', true);
+        window.history.replaceState({}, '', window.location.pathname);
+        setTimeout(() => {
+            if (typeof openPortfolioModal === 'function') {
+                openPortfolioModal();
+                switchPortfolioModalTab('payouts');
+            }
+        }, 500);
     }
 }
 

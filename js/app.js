@@ -186,6 +186,7 @@ async function loadOrigins() {
 
 document.addEventListener('DOMContentLoaded', async () => {
     if (typeof handleCheckoutReturn === 'function') handleCheckoutReturn();
+    if (typeof handleConnectReturn === 'function') handleConnectReturn();
 
     // ── Phase 0: Instant skeleton UI + sync hydration ──
     // The nav bar and balance already render from HTML; we just need
