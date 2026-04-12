@@ -310,115 +310,207 @@
         }
         .login-status-btn:hover { background: var(--accent-blue-deep); }
 
-        /* ── RIGHT PANEL: Marketing cards ── */
+        /* ── RIGHT PANEL: Hero terminal ── */
         .login-right {
             flex: 1;
             background: var(--bg-secondary);
             border-left: 1px solid var(--border);
-            padding: 40px;
-            overflow-y: auto;
             display: flex;
             align-items: center;
             justify-content: center;
+            overflow: hidden;
+            position: relative;
+            padding: 40px;
+        }
+        .login-right::before {
+            content: '';
+            position: absolute;
+            top: 20%; left: 50%;
+            transform: translateX(-50%);
+            width: 700px; height: 700px;
+            background: radial-gradient(ellipse at center, rgba(37,99,235,0.1) 0%, rgba(37,99,235,0.03) 40%, transparent 70%);
+            pointer-events: none;
         }
 
-        .marketing-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            max-width: 640px;
+        .hero-visual {
+            position: relative;
             width: 100%;
+            max-width: 580px;
         }
 
-        .marketing-card {
-            background: var(--bg-card);
+        /* ── Float cards ── */
+        .hero-float-card {
+            position: absolute;
+            background: linear-gradient(145deg, rgba(15,21,32,0.95), rgba(10,15,25,0.98));
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 28px 24px;
-            transition: background 0.2s;
+            padding: 14px 18px;
+            backdrop-filter: blur(20px);
+            z-index: 2;
         }
-        .marketing-card:hover { background: var(--bg-card-hover); }
-
-        .marketing-card-icon {
-            width: 48px;
-            height: 48px;
-            background: rgba(59,130,246,0.1);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 16px;
-            font-size: 22px;
+        .hero-float-card--pnl {
+            top: 30px; right: -20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4), 0 0 30px rgba(59,130,246,0.1);
         }
-
-        .marketing-card-title {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 6px;
+        .hero-float-card--pos {
+            bottom: 40px; left: -20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4), 0 0 30px rgba(59,130,246,0.1);
         }
-        .marketing-card-text {
-            font-size: 0.82rem;
-            color: var(--text-secondary);
-            line-height: 1.5;
-        }
-
-        /* ── Stat highlight card ── */
-        .marketing-card--stat {
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-        .marketing-stat-number {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 2.2rem;
-            font-weight: 700;
-            color: var(--accent-blue);
-            line-height: 1;
+        .hero-float-label {
+            font-size: 9px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
             margin-bottom: 4px;
         }
-        .marketing-stat-label {
-            font-size: 0.82rem;
-            color: var(--text-secondary);
+        .hero-float-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
+            font-weight: 700;
+        }
+        .hero-float-value.green { color: #10b981; }
+        .hero-float-value.blue { color: var(--accent-blue); }
+        .hero-float-sub {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .hero-live-dot {
+            display: inline-block;
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: #10b981;
+            margin-right: 6px;
+            animation: livePulse 2s ease-in-out infinite;
+            box-shadow: 0 0 8px rgba(16,185,129,0.6);
+        }
+        @keyframes livePulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.8); }
         }
 
-        /* ── Brand marks row ── */
-        .marketing-brands {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-bottom: 16px;
-        }
-        .marketing-brand-tag {
-            padding: 6px 12px;
-            background: rgba(59,130,246,0.08);
-            border: 1px solid rgba(59,130,246,0.2);
-            border-radius: 6px;
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--accent-blue);
-            letter-spacing: 0.3px;
-        }
-
-        /* ── Commodity icons row ── */
-        .marketing-commodities {
-            display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
-            margin-bottom: 16px;
-        }
-        .marketing-commodity {
-            width: 40px;
-            height: 40px;
-            background: var(--bg-secondary);
+        /* ── Terminal card ── */
+        .hero-terminal {
+            background: linear-gradient(145deg, var(--bg-card), rgba(10,15,25,0.95));
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.5), 0 0 100px rgba(37,99,235,0.12), 0 0 40px rgba(37,99,235,0.08);
+        }
+        .hero-terminal::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(180deg, rgba(37,99,235,0.04) 0%, transparent 40%);
+            pointer-events: none;
+        }
+        .hero-terminal-bar {
             display: flex;
             align-items: center;
-            justify-content: center;
-            font-size: 18px;
+            gap: 7px;
+            padding: 14px 18px;
+            background: rgba(0,0,0,0.35);
+            border-bottom: 1px solid var(--border);
+        }
+        .hero-dot { width: 11px; height: 11px; border-radius: 50%; }
+        .hero-dot--r { background: #ef4444; }
+        .hero-dot--y { background: #eab308; }
+        .hero-dot--g { background: #22c55e; }
+        .hero-terminal-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-left: 8px;
+        }
+        .hero-terminal-body {
+            padding: 24px;
+            position: relative;
+        }
+        .hero-ticker {
+            display: flex;
+            gap: 18px;
+            margin-bottom: 18px;
+            overflow: hidden;
+        }
+        .hero-ticker-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+        .hero-ticker-item .t-name { color: var(--text-muted); }
+        .hero-ticker-item .t-pos { color: #10b981; }
+        .hero-ticker-item .t-neg { color: #ef4444; }
+
+        .hero-chart {
+            position: relative;
+            height: 220px;
+            margin-bottom: 18px;
+        }
+        .hero-chart svg { width: 100%; height: 100%; }
+        .hero-chart-line {
+            fill: none;
+            stroke: var(--accent-blue);
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            filter: drop-shadow(0 0 6px rgba(59,130,246,0.4));
+            stroke-dasharray: 800;
+            stroke-dashoffset: 800;
+            animation: drawLine 2.5s ease-out forwards;
+        }
+        @keyframes drawLine { to { stroke-dashoffset: 0; } }
+        .hero-chart-fill {
+            opacity: 0;
+            animation: chartFadeIn 1s ease-out 1.5s forwards;
+        }
+        @keyframes chartFadeIn { to { opacity: 1; } }
+        .hero-grid-line {
+            stroke: var(--border);
+            stroke-width: 0.5;
+            stroke-dasharray: 4 4;
+        }
+        .hero-scan-line {
+            position: absolute;
+            top: 0; bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, transparent, var(--accent-blue), transparent);
+            opacity: 0.4;
+            animation: scanMove 4s ease-in-out infinite;
+        }
+        @keyframes scanMove {
+            0% { left: 0; opacity: 0; }
+            10% { opacity: 0.4; }
+            90% { opacity: 0.4; }
+            100% { left: 100%; opacity: 0; }
+        }
+
+        .hero-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+        .hero-stat { text-align: center; }
+        .hero-stat-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 15px;
+            font-weight: 700;
+            color: #fff;
+        }
+        .hero-stat-val.green { color: #10b981; }
+        .hero-stat-label {
+            font-size: 9px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-top: 2px;
         }
 
         /* ── Responsive ── */
@@ -554,48 +646,70 @@
         </div>
     </div>
 
-    <!-- ═══════════ RIGHT PANEL: Marketing ═══════════ -->
+    <!-- ═══════════ RIGHT PANEL: Hero Terminal ═══════════ -->
     <div class="login-right">
-        <div class="marketing-grid">
-            <!-- Card 1: Platform features -->
-            <div class="marketing-card">
-                <div class="marketing-brands">
-                    <span class="marketing-brand-tag">Live Data</span>
-                    <span class="marketing-brand-tag">Real-Time</span>
-                    <span class="marketing-brand-tag">Prop Firm</span>
+        <div class="hero-visual">
+            <!-- Floating P&L card -->
+            <div class="hero-float-card hero-float-card--pnl">
+                <div class="hero-float-label">Today's P&amp;L</div>
+                <div class="hero-float-value green">+&pound;1,247.80</div>
+                <div class="hero-float-sub">+3.12% ROI</div>
+            </div>
+            <!-- Floating position card -->
+            <div class="hero-float-card hero-float-card--pos">
+                <div class="hero-float-label"><span class="hero-live-dot"></span>Open Position</div>
+                <div class="hero-float-value blue">KENYA-BOP1</div>
+                <div class="hero-float-sub">Long &middot; 500 lots &middot; +&pound;342</div>
+            </div>
+            <!-- Main terminal -->
+            <div class="hero-terminal">
+                <div class="hero-terminal-bar">
+                    <div class="hero-dot hero-dot--r"></div>
+                    <div class="hero-dot hero-dot--y"></div>
+                    <div class="hero-dot hero-dot--g"></div>
+                    <span class="hero-terminal-title">TeaTrade Terminal &mdash; Live</span>
                 </div>
-                <div class="marketing-card-title">Exchange Platform</div>
-                <div class="marketing-card-text">Professional-grade trading terminal powered by live commodity market data.</div>
-            </div>
-
-            <!-- Card 2: About -->
-            <div class="marketing-card">
-                <div class="marketing-card-icon">&#9883;</div>
-                <div class="marketing-card-title">Commodity Focus</div>
-                <div class="marketing-card-text">The first prop trading evaluation platform built exclusively for commodity markets — tea, coffee, cocoa and more.</div>
-            </div>
-
-            <!-- Card 3: Commodities traded -->
-            <div class="marketing-card">
-                <div class="marketing-commodities">
-                    <div class="marketing-commodity">&#127861;</div>
-                    <div class="marketing-commodity">&#9749;</div>
-                    <div class="marketing-commodity">&#127851;</div>
-                    <div class="marketing-commodity">&#127854;</div>
-                    <div class="marketing-commodity">&#129382;</div>
-                    <div class="marketing-commodity">&#127807;</div>
-                </div>
-                <div class="marketing-card-title">Global Markets</div>
-                <div class="marketing-card-text">Trade tea, coffee, cocoa, sugar, rubber, cotton and commodity indices across global exchanges.</div>
-            </div>
-
-            <!-- Card 4: Stats -->
-            <div class="marketing-card marketing-card--stat">
-                <div class="marketing-stat-number">£50K</div>
-                <div class="marketing-stat-label">Maximum Simulated Evaluation Capital</div>
-                <div style="margin-top:16px;">
-                    <div class="marketing-stat-number" style="font-size:1.4rem;">3</div>
-                    <div class="marketing-stat-label">Account Tiers: £10K · £25K · £50K</div>
+                <div class="hero-terminal-body">
+                    <div class="hero-ticker">
+                        <div class="hero-ticker-item"><span class="t-name">KENYA-PF1</span> <span class="t-pos">+1.82%</span></div>
+                        <div class="hero-ticker-item"><span class="t-name">SL-BOP</span> <span class="t-neg">-0.47%</span></div>
+                        <div class="hero-ticker-item"><span class="t-name">IND-CTC</span> <span class="t-pos">+0.93%</span></div>
+                        <div class="hero-ticker-item"><span class="t-name">CN-GNP</span> <span class="t-pos">+2.15%</span></div>
+                    </div>
+                    <div class="hero-chart">
+                        <div class="hero-scan-line"></div>
+                        <svg viewBox="0 0 480 220" preserveAspectRatio="none">
+                            <defs>
+                                <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="rgba(59,130,246,0.3)"/>
+                                    <stop offset="100%" stop-color="rgba(59,130,246,0)"/>
+                                </linearGradient>
+                            </defs>
+                            <line class="hero-grid-line" x1="0" y1="55" x2="480" y2="55"/>
+                            <line class="hero-grid-line" x1="0" y1="110" x2="480" y2="110"/>
+                            <line class="hero-grid-line" x1="0" y1="165" x2="480" y2="165"/>
+                            <path class="hero-chart-fill" fill="url(#chartGrad)" d="M0,170 C30,158 60,152 90,122 C120,92 140,116 170,98 C200,80 220,104 250,74 C280,44 300,68 330,50 C360,32 390,56 420,38 C450,20 465,32 480,26 L480,220 L0,220 Z"/>
+                            <path class="hero-chart-line" d="M0,170 C30,158 60,152 90,122 C120,92 140,116 170,98 C200,80 220,104 250,74 C280,44 300,68 330,50 C360,32 390,56 420,38 C450,20 465,32 480,26"/>
+                        </svg>
+                    </div>
+                    <div class="hero-stats">
+                        <div class="hero-stat">
+                            <div class="hero-stat-val">&pound;42,847</div>
+                            <div class="hero-stat-label">Balance</div>
+                        </div>
+                        <div class="hero-stat">
+                            <div class="hero-stat-val green">+&pound;2,847</div>
+                            <div class="hero-stat-label">Total P&amp;L</div>
+                        </div>
+                        <div class="hero-stat">
+                            <div class="hero-stat-val">7</div>
+                            <div class="hero-stat-label">Trading Days</div>
+                        </div>
+                        <div class="hero-stat">
+                            <div class="hero-stat-val green">71.4%</div>
+                            <div class="hero-stat-label">Win Rate</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
