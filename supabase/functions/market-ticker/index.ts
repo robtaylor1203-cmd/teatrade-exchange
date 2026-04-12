@@ -684,10 +684,35 @@ serve(async (req: any) => {
         if (passed > 0 || failed > 0) {
           console.log(`🏆 Combines: ${passed} passed, ${failed} failed/expired`);
         }
-        // Daily equity reset is handled inside check_combine_rules() via last_equity_reset_date
       }
     } catch (combineErr) {
       console.error('Combine monitoring error:', (combineErr as Error).message);
+    }
+
+    // 14. Funded account monitoring — check evaluation/funded accounts for drawdown breaches
+    try {
+      const { data: fundedResult, error: fundedErr } = await supabase.rpc('check_funded_account_rules');
+      if (fundedErr) console.error('check_funded_account_rules error:', fundedErr.message);
+      else if (fundedResult?.liquidated > 0) {
+        console.log(`🛑 Funded accounts: ${fundedResult.liquidated} liquidated, ${fundedResult.checked} checked`);
+      }
+
+      // Check evaluation passes for active evaluation accounts
+      const { data: evalAccounts } = await supabase
+        .from('funded_accounts')
+        .select('id, user_id')
+        .eq('account_status', 'evaluation');
+
+      if (evalAccounts && evalAccounts.length > 0) {
+        let evalPassed = 0;
+        for (const ea of evalAccounts) {
+          const { data: evalResult } = await supabase.rpc('check_evaluation_pass', { p_funded_account_id: ea.id });
+          if (evalResult?.passed) evalPassed++;
+        }
+        if (evalPassed > 0) console.log(`🏆 Evaluations passed: ${evalPassed}`);
+      }
+    } catch (fundedErr) {
+      console.error('Funded account monitoring error:', (fundedErr as Error).message);
     }
 
     return new Response(JSON.stringify({

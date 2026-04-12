@@ -331,17 +331,13 @@ async function executeTrade() {
     try {
         if (isIndexTrade) {
             // ── INDEX TRADE ─────────────────────────────────────────────────────
-            // Send exactly the price the user sees in the form (Ask for BUY,
-            // Bid for SELL — already spread-adjusted). The Edge Function will
-            // store this exact price; no further spread is added server-side.
-            // spread = +1% for BUY (Ask), -1% for SELL (Bid)
-            const SPREAD = 0.01; // 1% per side
+            // Send the raw MID price to the server. The SQL RPC is the single
+            // source of truth for spread calculation — it applies the spread
+            // from platform_config once, stores the spread-adjusted price in
+            // the DB, and returns it. No client-side spread on execution.
             const midPrice = (_liveIndex?.price && _liveIndex.price > 0) ? _liveIndex.price : price;
-            const executionPrice = state.tradeType === 'BUY'
-                ? midPrice * (1 + SPREAD)   // user sees and buys at Ask
-                : midPrice * (1 - SPREAD);  // user sees and sells at Bid
 
-            const result = await apiExecuteIndexTrade(indexSymbol, state.tradeType, qty, executionPrice, leverage);
+            const result = await apiExecuteIndexTrade(indexSymbol, state.tradeType, qty, midPrice, leverage);
 
             if (!result.success) {
                 throw new Error(result.error || 'Index trade failed');
@@ -373,7 +369,8 @@ async function executeTrade() {
 
             // Immediately patch local indexPositions state with the server-confirmed
             // execution price BEFORE loadUserTrades() renders the table.
-            const confirmedIdxPrice = result.execution_price ?? executionPrice;
+            // Use result.price — the spread-adjusted price stored in the DB.
+            const confirmedIdxPrice = result.price ?? midPrice;
             if (state.indexPositions) {
                 if (state.indexPositions[indexSymbol]) {
                     state.indexPositions[indexSymbol].avg_entry_price = confirmedIdxPrice;
@@ -392,9 +389,7 @@ async function executeTrade() {
 
             // confirmedIdxPrice already declared above — reuse for toast.
             const idxSideLabel = state.tradeType === 'BUY' ? 'Bought' : 'Shorted';
-            // Use result.price (the spread-adjusted Ask/Bid stored in DB by the RPC).
-            // The Edge Function also returns 'execution_price' but overwrites it with
-            // the raw mid price — NOT what's stored in the DB or shown in the orders table.
+            // Use result.price — the spread-adjusted price stored in the DB by the RPC.
             const toastPrice = result.price ?? confirmedIdxPrice;
             const _sc = result.spread_cost ? ` — Spread: $${Number(result.spread_cost).toFixed(4)}` : '';
             showToast('Trade Executed!', `${idxSideLabel} ${qty.toLocaleString()} kg of ${productName} at $${Number(toastPrice).toFixed(4)}/kg (${leverage}x)${_sc}`);

@@ -521,9 +521,50 @@ function convertToOHLC(priceData, intervalMinutes = 60) {
 }
 
 function _fillCandleGaps(candles, intervalMs) {
-    // TradingView Lightweight Charts handles discontinuous time series natively.
-    // The legacy zero-volume forward-fill logic is no longer needed and distorts indicators.
-    return candles;
+    // Forward-fill missing candles so the chart doesn't display as choppy/gapped.
+    // For daily candles (1440 min), skip weekends (Sat/Sun) since markets are closed.
+    // For shorter intervals, fill all gaps.
+    if (!candles || candles.length < 2) return candles;
+
+    const isDailyOrLarger = intervalMs >= 1440 * 60000;
+    const filled = [candles[0]];
+
+    for (let i = 1; i < candles.length; i++) {
+        const prev = candles[i - 1];
+        const curr = candles[i];
+        const prevTime = prev.date.getTime();
+        const currTime = curr.date.getTime();
+        const gap = currTime - prevTime;
+
+        // Fill missing intervals between prev and curr
+        if (gap > intervalMs * 1.5) {
+            let fillTime = prevTime + intervalMs;
+            const lastClose = prev.close;
+            while (fillTime < currTime - intervalMs * 0.5) {
+                const fillDate = new Date(fillTime);
+                // Skip weekends for daily+ candles
+                if (isDailyOrLarger) {
+                    const day = fillDate.getUTCDay();
+                    if (day === 0 || day === 6) {
+                        fillTime += intervalMs;
+                        continue;
+                    }
+                }
+                filled.push({
+                    date: fillDate,
+                    open: lastClose,
+                    high: lastClose * 1.001,
+                    low: lastClose * 0.999,
+                    close: lastClose,
+                    volume: 0
+                });
+                fillTime += intervalMs;
+            }
+        }
+        filled.push(curr);
+    }
+
+    return filled;
 }
 
 // Seed a chart array with a first candle if empty, otherwise append.

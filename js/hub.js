@@ -1343,8 +1343,7 @@ function setHubTimeframe(tf) {
             if (currentRaw && currentSym !== snapshotSymbol) return;
 
             // Populate the shared cache so live-tick updates can append to it
-            const _tfKey = state.currentTimeframe || '1D';
-            const cacheKey = (symbolType === 'index' ? `INDEX_${symbol}` : symbol) + `_${_tfKey}`;
+            const cacheKey = (symbolType === 'index' ? `INDEX_${symbol}` : symbol) + `_${snapshotTf}`;
             if (state.priceDataCache) {
                 state.priceDataCache.data[cacheKey] = data;
                 state.priceDataCache.lastUpdate[cacheKey] = Date.now();
@@ -1445,12 +1444,16 @@ function updateHubOrderPreview() {
         return curr + val.toFixed(2);
     };
 
-    const SPREAD_PCT = 0.01;
+    // Index spread = 2% total (1% per side), tea spread = 1% total (0.5% per side)
+    const buyIsIdx = isIndexSymbol(buySymbol === 'KENYAN' ? 'KENYA' : buySymbol);
+    const sellIsIdx = isIndexSymbol(sellSymbol === 'KENYAN' ? 'KENYA' : sellSymbol);
+    const BUY_SPREAD_PCT = buyIsIdx ? 0.02 : 0.01;
+    const SELL_SPREAD_PCT = sellIsIdx ? 0.02 : 0.01;
     const OVERNIGHT_RATE = 0.05 / 365;
 
     // BUY preview: user pays ASK = market * (1 + spread/2)
     const buyLeverage = parseFloat(document.getElementById('hub-buy-leverage')?.value) || 10;
-    const buyAskPrice = buy.price * (1 + SPREAD_PCT / 2);
+    const buyAskPrice = buy.price * (1 + BUY_SPREAD_PCT / 2);
     const buyNotional = buyQty * buyAskPrice;
     const buyMargin = buyNotional / buyLeverage;
     const buySpreadCost = (buyAskPrice - buy.price) * buyQty;
@@ -1459,6 +1462,8 @@ function updateHubOrderPreview() {
     const mktPriceEl = document.getElementById('hub-buy-market-price');
     if (mktPriceEl) mktPriceEl.textContent = `${_fmt(buy.price, buy.currency)}/kg`;
     document.getElementById('hub-buy-est-price').textContent = `${_fmt(buyAskPrice, buy.currency)}/kg`;
+    const buySpreadLabel = document.getElementById('hub-buy-spread-label');
+    if (buySpreadLabel) buySpreadLabel.innerHTML = `Your Price <small style="color:var(--text-muted)">(+${(BUY_SPREAD_PCT / 2 * 100).toFixed(1)}% spread)</small>`;
     document.getElementById('hub-buy-total-cost').textContent = _fmt(buyNotional, buy.currency);
     const buyMarginEl = document.getElementById('hub-buy-margin');
     if (buyMarginEl) buyMarginEl.textContent = _fmt(buyMargin, buy.currency);
@@ -1468,7 +1473,7 @@ function updateHubOrderPreview() {
 
     // SELL preview: user gets BID = market * (1 - spread/2)
     const sellLeverage = parseFloat(document.getElementById('hub-sell-leverage')?.value) || 10;
-    const sellBidPrice = sell.price * (1 - SPREAD_PCT / 2);
+    const sellBidPrice = sell.price * (1 - SELL_SPREAD_PCT / 2);
     const sellNotional = sellQty * sellBidPrice;
     const sellMargin = sellNotional / sellLeverage;
     const sellSpreadCost = (sell.price - sellBidPrice) * sellQty;
@@ -1477,6 +1482,8 @@ function updateHubOrderPreview() {
     const sellMktEl = document.getElementById('hub-sell-market-price');
     if (sellMktEl) sellMktEl.textContent = `${_fmt(sell.price, sell.currency)}/kg`;
     document.getElementById('hub-sell-est-price').textContent = `${_fmt(sellBidPrice, sell.currency)}/kg`;
+    const sellSpreadLabel = document.getElementById('hub-sell-spread-label');
+    if (sellSpreadLabel) sellSpreadLabel.innerHTML = `Your Price <small style="color:var(--text-muted)">(-${(SELL_SPREAD_PCT / 2 * 100).toFixed(1)}% spread)</small>`;
     document.getElementById('hub-sell-total-cost').textContent = _fmt(sellNotional, sell.currency);
     const sellMarginEl = document.getElementById('hub-sell-margin');
     if (sellMarginEl) sellMarginEl.textContent = _fmt(sellMargin, sell.currency);

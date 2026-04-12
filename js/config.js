@@ -530,20 +530,6 @@ function showAccountLockedModal() {
     if (!modal) return;
     modal.classList.add('active');
     document.body.style.overflow = 'hidden';
-
-    const resetAt = state.userProfile?.next_free_reset_at;
-    const timerEl = document.getElementById('locked-bailout-timer');
-    const btnEl = document.getElementById('locked-bailout-btn');
-
-    if (resetAt && new Date(resetAt) <= new Date()) {
-        if (timerEl) timerEl.textContent = 'Available now!';
-        if (btnEl) { btnEl.disabled = false; btnEl.textContent = 'Claim $1,000 Bailout'; }
-    } else if (resetAt) {
-        const d = new Date(resetAt);
-        const label = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-        if (timerEl) timerEl.textContent = `Available ${label}`;
-        if (btnEl) { btnEl.disabled = true; btnEl.textContent = `Wait until ${label}`; }
-    }
 }
 
 function closeAccountLockedModal() {
@@ -577,23 +563,8 @@ async function purchaseAccountReset() {
 }
 
 async function claimFreeBailout() {
-    const resetAt = state.userProfile?.next_free_reset_at;
-    if (resetAt && new Date(resetAt) > new Date()) {
-        showToast('Not yet', 'Free bailout is not available yet', true);
-        return;
-    }
-    try {
-        const { data, error } = await apiClaimFreeBailout();
-        if (error) { showToast('Error', error.message, true); return; }
-        if (data?.success) {
-            setActiveBalance(data.new_balance);
-            state.userProfile.account_status = 'ACTIVE';
-            closeAccountLockedModal();
-            showToast('Bailout Claimed', 'You received $1,000. Trade wisely this time!');
-        }
-    } catch (e) {
-        showToast('Error', 'Bailout failed', true);
-    }
+    // Free bailout removed
+    showToast('Unavailable', 'Free bailout is no longer available. Please use the paid reset.', true);
 }
 
 async function purchaseCombineEntry() {
@@ -635,6 +606,26 @@ function handleCheckoutReturn() {
     const params = new URLSearchParams(window.location.search);
     const checkout = params.get('checkout');
     const product = params.get('product');
+    const tier = params.get('tier');
+
+    // Auto-trigger evaluation purchase if tier param present (from landing page pricing CTA)
+    if (tier && ['10K', '25K', '50K'].includes(tier)) {
+        window.history.replaceState({}, '', window.location.pathname);
+        // Wait for auth to resolve, then trigger checkout
+        const waitForAuth = setInterval(() => {
+            if (typeof state !== 'undefined' && state.currentUser) {
+                clearInterval(waitForAuth);
+                if (typeof purchaseEvaluation === 'function') purchaseEvaluation(tier);
+            } else if (typeof state !== 'undefined' && state.currentUser === null) {
+                clearInterval(waitForAuth);
+                if (typeof openAuthModal === 'function') openAuthModal();
+            }
+        }, 500);
+        // Timeout after 10s
+        setTimeout(() => clearInterval(waitForAuth), 10000);
+        return;
+    }
+
     if (!checkout) return;
 
     window.history.replaceState({}, '', window.location.pathname);
@@ -644,6 +635,10 @@ function handleCheckoutReturn() {
             ACCOUNT_RESET: ['Account Reset!', 'Your balance has been restored to $10,000'],
             COMBINE_ENTRY: ['Combine Started!', 'Your $50,000 challenge account is live. Good luck!'],
             PRO_SUBSCRIPTION: ['Welcome to PRO!', 'You now have access to all premium features'],
+            EVAL_10K: ['Evaluation Started!', 'Your £10,000 simulated evaluation account is live. Good luck!'],
+            EVAL_25K: ['Evaluation Started!', 'Your £25,000 simulated evaluation account is live. Good luck!'],
+            EVAL_50K: ['Evaluation Started!', 'Your £50,000 simulated evaluation account is live. Good luck!'],
+            EVALUATION_ENTRY: ['Evaluation Started!', 'Your evaluation account is live. Good luck!'],
         };
         const [title, msg] = msgs[product] || ['Payment Complete', 'Thank you!'];
         showToast(title, msg);

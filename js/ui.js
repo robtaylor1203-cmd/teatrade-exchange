@@ -1522,12 +1522,12 @@ function updateMobileTradePrices() {
     if (!buyEl || !sellEl) return;
     if (window.innerWidth > 768) return;
 
-    const SPREAD_PCT = 0.01;
     let marketPrice = 0;
+    let isIdx = false;
 
     if (state.mainChartData && state.mainChartData.symbol) {
         const sym = state.mainChartData.symbol;
-        const isIdx = state.mainChartData.isIndex;
+        isIdx = state.mainChartData.isIndex;
 
         if (isIdx) {
             const indexes = typeof calculateRegionalIndexes === 'function'
@@ -1545,12 +1545,14 @@ function updateMobileTradePrices() {
         const selectValue = select?.value;
         if (selectValue) {
             if (selectValue.startsWith('INDEX_')) {
+                isIdx = true;
                 const s = selectValue.replace('INDEX_', '');
                 const indexes = typeof calculateRegionalIndexes === 'function'
                     ? calculateRegionalIndexes() : [];
                 const idx = indexes.find(i => i.symbol === s);
                 marketPrice = idx?.price || 0;
             } else {
+                isIdx = false;
                 const teaId = parseInt(selectValue);
                 const tea = state.teas?.find(t => t.id === teaId);
                 marketPrice = tea?.current_price || 0;
@@ -1559,6 +1561,8 @@ function updateMobileTradePrices() {
     }
 
     if (marketPrice > 0) {
+        // Index spread = 2% total (1% per side), tea spread = 1% total (0.5% per side)
+        const SPREAD_PCT = isIdx ? 0.02 : 0.01;
         const askPrice = marketPrice * (1 + SPREAD_PCT / 2);
         const bidPrice = marketPrice * (1 - SPREAD_PCT / 2);
         buyEl.textContent = '$' + askPrice.toFixed(2);
@@ -1809,7 +1813,9 @@ window.openMobileTradeSheet = function (side) {
     state.qqCurrentTea = tea;
 
     // 2. Calculate execution price with spread (mirrors updateQuickTradeSummary)
-    var SPREAD_PCT = 0.01;
+    // Index spread = 2% total (1% per side), tea spread = 1% total (0.5% per side)
+    var isIndex = tea.isIndex || (typeof isIndexSymbol === 'function' && isIndexSymbol(tea.symbol));
+    var SPREAD_PCT = isIndex ? 0.02 : 0.01;
     var marketPrice = 0;
     if (tea.isIndex || (typeof isIndexSymbol === 'function' && isIndexSymbol(tea.symbol))) {
         var idxs = typeof calculateRegionalIndexes === 'function' ? calculateRegionalIndexes() : [];

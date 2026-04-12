@@ -125,6 +125,22 @@ serve(async (req: Request) => {
       })
     }
 
+    // ── 2b. LEVERAGE CAP FOR FUNDED/EVALUATION ACCOUNTS ────────────
+    // Rule E: Strict 1:30 max leverage for evaluation & funded accounts
+    const { data: levCapResult } = await supabaseAdmin.rpc('check_leverage_cap', {
+      p_user_id: user.id,
+      p_leverage: lev,
+    })
+    if (levCapResult === false) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: `Leverage ${lev}x exceeds the maximum 30x allowed for evaluation/funded accounts.`
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
+    }
+
     // ── 3. CLIENT PRICE VALIDATION ─────────────────────────────────
     // Frontend is source of truth: it sends the exact Ask (BUY) or Bid (SELL)
     // the user saw in the trade form. We only fetch DB price to guard against
@@ -183,7 +199,13 @@ serve(async (req: Request) => {
       })
     }
 
-    // ── 5. RETURN SUCCESS ──────────────────────────────────────────
+    // ── 5. RECORD TRADING DAY FOR FUNDED ACCOUNTS ────────────────
+    // After successful trade, record this as an active trading day
+    try {
+      await supabaseAdmin.rpc('record_funded_trading_day', { p_user_id: user.id })
+    } catch (_) { /* non-critical — funded account may not exist */ }
+
+    // ── 6. RETURN SUCCESS ──────────────────────────────────────────
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,

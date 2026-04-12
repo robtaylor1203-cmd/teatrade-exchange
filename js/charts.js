@@ -46,11 +46,19 @@ function setTimeframe(tf) {
 }
 
 function invalidatePriceCacheForCurrentChart() {
-    const select = document.getElementById('trade-tea-select');
-    const selectedSymbol = select?.value;
-    const selectedTea = state.teas && state.teas.find(t => t.symbol === selectedSymbol);
-
-    let baseKey = selectedTea ? selectedTea.symbol : `INDEX_${state.mainChartData?.symbol || 'KENYA'}`;
+    // When the hub is maximized, use its active symbol instead of the main chart dropdown
+    let baseKey;
+    const hubMaximized = state.maximizedPanel && state.maximizedPanel.id === 'chart-section';
+    if (hubMaximized) {
+        const hubSymbol = document.getElementById('hub-buy-symbol')?.value || state.mainChartData?.symbol || 'KENYA';
+        const resolved = hubSymbol === 'KENYAN' ? 'KENYA' : hubSymbol;
+        baseKey = isIndexSymbol(resolved) ? `INDEX_${resolved}` : resolved;
+    } else {
+        const select = document.getElementById('trade-tea-select');
+        const selectedSymbol = select?.value;
+        const selectedTea = state.teas && state.teas.find(t => t.symbol === selectedSymbol);
+        baseKey = selectedTea ? selectedTea.symbol : `INDEX_${state.mainChartData?.symbol || 'KENYA'}`;
+    }
 
     if (state.priceDataCache) {
         Object.keys(state.priceDataCache.data || {}).forEach(k => {
@@ -245,7 +253,6 @@ function _initRsiChartIfNull() {
 // DATA GENERATION & FORMATTING
 // =============================================
 function generateChartData(timeframe) {
-    if (state.isFetchingHistory) return [];
     const config = timeframeConfig[timeframe];
     if (!config) return [];
 
@@ -279,12 +286,20 @@ function generateChartData(timeframe) {
     if (!isOfficiallyLoaded || !fullHistory || fullHistory.length < 2) {
         if (!state.isFetchingHistory) {
             state.isFetchingHistory = true;
+            const snapshotTf = timeframe;
+            const snapshotSymbol = symbol;
             getPriceHistory(symbol, symbolType, timeframe)
                 .catch(() => { })
                 .finally(() => {
                     state.isFetchingHistory = false;
-                    state.cachedTimeframe = null;
-                    drawChart();
+                    // Only redraw if the user hasn't switched timeframe/symbol while loading
+                    const currentSymbol = state.mainChartData?.isTea
+                        ? state.mainChartData.symbol
+                        : (_CARD_TO_INDEX[state.mainChartData?.symbol] || state.mainChartData?.symbol || 'KENYA');
+                    if (state.currentTimeframe === snapshotTf && currentSymbol === snapshotSymbol) {
+                        state.cachedTimeframe = null;
+                        drawChart();
+                    }
                 });
         }
         return fullHistory || []; // Fallback to whatever exists while waiting

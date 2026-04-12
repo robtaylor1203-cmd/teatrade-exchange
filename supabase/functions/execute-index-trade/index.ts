@@ -139,8 +139,8 @@ serve(async (req) => {
       const result = data as Record<string, unknown>
       return new Response(JSON.stringify({
         ...result,
-        // Keep execution_price consistent with result.price (the stored value).
-        execution_price: executionPrice,
+        // The RPC returns execution_price and price (both = spread-adjusted).
+        // Pass through as-is — the RPC is the single source of truth for pricing.
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: result.success ? 200 : 400,

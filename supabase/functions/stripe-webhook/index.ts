@@ -145,6 +145,31 @@ serve(async (req) => {
           break
         }
 
+        case 'EVALUATION_ENTRY':
+        case 'EVAL_10K':
+        case 'EVAL_25K':
+        case 'EVAL_50K': {
+          // Start prop trading evaluation — paid entry
+          // Map product to initial balance
+          const evalBalanceMap: Record<string, number> = {
+            'EVAL_10K': 10000,
+            'EVAL_25K': 25000,
+            'EVAL_50K': 50000,
+            'EVALUATION_ENTRY': 10000,
+          }
+          const evalBalance = evalBalanceMap[product] || Number(session.metadata?.initial_balance) || 10000
+          const { data: evalResult, error: evalErr } = await supabaseAdmin.rpc('start_evaluation', {
+            p_user_id: userId,
+            p_initial_balance: evalBalance,
+          })
+          if (evalErr) {
+            console.error('start_evaluation error:', evalErr.message)
+          } else {
+            console.log('Evaluation started:', evalResult, 'balance:', evalBalance)
+          }
+          break
+        }
+
         default:
           console.warn('Unknown product in webhook:', product)
       }

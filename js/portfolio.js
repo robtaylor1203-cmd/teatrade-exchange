@@ -2780,22 +2780,50 @@ function renderStoreTab() {
 
     const tier = state.userProfile?.tier || 'FREE';
     const isPro = tier === 'PRO';
-    const hasBadge = state.userProfile?.combine_badge === true;
-    const inCombine = state.userProfile?.account_status === 'COMBINE';
+    const acctStatus = state.userProfile?.account_status || 'ACTIVE';
+    const inEval = acctStatus === 'EVALUATION';
+    const isFunded = acctStatus === 'FUNDED';
 
     panel.innerHTML = `
-        <div class="combine-entry-card store-card">
-            <span class="store-card-icon">${hasBadge ? '&#127942;' : '&#9876;&#65039;'}</span>
-            <div class="store-card-title">${hasBadge ? 'Funded Trader' : 'TeaTrade Combine'}</div>
+        <div class="funded-account-card store-card">
+            <span class="store-card-icon">${isFunded ? '&#127942;' : '&#9876;&#65039;'}</span>
+            <div class="store-card-title">${isFunded ? 'Funded Simulated Account' : inEval ? 'Evaluation In Progress' : 'Trading Evaluation Challenge'}</div>
             <div class="store-card-desc">
-                ${hasBadge
-            ? 'You passed the Combine and earned the Funded Trader badge. Enter again to prove your skills.'
-            : 'Prove you are an elite trader. Get a $50,000 challenge account. Make 50% profit in 30 days without a 5% daily drawdown to earn the Funded Trader badge.'}
+                ${isFunded
+            ? 'You passed the evaluation! Trade with simulated capital and claim 80% performance rewards every 14 days.'
+            : inEval
+                ? 'Your evaluation is active. Meet the 8% profit target with 5+ trading days and consistent performance to earn a funded simulated account.'
+                : 'Purchase an evaluation challenge. Prove your trading skill with simulated capital. Pass the evaluation to earn a funded simulated account with 80/20 performance reward splits.'}
             </div>
-            <button class="store-card-btn" onclick="purchaseCombineEntry()" ${inCombine ? 'disabled' : ''}>
-                ${inCombine ? 'Challenge In Progress' : 'Enter Combine &mdash; Start Free Beta'}
+            <div class="store-card-details">
+                <div class="store-detail-row"><span>Max Daily Loss</span><span>5% of starting equity</span></div>
+                <div class="store-detail-row"><span>Max Total Loss</span><span>10% of initial balance</span></div>
+                <div class="store-detail-row"><span>Profit Target (Eval)</span><span>8%</span></div>
+                <div class="store-detail-row"><span>Min Trading Days</span><span>5 days</span></div>
+                <div class="store-detail-row"><span>Consistency Rule</span><span>No single day &gt; 50% of profit</span></div>
+                <div class="store-detail-row"><span>Max Leverage</span><span>1:30</span></div>
+                <div class="store-detail-row"><span>Performance Reward</span><span>80% trader / 20% platform</span></div>
+                <div class="store-detail-row"><span>Reward Cycle</span><span>Every 14 days</span></div>
+            </div>
+            <button class="store-card-btn" onclick="purchaseEvaluation()" ${(inEval || isFunded) ? 'disabled' : ''}>
+                ${isFunded ? 'Account Active' : inEval ? 'Evaluation In Progress' : 'Purchase Evaluation Challenge'}
             </button>
+            <p class="store-card-legal">All trading is conducted with simulated capital. Challenge fees are non-refundable software subscription fees.</p>
         </div>
+
+        ${isFunded ? `
+        <div class="payout-card store-card">
+            <span class="store-card-icon">&#128176;</span>
+            <div class="store-card-title">Claim Performance Reward</div>
+            <div class="store-card-desc">
+                Request your 80% performance reward. You must have a flat book (no open positions), be profitable, have 5+ trading days, and meet the consistency rule.
+            </div>
+            <button class="store-card-btn" onclick="requestPayout()">Claim Performance Reward</button>
+            <p class="store-card-legal">Performance rewards are independent contractor payments for generating successful simulated trading data, not withdrawals of financial market profits.</p>
+        </div>
+        ` : ''}
+
+        <div id="funded-dashboard-panel"></div>
 
         <div class="pro-upgrade-card store-card">
             <span class="store-card-icon">&#11088;</span>
@@ -2809,7 +2837,271 @@ function renderStoreTab() {
                 ${isPro ? 'Already PRO' : 'Upgrade to PRO &mdash; &pound;14.99/mo'}
             </button>
         </div>
+
+        <div class="simulated-env-notice">
+            <strong>&#9888;&#65039; Simulated Trading Environment</strong><br>
+            All trading on TeaTrade Exchange is conducted with simulated capital. No real money is traded or at risk.
+        </div>
     `;
+
+    // Load funded account dashboard if applicable
+    if (inEval || isFunded) {
+        loadFundedDashboard();
+    }
+}
+
+// =============================================
+// FUNDED ACCOUNT DASHBOARD
+// =============================================
+
+async function loadFundedDashboard() {
+    const panel = document.getElementById('funded-dashboard-panel');
+    if (!panel) return;
+
+    try {
+        const { data, error } = await apiFetchFundedAccountStatus();
+        if (error || !data?.has_account) {
+            panel.innerHTML = '';
+            return;
+        }
+
+        const d = data;
+        const isFunded = d.account_status === 'funded';
+        const isEval = d.account_status === 'evaluation';
+        const isLiquidated = d.account_status === 'liquidated';
+
+        const dailyPct = Math.max(0, d.daily_loss_pct || 0);
+        const totalPct = Math.max(0, d.total_loss_pct || 0);
+        const profitPct = d.profit_pct || 0;
+        const consistencyPct = d.consistency_pct || 0;
+
+        const fmt = (v) => '$' + Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        panel.innerHTML = `
+            <div class="funded-dashboard store-card">
+                <div class="funded-dash-header">
+                    <span class="funded-dash-status ${d.account_status}">${isEval ? 'EVALUATION' : isFunded ? 'FUNDED' : 'LIQUIDATED'}</span>
+                    <span class="funded-dash-label">Simulated Account</span>
+                </div>
+                <div class="funded-dash-grid">
+                    <div class="funded-dash-stat">
+                        <div class="funded-dash-stat-value">${fmt(d.floating_equity)}</div>
+                        <div class="funded-dash-stat-label">Floating Equity</div>
+                    </div>
+                    <div class="funded-dash-stat">
+                        <div class="funded-dash-stat-value">${fmt(d.initial_balance)}</div>
+                        <div class="funded-dash-stat-label">Initial Balance</div>
+                    </div>
+                    <div class="funded-dash-stat">
+                        <div class="funded-dash-stat-value ${profitPct >= 0 ? 'positive' : 'negative'}">${profitPct >= 0 ? '+' : ''}${profitPct}%</div>
+                        <div class="funded-dash-stat-label">Profit</div>
+                    </div>
+                    <div class="funded-dash-stat">
+                        <div class="funded-dash-stat-value">${d.active_trading_days} / 4</div>
+                        <div class="funded-dash-stat-label">Trading Days</div>
+                    </div>
+                </div>
+                <div class="funded-dash-rules">
+                    <div class="funded-rule ${dailyPct >= 5 ? 'breached' : dailyPct >= 3.5 ? 'warning' : 'safe'}">
+                        <span>Daily Loss</span>
+                        <span>${dailyPct.toFixed(2)}% / 5.00%</span>
+                        <div class="funded-rule-bar"><div class="funded-rule-fill" style="width:${Math.min(100, (dailyPct / 5) * 100)}%"></div></div>
+                    </div>
+                    <div class="funded-rule ${totalPct >= 10 ? 'breached' : totalPct >= 7 ? 'warning' : 'safe'}">
+                        <span>Total Loss</span>
+                        <span>${totalPct.toFixed(2)}% / 10.00%</span>
+                        <div class="funded-rule-bar"><div class="funded-rule-fill" style="width:${Math.min(100, (totalPct / 10) * 100)}%"></div></div>
+                    </div>
+                    <div class="funded-rule ${consistencyPct > 50 ? 'breached' : consistencyPct > 35 ? 'warning' : 'safe'}">
+                        <span>Consistency</span>
+                        <span>Best day: ${consistencyPct.toFixed(1)}% of profit (max 50%)</span>
+                    </div>
+                </div>
+                ${isFunded ? `
+                <div class="funded-dash-payout-info">
+                    <div>Next reward eligible: <strong>${d.next_payout_eligible ? new Date(d.next_payout_eligible).toLocaleDateString('en-GB') : 'N/A'}</strong></div>
+                    <div>Open positions: <strong>${d.open_positions}</strong></div>
+                    <div>Can claim reward: <strong>${d.can_request_payout ? 'Yes ✓' : 'Not yet'}</strong></div>
+                </div>
+                ` : ''}
+                ${isEval ? `
+                <div class="funded-dash-eval-info">
+                    <div>Profit target: <strong>8% (${fmt(d.initial_balance * 1.08)})</strong></div>
+                    <div>Current: <strong>${fmt(d.floating_equity)} (${profitPct}%)</strong></div>
+                </div>
+                ` : ''}
+            </div>
+        `;
+
+        // Check for liquidation and show modal
+        if (isLiquidated && d.liquidation_details) {
+            showLiquidationModal(d.liquidation_details);
+        }
+    } catch (err) {
+        console.error('Funded dashboard error:', err);
+        panel.innerHTML = '';
+    }
+}
+
+// =============================================
+// PAYOUT REQUEST
+// =============================================
+
+async function requestPayout() {
+    if (!state.currentUser) {
+        showToast('Error', 'Please log in first.', true);
+        return;
+    }
+
+    if (!confirm('Claim Performance Reward?\n\nThis will:\n• Calculate your 80% performance reward\n• Reset your balance to the initial amount\n• Reset your trading day count\n\nAll positions must be closed.')) {
+        return;
+    }
+
+    try {
+        const { data, error } = await apiRequestRewardPayout();
+        if (error) {
+            showToast('Reward Claim Failed', error.message, true);
+            return;
+        }
+
+        showToast('Performance Reward Claimed!',
+            `Reward: $${Number(data.payout_amount).toFixed(2)} (80% of $${Number(data.gross_profit).toFixed(2)} profit). Balance reset to $${Number(data.new_balance).toFixed(2)}.`);
+
+        await loadUserProfile();
+        renderStoreTab();
+    } catch (err) {
+        showToast('Error', 'Failed to claim performance reward. Please try again.', true);
+    }
+}
+
+// =============================================
+// PURCHASE EVALUATION
+// =============================================
+
+async function purchaseEvaluation(tier) {
+    if (!state.currentUser) {
+        openAuthModal();
+        return;
+    }
+    // Map tier to Stripe product key and balance
+    const tiers = {
+        '10K': { product: 'EVAL_10K', balance: 10000 },
+        '25K': { product: 'EVAL_25K', balance: 25000 },
+        '50K': { product: 'EVAL_50K', balance: 50000 },
+    };
+    const selected = tiers[tier] || tiers['10K'];
+    // Redirect to Stripe checkout for evaluation entry
+    try {
+        const { data, error } = await _invokeEdgeFunction('stripe-checkout', {
+            product: selected.product,
+            initial_balance: selected.balance,
+        });
+        if (error) throw error;
+        if (data?.url) window.location.href = data.url;
+    } catch (err) {
+        showToast('Error', 'Failed to start checkout. Please try again.', true);
+    }
+}
+
+// =============================================
+// LIQUIDATION MODAL
+// =============================================
+
+function showLiquidationModal(details) {
+    // Remove any existing modal
+    const existing = document.getElementById('liquidation-modal');
+    if (existing) existing.remove();
+
+    let reason = 'Unknown';
+    let detailsHtml = '';
+
+    if (details) {
+        if (details.midnight_equity !== undefined) {
+            reason = 'Maximum Daily Loss Breach (5%)';
+            detailsHtml = `
+                <div class="liq-detail"><span>Midnight Equity:</span><span>$${Number(details.midnight_equity).toFixed(2)}</span></div>
+                <div class="liq-detail"><span>Floating Equity at Breach:</span><span>$${Number(details.floating_equity).toFixed(2)}</span></div>
+                <div class="liq-detail"><span>Daily Loss Floor (95%):</span><span>$${Number(details.daily_floor).toFixed(2)}</span></div>
+                <div class="liq-detail"><span>Loss Percentage:</span><span>${details.loss_pct}%</span></div>
+                <div class="liq-detail"><span>Timestamp:</span><span>${new Date(details.timestamp).toLocaleString('en-GB')}</span></div>
+            `;
+        } else if (details.initial_balance !== undefined) {
+            reason = 'Maximum Total Loss Breach (10%)';
+            detailsHtml = `
+                <div class="liq-detail"><span>Initial Balance:</span><span>$${Number(details.initial_balance).toFixed(2)}</span></div>
+                <div class="liq-detail"><span>Floating Equity at Breach:</span><span>$${Number(details.floating_equity).toFixed(2)}</span></div>
+                <div class="liq-detail"><span>Total Loss Floor (90%):</span><span>$${Number(details.total_floor).toFixed(2)}</span></div>
+                <div class="liq-detail"><span>Loss Percentage:</span><span>${details.loss_pct}%</span></div>
+                <div class="liq-detail"><span>Timestamp:</span><span>${new Date(details.timestamp).toLocaleString('en-GB')}</span></div>
+            `;
+        }
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'liquidation-modal';
+    modal.className = 'liquidation-modal-overlay';
+    modal.innerHTML = `
+        <div class="liquidation-modal">
+            <div class="liquidation-modal-header">
+                <span class="liquidation-icon">&#9888;&#65039;</span>
+                <h2>Account Liquidated</h2>
+            </div>
+            <div class="liquidation-modal-body">
+                <p class="liquidation-reason"><strong>Reason:</strong> ${reason}</p>
+                <div class="liquidation-details">${detailsHtml}</div>
+                <p class="liquidation-explanation">
+                    Your evaluation/funded simulated account was liquidated because a risk limit was breached.
+                    All open positions were force-closed at market prices. This is an automated system action
+                    to protect against excessive drawdown.
+                </p>
+                <div class="liquidation-audit-link">
+                    <button class="store-card-btn" onclick="showFullAuditLog()">View Full Audit Log</button>
+                </div>
+                <p class="liquidation-next-steps">
+                    You may purchase a new evaluation challenge to try again. Your previous trading history
+                    and audit logs are permanently retained for transparency.
+                </p>
+                <div class="simulated-env-notice" style="margin-top:12px;">
+                    <strong>Simulated Trading Environment</strong> — No real money was lost.
+                </div>
+            </div>
+            <button class="liquidation-close-btn" onclick="closeLiquidationModal()">Acknowledge &amp; Continue</button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function closeLiquidationModal() {
+    const modal = document.getElementById('liquidation-modal');
+    if (modal) modal.remove();
+}
+
+async function showFullAuditLog() {
+    try {
+        const { data, error } = await apiFetchLiquidationAudit();
+        if (error) { showToast('Error', 'Failed to load audit log', true); return; }
+
+        const logs = Array.isArray(data) ? data : [];
+        let html = '<div class="audit-log-list">';
+        for (const log of logs) {
+            html += `
+                <div class="audit-log-entry">
+                    <div class="audit-log-time">${new Date(log.timestamp).toLocaleString('en-GB')}</div>
+                    <div class="audit-log-type">${log.event_type.replace(/_/g, ' ').toUpperCase()}</div>
+                    <div class="audit-log-details"><pre>${JSON.stringify(log.details, null, 2)}</pre></div>
+                </div>
+            `;
+        }
+        html += '</div>';
+
+        const modal = document.getElementById('liquidation-modal');
+        if (modal) {
+            const body = modal.querySelector('.liquidation-modal-body');
+            if (body) body.innerHTML = html;
+        }
+    } catch (err) {
+        showToast('Error', 'Failed to load audit log', true);
+    }
 }
 
 // =============================================
@@ -2820,7 +3112,52 @@ async function updateCombineBanner() {
     const banner = document.getElementById('combine-banner');
     if (!banner) return;
 
-    if (state.userProfile?.account_status !== 'COMBINE') {
+    const acctStatus = state.userProfile?.account_status;
+
+    // Handle funded/evaluation account banner
+    if (acctStatus === 'EVALUATION' || acctStatus === 'FUNDED') {
+        try {
+            const { data } = await apiFetchFundedAccountStatus();
+            if (!data?.has_account || data.account_status === 'liquidated') {
+                banner.classList.remove('active');
+                if (data?.account_status === 'liquidated' && data.liquidation_details) {
+                    showLiquidationModal(data.liquidation_details);
+                }
+                return;
+            }
+
+            const fmt = (v) => '$' + Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 });
+            const labelEl = banner.querySelector('.combine-banner-label');
+            const eqEl = document.getElementById('combine-equity');
+            const tgEl = document.getElementById('combine-target');
+            const ddEl = document.getElementById('combine-dd-floor');
+            const dayEl = document.getElementById('combine-days');
+
+            if (labelEl) labelEl.textContent = data.account_status === 'funded' ? 'FUNDED ACCOUNT' : 'EVALUATION ACTIVE';
+            if (eqEl) eqEl.textContent = fmt(data.floating_equity);
+            if (tgEl) {
+                tgEl.textContent = data.account_status === 'evaluation'
+                    ? fmt(data.initial_balance * 1.08)
+                    : fmt(data.profit || 0);
+                const tgLabel = tgEl.nextElementSibling;
+                if (tgLabel) tgLabel.textContent = data.account_status === 'evaluation' ? 'Target (8%)' : 'Profit';
+            }
+            if (ddEl) ddEl.textContent = fmt(data.daily_floor);
+            if (dayEl) {
+                dayEl.textContent = data.active_trading_days + '/4';
+                const dayLabel = dayEl.nextElementSibling;
+                if (dayLabel) dayLabel.textContent = 'Trade Days';
+            }
+
+            banner.classList.add('active');
+        } catch (_) {
+            banner.classList.remove('active');
+        }
+        return;
+    }
+
+    // Legacy combine challenge banner
+    if (acctStatus !== 'COMBINE') {
         banner.classList.remove('active');
         return;
     }
@@ -2946,10 +3283,6 @@ function _showBadgeCelebration(badgeId) {
             <div class="badge-celeb-title">Badge Unlocked!</div>
             <div class="badge-celeb-name" style="color:${def.color}">${def.name}</div>
             <div class="badge-celeb-desc">${def.desc}</div>
-            <div class="share-bonus-callout">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-                <span>Share &amp; receive a <strong>$1,000</strong> thank you bonus!</span>
-            </div>
             <div class="badge-celeb-share-row">
                 <a href="${twitterUrl}" target="_blank" rel="noopener" class="badge-share-btn badge-share-x" title="Share on X" onclick="_creditShareBonus()">
                     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
@@ -3063,10 +3396,6 @@ function _showSharePrompt() {
             </div>
             <div class="share-prompt-title">Enjoying TeaTrade?</div>
             <div class="share-prompt-sub">Share with friends and help grow the community</div>
-            <div class="share-bonus-callout">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M21 12.22C21 6.73 16.74 3 12 3c-4.69 0-9 3.65-9 9.22 0 2.39 1.06 4.36 2.72 5.74L4 21l3.39-1.32c1.34.69 2.88 1.1 4.61 1.1 4.69 0 9-3.65 9-8.56z"/></svg>
-                <span>Share &amp; receive a <strong>$1,000</strong> thank you bonus!</span>
-            </div>
             ${statsBlock}
             <div class="share-prompt-share-row">
                 <a href="https://twitter.com/intent/tweet?text=${encodeURIComponent(defaultText)}&url=${encodeURIComponent(siteUrl)}" target="_blank" rel="noopener" class="badge-share-btn badge-share-x" title="Share on X" onclick="_creditShareBonus(); closeSharePrompt();">
@@ -3136,15 +3465,5 @@ function copyShareLink() {
 }
 
 async function _creditShareBonus() {
-    try {
-        const user = supabaseClient.auth.getUser ? (await supabaseClient.auth.getUser()).data.user : null;
-        if (!user) return;
-        const { data: credited } = await supabaseClient.rpc('credit_share_bonus', { p_user_id: user.id });
-        if (credited) {
-            showToast('$1,000 Bonus!', 'Thank you for sharing — $1,000 has been added to your balance');
-            if (typeof loadUserProfile === 'function') loadUserProfile();
-        }
-    } catch (e) {
-        console.error('Share bonus error:', e);
-    }
+    // Share bonus removed — placeholder kept so onclick handlers don't error
 }

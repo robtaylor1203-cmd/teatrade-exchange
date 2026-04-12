@@ -948,15 +948,6 @@ async function apiCreateCheckout(product) {
     return _invokeEdgeFunction('stripe-checkout', { product });
 }
 
-async function apiClaimFreeBailout() {
-    return supabaseClient.rpc('reset_account', {
-        p_user_id: state.currentUser?.id,
-        p_default_balance: 1000,
-        p_mode: state.tradingMode || 'VIRTUAL',
-        p_source: 'FREE_BAILOUT',
-    });
-}
-
 async function apiFetchActiveCombine() {
     return supabaseClient
         .from('combine_challenges')
@@ -970,6 +961,28 @@ async function apiFetchActiveCombine() {
 
 async function apiFetchCombineRules() {
     return supabaseClient.rpc('check_combine_rules', {
+        p_user_id: state.currentUser?.id,
+    });
+}
+
+// =============================================
+// FUNDED ACCOUNT / PROP TRADING
+// =============================================
+
+async function apiFetchFundedAccountStatus() {
+    return supabaseClient.rpc('get_funded_account_status', {
+        p_user_id: state.currentUser?.id,
+    });
+}
+
+async function apiRequestRewardPayout() {
+    return supabaseClient.rpc('request_reward_payout', {
+        p_user_id: state.currentUser?.id,
+    });
+}
+
+async function apiFetchLiquidationAudit() {
+    return supabaseClient.rpc('get_liquidation_audit', {
         p_user_id: state.currentUser?.id,
     });
 }

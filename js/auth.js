@@ -84,6 +84,14 @@ async function handleSignup(e) {
         return;
     }
 
+    // Validate terms acceptance
+    const termsCheckbox = document.getElementById('signup-terms-checkbox');
+    if (termsCheckbox && !termsCheckbox.checked) {
+        errorDiv.textContent = 'You must accept the Terms of Service and legal disclaimers to create an account.';
+        errorDiv.classList.add('visible');
+        return;
+    }
+
     // H4 FIX: Enforce strong password policy
     if (password.length < 8) {
         errorDiv.textContent = 'Password must be at least 8 characters';
@@ -246,9 +254,27 @@ async function loadUserProfile() {
         if (typeof checkAccountStatus === 'function') checkAccountStatus();
         if (typeof updateCombineBanner === 'function') updateCombineBanner();
         if (typeof syncKnownBadgesFromProfile === 'function') syncKnownBadgesFromProfile();
+
+        // Check for liquidated funded account — show mandatory modal
+        if (typeof checkFundedAccountLiquidation === 'function') checkFundedAccountLiquidation();
     } catch (error) {
         console.error('Profile load error:', error);
     }
+}
+
+/**
+ * Check if user has a recently liquidated funded account and show the modal.
+ */
+async function checkFundedAccountLiquidation() {
+    if (!state.currentUser) return;
+    try {
+        const { data } = await apiFetchFundedAccountStatus();
+        if (data?.has_account && data.account_status === 'liquidated' && data.liquidation_details) {
+            if (typeof showLiquidationModal === 'function') {
+                showLiquidationModal(data.liquidation_details);
+            }
+        }
+    } catch (_) { /* non-critical */ }
 }
 
 async function _syncLocalFollowsToDb() {

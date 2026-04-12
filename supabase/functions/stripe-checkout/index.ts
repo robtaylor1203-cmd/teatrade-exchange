@@ -27,6 +27,10 @@ const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' })
 const PRODUCTS: Record<string, { name: string; pence: number; mode: 'payment' | 'subscription'; recurring?: boolean }> = {
   ACCOUNT_RESET:    { name: 'TeaTrade Account Reset ($10,000)',   pence: 499,  mode: 'payment' },
   COMBINE_ENTRY:    { name: 'TeaTrade Combine Challenge ($50,000)', pence: 4900, mode: 'payment' },
+  EVAL_10K:         { name: 'TeaTrade Evaluation – £10,000 Simulated', pence: 4900, mode: 'payment' },
+  EVAL_25K:         { name: 'TeaTrade Evaluation – £25,000 Simulated', pence: 11900, mode: 'payment' },
+  EVAL_50K:         { name: 'TeaTrade Evaluation – £50,000 Simulated', pence: 19900, mode: 'payment' },
+  EVALUATION_ENTRY: { name: 'TeaTrade Evaluation Challenge ($10,000 Simulated)', pence: 4900, mode: 'payment' },
   PRO_SUBSCRIPTION: { name: 'TeaTrade PRO',                        pence: 1499, mode: 'subscription', recurring: true },
 }
 
@@ -78,7 +82,8 @@ serve(async (req) => {
     }
 
     // ── 2. PARSE REQUEST ───────────────────────────────────────────
-    const { product } = await req.json()
+    const body = await req.json()
+    const { product, initial_balance } = body
 
     const productConfig = PRODUCTS[product]
     if (!productConfig) {
@@ -124,9 +129,9 @@ serve(async (req) => {
       customer: customerId,
       mode: productConfig.mode,
       line_items: [lineItem],
-      metadata: { user_id: userId, product },
-      success_url: `${SITE_URL}?checkout=success&product=${product}`,
-      cancel_url: `${SITE_URL}?checkout=cancelled`,
+      metadata: { user_id: userId, product, ...(initial_balance ? { initial_balance: String(initial_balance) } : {}) },
+      success_url: `${SITE_URL}/terminal.html?checkout=success&product=${product}`,
+      cancel_url: `${SITE_URL}/terminal.html?checkout=cancelled`,
     }
 
     // For subscriptions, also store metadata on the subscription itself
