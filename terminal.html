@@ -118,6 +118,14 @@
         href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="styles.css?v=20260227a">
+    <script>
+    // Access gate: redirect to landing page if not granted
+    (function(){
+        var B='tealive26',K='tt_access_granted',p=new URLSearchParams(window.location.search);
+        if(p.get('access')===B){localStorage.setItem(K,'1');p.delete('access');var u=window.location.pathname;if(p.toString())u+='?'+p.toString();window.history.replaceState(null,'',u);}
+        if(localStorage.getItem(K)!=='1'){window.location.replace('/');}
+    })();
+    </script>
     <script defer src="https://browser.sentry-cdn.com/7.99.0/bundle.tracing.min.js" crossorigin="anonymous"></script>
     <script defer src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>

@@ -32,6 +32,14 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script defer src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script>
+    // Access gate: redirect to landing page if not granted
+    (function(){
+        var B='tealive26',K='tt_access_granted',p=new URLSearchParams(window.location.search);
+        if(p.get('access')===B){localStorage.setItem(K,'1');p.delete('access');var u=window.location.pathname;if(p.toString())u+='?'+p.toString();window.history.replaceState(null,'',u);}
+        if(localStorage.getItem(K)!=='1'){window.location.replace('/');}
+    })();
+    </script>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
