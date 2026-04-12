@@ -608,21 +608,25 @@ function handleCheckoutReturn() {
     const product = params.get('product');
     const tier = params.get('tier');
 
-    // Auto-trigger evaluation purchase if tier param present (from landing page pricing CTA)
+    // Auto-trigger evaluation purchase if tier param present (from login page / pricing CTA)
     if (tier && ['10K', '25K', '50K'].includes(tier)) {
         window.history.replaceState({}, '', window.location.pathname);
-        // Wait for auth to resolve, then trigger checkout
+        // Wait for auth + purchaseEvaluation to be available, then trigger checkout.
+        // The user should already be authenticated (login.html handles auth first).
+        // If not authed, redirect back to login page with the tier preserved.
         const waitForAuth = setInterval(() => {
-            if (typeof state !== 'undefined' && state.currentUser) {
+            if (typeof state === 'undefined') return; // config not ready yet
+            if (state.currentUser && typeof purchaseEvaluation === 'function') {
                 clearInterval(waitForAuth);
-                if (typeof purchaseEvaluation === 'function') purchaseEvaluation(tier);
-            } else if (typeof state !== 'undefined' && state.currentUser === null) {
+                purchaseEvaluation(tier);
+            } else if (state.currentUser === null) {
                 clearInterval(waitForAuth);
-                if (typeof openAuthModal === 'function') openAuthModal();
+                // Not logged in — send to login page with tier
+                window.location.href = 'login.html?tier=' + tier;
             }
-        }, 500);
-        // Timeout after 10s
-        setTimeout(() => clearInterval(waitForAuth), 10000);
+        }, 300);
+        // Timeout after 15s
+        setTimeout(() => clearInterval(waitForAuth), 15000);
         return;
     }
 

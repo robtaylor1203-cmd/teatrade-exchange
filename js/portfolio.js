@@ -2980,7 +2980,7 @@ async function requestPayout() {
 
 async function purchaseEvaluation(tier) {
     if (!state.currentUser) {
-        openAuthModal();
+        window.location.href = 'login.html' + (tier ? '?tier=' + tier : '');
         return;
     }
     // Map tier to Stripe product key and balance
@@ -2992,13 +2992,19 @@ async function purchaseEvaluation(tier) {
     const selected = tiers[tier] || tiers['10K'];
     // Redirect to Stripe checkout for evaluation entry
     try {
-        const { data, error } = await _invokeEdgeFunction('stripe-checkout', {
+        const result = await _invokeEdgeFunction('stripe-checkout', {
             product: selected.product,
             initial_balance: selected.balance,
         });
-        if (error) throw error;
-        if (data?.url) window.location.href = data.url;
+        if (result?.url) {
+            window.location.href = result.url;
+        } else {
+            const errMsg = result?.error || 'No checkout URL returned';
+            console.error('Checkout error:', errMsg, result);
+            showToast('Error', 'Failed to start checkout: ' + errMsg, true);
+        }
     } catch (err) {
+        console.error('Checkout exception:', err);
         showToast('Error', 'Failed to start checkout. Please try again.', true);
     }
 }
