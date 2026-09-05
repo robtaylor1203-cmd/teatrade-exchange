@@ -205,23 +205,24 @@ function updatePriceCache(symbol, newPrice, symbolType = 'tea') {
 async function initializePriceCache() {
     console.log('Initializing price cache from database...');
 
-    // Build the full symbol list (teas + indexes).
-    const jobs = [];
-    if (state.teas && state.teas.length > 0) {
-        state.teas.forEach(tea => jobs.push(() => getPriceHistory(tea.symbol, 'tea', '1D')));
-    }
-    getIndexSymbols().forEach(symbol => {
-        jobs.push(() => getPriceHistory(symbol, 'index', '1D'));
-    });
+    // DATABASE-FRIENDLY: only warm the chart the user is actually viewing.
+    // Previously this fetched history for every tea + index (~50 queries) on
+    // every page load, which drains the DB's I/O budget on a large
+    // price_history table. Other symbols now load on demand when opened, and
+    // sparklines fill in lazily as the user browses.
+    const mainSym = state.mainChartData?.symbol;
+    const mainType = state.mainChartData?.isIndex ? 'index' : 'tea';
 
-    // Run in small concurrency-limited batches so we don't fire 100+
-    // concurrent price_history queries and saturate the Supabase pooler
-    // (which surfaces as a burst of HTTP 500s on first load).
-    const BATCH = 6;
-    for (let i = 0; i < jobs.length; i += BATCH) {
-        await Promise.allSettled(jobs.slice(i, i + BATCH).map(fn => fn()));
+    const jobs = [];
+    if (mainSym) {
+        jobs.push(getPriceHistory(mainSym, mainType, '1D'));
+    } else {
+        // Fallback to the default landing chart (KENYA index).
+        jobs.push(getPriceHistory('KENYA', 'index', '1D'));
     }
-    console.log('Price cache initialized');
+
+    await Promise.allSettled(jobs);
+    console.log('Price cache initialized (lazy mode)');
 }
 
 // =============================================
