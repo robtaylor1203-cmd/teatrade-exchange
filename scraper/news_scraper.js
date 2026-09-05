@@ -13,9 +13,10 @@ if (!supabaseUrl || !supabaseKey) {
 }
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+// OpenAI is optional — without a key we fall back to rule-based sentiment.
+const openai = process.env.OPENAI_API_KEY
+    ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    : null;
 
 async function extractNewsWithLLM(title, snippet) {
     const prompt = `
@@ -41,6 +42,7 @@ ${snippet}
 `;
 
     try {
+        if (!openai) throw new Error('No OPENAI_API_KEY set');
         const response = await openai.chat.completions.create({
             model: "gpt-4o",
             messages: [{ role: "user", content: prompt }],
@@ -49,10 +51,10 @@ ${snippet}
         });
         return JSON.parse(response.choices[0].message.content);
     } catch (e) {
-        console.error("OpenAI processing failed:", e.message);
+        if (openai) console.error("OpenAI processing failed:", e.message);
 
-        // --- FALLBACK LOGIC IF QUOTA EXCEEDED ---
-        console.log("Using rule-based fallback logic instead of AI.");
+        // --- RULE-BASED FALLBACK (no key, or OpenAI unavailable) ---
+        console.log("Using rule-based sentiment logic.");
         const textToAnalyze = (title + " " + snippet).toLowerCase();
 
         let sentiment = "neutral";
