@@ -1,9 +1,18 @@
--- START MARKET TICKER CRON JOB
--- Please run this in your Supabase SQL Editor to restart the live ticker.
--- It ensures the background market-ticker edge function is invoked every 60 seconds
--- so that prices are "ticking and live" even when no users are trading manually.
+-- ============================================================
+-- START / RESTART THE LIVE MARKET TICKER  (fixes "Feed Offline")
+-- ============================================================
+-- Run this in the Supabase SQL Editor. It schedules the background
+-- market-ticker edge function to run every minute so prices stay live.
+--
+-- BEFORE RUNNING:
+--   1. Enable the "pg_cron" and "pg_net" extensions:
+--      Dashboard -> Database -> Extensions -> search each -> toggle ON.
+--   2. Replace  PASTE_YOUR_SERVICE_ROLE_KEY_HERE  below with your
+--      service_role key from  Dashboard -> Project Settings -> API.
+--      (Keep the word "Bearer " in front of it.)
+-- ============================================================
 
--- 1. Remove any old broken schedules for this ticker (safely)
+-- 1. Remove any old schedule (safe if none exists)
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'invoke-market-ticker') THEN
@@ -11,18 +20,21 @@ BEGIN
   END IF;
 END $$;
 
--- 2. Create the new schedule
+-- 2. Schedule it to run every minute
 SELECT cron.schedule(
   'invoke-market-ticker',
-  '* * * * *', -- Every minute
+  '* * * * *',
   $$
     SELECT net.http_post(
-      url:='https://uznxzyuknigzlxecjgtb.supabase.co/functions/v1/market-ticker',
-      headers:='{"Content-Type": "application/json", "Authorization": "Bearer YOUR_SERVICE_ROLE_KEY", "x-ticker-secret": "YOUR_TICKER_SECRET_IF_ANY"}',
-      body:='{}'
+      url    := 'https://uznxzyuknigzlxecjgtb.supabase.co/functions/v1/market-ticker',
+      headers:= jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer PASTE_YOUR_SERVICE_ROLE_KEY_HERE'
+      ),
+      body   := '{}'::jsonb
     );
   $$
 );
 
--- NOTE: Ensure you replace "YOUR_SERVICE_ROLE_KEY" with your actual Supabase service_role key
--- if the edge function requires authentication.
+-- 3. (Optional) Verify it was scheduled
+SELECT jobname, schedule, active FROM cron.job WHERE jobname = 'invoke-market-ticker';

@@ -2798,7 +2798,7 @@ function renderStoreTab() {
             </div>
             <div class="store-card-details">
                 <div class="store-detail-row"><span>Risk-Free Virtual Trading</span><span>Included</span></div>
-                <div class="store-detail-row"><span>Live Tea Auction Data</span><span>Included</span></div>
+                <div class="store-detail-row"><span>Live Tea Auction Data</span><span style="color:var(--accent-orange);">&#128274; Locked</span></div>
                 <div class="store-detail-row"><span>Forecasting Tutorials</span><span>Included</span></div>
                 <div class="store-detail-row"><span>Margin Calculation Modules</span><span>Included</span></div>
                 <div class="store-detail-row"><span>Virtual Portfolios</span><span>Up to &pound;100k</span></div>
