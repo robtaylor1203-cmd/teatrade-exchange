@@ -1585,13 +1585,10 @@
     const errorBox = document.getElementById('siteLockError');
 
     // 3. Check if they already unlocked it this session
-    if (sessionStorage.getItem('subdomainUnlocked') === 'true') {
-      overlay.style.display = 'none';
-      return; // Stop the script, let them view the site
-    } else {
-      // Lock scrolling so they can't scroll the page behind the lock
-      document.body.style.overflow = 'hidden';
-    }
+    // Site lock DISABLED — the platform is now public.
+    if (overlay) overlay.remove();
+    document.body.style.overflow = '';
+    return;
 
     // 4. Handle Password Submission
     form.addEventListener('submit', function(e) {
