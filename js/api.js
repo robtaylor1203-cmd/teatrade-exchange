@@ -194,9 +194,16 @@ async function apiFetchTradeById(tradeId) {
 async function apiFetchPriceHistory(symbol, limit, since) {
     if (since && supabaseClient.from) {
         try {
+            // Cap the lookback so a very large price_history table can't be forced
+            // into a multi-year deep scan (which statement-times-out → HTTP 500)
+            // when the (symbol,is_simulated,recorded_at) perf index isn't present.
+            const _floor = new Date(Date.now() - 400 * 86400000).toISOString();
+            const scanSince = since > _floor ? since : _floor;
+            const rowCap = Math.min(limit || 2000, 2000);
+
             // Optimized 2-segment fetch to avoid slamming the connection pool on load.
             // 1) Simulated history (1 row/day)
-            // 2) Live engine history (max 3000 rows requested, capped automatically by PostgREST to 1000)
+            // 2) Live engine history
             // By sorting descending and reversing, we ensure the most recent data is caught.
             const [histResult, liveResult] = await Promise.all([
                 supabaseClient
@@ -204,17 +211,17 @@ async function apiFetchPriceHistory(symbol, limit, since) {
                     .select('price, recorded_at, volume')
                     .eq('symbol', symbol)
                     .eq('is_simulated', true)
-                    .gte('recorded_at', since)
+                    .gte('recorded_at', scanSince)
                     .order('recorded_at', { ascending: false })
-                    .limit(limit || 5000),
+                    .limit(rowCap),
                 supabaseClient
                     .from('price_history')
                     .select('price, recorded_at, volume')
                     .eq('symbol', symbol)
                     .eq('is_simulated', false)
-                    .gte('recorded_at', since)
+                    .gte('recorded_at', scanSince)
                     .order('recorded_at', { ascending: false })
-                    .limit(limit || 5000)
+                    .limit(rowCap)
             ]);
 
             if (!histResult.error || !liveResult.error) {
