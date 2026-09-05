@@ -204,8 +204,10 @@ function _initTvChartIfNull() {
 
     // Sync crosshairs between charts
     tvChart.subscribeCrosshairMove(param => {
-        if (!param.time || !rsiChart) return;
-        rsiChart.setCrosshairPosition(param.price, param.time, rsiSeries);
+        if (!rsiChart || !rsiSeries || !param.time || !param.point) return;
+        // v4 crosshair param has no `.price`; position the RSI time-line at a
+        // valid mid value so the vertical crosshair syncs without throwing.
+        try { rsiChart.setCrosshairPosition(50, param.time, rsiSeries); } catch (_) { }
     });
 }
 

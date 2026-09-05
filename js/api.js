@@ -248,6 +248,14 @@ async function apiFetchPriceHistory(symbol, limit, since) {
     return result;
 }
 
+async function apiFetchNews(limit = 12) {
+    return supabaseClient
+        .from('news')
+        .select('title, snippet, sentiment, tags, published_at, url')
+        .order('published_at', { ascending: false })
+        .limit(limit);
+}
+
 // M10 FIX: apiUpsertPriceHistory() REMOVED (dead code, C5 blocks client inserts anyway).
 
 // =============================================
@@ -975,11 +983,8 @@ async function apiFetchFundedAccountStatus() {
     });
 }
 
-async function apiRequestRewardPayout() {
-    return supabaseClient.rpc('request_reward_payout', {
-        p_user_id: state.currentUser?.id,
-    });
-}
+// Reward-payout API removed — TeaTrade is a risk-free educational platform
+// with no real-money withdrawals.
 
 async function apiFetchLiquidationAudit() {
     return supabaseClient.rpc('get_liquidation_audit', {

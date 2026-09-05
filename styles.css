@@ -17991,3 +17991,307 @@ a.user-dropdown-item {
         gap: 10px;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   LEARN TAB — Margin Calculator & Forecasting Tutorials
+   ═══════════════════════════════════════════════════════════════ */
+
+.learn-card {
+    background: var(--bg-elevated, #12161f);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 16px;
+}
+
+.learn-card-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.learn-card-icon {
+    font-size: 26px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.learn-card-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.learn-card-sub {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+    line-height: 1.4;
+}
+
+.learn-live-tag {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--accent-green);
+    background: rgba(16,185,129,0.12);
+    border: 1px solid rgba(16,185,129,0.25);
+    padding: 3px 8px;
+    border-radius: 20px;
+    flex-shrink: 0;
+}
+
+.learn-live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    animation: learnPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes learnPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.35; transform: scale(0.75); }
+}
+
+.learn-card-legal {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin: 14px 0 0;
+    line-height: 1.5;
+}
+
+/* ── Calculator layout ── */
+.mc-body {
+    display: grid;
+    grid-template-columns: minmax(0, 300px) 1fr;
+    gap: 18px;
+    align-items: start;
+}
+
+.mc-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.mc-field { display: flex; flex-direction: column; gap: 6px; }
+.mc-field--wide { grid-column: 1 / -1; }
+
+.mc-field label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.mc-input {
+    width: 100%;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 9px 10px;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.mc-input:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+}
+select.mc-input { font-family: inherit; cursor: pointer; }
+
+.mc-mini-btn, .mc-lev-max {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--accent-blue);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+}
+.mc-lev-max { color: var(--text-muted); cursor: default; }
+
+.mc-dir {
+    display: flex;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 3px;
+}
+.mc-dir-btn {
+    flex: 1;
+    padding: 7px 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.mc-dir-btn.active[data-dir="LONG"] { background: rgba(16,185,129,0.9); color: #041; }
+.mc-dir-btn.active[data-dir="SHORT"] { background: rgba(239,68,68,0.9); color: #fff; }
+
+.mc-lev-val {
+    color: var(--accent-orange, #f59e0b);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+}
+
+.mc-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-orange, #f59e0b));
+    outline: none;
+    cursor: pointer;
+}
+.mc-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    border: 3px solid var(--accent-blue);
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+.mc-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    border: 3px solid var(--accent-blue);
+    cursor: pointer;
+}
+
+/* ── Calculator results ── */
+.mc-results {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.mc-res {
+    background: rgba(0,0,0,0.22);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 12px;
+}
+.mc-res--primary {
+    background: rgba(59,130,246,0.1);
+    border-color: rgba(59,130,246,0.3);
+    grid-column: 1 / -1;
+}
+.mc-res--warn {
+    background: rgba(239,68,68,0.07);
+    border-color: rgba(239,68,68,0.2);
+}
+
+.mc-res-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+}
+.mc-res-val {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.1;
+}
+.mc-res--primary .mc-res-val { font-size: 24px; color: var(--accent-blue); }
+.mc-res-val.pos { color: var(--accent-green); }
+.mc-res-val.neg { color: var(--accent-red); }
+.mc-res-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+.mc-res-sub.pos { color: var(--accent-green); }
+.mc-res-sub.neg { color: var(--accent-red); }
+
+/* ── Forecasting lessons (accordion) ── */
+.lesson-list { display: flex; flex-direction: column; gap: 8px; }
+
+.lesson {
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    overflow: hidden;
+    background: rgba(0,0,0,0.15);
+}
+.lesson-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 13px 14px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-primary);
+    text-align: left;
+}
+.lesson-icon { font-size: 18px; flex-shrink: 0; }
+.lesson-title { font-size: 14px; font-weight: 600; flex: 1; }
+.lesson-chevron {
+    font-size: 20px;
+    color: var(--text-muted);
+    transition: transform 0.2s ease;
+}
+.lesson.open .lesson-chevron { transform: rotate(90deg); }
+
+.lesson-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.28s ease, padding 0.28s ease;
+    padding: 0 14px;
+}
+.lesson.open .lesson-body { max-height: 320px; padding: 0 14px 14px; }
+.lesson-body p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+.learn-note {
+    background: rgba(234,179,8,0.08);
+    border: 1px solid rgba(234,179,8,0.22);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+.learn-note strong { display: block; color: var(--text-primary); margin-bottom: 4px; font-size: 13px; }
+
+@media (max-width: 780px) {
+    .mc-body { grid-template-columns: 1fr; }
+    .mc-results { grid-template-columns: 1fr 1fr; }
+    .mc-res--primary { grid-column: 1 / -1; }
+}
+@media (max-width: 440px) {
+    .mc-inputs { grid-template-columns: 1fr; }
+    .mc-field--wide { grid-column: auto; }
+}

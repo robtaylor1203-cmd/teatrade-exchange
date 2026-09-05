@@ -25,13 +25,8 @@ const corsHeaders = {
 const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' })
 
 const PRODUCTS: Record<string, { name: string; pence: number; mode: 'payment' | 'subscription'; recurring?: boolean }> = {
-  ACCOUNT_RESET:    { name: 'TeaTrade Account Reset ($10,000)',   pence: 499,  mode: 'payment' },
-  COMBINE_ENTRY:    { name: 'TeaTrade Combine Challenge ($50,000)', pence: 4900, mode: 'payment' },
-  EVAL_10K:         { name: 'TeaTrade Evaluation – £10,000 Simulated', pence: 4900, mode: 'payment' },
-  EVAL_25K:         { name: 'TeaTrade Evaluation – £25,000 Simulated', pence: 11900, mode: 'payment' },
-  EVAL_50K:         { name: 'TeaTrade Evaluation – £50,000 Simulated', pence: 19900, mode: 'payment' },
-  EVALUATION_ENTRY: { name: 'TeaTrade Evaluation Challenge ($10,000 Simulated)', pence: 4900, mode: 'payment' },
-  PRO_SUBSCRIPTION: { name: 'TeaTrade PRO',                        pence: 1499, mode: 'subscription', recurring: true },
+  ACCOUNT_RESET:    { name: 'TeaTrade Account Reset (Virtual Balance)',   pence: 499,  mode: 'payment' },
+  PRO_SUBSCRIPTION: { name: 'TeaTrade Membership',                 pence: 3000, mode: 'subscription', recurring: true },
 }
 
 function decodeJWTPayload(token: string): Record<string, unknown> | null {

@@ -6,14 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
     <title>TeaTrade Exchange | Sign In</title>
-    <meta name="description" content="Sign in or create your TeaTrade Exchange account to start your funded tea trading evaluation challenge.">
+    <meta name="description" content="Sign in or create your TeaTrade Exchange account to learn the global tea markets risk-free.">
     <link rel="canonical" href="https://exchange.teatrade.co.uk/login.html" />
 
     <!-- Open Graph (for social sharing even though noindex) -->
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="TeaTrade Exchange">
     <meta property="og:title" content="TeaTrade Exchange | Sign In">
-    <meta property="og:description" content="Sign in to your TeaTrade Exchange account. Start your funded tea trading evaluation challenge.">
+    <meta property="og:description" content="Sign in to your TeaTrade Exchange account. Learn the global tea markets risk-free.">
     <meta property="og:url" content="https://exchange.teatrade.co.uk/login.html">
     <meta property="og:image" content="https://exchange.teatrade.co.uk/images/preview.png">
     <meta property="og:image:width" content="1024">
@@ -24,7 +24,7 @@
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="TeaTrade Exchange | Sign In">
-    <meta name="twitter:description" content="Sign in and start your funded tea trading evaluation challenge.">
+    <meta name="twitter:description" content="Sign in and learn the global tea markets risk-free.">
     <meta name="twitter:image" content="https://exchange.teatrade.co.uk/images/preview.png">
 
     <link rel="icon" type="image/png" href="images/favicon-nb.png">
@@ -32,14 +32,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script defer src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script>
-    // Access gate: redirect to landing page if not granted
-    (function(){
-        var B='tealive26',K='tt_access_granted',p=new URLSearchParams(window.location.search);
-        if(p.get('access')===B){localStorage.setItem(K,'1');p.delete('access');var u=window.location.pathname;if(p.toString())u+='?'+p.toString();window.history.replaceState(null,'',u);}
-        if(localStorage.getItem(K)!=='1'){window.location.replace('/');}
-    })();
-    </script>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -595,7 +587,7 @@
             <div class="badge-icon">&#9883;</div>
             <div>
                 <div class="login-tier-amount" id="tier-amount"></div>
-                <div class="login-tier-label">Simulated Evaluation Account &mdash; sign in to continue</div>
+                <div class="login-tier-label">Risk-Free Virtual Portfolio &mdash; sign in to continue</div>
             </div>
         </div>
 
@@ -607,7 +599,7 @@
             <div class="login-promo">
                 <span class="login-promo-badge">New</span>
                 <div>
-                    <div class="login-promo-text">Commodity Prop Trading</div>
+                    <div class="login-promo-text">Risk-Free Virtual Trading</div>
                     <div class="login-promo-sub">Sign up to get started</div>
                 </div>
                 <button class="login-promo-close" onclick="this.parentElement.style.display='none'">&times;</button>
@@ -634,10 +626,10 @@
                         <span>I confirm that I have read and agree to the <a href="/terms.html" target="_blank" rel="noopener">Terms of Service</a> and acknowledge the following:</span>
                     </label>
                     <div class="login-terms-text">
-                        <p><strong>Regulatory Status:</strong> TeaTrade Ltd is a software and data evaluation company, not a financial institution or broker. We do not accept client deposits, hold client funds for investment, or execute trades in the live financial markets. Because TeaTrade does not carry out regulated activities, it is not authorized or regulated by the Financial Conduct Authority (FCA).</p>
-                        <p><strong>Simulated Environment:</strong> All trading activities on the TeaTrade Exchange are conducted exclusively with simulated capital in a simulated environment based on live market data. Users do not risk or trade real market liquidity.</p>
-                        <p><strong>Nature of Fees:</strong> Any fees paid to TeaTrade are strictly for access to our educational software, proprietary data, and evaluation challenges. They are software subscription fees, not financial deposits, and are non-refundable once the evaluation has been actively used.</p>
-                        <p><strong>Performance Rewards:</strong> Any monetary payouts distributed by TeaTrade are independent contractor performance rewards, paid in exchange for generating successful simulated trading data. They are not withdrawals of financial market profits.</p>
+                        <p><strong>Regulatory Status:</strong> TeaTrade Ltd is an educational software and data company, not a financial institution or broker. We do not accept client deposits, hold client funds for investment, or execute trades in the live financial markets. Because TeaTrade does not carry out regulated activities, it is not authorized or regulated by the Financial Conduct Authority (FCA).</p>
+                        <p><strong>Simulated Environment:</strong> All trading activities on the TeaTrade Exchange are conducted exclusively with virtual portfolios in a simulated environment based on live market data. Users do not risk or trade real market liquidity.</p>
+                        <p><strong>Nature of Fees:</strong> The &pound;30/month membership is strictly for access to our educational software, proprietary data, and learning content. It is a software subscription fee, not a financial deposit.</p>
+                        <p><strong>No Payouts:</strong> TeaTrade is a purely educational platform. There are no real-money withdrawals, performance rewards, or profit splits of any kind &mdash; all balances are virtual and cannot be exchanged for real currency.</p>
                     </div>
                 </div>
                 <button type="submit" class="login-submit" id="signup-btn">Create Account</button>
@@ -652,7 +644,7 @@
             <div class="login-promo" id="login-promo">
                 <span class="login-promo-badge">New</span>
                 <div>
-                    <div class="login-promo-text">Commodity Prop Trading</div>
+                    <div class="login-promo-text">Risk-Free Virtual Trading</div>
                     <div class="login-promo-sub">Log in to get started</div>
                 </div>
                 <button class="login-promo-close" onclick="this.parentElement.style.display='none'">&times;</button>
@@ -766,6 +758,7 @@
 
         // ── State ──
         let pendingTier = null;
+        let pendingPlan = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
             // Wait for Supabase SDK to load
@@ -780,10 +773,15 @@
 
             supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-            // Parse tier from URL
+            // Parse tier/plan from URL
             const params = new URLSearchParams(window.location.search);
             const tier = params.get('tier');
-            if (tier && ['10K', '25K', '50K'].includes(tier)) {
+            const plan = params.get('plan');
+            if (plan === 'membership') {
+                pendingPlan = 'membership';
+                window.history.replaceState({}, '', window.location.pathname);
+                showTierBadge('MEMBERSHIP');
+            } else if (tier && ['10K', '25K', '50K'].includes(tier)) {
                 pendingTier = tier;
                 window.history.replaceState({}, '', window.location.pathname);
                 showTierBadge(tier);
@@ -803,7 +801,7 @@
         });
 
         function showTierBadge(tier) {
-            const amounts = { '10K': '£10,000', '25K': '£25,000', '50K': '£50,000' };
+            const amounts = { '10K': '£10,000', '25K': '£25,000', '50K': '£50,000', 'MEMBERSHIP': 'TeaTrade Membership' };
             const badge = document.getElementById('tier-badge');
             document.getElementById('tier-amount').textContent = amounts[tier] || tier;
             badge.classList.add('visible');
@@ -820,9 +818,11 @@
         }
 
         function redirectToTerminal() {
-            const url = pendingTier
-                ? `terminal.html?tier=${pendingTier}`
-                : 'terminal.html';
+            const url = pendingPlan
+                ? 'terminal.html?plan=membership'
+                : pendingTier
+                    ? `terminal.html?tier=${pendingTier}`
+                    : 'terminal.html';
             window.location.href = url;
         }
 

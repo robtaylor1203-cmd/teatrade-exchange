@@ -377,7 +377,7 @@ function populateTeaSelect() {
     }
 
     // Ensure selects display the current chart focus on first load/re-build
-    if (valToSelect && select) { // fallback check if we don't have current value
+    if (valToSelect) { // fallback check if we don't have current value
         selects.forEach(sel => {
             if (sel.querySelector(`option[value="${valToSelect}"]`)) {
                 sel.value = valToSelect;
@@ -871,6 +871,69 @@ function _flashMacroPrice(el, direction) {
     void el.offsetWidth; // force reflow to restart animation
     el.classList.add(direction > 0 ? 'macro-flash-up' : 'macro-flash-down');
     setTimeout(() => el.classList.remove('macro-flash-up', 'macro-flash-down'), 700);
+}
+
+// =============================================
+// LIVE MARKET NEWS (terminal right-panel feed)
+// =============================================
+
+// Map an article's tags/title to a coloured origin/sentiment chip.
+const _NEWS_REGION_TAGS = {
+    kenya: 'KENYA', mombasa: 'KENYA', rift: 'KENYA',
+    india: 'INDIA', assam: 'INDIA', darjeeling: 'INDIA', kolkata: 'INDIA',
+    'sri lanka': 'SRI LANKA', ceylon: 'SRI LANKA', colombo: 'SRI LANKA',
+    china: 'CHINA', yunnan: 'CHINA',
+    indonesia: 'INDONESIA', jakarta: 'INDONESIA',
+    bangladesh: 'BANGLADESH', malawi: 'MALAWI', rwanda: 'RWANDA',
+};
+
+function _newsRelativeTime(iso) {
+    if (!iso) return '';
+    const then = new Date(iso).getTime();
+    if (isNaN(then)) return '';
+    const mins = Math.max(0, Math.floor((Date.now() - then) / 60000));
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + 'h ago';
+    const days = Math.floor(hrs / 24);
+    return days + 'd ago';
+}
+
+function _newsChip(item) {
+    const hay = ((item.title || '') + ' ' + (Array.isArray(item.tags) ? item.tags.join(' ') : '')).toLowerCase();
+    let region = null;
+    for (const key in _NEWS_REGION_TAGS) {
+        if (hay.includes(key)) { region = _NEWS_REGION_TAGS[key]; break; }
+    }
+    const sentiment = (item.sentiment || 'neutral').toLowerCase();
+    const bg = sentiment === 'bullish' ? 'var(--accent-green)'
+        : sentiment === 'bearish' ? 'var(--accent-red)'
+            : 'var(--accent-blue)';
+    const label = region || (sentiment === 'bullish' ? 'BULLISH' : sentiment === 'bearish' ? 'BEARISH' : 'MARKET');
+    return `<span class="news-tag" style="background:${bg};">${escapeHtml(label)}</span>`;
+}
+
+async function loadTerminalNews() {
+    const container = document.getElementById('terminal-news-feed');
+    if (!container || typeof apiFetchNews !== 'function') return;
+    try {
+        const { data, error } = await apiFetchNews(12);
+        if (error || !Array.isArray(data) || data.length === 0) return; // keep existing content
+        container.innerHTML = data.map(item => {
+            const title = escapeHtml(item.title || '');
+            const link = item.url
+                ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none;">${title}</a>`
+                : title;
+            return `
+                <div class="news-item">
+                    <div class="news-time">${_newsRelativeTime(item.published_at)}</div>
+                    <div class="news-headline">${_newsChip(item)}${link}</div>
+                </div>`;
+        }).join('');
+    } catch (_) {
+        // Network hiccup — leave the current feed in place.
+    }
 }
 
 function updateMacroIndicators() {

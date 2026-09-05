@@ -5,6 +5,7 @@
   "main": "scraper.js",
   "scripts": {
     "start": "node scraper.js",
+    "news": "node news_scraper.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {

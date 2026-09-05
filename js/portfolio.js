@@ -1975,14 +1975,14 @@ function switchPortfolioModalTab(tab) {
     if (badgesTab) badgesTab.style.display = tab === 'badges' ? 'block' : 'none';
     const storeTab = document.getElementById('portfolio-tab-store');
     if (storeTab) storeTab.style.display = tab === 'store' ? 'block' : 'none';
-    const payoutsTab = document.getElementById('portfolio-tab-payouts');
-    if (payoutsTab) payoutsTab.style.display = tab === 'payouts' ? 'block' : 'none';
+    const learnTab = document.getElementById('portfolio-tab-learn');
+    if (learnTab) learnTab.style.display = tab === 'learn' ? 'block' : 'none';
     if (tab === 'financial') renderFinancialTab();
     if (tab === 'history') renderHistoryTab();
     if (tab === 'social') renderPortfolioModal();
     if (tab === 'badges') renderBadgesTab();
     if (tab === 'store') renderStoreTab();
-    if (tab === 'payouts') renderPayoutsTab();
+    if (tab === 'learn') renderLearnTab();
 }
 
 function renderFinancialTab() {
@@ -2788,69 +2788,251 @@ function renderStoreTab() {
     const isFunded = acctStatus === 'FUNDED';
 
     panel.innerHTML = `
-        <div class="funded-account-card store-card">
-            <span class="store-card-icon">${isFunded ? '&#127942;' : '&#9876;&#65039;'}</span>
-            <div class="store-card-title">${isFunded ? 'Funded Simulated Account' : inEval ? 'Evaluation In Progress' : 'Trading Evaluation Challenge'}</div>
+        <div class="pro-upgrade-card store-card">
+            <span class="store-card-icon">&#11088;</span>
+            <div class="store-card-title">${isPro ? 'TeaTrade Membership (Active)' : 'TeaTrade Membership'}</div>
             <div class="store-card-desc">
-                ${isFunded
-            ? 'You passed the evaluation! Trade with simulated capital and claim 80% performance rewards every 14 days.'
-            : inEval
-                ? 'Your evaluation is active. Meet the 8% profit target with 5+ trading days and consistent performance to earn a funded simulated account.'
-                : 'Purchase an evaluation challenge. Prove your trading skill with simulated capital. Pass the evaluation to earn a funded simulated account with 80/20 performance reward splits.'}
+                ${isPro
+            ? 'Your membership is active. Enjoy full access to risk-free virtual trading, every virtual portfolio, forecasting tutorials, and margin calculation modules.'
+            : 'Unlock the full educational terminal for &pound;30/month: risk-free virtual margin trading, live tea auction data, forecasting tutorials, and all virtual portfolios up to &pound;100k.'}
             </div>
             <div class="store-card-details">
-                <div class="store-detail-row"><span>Max Daily Loss</span><span>5% of starting equity</span></div>
-                <div class="store-detail-row"><span>Max Total Loss</span><span>10% of initial balance</span></div>
-                <div class="store-detail-row"><span>Profit Target (Eval)</span><span>8%</span></div>
-                <div class="store-detail-row"><span>Min Trading Days</span><span>5 days</span></div>
-                <div class="store-detail-row"><span>Consistency Rule</span><span>No single day &gt; 50% of profit</span></div>
-                <div class="store-detail-row"><span>Max Leverage</span><span>1:30</span></div>
-                <div class="store-detail-row"><span>Performance Reward</span><span>80% trader / 20% platform</span></div>
-                <div class="store-detail-row"><span>Reward Cycle</span><span>Every 14 days</span></div>
+                <div class="store-detail-row"><span>Risk-Free Virtual Trading</span><span>Included</span></div>
+                <div class="store-detail-row"><span>Live Tea Auction Data</span><span>Included</span></div>
+                <div class="store-detail-row"><span>Forecasting Tutorials</span><span>Included</span></div>
+                <div class="store-detail-row"><span>Margin Calculation Modules</span><span>Included</span></div>
+                <div class="store-detail-row"><span>Virtual Portfolios</span><span>Up to &pound;100k</span></div>
             </div>
-            <button class="store-card-btn" onclick="purchaseEvaluation()" ${(inEval || isFunded) ? 'disabled' : ''}>
-                ${isFunded ? 'Account Active' : inEval ? 'Evaluation In Progress' : 'Purchase Evaluation Challenge'}
+            <button class="store-card-btn" onclick="purchaseProSubscription()" ${isPro ? 'disabled' : ''}>
+                ${isPro ? 'Membership Active' : 'Join &mdash; &pound;30/mo'}
             </button>
-            <p class="store-card-legal">All trading is conducted with simulated capital. Challenge fees are non-refundable software subscription fees.</p>
+            <p class="store-card-legal">A software subscription fee for educational access only. No real-money trading, deposits, or payouts of any kind.</p>
         </div>
-
-        ${isFunded ? `
-        <div class="payout-card store-card">
-            <span class="store-card-icon">&#128176;</span>
-            <div class="store-card-title">Claim Performance Reward</div>
-            <div class="store-card-desc">
-                Request your 80% performance reward. You must have a flat book (no open positions), be profitable, have 5+ trading days, and meet the consistency rule.
-            </div>
-            <button class="store-card-btn" onclick="requestPayout()">Claim Performance Reward</button>
-            <p class="store-card-legal">Performance rewards are independent contractor payments for generating successful simulated trading data, not withdrawals of financial market profits.</p>
-        </div>
-        ` : ''}
 
         <div id="funded-dashboard-panel"></div>
 
-        <div class="pro-upgrade-card store-card">
-            <span class="store-card-icon">&#11088;</span>
-            <div class="store-card-title">${isPro ? 'TeaTrade PRO (Active)' : 'TeaTrade PRO'}</div>
-            <div class="store-card-desc">
-                ${isPro
-            ? 'You have PRO access. Copy the Top 5 traders, auto-copy mode, premium indicators, and gold chat badge.'
-            : 'Follow and auto-copy the Top 5 leaderboard traders. Premium chart indicators and a gold username in chat.'}
-            </div>
-            <button class="store-card-btn" onclick="purchaseProSubscription()" ${isPro ? 'disabled' : ''}>
-                ${isPro ? 'Already PRO' : 'Upgrade to PRO &mdash; &pound;14.99/mo'}
-            </button>
-        </div>
-
         <div class="simulated-env-notice">
-            <strong>&#9888;&#65039; Simulated Trading Environment</strong><br>
-            All trading on TeaTrade Exchange is conducted with simulated capital. No real money is traded or at risk.
+            <strong>&#9888;&#65039; Risk-Free Educational Environment</strong><br>
+            All trading on TeaTrade Exchange uses virtual portfolios with simulated balances. No real money is traded, deposited, withdrawn, or at risk.
         </div>
     `;
 
-    // Load funded account dashboard if applicable
-    if (inEval || isFunded) {
-        loadFundedDashboard();
+    // Load educational milestone dashboard
+    loadFundedDashboard();
+}
+
+// =============================================
+// LEARN TAB (Educational Modules)
+// =============================================
+
+function renderLearnTab() {
+    const panel = document.getElementById('learn-panel');
+    if (!panel) return;
+
+    const teas = (state.teas || []).slice().sort((a, b) => (a.symbol || '').localeCompare(b.symbol || ''));
+    const teaOptions = teas.length
+        ? teas.map(t => `<option value="${t.id}">${escapeHtml(t.symbol)} — ${escapeHtml(t.name || t.symbol)}</option>`).join('')
+        : '<option value="">Loading live markets…</option>';
+    const maxLev = typeof getMaxLeverage === 'function' ? getMaxLeverage() : 25;
+
+    panel.innerHTML = `
+        <!-- ── MARGIN CALCULATOR ────────────────────────────── -->
+        <div class="learn-card mc-card">
+            <div class="learn-card-head">
+                <span class="learn-card-icon">&#128200;</span>
+                <div>
+                    <div class="learn-card-title">Margin Calculator</div>
+                    <div class="learn-card-sub">See exactly how leverage, margin and P&amp;L interact — with live tea prices.</div>
+                </div>
+                <span class="learn-live-tag"><span class="learn-live-dot"></span>LIVE</span>
+            </div>
+
+            <div class="mc-body">
+                <div class="mc-inputs">
+                    <div class="mc-field">
+                        <label for="mc-instrument">Instrument</label>
+                        <select id="mc-instrument" class="mc-input" onchange="mcLoadLivePrice()">${teaOptions}</select>
+                    </div>
+
+                    <div class="mc-field">
+                        <label>Direction</label>
+                        <div class="mc-dir" id="mc-dir">
+                            <button type="button" class="mc-dir-btn active" data-dir="LONG" onclick="mcSetDirection('LONG')">Long</button>
+                            <button type="button" class="mc-dir-btn" data-dir="SHORT" onclick="mcSetDirection('SHORT')">Short</button>
+                        </div>
+                    </div>
+
+                    <div class="mc-field">
+                        <label for="mc-entry">Entry Price ($) <button type="button" class="mc-mini-btn" onclick="mcLoadLivePrice()" title="Pull live price">&#8635; live</button></label>
+                        <input type="number" id="mc-entry" class="mc-input" step="0.01" min="0" oninput="mcRecalc()">
+                    </div>
+
+                    <div class="mc-field">
+                        <label for="mc-qty">Quantity (lots)</label>
+                        <input type="number" id="mc-qty" class="mc-input" step="1" min="0" value="100" oninput="mcRecalc()">
+                    </div>
+
+                    <div class="mc-field mc-field--wide">
+                        <label for="mc-lev">Leverage <span id="mc-lev-val" class="mc-lev-val">10x</span> <span class="mc-lev-max">(max ${maxLev}x)</span></label>
+                        <input type="range" id="mc-lev" class="mc-slider" min="1" max="${maxLev}" step="1" value="10" oninput="mcRecalc()">
+                    </div>
+
+                    <div class="mc-field mc-field--wide">
+                        <label for="mc-target">Target / Exit Price ($)</label>
+                        <input type="number" id="mc-target" class="mc-input" step="0.01" min="0" oninput="mcRecalc()">
+                    </div>
+                </div>
+
+                <div class="mc-results" id="mc-results"></div>
+            </div>
+            <p class="learn-card-legal">Educational tool only. Uses the platform's real formula (margin = position value &divide; leverage) with virtual prices. No real capital is involved.</p>
+        </div>
+
+        <!-- ── FORECASTING TUTORIALS ────────────────────────── -->
+        <div class="learn-card">
+            <div class="learn-card-head">
+                <span class="learn-card-icon">&#128218;</span>
+                <div>
+                    <div class="learn-card-title">Forecasting Tutorials</div>
+                    <div class="learn-card-sub">Read the global tea supply chain and anticipate price moves.</div>
+                </div>
+            </div>
+            <div class="lesson-list">
+                ${_learnLesson('&#127807;', 'Seasonality & Flush Cycles',
+                    'Tea prices move with the harvest calendar. Kenyan volumes peak after the long rains (Apr–Jun) and short rains (Oct–Dec); Assam runs a First Flush (Mar–May) and a heavier Second Flush (Jun–Aug); Darjeeling’s prized First Flush commands a premium. <strong>Rule of thumb:</strong> abundant flush = supply pressure = softer prices, while a delayed or weak flush tightens supply and lifts them.')}
+                ${_learnLesson('&#127783;', 'Weather Signals',
+                    'Rainfall and temperature drive yield weeks before it shows in auction lots. Drought in the Rift Valley or excessive rain in Sri Lanka reduces pluckable leaf and quality. Watch the platform’s Weather panel and currency/oil macro tiles: a KES or LKR move re-prices exports for global buyers almost instantly.')}
+                ${_learnLesson('&#127974;', 'Auction Dynamics',
+                    'Mombasa, Kolkata and Colombo auctions set the reference prices you trade. Higher lot withdrawal rates and rising “best” bids signal strength; heavy carry-over (unsold lots) signals weakness. Grade matters — BP1/PF1 (broken/fannings) trade differently from orthodox whole-leaf.')}
+                ${_learnLesson('&#128202;', 'Index vs. Origin Behaviour',
+                    'A regional index (e.g. Africa or Global Futures) smooths out single-origin noise, so it trends more slowly and is lower-volatility than an individual origin like KENYA-PF1. Use origins for sharp directional plays and indices for steadier, lower-margin positions.')}
+                ${_learnLesson('&#128737;', 'Risk Discipline',
+                    'Consistency beats hero trades. Keep per-trade risk small, respect the 5% daily and 10% total drawdown milestones, and avoid concentrating gains in a single session (the consistency milestone rewards spreading results across days). Size positions with the calculator above <em>before</em> you click trade.')}
+            </div>
+        </div>
+
+        <div class="learn-note">
+            <strong>&#127891; Keep Learning</strong>
+            Complete Educational Milestones in the Store tab to unlock larger virtual portfolios — from &pound;10k up to &pound;100k in simulated capital.
+        </div>
+    `;
+
+    mcLoadLivePrice();
+}
+
+function _learnLesson(icon, title, body) {
+    return `
+        <div class="lesson">
+            <button type="button" class="lesson-head" onclick="this.parentElement.classList.toggle('open')">
+                <span class="lesson-icon">${icon}</span>
+                <span class="lesson-title">${title}</span>
+                <span class="lesson-chevron">&#8250;</span>
+            </button>
+            <div class="lesson-body"><p>${body}</p></div>
+        </div>`;
+}
+
+// ── Margin calculator state + logic ──────────────────────────
+let _mcDirection = 'LONG';
+
+function mcSetDirection(dir) {
+    _mcDirection = dir;
+    document.querySelectorAll('#mc-dir .mc-dir-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.dir === dir);
+    });
+    mcRecalc();
+}
+
+function mcLoadLivePrice() {
+    const sel = document.getElementById('mc-instrument');
+    const entry = document.getElementById('mc-entry');
+    const target = document.getElementById('mc-target');
+    if (!sel || !entry) return;
+    const tea = (state.teas || []).find(t => String(t.id) === String(sel.value));
+    const mid = Number(tea?.current_price) || 0;
+    if (mid > 0) {
+        entry.value = mid.toFixed(2);
+        if (!target.value || Number(target.value) === 0) {
+            // Seed a +2% target for longs, -2% for shorts as a starting point
+            target.value = (mid * (_mcDirection === 'SHORT' ? 0.98 : 1.02)).toFixed(2);
+        }
     }
+    mcRecalc();
+}
+
+function mcRecalc() {
+    const results = document.getElementById('mc-results');
+    if (!results) return;
+
+    const sel = document.getElementById('mc-instrument');
+    const tea = (state.teas || []).find(t => String(t.id) === String(sel?.value));
+    const baseSpread = Number(tea?.base_spread) || 0.01;
+    const volMult = Number(tea?.volatility_multiplier) || 1.0;
+    const spreadPct = baseSpread * volMult;
+
+    const mid = Number(document.getElementById('mc-entry')?.value) || 0;
+    const qty = Number(document.getElementById('mc-qty')?.value) || 0;
+    const lev = Number(document.getElementById('mc-lev')?.value) || 1;
+    const target = Number(document.getElementById('mc-target')?.value) || 0;
+    const isLong = _mcDirection === 'LONG';
+
+    const levVal = document.getElementById('mc-lev-val');
+    if (levVal) levVal.textContent = lev + 'x';
+
+    // Fill price at the spread you'd actually pay (buy at ask, sell at bid)
+    const fillPrice = isLong ? mid * (1 + spreadPct / 2) : mid * (1 - spreadPct / 2);
+    const notional = qty * fillPrice;
+    const requiredMargin = lev > 0 ? notional / lev : 0;
+    const spreadCost = qty * mid * spreadPct / 2; // half-spread on entry
+
+    // P&L: leverage does NOT multiply physical quantity in P&L
+    const pnl = target > 0 ? (isLong ? (target - fillPrice) : (fillPrice - target)) * qty : 0;
+    const roiOnMargin = requiredMargin > 0 ? (pnl / requiredMargin) * 100 : 0;
+
+    // Approx. margin wipe-out price: where cumulative loss = required margin
+    const wipeMove = fillPrice / lev; // price move that erases the margin
+    const wipePrice = isLong ? fillPrice - wipeMove : fillPrice + wipeMove;
+    const wipePct = fillPrice > 0 ? (wipeMove / fillPrice) * 100 : 0;
+
+    const balance = typeof getActiveBalance === 'function' ? getActiveBalance() : 0;
+    const marginPctBal = balance > 0 ? (requiredMargin / balance) * 100 : 0;
+    const maxLots = fillPrice > 0 ? Math.floor((balance * lev) / fillPrice) : 0;
+
+    const money = (v) => '$' + Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const pnlCls = pnl >= 0 ? 'pos' : 'neg';
+
+    results.innerHTML = `
+        <div class="mc-res mc-res--primary">
+            <div class="mc-res-label">Required Margin</div>
+            <div class="mc-res-val">${money(requiredMargin)}</div>
+            ${balance > 0 ? `<div class="mc-res-sub">${marginPctBal.toFixed(1)}% of your ${money(balance)} balance</div>` : ''}
+        </div>
+        <div class="mc-res">
+            <div class="mc-res-label">Position Value</div>
+            <div class="mc-res-val">${money(notional)}</div>
+            <div class="mc-res-sub">${qty.toLocaleString()} lots @ ${money(fillPrice)}</div>
+        </div>
+        <div class="mc-res">
+            <div class="mc-res-label">P&amp;L at Target</div>
+            <div class="mc-res-val ${pnlCls}">${pnl >= 0 ? '+' : ''}${money(pnl)}</div>
+            <div class="mc-res-sub ${pnlCls}">${roiOnMargin >= 0 ? '+' : ''}${roiOnMargin.toFixed(1)}% on margin</div>
+        </div>
+        <div class="mc-res">
+            <div class="mc-res-label">Spread Cost (entry)</div>
+            <div class="mc-res-val">${money(spreadCost)}</div>
+            <div class="mc-res-sub">${(spreadPct * 100).toFixed(2)}% total spread</div>
+        </div>
+        <div class="mc-res mc-res--warn">
+            <div class="mc-res-label">Margin Wipe-out ≈</div>
+            <div class="mc-res-val">${money(wipePrice)}</div>
+            <div class="mc-res-sub">a ${wipePct.toFixed(1)}% move against you</div>
+        </div>
+        <div class="mc-res">
+            <div class="mc-res-label">Max Affordable</div>
+            <div class="mc-res-val">${maxLots.toLocaleString()} lots</div>
+            <div class="mc-res-sub">at ${lev}x on ${money(balance)}</div>
+        </div>
+    `;
 }
 
 // =============================================
@@ -2883,60 +3065,53 @@ async function loadFundedDashboard() {
         panel.innerHTML = `
             <div class="funded-dashboard store-card">
                 <div class="funded-dash-header">
-                    <span class="funded-dash-status ${d.account_status}">${isEval ? 'EVALUATION' : isFunded ? 'FUNDED' : 'LIQUIDATED'}</span>
-                    <span class="funded-dash-label">Simulated Account</span>
+                    <span class="funded-dash-status ${d.account_status}">${isEval ? 'IN PROGRESS' : isFunded ? 'GRADUATE' : 'RESET'}</span>
+                    <span class="funded-dash-label">Educational Milestones</span>
                 </div>
                 <div class="funded-dash-grid">
                     <div class="funded-dash-stat">
                         <div class="funded-dash-stat-value">${fmt(d.floating_equity)}</div>
-                        <div class="funded-dash-stat-label">Floating Equity</div>
+                        <div class="funded-dash-stat-label">Virtual Equity</div>
                     </div>
                     <div class="funded-dash-stat">
                         <div class="funded-dash-stat-value">${fmt(d.initial_balance)}</div>
-                        <div class="funded-dash-stat-label">Initial Balance</div>
+                        <div class="funded-dash-stat-label">Starting Balance</div>
                     </div>
                     <div class="funded-dash-stat">
                         <div class="funded-dash-stat-value ${profitPct >= 0 ? 'positive' : 'negative'}">${profitPct >= 0 ? '+' : ''}${profitPct}%</div>
-                        <div class="funded-dash-stat-label">Profit</div>
+                        <div class="funded-dash-stat-label">Growth</div>
                     </div>
                     <div class="funded-dash-stat">
-                        <div class="funded-dash-stat-value">${d.active_trading_days} / 4</div>
-                        <div class="funded-dash-stat-label">Trading Days</div>
+                        <div class="funded-dash-stat-value">${d.active_trading_days} / 5</div>
+                        <div class="funded-dash-stat-label">Active Days</div>
                     </div>
                 </div>
                 <div class="funded-dash-rules">
                     <div class="funded-rule ${dailyPct >= 5 ? 'breached' : dailyPct >= 3.5 ? 'warning' : 'safe'}">
-                        <span>Daily Loss</span>
+                        <span>Daily Risk Discipline</span>
                         <span>${dailyPct.toFixed(2)}% / 5.00%</span>
                         <div class="funded-rule-bar"><div class="funded-rule-fill" style="width:${Math.min(100, (dailyPct / 5) * 100)}%"></div></div>
                     </div>
                     <div class="funded-rule ${totalPct >= 10 ? 'breached' : totalPct >= 7 ? 'warning' : 'safe'}">
-                        <span>Total Loss</span>
+                        <span>Capital Preservation</span>
                         <span>${totalPct.toFixed(2)}% / 10.00%</span>
                         <div class="funded-rule-bar"><div class="funded-rule-fill" style="width:${Math.min(100, (totalPct / 10) * 100)}%"></div></div>
                     </div>
                     <div class="funded-rule ${consistencyPct > 50 ? 'breached' : consistencyPct > 35 ? 'warning' : 'safe'}">
                         <span>Consistency</span>
-                        <span>Best day: ${consistencyPct.toFixed(1)}% of profit (max 50%)</span>
+                        <span>Best day: ${consistencyPct.toFixed(1)}% of growth (aim &lt; 50%)</span>
                     </div>
                 </div>
-                ${isFunded ? `
-                <div class="funded-dash-payout-info">
-                    <div>Next reward eligible: <strong>${d.next_payout_eligible ? new Date(d.next_payout_eligible).toLocaleDateString('en-GB') : 'N/A'}</strong></div>
-                    <div>Open positions: <strong>${d.open_positions}</strong></div>
-                    <div>Can claim reward: <strong>${d.can_request_payout ? 'Yes ✓' : 'Not yet'}</strong></div>
-                </div>
-                ` : ''}
                 ${isEval ? `
                 <div class="funded-dash-eval-info">
-                    <div>Profit target: <strong>8% (${fmt(d.initial_balance * 1.08)})</strong></div>
+                    <div>Growth milestone: <strong>8% (${fmt(d.initial_balance * 1.08)})</strong></div>
                     <div>Current: <strong>${fmt(d.floating_equity)} (${profitPct}%)</strong></div>
                 </div>
                 ` : ''}
             </div>
         `;
 
-        // Check for liquidation and show modal
+        // Show a learning-recap modal on a reset (no penalty)
         if (isLiquidated && d.liquidation_details) {
             showLiquidationModal(d.liquidation_details);
         }
@@ -2947,330 +3122,30 @@ async function loadFundedDashboard() {
 }
 
 // =============================================
-// PAYOUT REQUEST
+// PAYOUT INFRASTRUCTURE REMOVED
+// TeaTrade is a risk-free educational platform. There are no real-money
+// withdrawals, KYC payouts, or profit splits. Kept as a no-op because
+// app.js still calls handleConnectReturn() on load.
 // =============================================
-
-async function requestPayout() {
-    if (!state.currentUser) {
-        showToast('Error', 'Please log in first.', true);
-        return;
-    }
-
-    if (!confirm('Claim Performance Reward?\n\nThis will:\n• Calculate your 80% performance reward\n• Reset your balance to the initial amount\n• Reset your trading day count\n\nAll positions must be closed.')) {
-        return;
-    }
-
-    try {
-        const { data, error } = await apiRequestRewardPayout();
-        if (error) {
-            showToast('Reward Claim Failed', error.message, true);
-            return;
-        }
-
-        showToast('Performance Reward Claimed!',
-            `Reward: $${Number(data.payout_amount).toFixed(2)} (80% of $${Number(data.gross_profit).toFixed(2)} profit). Balance reset to $${Number(data.new_balance).toFixed(2)}.`);
-
-        await loadUserProfile();
-        renderStoreTab();
-    } catch (err) {
-        showToast('Error', 'Failed to claim performance reward. Please try again.', true);
-    }
-}
-
-// =============================================
-// PAYOUTS TAB (KYC + Stripe Connect + History)
-// =============================================
-
-async function renderPayoutsTab() {
-    const panel = document.getElementById('payouts-panel');
-    if (!panel) return;
-
-    panel.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary);">Loading payout information...</div>';
-
-    if (!state.currentUser) {
-        panel.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-secondary);">Please log in to view payouts.</div>';
-        return;
-    }
-
-    try {
-        const { data, error } = await supabaseClient.rpc('get_kyc_payout_status', {
-            p_user_id: state.currentUser.id,
-        });
-
-        if (error) throw error;
-
-        const kycStatus = data?.kyc_status || 'none';
-        const hasConnect = data?.has_connect_account || false;
-        const acctStatus = data?.account_status || 'ACTIVE';
-        const isFunded = acctStatus === 'FUNDED';
-        const totalPaidPence = data?.total_paid_pence || 0;
-        const payouts = data?.payout_requests || [];
-
-        const kycBadge = _getKycBadge(kycStatus);
-        const fmtGBP = (pence) => '£' + (pence / 100).toFixed(2);
-
-        let html = `
-            <div class="payouts-header">
-                <div class="payouts-header-title">
-                    <span class="store-card-icon" style="font-size:28px;">&#128179;</span>
-                    <div>
-                        <div style="font-size:18px;font-weight:700;color:var(--text-primary);">Performance Rewards & Payouts</div>
-                        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">Complete verification to receive your trading performance rewards</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- KYC Status Card -->
-            <div class="store-card" style="margin-top:16px;">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-                    <div style="display:flex;align-items:center;gap:12px;">
-                        <span style="font-size:24px;">&#128100;</span>
-                        <div>
-                            <div style="font-weight:700;color:var(--text-primary);">Identity Verification (KYC)</div>
-                            <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">Required before any payout can be processed</div>
-                        </div>
-                    </div>
-                    ${kycBadge}
-                </div>
-                <div class="store-card-details">
-                    <div class="store-detail-row"><span>ID Verification</span><span>${kycStatus === 'verified' ? '✓ Passed' : kycStatus === 'pending' ? '⏳ In Review' : kycStatus === 'requires_info' ? '⚠️ Info Needed' : '○ Not Started'}</span></div>
-                    <div class="store-detail-row"><span>Bank Details</span><span>${kycStatus === 'verified' ? '✓ Connected' : '○ Added via Stripe'}</span></div>
-                    <div class="store-detail-row"><span>Tax Information</span><span>${kycStatus === 'verified' ? '✓ Submitted' : '○ Collected by Stripe'}</span></div>
-                </div>
-                ${kycStatus === 'none' ? `
-                    <button class="store-card-btn" onclick="startKycOnboarding()" ${!isFunded ? 'disabled title="Complete your evaluation to unlock verification"' : ''}>
-                        ${isFunded ? 'Start Verification →' : 'Complete Evaluation First'}
-                    </button>
-                    <p class="store-card-legal">Stripe handles identity verification securely. We never see your ID documents or bank details.</p>
-                ` : kycStatus === 'requires_info' ? `
-                    <button class="store-card-btn" onclick="startKycOnboarding()">Complete Verification →</button>
-                    <p class="store-card-legal">Additional information is required. Click above to continue on Stripe's secure platform.</p>
-                ` : kycStatus === 'pending' ? `
-                    <div style="text-align:center;padding:12px;background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.3);border-radius:8px;margin-top:12px;">
-                        <span style="color:#eab308;font-weight:600;">⏳ Verification in review</span>
-                        <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">This typically takes a few minutes. Refresh to check status.</div>
-                    </div>
-                ` : kycStatus === 'rejected' ? `
-                    <div style="text-align:center;padding:12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;margin-top:12px;">
-                        <span style="color:#ef4444;font-weight:600;">✗ Verification failed</span>
-                        <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">Please contact support at contact@teatrade.co.uk for assistance.</div>
-                    </div>
-                ` : `
-                    <div style="text-align:center;padding:12px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:8px;margin-top:12px;">
-                        <span style="color:#10b981;font-weight:600;">✓ Verified — ready to receive payouts</span>
-                    </div>
-                `}
-            </div>
-
-            <!-- Payout Summary Card -->
-            <div class="store-card" style="margin-top:16px;">
-                <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-                    <span style="font-size:24px;">&#128176;</span>
-                    <div>
-                        <div style="font-weight:700;color:var(--text-primary);">Claim Performance Reward</div>
-                        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">80% trader / 20% platform split</div>
-                    </div>
-                </div>
-                <div class="store-card-details">
-                    <div class="store-detail-row"><span>Total Paid Out</span><span style="font-weight:700;color:var(--accent-green);">${fmtGBP(totalPaidPence)}</span></div>
-                    <div class="store-detail-row"><span>Reward Split</span><span>80% to you</span></div>
-                    <div class="store-detail-row"><span>Payout Method</span><span>Direct to your bank via Stripe</span></div>
-                    <div class="store-detail-row"><span>Processing Time</span><span>1-3 business days</span></div>
-                </div>
-                <button class="store-card-btn" onclick="requestPayoutWithKyc()" ${!(isFunded && kycStatus === 'verified') ? 'disabled' : ''}>
-                    ${!isFunded ? 'Account Not Funded' : kycStatus !== 'verified' ? 'Complete Verification First' : 'Claim Performance Reward'}
-                </button>
-                <p class="store-card-legal">Performance rewards are independent contractor payments for generating successful simulated trading data. Not withdrawals of financial market profits.</p>
-            </div>
-        `;
-
-        // Payout History
-        if (payouts.length > 0) {
-            html += `
-                <div class="store-card" style="margin-top:16px;">
-                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-                        <span style="font-size:24px;">&#128203;</span>
-                        <div style="font-weight:700;color:var(--text-primary);">Payout History</div>
-                    </div>
-                    <table style="width:100%;border-collapse:collapse;font-size:12px;">
-                        <thead>
-                            <tr style="border-bottom:1px solid var(--border);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">
-                                <th style="padding:8px 4px;text-align:left;">Date</th>
-                                <th style="padding:8px 4px;text-align:right;">Amount</th>
-                                <th style="padding:8px 4px;text-align:center;">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${payouts.map(p => `
-                                <tr style="border-bottom:1px solid var(--border);">
-                                    <td style="padding:8px 4px;color:var(--text-secondary);">${new Date(p.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
-                                    <td style="padding:8px 4px;text-align:right;font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--text-primary);">${fmtGBP(p.amount_pence)}</td>
-                                    <td style="padding:8px 4px;text-align:center;">${_getPayoutStatusBadge(p.status)}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `;
-        }
-
-        html += `
-            <div class="simulated-env-notice" style="margin-top:16px;">
-                <strong>&#9888;&#65039; How Payouts Work</strong><br>
-                1. Pass the evaluation challenge to earn a funded simulated account<br>
-                2. Complete identity verification (KYC) via Stripe<br>
-                3. Trade profitably for 14+ days meeting all rules<br>
-                4. Claim your 80% performance reward — paid directly to your bank
-            </div>
-        `;
-
-        panel.innerHTML = html;
-
-    } catch (err) {
-        console.error('Payouts tab error:', err);
-        panel.innerHTML = '<div style="text-align:center;padding:40px;color:var(--accent-red);">Failed to load payout information. Please try again.</div>';
-    }
-}
-
-function _getKycBadge(status) {
-    const badges = {
-        none: '<span style="display:inline-block;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;background:rgba(100,116,139,0.15);color:#94a3b8;">Not Started</span>',
-        pending: '<span style="display:inline-block;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;background:rgba(234,179,8,0.15);color:#eab308;">In Review</span>',
-        requires_info: '<span style="display:inline-block;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;background:rgba(249,115,22,0.15);color:#f97316;">Info Needed</span>',
-        verified: '<span style="display:inline-block;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;background:rgba(16,185,129,0.15);color:#10b981;">Verified ✓</span>',
-        rejected: '<span style="display:inline-block;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;background:rgba(239,68,68,0.15);color:#ef4444;">Rejected</span>',
-    };
-    return badges[status] || badges.none;
-}
-
-function _getPayoutStatusBadge(status) {
-    const badges = {
-        pending: '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:rgba(234,179,8,0.15);color:#eab308;">Pending</span>',
-        approved: '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:rgba(59,130,246,0.15);color:#3b82f6;">Approved</span>',
-        processing: '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:rgba(59,130,246,0.15);color:#3b82f6;">Processing</span>',
-        completed: '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:rgba(16,185,129,0.15);color:#10b981;">Paid ✓</span>',
-        rejected: '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:rgba(239,68,68,0.15);color:#ef4444;">Rejected</span>',
-        failed: '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:rgba(239,68,68,0.15);color:#ef4444;">Failed</span>',
-    };
-    return badges[status] || badges.pending;
-}
-
-// ── KYC Onboarding (redirects to Stripe hosted page) ──
-
-async function startKycOnboarding() {
-    if (!state.currentUser) {
-        showToast('Error', 'Please log in first.', true);
-        return;
-    }
-
-    showToast('Setting up verification...', 'Redirecting to Stripe for secure identity verification.');
-
-    try {
-        const result = await _invokeEdgeFunction('create-connect-account', {});
-
-        if (result?.url) {
-            window.location.href = result.url;
-        } else {
-            const errMsg = result?.error || 'Failed to create verification session';
-            showToast('Verification Error', errMsg, true);
-        }
-    } catch (err) {
-        console.error('KYC onboarding error:', err);
-        showToast('Error', 'Failed to start verification. Please try again.', true);
-    }
-}
-
-// ── Payout with KYC check ──
-
-async function requestPayoutWithKyc() {
-    if (!state.currentUser) {
-        showToast('Error', 'Please log in first.', true);
-        return;
-    }
-
-    if (!confirm('Claim Performance Reward?\n\nThis will:\n• Calculate your 80% performance reward\n• Transfer funds to your verified bank account\n• Reset your balance to the initial amount\n• Reset your trading day count\n\nAll positions must be closed.')) {
-        return;
-    }
-
-    try {
-        showToast('Processing...', 'Calculating and transferring your performance reward.');
-
-        const result = await _invokeEdgeFunction('request-payout', {});
-
-        if (result?.success) {
-            showToast('Reward Paid! 🎉',
-                `£${result.payout_amount} transferred to your bank account (${result.trader_share} of £${result.gross_profit} profit).`);
-            await loadUserProfile();
-            renderPayoutsTab();
-        } else {
-            const errMsg = result?.error || 'Payout request failed';
-            showToast('Payout Failed', errMsg, true);
-        }
-    } catch (err) {
-        console.error('Payout request error:', err);
-        showToast('Error', 'Failed to process payout. Please try again.', true);
-    }
-}
-
-// ── Handle Connect return/refresh from Stripe onboarding ──
 
 function handleConnectReturn() {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('connect_return') === '1') {
-        showToast('Verification Submitted', 'Your identity verification has been submitted. We\'ll update your status shortly.');
+    if (params.get('connect_return') === '1' || params.get('connect_refresh') === '1') {
         window.history.replaceState({}, '', window.location.pathname);
-        // Open payouts tab to show updated status
-        setTimeout(() => {
-            if (typeof openPortfolioModal === 'function') {
-                openPortfolioModal();
-                switchPortfolioModalTab('payouts');
-            }
-        }, 500);
-    }
-    if (params.get('connect_refresh') === '1') {
-        showToast('Verification Incomplete', 'Please complete the verification process to enable payouts.', true);
-        window.history.replaceState({}, '', window.location.pathname);
-        setTimeout(() => {
-            if (typeof openPortfolioModal === 'function') {
-                openPortfolioModal();
-                switchPortfolioModalTab('payouts');
-            }
-        }, 500);
     }
 }
 
 // =============================================
-// PURCHASE EVALUATION
+// MEMBERSHIP (legacy purchaseEvaluation entrypoint)
 // =============================================
 
-async function purchaseEvaluation(tier) {
+async function purchaseEvaluation() {
     if (!state.currentUser) {
-        window.location.href = 'login.html' + (tier ? '?tier=' + tier : '');
+        window.location.href = 'login.html?plan=membership';
         return;
     }
-    // Map tier to Stripe product key and balance
-    const tiers = {
-        '10K': { product: 'EVAL_10K', balance: 10000 },
-        '25K': { product: 'EVAL_25K', balance: 25000 },
-        '50K': { product: 'EVAL_50K', balance: 50000 },
-    };
-    const selected = tiers[tier] || tiers['10K'];
-    // Redirect to Stripe checkout for evaluation entry
-    try {
-        const result = await _invokeEdgeFunction('stripe-checkout', {
-            product: selected.product,
-            initial_balance: selected.balance,
-        });
-        if (result?.url) {
-            window.location.href = result.url;
-        } else {
-            const errMsg = result?.error || 'No checkout URL returned';
-            console.error('Checkout error:', errMsg, result);
-            showToast('Error', 'Failed to start checkout: ' + errMsg, true);
-        }
-    } catch (err) {
-        console.error('Checkout exception:', err);
-        showToast('Error', 'Failed to start checkout. Please try again.', true);
+    if (typeof purchaseProSubscription === 'function') {
+        purchaseProSubscription();
     }
 }
 

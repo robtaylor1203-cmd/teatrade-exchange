@@ -254,6 +254,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (typeof initWeather === 'function') initWeather();
         loadLeaderboard();
         loadTopTraders();
+        if (typeof loadTerminalNews === 'function') loadTerminalNews();
     }, 200);
     setTimeout(() => { initChat(); }, 1000);
 
@@ -305,6 +306,7 @@ setInterval(async () => {
     }
     await loadLeaderboard();
     loadTopTraders();
+    if (typeof loadTerminalNews === 'function') loadTerminalNews();
 }, 60000);
 
 

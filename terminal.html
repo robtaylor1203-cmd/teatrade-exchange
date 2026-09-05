@@ -118,14 +118,6 @@
         href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="styles.css?v=20260227a">
-    <script>
-    // Access gate: redirect to landing page if not granted
-    (function(){
-        var B='tealive26',K='tt_access_granted',p=new URLSearchParams(window.location.search);
-        if(p.get('access')===B){localStorage.setItem(K,'1');p.delete('access');var u=window.location.pathname;if(p.toString())u+='?'+p.toString();window.history.replaceState(null,'',u);}
-        if(localStorage.getItem(K)!=='1'){window.location.replace('/');}
-    })();
-    </script>
     <script defer src="https://browser.sentry-cdn.com/7.99.0/bundle.tracing.min.js" crossorigin="anonymous"></script>
     <script defer src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
@@ -170,8 +162,8 @@
 
             <!-- Signup Form -->
             <div id="signup-form-container" role="tabpanel" aria-labelledby="tab-signup">
-                <h3 class="auth-title" id="auth-modal-title">Join the Evaluation Platform</h3>
-                <p class="auth-subtitle">Prove your trading skill with simulated capital. Top performers earn funded simulated accounts.
+                <h3 class="auth-title" id="auth-modal-title">Join TeaTrade Exchange</h3>
+                <p class="auth-subtitle">Learn the global tea markets risk-free. Practise virtual margin trading and supply chain forecasting.
                 </p>
                 <div class="auth-error" id="signup-error" role="alert" aria-live="assertive"></div>
                 <form class="auth-form" id="signup-form" onsubmit="handleSignup(event)" novalidate>
@@ -199,10 +191,10 @@
                             <span>I confirm that I have read and agree to the <a href="/terms.html" target="_blank" rel="noopener">Terms of Service</a> and acknowledge the following:</span>
                         </label>
                         <div class="auth-terms-text">
-                            <p><strong>Regulatory Status:</strong> TeaTrade Ltd is a software and data evaluation company, not a financial institution or broker. We do not accept client deposits, hold client funds for investment, or execute trades in the live financial markets. Because TeaTrade does not carry out regulated activities, it is not authorized or regulated by the Financial Conduct Authority (FCA).</p>
-                            <p><strong>Simulated Environment:</strong> All trading activities on the TeaTrade Exchange are conducted exclusively with simulated capital in a simulated environment based on live market data. Users do not risk or trade real market liquidity.</p>
-                            <p><strong>Nature of Fees:</strong> Any fees paid to TeaTrade are strictly for access to our educational software, proprietary data, and evaluation challenges. They are software subscription fees, not financial deposits, and are non-refundable once the evaluation has been actively used.</p>
-                            <p><strong>Performance Rewards:</strong> Any monetary payouts distributed by TeaTrade are independent contractor performance rewards, paid in exchange for generating successful simulated trading data. They are not withdrawals of financial market profits.</p>
+                            <p><strong>Regulatory Status:</strong> TeaTrade Ltd is an educational software and data company, not a financial institution or broker. We do not accept client deposits, hold client funds for investment, or execute trades in the live financial markets. Because TeaTrade does not carry out regulated activities, it is not authorized or regulated by the Financial Conduct Authority (FCA).</p>
+                            <p><strong>Simulated Environment:</strong> All trading activities on the TeaTrade Exchange are conducted exclusively with virtual portfolios in a simulated environment based on live market data. Users do not risk or trade real market liquidity.</p>
+                            <p><strong>Nature of Fees:</strong> The &pound;30/month membership is strictly for access to our educational software, proprietary data, and learning content. It is a software subscription fee, not a financial deposit.</p>
+                            <p><strong>No Payouts:</strong> TeaTrade is a purely educational platform. There are no real-money withdrawals, performance rewards, or profit splits of any kind &mdash; all balances are virtual and cannot be exchanged for real currency.</p>
                         </div>
                     </div>
                     <button type="submit" class="auth-submit" id="signup-btn">Create Account &amp; Start
@@ -2180,7 +2172,7 @@
                     Market News
                     <span class="live-badge">LIVE</span>
                 </div>
-                <div class="news-feed">
+                <div class="news-feed" id="terminal-news-feed">
                     <div class="news-item">
                         <div class="news-time">14:32 UTC</div>
                         <div class="news-headline">
@@ -2413,17 +2405,13 @@
                     </div>
 
                     <div class="t212-menu-group">
-                        <div class="t212-menu-row" onclick="purchaseCombineEntry()">
+                        <div class="t212-menu-row" onclick="if(typeof openPortfolioModal==='function'){openPortfolioModal();switchPortfolioModalTab('learn');}">
                             <div class="t212-row-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"
                                     stroke="#eab308" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
-                                    <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
-                                    <path d="M4 22h16" />
-                                    <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
-                                    <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
-                                    <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+                                    <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+                                    <path d="M6 12v5c3 3 9 3 12 0v-5" />
                                 </svg></div>
-                            <div class="t212-row-label">Combine Challenge</div>
+                            <div class="t212-row-label">Learn</div>
                             <div class="t212-row-chevron">›</div>
                         </div>
                         <div class="t212-menu-row" onclick="window.switchMobileSection('social')">
@@ -2571,8 +2559,8 @@
         <div class="locked-overlay"></div>
         <div class="locked-card">
             <div class="locked-icon">&#128163;</div>
-            <h2 class="locked-title">Account Blown</h2>
-            <p class="locked-subtitle">Your equity hit zero. Reset your account to get back in the game:</p>
+            <h2 class="locked-title">Out of Virtual Funds</h2>
+            <p class="locked-subtitle">Your virtual equity hit zero. Reset your practice balance to get back to learning:</p>
             <div class="locked-options">
                 <div class="locked-option locked-option-paid">
                     <div class="locked-option-badge">INSTANT</div>
@@ -2649,12 +2637,12 @@
                     </svg>
                     Store
                 </button>
-                <button class="portfolio-tab" data-tab="payouts" onclick="switchPortfolioModalTab('payouts')">
+                <button class="portfolio-tab" data-tab="learn" onclick="switchPortfolioModalTab('learn')">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
-                        <line x1="1" y1="10" x2="23" y2="10"/>
+                        <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                        <path d="M6 12v5c3 3 9 3 12 0v-5"/>
                     </svg>
-                    Payouts
+                    Learn
                 </button>
             </div>
             <div class="portfolio-modal-body">
@@ -2682,8 +2670,8 @@
                 <div id="portfolio-tab-store" class="portfolio-tab-content" style="display:none;">
                     <div id="store-panel"></div>
                 </div>
-                <div id="portfolio-tab-payouts" class="portfolio-tab-content" style="display:none;">
-                    <div id="payouts-panel"></div>
+                <div id="portfolio-tab-learn" class="portfolio-tab-content" style="display:none;">
+                    <div id="learn-panel"></div>
                 </div>
             </div>
         </div>
@@ -2704,7 +2692,7 @@
 
     <!-- Simulated Environment Banner -->
     <div id="fca-risk-banner" class="fca-risk-banner" style="display:none;">
-        <strong>Simulated Trading Environment:</strong> All trading on TeaTrade Exchange is conducted exclusively with simulated capital. No real money is traded or at risk. Fees paid are software subscription fees for access to our evaluation platform.
+        <strong>Simulated Trading Environment:</strong> All trading on TeaTrade Exchange is conducted exclusively with virtual portfolios. No real money is traded or at risk. The membership fee is a software subscription for access to our educational platform.
     </div>
 
     <!-- FCA Agreement Modal -->
@@ -2806,9 +2794,9 @@
                     <path d="M14 10l6-6M10 14l-6 6" />
                 </svg>
             </div>
-            <h2>Welcome to the Evaluation Platform</h2>
+            <h2>Welcome to TeaTrade Exchange</h2>
             <p>
-                Your account starts with <strong>$10,000</strong> in simulated capital. Your first mission: Execute a
+                Your virtual portfolio starts with <strong>$10,000</strong> in simulated capital. Your first mission: Execute a
                 trade on any active tea contract to unlock your portfolio dashboard.
             </p>
             <button class="first-trade-btn" onclick="completeFirstTradeMissionAck()">
@@ -3195,22 +3183,20 @@
             <div class="legal-footer-sections">
                 <div class="legal-footer-section">
                     <strong>Regulatory Status</strong>
-                    <p>TeaTrade Ltd is a software and data evaluation company, not a financial institution or broker.
+                    <p>TeaTrade Ltd is an educational software and data company, not a financial institution or broker.
                     We do not accept client deposits, hold client funds for investment, or execute trades in the live
                     financial markets. Because TeaTrade does not carry out regulated activities, it is not authorized
                     or regulated by the Financial Conduct Authority (FCA).</p>
                 </div>
                 <div class="legal-footer-section">
                     <strong>Nature of Fees</strong>
-                    <p>Any fees paid to TeaTrade are strictly for access to our educational software, proprietary data,
-                    and evaluation challenges. They are software subscription fees, not financial deposits, and are
-                    non-refundable once the evaluation has been actively used.</p>
+                    <p>The &pound;30/month membership is strictly for access to our educational software, proprietary data,
+                    and learning content. It is a software subscription fee, not a financial deposit.</p>
                 </div>
                 <div class="legal-footer-section">
-                    <strong>Performance Rewards</strong>
-                    <p>Any monetary payouts distributed by TeaTrade are independent contractor performance rewards,
-                    paid in exchange for generating successful simulated trading data. They are not withdrawals of
-                    financial market profits.</p>
+                    <strong>No Payouts</strong>
+                    <p>TeaTrade is a purely educational platform. There are no real-money withdrawals, performance
+                    rewards, or profit splits &mdash; all balances are virtual and cannot be exchanged for real currency.</p>
                 </div>
             </div>
             <div class="legal-footer-links">

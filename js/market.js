@@ -204,21 +204,23 @@ function updatePriceCache(symbol, newPrice, symbolType = 'tea') {
 // Initialize price cache from database for all known symbols
 async function initializePriceCache() {
     console.log('Initializing price cache from database...');
-    const loadPromises = [];
 
-    // Load all tea symbols (force 1D for fast UI/sparklines on load)
+    // Build the full symbol list (teas + indexes).
+    const jobs = [];
     if (state.teas && state.teas.length > 0) {
-        state.teas.forEach(tea => {
-            loadPromises.push(getPriceHistory(tea.symbol, 'tea', '1D'));
-        });
+        state.teas.forEach(tea => jobs.push(() => getPriceHistory(tea.symbol, 'tea', '1D')));
     }
-
-    // Load all index symbols from DB (force 1D for fast UI/sparklines on load)
     getIndexSymbols().forEach(symbol => {
-        loadPromises.push(getPriceHistory(symbol, 'index', '1D'));
+        jobs.push(() => getPriceHistory(symbol, 'index', '1D'));
     });
 
-    await Promise.allSettled(loadPromises);
+    // Run in small concurrency-limited batches so we don't fire 100+
+    // concurrent price_history queries and saturate the Supabase pooler
+    // (which surfaces as a burst of HTTP 500s on first load).
+    const BATCH = 6;
+    for (let i = 0; i < jobs.length; i += BATCH) {
+        await Promise.allSettled(jobs.slice(i, i + BATCH).map(fn => fn()));
+    }
     console.log('Price cache initialized');
 }
 

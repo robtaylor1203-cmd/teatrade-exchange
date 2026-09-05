@@ -426,8 +426,8 @@ const BADGE_DEFINITIONS = {
     PHOENIX: { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L8 8l-6 2 4 5-1 6 7-3 7 3-1-6 4-5-6-2z"/></svg>', color: '#f97316', bg: 'rgba(249,115,22,0.12)', name: 'The Phoenix', cat: 'Lore', desc: 'Blew up, paid reset, then made 10% profit', unlock: 'Rise from the ashes' },
     BOTTOM_CATCHER: { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="23,18 13.5,8.5 8.5,13.5 1,6"/><polyline points="17,18 23,18 23,12"/></svg>', color: '#06b6d4', bg: 'rgba(6,182,212,0.12)', name: 'Bottom Catcher', cat: 'Lore', desc: 'Bought within 1% of the weekly low', unlock: 'Catch the bottom' },
     SURVIVOR: { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M9 12l2 2 4-4"/></svg>', color: '#10b981', bg: 'rgba(16,185,129,0.12)', name: 'Survivor', cat: 'Lore', desc: 'Survived a trade at 5% margin, closed in the green', unlock: 'Hold and survive' },
-    PRO_MEMBER: { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26z"/></svg>', color: '#a855f7', bg: 'rgba(168,85,247,0.12)', name: 'PRO Member', cat: 'Status', desc: 'Active TeaTrade PRO subscriber', unlock: 'Subscribe to PRO' },
-    FUNDED_TRADER: { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>', color: '#eab308', bg: 'rgba(234,179,8,0.15)', name: 'Funded Trader', cat: 'Status', desc: 'Passed the TeaTrade Combine Challenge', unlock: 'Pass the Combine' },
+    PRO_MEMBER: { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26z"/></svg>', color: '#a855f7', bg: 'rgba(168,85,247,0.12)', name: 'Member', cat: 'Status', desc: 'Active TeaTrade member', unlock: 'Join TeaTrade' },
+    FUNDED_TRADER: { svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>', color: '#eab308', bg: 'rgba(234,179,8,0.15)', name: 'Graduate', cat: 'Status', desc: 'Completed all Educational Milestones', unlock: 'Complete every milestone' },
 };
 const BADGE_PRIORITY = ['FUNDED_TRADER', 'PRO_MEMBER', 'WHALE', 'SNIPER', 'TEN_BAGGER', 'SHEPHERD', 'DIAMOND_HANDS', 'IRON_CLAD', 'PHOENIX', 'SURVIVOR', 'BOTTOM_CATCHER'];
 
@@ -606,26 +606,21 @@ function handleCheckoutReturn() {
     const params = new URLSearchParams(window.location.search);
     const checkout = params.get('checkout');
     const product = params.get('product');
-    const tier = params.get('tier');
+    const plan = params.get('plan');
 
-    // Auto-trigger evaluation purchase if tier param present (from login page / pricing CTA)
-    if (tier && ['10K', '25K', '50K'].includes(tier)) {
+    // Auto-trigger membership subscription if plan param present (from pricing CTA)
+    if (plan === 'membership') {
         window.history.replaceState({}, '', window.location.pathname);
-        // Wait for auth + purchaseEvaluation to be available, then trigger checkout.
-        // The user should already be authenticated (login.html handles auth first).
-        // If not authed, redirect back to login page with the tier preserved.
         const waitForAuth = setInterval(() => {
             if (typeof state === 'undefined') return; // config not ready yet
-            if (state.currentUser && typeof purchaseEvaluation === 'function') {
+            if (state.currentUser && typeof purchaseProSubscription === 'function') {
                 clearInterval(waitForAuth);
-                purchaseEvaluation(tier);
+                purchaseProSubscription();
             } else if (state.currentUser === null) {
                 clearInterval(waitForAuth);
-                // Not logged in — send to login page with tier
-                window.location.href = 'login.html?tier=' + tier;
+                window.location.href = 'login.html?plan=membership';
             }
         }, 300);
-        // Timeout after 15s
         setTimeout(() => clearInterval(waitForAuth), 15000);
         return;
     }
@@ -636,15 +631,10 @@ function handleCheckoutReturn() {
 
     if (checkout === 'success') {
         const msgs = {
-            ACCOUNT_RESET: ['Account Reset!', 'Your balance has been restored to $10,000'],
-            COMBINE_ENTRY: ['Combine Started!', 'Your $50,000 challenge account is live. Good luck!'],
-            PRO_SUBSCRIPTION: ['Welcome to PRO!', 'You now have access to all premium features'],
-            EVAL_10K: ['Evaluation Started!', 'Your £10,000 simulated evaluation account is live. Good luck!'],
-            EVAL_25K: ['Evaluation Started!', 'Your £25,000 simulated evaluation account is live. Good luck!'],
-            EVAL_50K: ['Evaluation Started!', 'Your £50,000 simulated evaluation account is live. Good luck!'],
-            EVALUATION_ENTRY: ['Evaluation Started!', 'Your evaluation account is live. Good luck!'],
+            ACCOUNT_RESET: ['Account Reset!', 'Your virtual balance has been restored'],
+            PRO_SUBSCRIPTION: ['Welcome to TeaTrade!', 'Your membership is active — enjoy full access to every learning tool'],
         };
-        const [title, msg] = msgs[product] || ['Payment Complete', 'Thank you!'];
+        const [title, msg] = msgs[product] || ['Membership Active', 'Thank you for joining TeaTrade!'];
         showToast(title, msg);
         setTimeout(() => location.reload(), 1500);
     } else if (checkout === 'cancelled') {
