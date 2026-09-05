@@ -918,7 +918,7 @@ async function loadTerminalNews() {
     const container = document.getElementById('terminal-news-feed');
     if (!container || typeof apiFetchNews !== 'function') return;
     try {
-        const { data, error } = await apiFetchNews(12);
+        const { data, error } = await apiFetchNews(8);
         if (error || !Array.isArray(data) || data.length === 0) return; // keep existing content
         container.innerHTML = data.map(item => {
             const title = escapeHtml(item.title || '');

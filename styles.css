@@ -5281,7 +5281,7 @@ body.modal-open {
 }
 
 .news-feed {
-    max-height: 300px;
+    max-height: 220px;
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: var(--border-light) var(--bg-tertiary);

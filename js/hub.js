@@ -189,6 +189,11 @@ function toggleMaximize(panelId) {
         document.body.classList.remove('modal-open');
         document.body.style.overflow = '';
         state.maximizedPanel = null;
+        // Free the now-hidden hub chart so it rebuilds fresh (and correctly
+        // sized) next time fullscreen opens — otherwise it reopens blank.
+        if (panelId === 'chart-section' && typeof _destroyHubTvChart === 'function') {
+            _destroyHubTvChart();
+        }
     } else {
         // Maximize
         if (state.maximizedPanel) {
@@ -201,6 +206,9 @@ function toggleMaximize(panelId) {
 
         // Initialize trading hub
         if (panelId === 'chart-section') {
+            // Rebuild the chart from scratch against the now-visible container
+            // so it's the right size and shows the current symbol's data.
+            if (typeof _destroyHubTvChart === 'function') _destroyHubTvChart();
             initTradingHub();
         }
     }
@@ -215,10 +223,14 @@ function toggleMaximize(panelId) {
     }, 100);
 
     if (panelId === 'chart-section' && panel.classList.contains('panel-maximized')) {
-        // Multiple redraws to ensure canvas is properly sized after layout
-        setTimeout(drawHubChart, 150);
-        setTimeout(drawHubChart, 300);
-        setTimeout(drawHubChart, 500);
+        // Rebuild once the fullscreen layout has settled so the chart is sized
+        // correctly against the visible container (fixes the blank/zero-height
+        // chart on reopen), then redraw for good measure.
+        setTimeout(() => {
+            if (typeof _destroyHubTvChart === 'function') _destroyHubTvChart();
+            drawHubChart();
+        }, 220);
+        setTimeout(drawHubChart, 450);
     }
 }
 
