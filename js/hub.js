@@ -305,23 +305,25 @@ function initTradingHub() {
         }
     }
 
-    // Regenerate hub chart data: use sync cache for immediate render,
-    // then force an async DB reload to ensure fresh, correct data.
-    state.hubChartData = generateHubChartData();
+    // SINGLE SOURCE OF TRUTH: mirror the main chart's already-loaded data so the
+    // fullscreen view always matches the main view exactly. Only fall back to the
+    // sync cache if the main chart hasn't loaded any data yet.
+    state.hubChartData = (Array.isArray(state.chartData) && state.chartData.length > 1)
+        ? state.chartData.map(d => ({ ...d }))
+        : generateHubChartData();
 
-    // Async reload: fetch fresh data from DB for the selected symbol.
-    // This overwrites any stale/mismatched cache entries and redraws.
-    const _hubSym = document.getElementById('hub-buy-symbol')?.value || '';
-    const _hubLookup = _hubSym === 'KENYAN' ? 'KENYA' : _hubSym;
-    const _hubIsIdx = typeof isIndexSymbol === 'function' && isIndexSymbol(_hubLookup);
-    const _hubSymType = _hubIsIdx ? 'index' : 'tea';
-    loadChartDataFromHistory(_hubLookup, _hubSymType).then(freshData => {
-        if (!freshData || freshData.length === 0) return;
-        const nowSym = document.getElementById('hub-buy-symbol')?.value || '';
-        if (nowSym !== _hubSym) return;
-        state.hubChartData = freshData;
-        drawHubChart();
-    }).catch(() => { });
+    // Refresh from the DB for the SAME symbol the main chart is showing, so a
+    // slow first paint still converges to the identical source of truth.
+    const _mainSym = state.mainChartData?.symbol;
+    const _mainType = state.mainChartData?.isIndex ? 'index' : 'tea';
+    if (_mainSym) {
+        loadChartDataFromHistory(_mainSym, _mainType).then(freshData => {
+            if (!freshData || freshData.length === 0) return;
+            if (state.mainChartData?.symbol !== _mainSym) return;
+            state.hubChartData = freshData;
+            drawHubChart();
+        }).catch(() => { });
+    }
 
     // Update hub title to match main chart
     const hubTitle = document.getElementById('hub-chart-title');
