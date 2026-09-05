@@ -305,24 +305,14 @@ function initTradingHub() {
         }
     }
 
-    // SINGLE SOURCE OF TRUTH: mirror the main chart's already-loaded data so the
-    // fullscreen view always matches the main view exactly. Only fall back to the
-    // sync cache if the main chart hasn't loaded any data yet.
-    state.hubChartData = (Array.isArray(state.chartData) && state.chartData.length > 1)
-        ? state.chartData.map(d => ({ ...d }))
-        : generateHubChartData();
-
-    // Refresh from the DB for the SAME symbol the main chart is showing, so a
-    // slow first paint still converges to the identical source of truth.
-    const _mainSym = state.mainChartData?.symbol;
-    const _mainType = state.mainChartData?.isIndex ? 'index' : 'tea';
-    if (_mainSym) {
-        loadChartDataFromHistory(_mainSym, _mainType).then(freshData => {
-            if (!freshData || freshData.length === 0) return;
-            if (state.mainChartData?.symbol !== _mainSym) return;
-            state.hubChartData = freshData;
-            drawHubChart();
-        }).catch(() => { });
+    // SINGLE SOURCE OF TRUTH: the fullscreen chart simply mirrors the main
+    // chart's already-loaded data. We deliberately do NOT re-fetch here — a
+    // re-fetch can time out on a busy database and overwrite good data with an
+    // empty result, which is what left the fullscreen chart blank.
+    if (Array.isArray(state.chartData) && state.chartData.length > 1) {
+        state.hubChartData = state.chartData.map(d => ({ ...d }));
+    } else {
+        state.hubChartData = generateHubChartData();
     }
 
     // Update hub title to match main chart
