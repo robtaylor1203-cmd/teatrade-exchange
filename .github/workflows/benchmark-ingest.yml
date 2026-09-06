@@ -1,13 +1,13 @@
-name: Daily Auction Scraper
+name: Monthly Auction Benchmark Ingest
 
 on:
   schedule:
-    # Runs at 18:00 (6 PM) GMT every day
-    - cron: '0 18 * * *'
-  workflow_dispatch: # Allows manual triggering from GH interface
+    # World Bank Pink Sheet publishes ~2nd of each month; run on the 5th at 07:00 UTC.
+    - cron: '0 7 5 * *'
+  workflow_dispatch: # Allow manual runs from the GitHub Actions tab
 
 jobs:
-  scrape-and-inject:
+  ingest:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -17,17 +17,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: './scraper/package.json'
 
       - name: Install Dependencies
         working-directory: ./scraper
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
-      - name: Run Node Scraper
+      - name: Ingest World Bank benchmarks
         working-directory: ./scraper
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: npm start
+        run: npm run benchmarks

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="index, follow">
+    <title>TeaTrade Terminal v1.0 | Auctions</title>
+    <meta name="description" content="Global tea auction benchmarks — monthly average auction prices from the World Bank Pink Sheet, weekly Indian centre averages, and the global auction calendar.">
+    <link rel="canonical" href="https://exchange.teatrade.co.uk/auctions.html" />
+    <link rel="icon" type="image/png" href="images/favicon-nb.png">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=20260228b">
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        html, body { height: 100%; }
+        body { display: flex; flex-direction: column; min-height: 100vh; background: var(--bg-primary); color: var(--text-primary); }
+
+        .auc-wrap { flex: 1; max-width: 1180px; width: 100%; margin: 0 auto; padding: 28px 20px 60px; }
+        .auc-hero { margin-bottom: 24px; }
+        .auc-hero h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.4px; }
+        .auc-hero p { color: var(--text-secondary); margin-top: 6px; font-size: 14px; max-width: 720px; line-height: 1.5; }
+
+        .auc-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 20px 0 28px; }
+        .auc-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+        .auc-card .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); }
+        .auc-card .val { font-family: 'JetBrains Mono', monospace; font-size: 24px; font-weight: 600; margin-top: 8px; }
+        .auc-card .sub { font-size: 12px; margin-top: 6px; color: var(--text-secondary); }
+        .auc-card .chg.up { color: var(--accent-green); }
+        .auc-card .chg.down { color: var(--accent-red); }
+        .auc-card.headline { border-color: var(--accent-blue); background: linear-gradient(160deg, rgba(26,115,232,0.10), var(--bg-card)); }
+
+        .auc-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 18px 20px; margin-bottom: 24px; }
+        .auc-panel h2 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+        .auc-panel .panel-note { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; }
+        #benchmark-chart { width: 100%; height: 300px; }
+
+        .auc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .auc-table th { text-align: left; padding: 9px 12px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+        .auc-table td { padding: 10px 12px; border-bottom: 1px solid var(--bg-tertiary); font-family: 'JetBrains Mono', monospace; }
+        .auc-table td.name { font-family: 'Inter', sans-serif; color: var(--text-primary); }
+        .auc-table tr:last-child td { border-bottom: none; }
+        .yoy.up { color: var(--accent-green); }
+        .yoy.down { color: var(--accent-red); }
+
+        .cal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+        .cal-item { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+        .cal-item .cal-centre { font-weight: 600; font-size: 14px; }
+        .cal-item .cal-region { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+        .cal-item .cal-meta { display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px; color: var(--text-muted); }
+        .cal-item .cal-day { font-family: 'JetBrains Mono', monospace; color: var(--accent-orange); }
+
+        .auc-method { font-size: 12.5px; color: var(--text-secondary); line-height: 1.65; }
+        .auc-method strong { color: var(--text-primary); }
+        .auc-method a { color: var(--accent-blue); text-decoration: none; }
+        .auc-method a:hover { text-decoration: underline; }
+        .auc-method ul { margin: 8px 0 0 18px; }
+
+        .empty-state { color: var(--text-muted); font-size: 13px; padding: 24px 4px; text-align: center; }
+
+        .auc-foot { border-top: 1px solid var(--border); padding: 18px 20px; text-align: center; font-size: 12px; color: var(--text-muted); }
+        .auc-foot a { color: var(--text-secondary); text-decoration: none; }
+
+        @media (max-width: 820px) { .auc-cards { grid-template-columns: repeat(2, 1fr); } }
+    </style>
+</head>
+<body>
+    <!-- TOP BAR -->
+    <div class="top-bar">
+        <div class="logo">
+            <a href="/" style="display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;">
+                <div class="logo-icon">TT</div>
+                <div class="logo-text">TeaTrade <span>Exchange</span></div>
+            </a>
+        </div>
+        <nav class="nav-links">
+            <a href="terminal.html">Markets</a>
+            <a href="analytics.html">Analytics</a>
+            <a href="auctions.html" class="active">Auctions</a>
+        </nav>
+        <div class="user-section">
+            <a href="terminal.html" class="login-btn" style="text-decoration:none;">Back to Terminal</a>
+        </div>
+    </div>
+
+    <main class="auc-wrap">
+        <div class="auc-hero">
+            <h1>Global Tea Auction Benchmarks</h1>
+            <p>Monthly benchmark auction prices published by the World Bank, weekly average prices from the Indian
+               auction centres, and the global auction calendar. All figures are aggregated market averages for
+               educational reference — not executable prices.</p>
+        </div>
+
+        <!-- Headline benchmark cards -->
+        <section class="auc-cards" id="benchmark-cards">
+            <div class="auc-card headline">
+                <div class="lbl">Global Average</div>
+                <div class="val" id="bm-global-val">—</div>
+                <div class="sub" id="bm-global-sub">Loading…</div>
+            </div>
+            <div class="auc-card">
+                <div class="lbl">Mombasa</div>
+                <div class="val" id="bm-mombasa-val">—</div>
+                <div class="sub" id="bm-mombasa-sub"></div>
+            </div>
+            <div class="auc-card">
+                <div class="lbl">Colombo</div>
+                <div class="val" id="bm-colombo-val">—</div>
+                <div class="sub" id="bm-colombo-sub"></div>
+            </div>
+            <div class="auc-card">
+                <div class="lbl">Kolkata</div>
+                <div class="val" id="bm-kolkata-val">—</div>
+                <div class="sub" id="bm-kolkata-sub"></div>
+            </div>
+        </section>
+
+        <!-- Benchmark history chart -->
+        <section class="auc-panel">
+            <h2>Global Benchmark — Monthly History</h2>
+            <div class="panel-note">Tea, average of three auctions (USD/kg). Source: World Bank Pink Sheet.</div>
+            <div id="benchmark-chart"></div>
+            <div class="empty-state" id="chart-empty" style="display:none;">
+                Benchmark history will appear after the next World Bank publication is ingested.
+            </div>
+        </section>
+
+        <!-- Weekly India centre averages -->
+        <section class="auc-panel">
+            <h2>Indian Centres — Latest Weekly Averages</h2>
+            <div class="panel-note" id="weekly-note">Weighted average auction price by centre. Source: Tea Board of India.</div>
+            <table class="auc-table" id="weekly-table">
+                <thead>
+                    <tr><th>Centre</th><th>Avg Price (₹/kg)</th><th>Year-on-Year</th></tr>
+                </thead>
+                <tbody id="weekly-body">
+                    <tr><td colspan="3" class="empty-state">Loading…</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Auction calendar -->
+        <section class="auc-panel">
+            <h2>Auction Calendar</h2>
+            <div class="panel-note">Indicative weekly auction schedule across major centres (local time).</div>
+            <div class="cal-grid" id="calendar-grid"></div>
+        </section>
+
+        <!-- Methodology & attribution -->
+        <section class="auc-panel auc-method">
+            <h2 style="margin-bottom:10px;">Methodology &amp; Data Sources</h2>
+            <p>TeaTrade presents only <strong>aggregated market averages</strong>. We do not reproduce lot-level results,
+               buyer/seller identities, broker commentary, or any granular or commercially sensitive detail.</p>
+            <ul>
+                <li><strong>Global &amp; regional benchmarks</strong> — monthly average auction prices from the
+                    <a href="https://www.worldbank.org/en/research/commodity-markets" target="_blank" rel="noopener">World Bank "Pink Sheet"</a>,
+                    published under a Creative Commons Attribution 4.0 (CC BY 4.0) licence.</li>
+                <li><strong>Indian centre averages</strong> — weekly weighted-average prices published by the Tea Board of India.</li>
+                <li><strong>FX &amp; macro overlays</strong> — public central-bank and market reference rates.</li>
+            </ul>
+            <p style="margin-top:10px;">Reports across brokers and centres are released on different days and occasionally
+               differ; where sources conflict we prefer official association/board figures and volume-weighted averages,
+               and normalise everything to a consistent set of grade buckets. Figures are for education and market
+               study only and do not represent real-time executable prices on any exchange.</p>
+            <p style="margin-top:10px; color: var(--text-muted);">Source: World Bank, Commodity Markets ("Pink Sheet"),
+               licensed under CC BY 4.0. TeaTrade is not affiliated with, or endorsed by, the World Bank or the Tea Board of India.</p>
+        </section>
+    </main>
+
+    <footer class="auc-foot">
+        <a href="terms.html">Terms</a> &nbsp;·&nbsp; <a href="privacy.html">Privacy</a> &nbsp;·&nbsp;
+        <a href="terminal.html">Terminal</a> &nbsp;·&nbsp; © 2026 TeaTrade Exchange
+    </footer>
+
+    <script>
+        const SUPABASE_URL = 'https://uznxzyuknigzlxecjgtb.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_7mtRyeHCS65NpDfz8EqcRg_F5-6G3MI';
+        const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const fmtUsd = (n) => '$' + Number(n).toFixed(2);
+        const monthLabel = (d) => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+
+        function setCard(key, rows) {
+            const valEl = document.getElementById(`bm-${key}-val`);
+            const subEl = document.getElementById(`bm-${key}-sub`);
+            if (!rows || rows.length === 0) {
+                valEl.textContent = '—';
+                if (subEl) subEl.textContent = 'Awaiting next publication';
+                return;
+            }
+            const latest = rows[0];
+            valEl.textContent = fmtUsd(latest.price_usd_kg);
+            let sub = monthLabel(latest.period_date);
+            if (rows[1]) {
+                const prev = rows[1].price_usd_kg;
+                const pct = ((latest.price_usd_kg - prev) / prev) * 100;
+                const cls = pct >= 0 ? 'up' : 'down';
+                const arrow = pct >= 0 ? '▲' : '▼';
+                sub = `<span class="chg ${cls}">${arrow} ${Math.abs(pct).toFixed(1)}% MoM</span> · ${sub}`;
+            }
+            if (subEl) subEl.innerHTML = sub;
+        }
+
+        async function loadBenchmarks() {
+            const { data, error } = await sb
+                .from('auction_benchmarks')
+                .select('series, period_date, price_usd_kg')
+                .order('period_date', { ascending: false });
+
+            if (error) { console.error(error); return; }
+            const bySeries = { GLOBAL: [], MOMBASA: [], COLOMBO: [], KOLKATA: [] };
+            (data || []).forEach(r => { if (bySeries[r.series]) bySeries[r.series].push(r); });
+
+            setCard('global', bySeries.GLOBAL);
+            setCard('mombasa', bySeries.MOMBASA);
+            setCard('colombo', bySeries.COLOMBO);
+            setCard('kolkata', bySeries.KOLKATA);
+
+            renderChart(bySeries.GLOBAL);
+        }
+
+        function renderChart(globalRows) {
+            const container = document.getElementById('benchmark-chart');
+            const emptyEl = document.getElementById('chart-empty');
+            if (!globalRows || globalRows.length < 2) {
+                container.style.display = 'none';
+                emptyEl.style.display = 'block';
+                return;
+            }
+            const chart = LightweightCharts.createChart(container, {
+                width: container.clientWidth,
+                height: 300,
+                layout: { background: { color: 'transparent' }, textColor: '#9ca3af' },
+                grid: { vertLines: { color: '#1a2332' }, horzLines: { color: '#1a2332' } },
+                rightPriceScale: { borderColor: '#2d3a4f' },
+                timeScale: { borderColor: '#2d3a4f' },
+                crosshair: { mode: 0 },
+            });
+            const series = chart.addAreaSeries({
+                lineColor: '#1a73e8', topColor: 'rgba(26,115,232,0.25)', bottomColor: 'rgba(26,115,232,0.02)', lineWidth: 2,
+            });
+            const points = globalRows
+                .slice()
+                .sort((a, b) => (a.period_date < b.period_date ? -1 : 1))
+                .map(r => ({ time: r.period_date, value: Number(r.price_usd_kg) }));
+            series.setData(points);
+            chart.timeScale().fitContent();
+            window.addEventListener('resize', () => chart.applyOptions({ width: container.clientWidth }));
+        }
+
+        async function loadWeekly() {
+            const body = document.getElementById('weekly-body');
+            const { data: latest, error: e1 } = await sb
+                .from('auction_results')
+                .select('auction_date')
+                .order('auction_date', { ascending: false })
+                .limit(1);
+            if (e1 || !latest || latest.length === 0) {
+                body.innerHTML = '<tr><td colspan="3" class="empty-state">No weekly data available.</td></tr>';
+                return;
+            }
+            const latestDate = latest[0].auction_date;
+            document.getElementById('weekly-note').textContent =
+                `Weighted average auction price by centre — week of ${latestDate}. Source: Tea Board of India.`;
+
+            const { data, error } = await sb
+                .from('auction_results')
+                .select('centre, avg_price_inr, prev_year_inr')
+                .eq('auction_date', latestDate)
+                .order('avg_price_inr', { ascending: false });
+            if (error || !data || data.length === 0) {
+                body.innerHTML = '<tr><td colspan="3" class="empty-state">No weekly data available.</td></tr>';
+                return;
+            }
+            body.innerHTML = data.map(r => {
+                const centre = r.centre.charAt(0) + r.centre.slice(1).toLowerCase();
+                let yoy = '<span style="color:var(--text-muted)">—</span>';
+                if (r.prev_year_inr) {
+                    const pct = ((r.avg_price_inr - r.prev_year_inr) / r.prev_year_inr) * 100;
+                    const cls = pct >= 0 ? 'up' : 'down';
+                    const arrow = pct >= 0 ? '▲' : '▼';
+                    yoy = `<span class="yoy ${cls}">${arrow} ${Math.abs(pct).toFixed(1)}%</span>`;
+                }
+                return `<tr><td class="name">${centre}</td><td>₹${Number(r.avg_price_inr).toFixed(2)}</td><td>${yoy}</td></tr>`;
+            }).join('');
+        }
+
+        const CALENDAR = [
+            { centre: 'Mombasa',  region: 'Kenya · East Africa',  day: 'Mon–Tue', note: '~12,000 lots/wk' },
+            { centre: 'Colombo',  region: 'Sri Lanka',            day: 'Tue–Wed', note: '~10,000 lots/wk' },
+            { centre: 'Kolkata',  region: 'India · Assam/Darjeeling', day: 'Tue–Wed', note: '~8,000 lots/wk' },
+            { centre: 'Guwahati', region: 'India · Assam',        day: 'Tue–Wed', note: '~15,000 lots/wk' },
+            { centre: 'Siliguri', region: 'India · Dooars/Terai', day: 'Wed–Thu', note: '~5,000 lots/wk' },
+            { centre: 'Coonoor',  region: 'India · Nilgiris',     day: 'Thu',     note: '~4,000 lots/wk' },
+            { centre: 'Cochin',   region: 'India · South',        day: 'Thu',     note: '~6,000 lots/wk' },
+            { centre: 'Jakarta',  region: 'Indonesia · Java',     day: 'Wed',     note: '~1,500 lots/wk' },
+        ];
+
+        function renderCalendar() {
+            document.getElementById('calendar-grid').innerHTML = CALENDAR.map(c => `
+                <div class="cal-item">
+                    <div class="cal-centre">${c.centre}</div>
+                    <div class="cal-region">${c.region}</div>
+                    <div class="cal-meta"><span class="cal-day">${c.day}</span><span>${c.note}</span></div>
+                </div>`).join('');
+        }
+
+        renderCalendar();
+        loadBenchmarks();
+        loadWeekly();
+    </script>
+</body>
+</html>
