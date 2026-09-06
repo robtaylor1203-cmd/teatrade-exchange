@@ -1977,12 +1977,15 @@ function switchPortfolioModalTab(tab) {
     if (storeTab) storeTab.style.display = tab === 'store' ? 'block' : 'none';
     const learnTab = document.getElementById('portfolio-tab-learn');
     if (learnTab) learnTab.style.display = tab === 'learn' ? 'block' : 'none';
+    const challengeTab = document.getElementById('portfolio-tab-challenge');
+    if (challengeTab) challengeTab.style.display = tab === 'challenge' ? 'block' : 'none';
     if (tab === 'financial') renderFinancialTab();
     if (tab === 'history') renderHistoryTab();
     if (tab === 'social') renderPortfolioModal();
     if (tab === 'badges') renderBadgesTab();
     if (tab === 'store') renderStoreTab();
     if (tab === 'learn') renderLearnTab();
+    if (tab === 'challenge') renderChallengeTab();
 }
 
 function renderFinancialTab() {
@@ -2811,6 +2814,16 @@ function renderStoreTab() {
 
         <div id="funded-dashboard-panel"></div>
 
+        <div class="store-card" style="margin-top:16px;">
+            <span class="store-card-icon">&#128176;</span>
+            <div class="store-card-title">Need More Credits?</div>
+            <div class="store-card-desc">
+                Ran your virtual balance low? Top back up to &#36;2,500 for a clean slate and keep practising &mdash; no need to wait until you hit zero.
+            </div>
+            <button class="store-card-btn" onclick="purchaseAccountReset()">Top Up to &#36;2,500 &mdash; &pound;4.99</button>
+            <p class="store-card-legal">A one-time top-up of virtual (simulated) credits. No real money is traded, deposited, or withdrawable.</p>
+        </div>
+
         <div class="simulated-env-notice">
             <strong>&#9888;&#65039; Risk-Free Educational Environment</strong><br>
             All trading on TeaTrade Exchange uses virtual portfolios with simulated balances. No real money is traded, deposited, withdrawn, or at risk.
@@ -2930,6 +2943,90 @@ function _learnLesson(icon, title, body) {
             </button>
             <div class="lesson-body"><p>${body}</p></div>
         </div>`;
+}
+
+// =============================================
+// MONTHLY CHALLENGE (skill-based prize competition)
+// =============================================
+
+function renderChallengeTab() {
+    const panel = document.getElementById('challenge-panel');
+    if (!panel) return;
+
+    const now = new Date();
+    const monthName = now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const msLeft = Math.max(0, endOfMonth - now);
+    const daysLeft = Math.floor(msLeft / 86400000);
+    const hoursLeft = Math.floor((msLeft % 86400000) / 3600000);
+
+    panel.innerHTML = `
+        <div class="challenge-hero">
+            <div class="challenge-hero-badge">&#127942; Monthly Trading Challenge</div>
+            <div class="challenge-hero-title">${monthName}</div>
+            <div class="challenge-hero-sub">Trade with skill and discipline. The top 3 members on the leaderboard each month win real cash prizes.</div>
+            <div class="challenge-countdown">
+                <div class="challenge-count-box"><span class="challenge-count-num">${daysLeft}</span><span class="challenge-count-label">days</span></div>
+                <div class="challenge-count-box"><span class="challenge-count-num">${hoursLeft}</span><span class="challenge-count-label">hrs</span></div>
+                <span class="challenge-count-text">left this round</span>
+            </div>
+        </div>
+
+        <div class="challenge-prizes">
+            <div class="challenge-prize gold"><div class="challenge-prize-medal">&#129351;</div><div class="challenge-prize-place">1st</div><div class="challenge-prize-amount">&pound;500</div></div>
+            <div class="challenge-prize silver"><div class="challenge-prize-medal">&#129352;</div><div class="challenge-prize-place">2nd</div><div class="challenge-prize-amount">&pound;250</div></div>
+            <div class="challenge-prize bronze"><div class="challenge-prize-medal">&#129353;</div><div class="challenge-prize-place">3rd</div><div class="challenge-prize-amount">&pound;100</div></div>
+        </div>
+
+        <div class="store-card">
+            <div class="challenge-lb-head">
+                <span>Live Standings</span>
+                <span class="learn-live-tag"><span class="learn-live-dot"></span>LIVE</span>
+            </div>
+            <div id="challenge-leaderboard"><div style="text-align:center;padding:20px;color:var(--text-secondary);">Loading standings&hellip;</div></div>
+        </div>
+
+        <div class="challenge-rules">
+            <strong>How it works</strong>
+            <ul>
+                <li>Members are ranked by <strong>portfolio return</strong> over the calendar month &mdash; rewarding skill and consistency, not luck.</li>
+                <li>Prizes are funded by TeaTrade and paid to the top 3 after each round.</li>
+                <li>Open to members aged 18+. Winners are responsible for any personal tax.</li>
+                <li>TeaTrade may disqualify manipulative or abusive play to keep it fair.</li>
+            </ul>
+            <p class="challenge-legal">A free-to-enter skill competition for members &mdash; not gambling and not a financial payout. Prizes are discretionary rewards for leaderboard performance on the simulated platform. Full <a href="/terms.html" target="_blank" rel="noopener">Terms</a> apply.</p>
+        </div>
+    `;
+
+    _loadChallengeStandings();
+}
+
+async function _loadChallengeStandings() {
+    const el = document.getElementById('challenge-leaderboard');
+    if (!el || typeof apiFetchLeaderboard !== 'function') return;
+    try {
+        const { data, error } = await apiFetchLeaderboard(10);
+        if (error || !Array.isArray(data) || data.length === 0) {
+            el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">No standings yet &mdash; be the first to climb the board!</div>';
+            return;
+        }
+        const myName = (state.userProfile?.username || '').toLowerCase();
+        el.innerHTML = data.map((u, i) => {
+            const rank = i + 1;
+            const medal = rank === 1 ? '&#129351;' : rank === 2 ? '&#129352;' : rank === 3 ? '&#129353;' : rank;
+            const ret = Number(u.return_pct) || 0;
+            const retCls = ret >= 0 ? 'up' : 'down';
+            const isMe = (u.username || '').toLowerCase() === myName;
+            return `
+                <div class="challenge-lb-row${isMe ? ' me' : ''}${rank <= 3 ? ' prize' : ''}">
+                    <span class="challenge-lb-rank">${medal}</span>
+                    <span class="challenge-lb-name">${escapeHtml(u.username || 'Trader')}${isMe ? ' <span class="challenge-lb-you">YOU</span>' : ''}</span>
+                    <span class="challenge-lb-return ${retCls}">${ret >= 0 ? '+' : ''}${ret.toFixed(1)}%</span>
+                </div>`;
+        }).join('');
+    } catch (_) {
+        el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--accent-red);">Could not load standings right now.</div>';
+    }
 }
 
 // ── Margin calculator state + logic ──────────────────────────
