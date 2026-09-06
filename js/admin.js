@@ -79,6 +79,8 @@ function renderAdminFinance(container, data) {
     const paid = data.paid_out || {};
     const byMonth = data.by_month || [];
     const recent = data.recent_payouts || [];
+    const subs = data.subscribers || {};
+    const subRecent = subs.recent || [];
     const esc = typeof escapeHtml === 'function' ? escapeHtml : (s) => String(s == null ? '' : s);
 
     const net = (Number(raised.total_pence) || 0) - (Number(paid.total_pence) || 0);
@@ -97,6 +99,30 @@ function renderAdminFinance(container, data) {
                 <div class="admin-fin-card"><div class="admin-fin-num">${_fmtGbp(raised.last_90d)}</div><div class="admin-fin-lbl">Raised &middot; 90 Days</div></div>
                 <div class="admin-fin-card"><div class="admin-fin-num">${_fmtGbp(raised.ytd)}</div><div class="admin-fin-lbl">Raised &middot; YTD</div></div>
                 <div class="admin-fin-card"><div class="admin-fin-num" style="color:var(--accent-red);">${_fmtGbp(paid.total_pence)}</div><div class="admin-fin-lbl">Total Paid Out</div></div>
+            </div>
+
+            <div class="admin-fin-grid">
+                <div class="admin-fin-card"><div class="admin-fin-num">${_fmt(subs.total || 0)}</div><div class="admin-fin-lbl">Real Members</div></div>
+                <div class="admin-fin-card"><div class="admin-fin-num" style="color:var(--accent-green);">${_fmt(subs.pro || 0)}</div><div class="admin-fin-lbl">Paying &middot; PRO</div></div>
+                <div class="admin-fin-card"><div class="admin-fin-num">${_fmt(subs.new_24h || 0)}</div><div class="admin-fin-lbl">New &middot; 24h</div></div>
+                <div class="admin-fin-card"><div class="admin-fin-num">${_fmt(subs.new_7d || 0)}</div><div class="admin-fin-lbl">New &middot; 7 Days</div></div>
+            </div>
+
+            <div class="admin-fin-months admin-subs">
+                <div class="admin-fin-months-title">Recent Signups (real members, bots excluded)</div>
+                ${subRecent.length === 0
+            ? '<div style="color:var(--text-muted);font-size:12px;padding:10px 0;">No members yet.</div>'
+            : subRecent.map(u => {
+                const d = new Date(u.joined).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                const isPro = u.tier === 'PRO';
+                const badge = `<span class="admin-sub-badge ${isPro ? 'pro' : 'free'}">${isPro ? 'PRO' : 'FREE'}</span>`;
+                return `<div class="admin-sub-row">
+                                <span class="admin-sub-email">${esc(u.email)}</span>
+                                <span class="admin-sub-user">${u.username ? esc(u.username) : '&mdash;'}</span>
+                                ${badge}
+                                <span class="admin-sub-date">${d}</span>
+                            </div>`;
+            }).join('')}
             </div>
 
             ${byMonth.length ? `
