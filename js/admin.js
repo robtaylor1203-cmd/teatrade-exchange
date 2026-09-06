@@ -30,8 +30,32 @@ function closeAdminPanel() {
 async function loadAdminData() {
     const body = document.getElementById('admin-body');
     if (!body) return;
-    body.innerHTML = '<div class="admin-loading">Loading analytics...</div>';
+    // Load the (fast) finance dashboard and the (heavy) platform analytics
+    // independently, so finances always show even if analytics is slow/busy.
+    body.innerHTML = '<div id="admin-finance-section" class="admin-loading">Loading finances…</div>'
+        + '<div id="admin-analytics-section"></div>';
+    loadAdminFinance();
+    loadAdminAnalytics();
+}
 
+async function loadAdminFinance() {
+    const el = document.getElementById('admin-finance-section');
+    if (!el) return;
+    try {
+        const { data, error } = await supabaseClient.rpc('admin_finance');
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.error || 'Unknown error');
+        renderAdminFinance(el, data);
+    } catch (e) {
+        el.className = '';
+        el.innerHTML = `<div class="admin-error">Finances unavailable: ${e.message}</div>`;
+    }
+}
+
+async function loadAdminAnalytics() {
+    const el = document.getElementById('admin-analytics-section');
+    if (!el) return;
+    el.innerHTML = '<div class="admin-loading">Loading platform analytics…</div>';
     try {
         const { data, error } = await supabaseClient.rpc('admin_analytics');
         if (error) throw error;
@@ -40,10 +64,42 @@ async function loadAdminData() {
         const ts = document.getElementById('admin-timestamp');
         if (ts) ts.textContent = 'Generated: ' + new Date(data.generated_at).toLocaleString();
 
-        renderAdminDashboard(body, data);
+        renderAdminDashboard(el, data);
     } catch (e) {
-        body.innerHTML = `<div class="admin-error">Failed to load: ${e.message}</div>`;
+        el.innerHTML = `<div class="admin-error">Platform analytics unavailable (the database may be busy — try again shortly): ${e.message}</div>`;
     }
+}
+
+function _fmtGbp(pence) {
+    return '£' + (Number(pence || 0) / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function renderAdminFinance(container, data) {
+    const raised = data.raised || {};
+    const paid = data.paid_out || {};
+    const byMonth = data.by_month || [];
+
+    container.className = '';
+    container.innerHTML = `
+        <div class="admin-finance">
+            <div class="admin-fin-hero">
+                <div class="admin-fin-hero-label">Total Funds Raised</div>
+                <div class="admin-fin-hero-value">${_fmtGbp(raised.total_pence)}</div>
+                <div class="admin-fin-hero-sub">${_fmt(raised.count || 0)} payments &middot; total paid out ${_fmtGbp(paid.total_pence)}</div>
+            </div>
+            <div class="admin-fin-grid">
+                <div class="admin-fin-card"><div class="admin-fin-num">${_fmtGbp(raised.this_month)}</div><div class="admin-fin-lbl">This Month</div></div>
+                <div class="admin-fin-card"><div class="admin-fin-num">${_fmtGbp(raised.last_90d)}</div><div class="admin-fin-lbl">Last 90 Days</div></div>
+                <div class="admin-fin-card"><div class="admin-fin-num">${_fmtGbp(raised.ytd)}</div><div class="admin-fin-lbl">Year to Date</div></div>
+                <div class="admin-fin-card"><div class="admin-fin-num">${_fmtGbp(paid.total_pence)}</div><div class="admin-fin-lbl">Total Paid Out</div></div>
+            </div>
+            ${byMonth.length ? `
+            <div class="admin-fin-months">
+                <div class="admin-fin-months-title">Monthly Revenue</div>
+                ${byMonth.map(m => `<div class="admin-fin-month-row"><span>${m.month}</span><span class="admin-fin-month-amt">${_fmtGbp(m.pence)}</span><span class="admin-fin-month-count">${m.count} txns</span></div>`).join('')}
+            </div>` : ''}
+        </div>
+    `;
 }
 
 function _fmt(n) {

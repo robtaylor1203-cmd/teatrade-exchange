@@ -223,13 +223,10 @@ function toggleMaximize(panelId) {
     }, 100);
 
     if (panelId === 'chart-section' && panel.classList.contains('panel-maximized')) {
-        // Rebuild once the fullscreen layout has settled so the chart is sized
-        // correctly against the visible container (fixes the blank/zero-height
-        // chart on reopen), then redraw for good measure.
-        setTimeout(() => {
-            if (typeof _destroyHubTvChart === 'function') _destroyHubTvChart();
-            drawHubChart();
-        }, 220);
+        // Redraw once the fullscreen layout has settled. drawHubChart() now
+        // resizes the chart to its container, so no destroy/recreate is needed
+        // (destroying the good chart was what left it blank).
+        setTimeout(drawHubChart, 220);
         setTimeout(drawHubChart, 450);
     }
 }
@@ -874,7 +871,16 @@ function _initHubTvChart() {
 
     _destroyHubTvChart();
 
+    // Explicit width/height instead of autoSize: on a rebuild the container
+    // size often doesn't change, so autoSize's ResizeObserver never fires and
+    // the chart stays at zero height (blank). We size it directly and keep it
+    // in sync via resizeHubChartToContainer().
+    const _w = container.clientWidth || container.offsetWidth || 600;
+    const _h = container.clientHeight || container.offsetHeight || 360;
+
     _hubTvChart = LightweightCharts.createChart(container, {
+        width: _w,
+        height: _h,
         layout: {
             textColor: '#94a3b8',
             background: { type: 'solid', color: 'transparent' }
@@ -889,7 +895,6 @@ function _initHubTvChart() {
         crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
         handleScroll: true,
         handleScale: true,
-        autoSize: true,
     });
 
     // Create the main price series
@@ -983,6 +988,14 @@ function drawHubChart() {
     }
 
     if (!_hubMainSeries) return; // Safety: init may fail if TV is not loaded yet
+
+    // Keep the chart sized to its (now-visible) container. Without this, a chart
+    // rebuilt while the container size is unchanged stays at zero height = blank.
+    const _cw = container.clientWidth || container.offsetWidth;
+    const _ch = container.clientHeight || container.offsetHeight;
+    if (_hubTvChart && _cw > 0 && _ch > 0) {
+        try { _hubTvChart.resize(_cw, _ch); } catch (e) { }
+    }
 
     const tvData = _toHubTvData(state.hubChartData);
     if (tvData.length === 0) return;
