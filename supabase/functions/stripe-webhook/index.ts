@@ -81,7 +81,7 @@ serve(async (req) => {
         case 'ACCOUNT_RESET': {
           const { error } = await supabaseAdmin.rpc('reset_account', {
             p_user_id: userId,
-            p_default_balance: 10000,
+            p_default_balance: 2500,
             p_mode: 'VIRTUAL',
             p_source: 'PAID_RESET',
           })

@@ -50,7 +50,7 @@ function updatePortfolioDisplay() {
         `;
         const totalValue = getActiveBalance();
         valueEl.textContent = '$' + totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        const startBal = state.tradingMode === 'REAL' ? 0 : 10000;
+        const startBal = state.tradingMode === 'REAL' ? 0 : 2500;
         const pnl = totalValue - startBal;
         const pnlPct = startBal > 0 ? (pnl / startBal * 100).toFixed(2) : '0.00';
         pnlEl.textContent = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} (${pnlPct}%)`;
@@ -207,7 +207,7 @@ function updatePortfolioDisplay() {
     const equity = balance + totalUnrealizedPnl;
     const freeMargin = equity - totalUsedMargin;
 
-    const startBal = state.tradingMode === 'REAL' ? 0 : 10000;
+const startBal = state.tradingMode === 'REAL' ? 0 : 2500;
     const equityPct = startBal > 0 ? (equity / startBal * 100) : 100;
 
     valueEl.textContent = '$' + equity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1317,7 +1317,7 @@ async function confirmResetAccount() {
         state.indexPositions = {};
         state.currentTradesData = [];
         state.tradeHistory = [];
-        setActiveBalance(result.new_balance || 10000);
+        setActiveBalance(result.new_balance || 2500);
 
         // Clear localStorage trade history
         localStorage.removeItem('tradeHistory');
@@ -1329,7 +1329,7 @@ async function confirmResetAccount() {
         updateUIForLoggedInUser();
 
         closeResetModal();
-        showToast('Account Reset', 'Your virtual account has been reset to $10,000 with a clean slate.');
+        showToast('Account Reset', 'Your virtual account has been reset to $2,500 with a clean slate.');
     } catch (error) {
         console.error('Account reset failed:', error);
         showToast('Reset Failed', 'Something went wrong. Please try again.', true);

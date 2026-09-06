@@ -249,7 +249,7 @@ serve(async (req) => {
     if (action === 'reset') {
       const { data, error } = await supabaseAdmin.rpc('reset_account', {
         p_user_id: user.id,
-        p_default_balance: 10000,
+        p_default_balance: 2500,
         p_mode: tradingMode,
       })
 

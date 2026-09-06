@@ -142,7 +142,7 @@ async function handleSignup(e) {
         if (data.user && !data.user.email_confirmed_at) {
             showToast('Check Your Email', 'Please verify your email address to enable trading. Check your inbox for a confirmation link.');
         } else {
-            showToast('Welcome to TeaTrade!', 'You have $10,000 virtual cash to start trading.');
+            showToast('Welcome to TeaTrade!', 'You have $2,500 virtual cash to start trading.');
         }
 
     } catch (error) {

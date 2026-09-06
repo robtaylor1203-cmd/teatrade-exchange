@@ -1901,7 +1901,7 @@ window.openMobileTradeSheet = function (side) {
     var qtyEl = document.getElementById('qq-mobile-qty');
     if (!qtyEl.value || qtyEl.value === '0') qtyEl.value = '100';
 
-    var balance = typeof getActiveBalance === 'function' ? (getActiveBalance() || 10000) : 10000;
+    var balance = typeof getActiveBalance === 'function' ? (getActiveBalance() || 2500) : 2500;
     var balEl = document.getElementById('qq-mobile-balance');
     if (balEl) balEl.textContent = '$' + balance.toLocaleString('en-US', { minimumFractionDigits: 2 });
 
