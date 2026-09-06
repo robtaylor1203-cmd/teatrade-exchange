@@ -99,7 +99,7 @@ function updatePortfolioDisplay() {
             <div class="position-item">
                 <div>
                     <div class="position-tea">${escapeHtml(tea.symbol)}${badge}${levBadge}</div>
-                    <div class="position-qty">${absQty.toLocaleString()} kg @ $${pos.avg_entry_price.toFixed(4)} · Invested: $${margin.toFixed(2)}</div>
+                    <div class="position-qty">${absQty.toLocaleString()} kg · Open $${pos.avg_entry_price.toFixed(4)} <span class="pos-arrow">→</span> Mark $${exitPrice.toFixed(4)}</div>
                 </div>
                 <div class="position-value">
                     <div class="position-current">$${returnValue.toFixed(2)}</div>
@@ -144,7 +144,7 @@ function updatePortfolioDisplay() {
             <div class="position-item">
                 <div>
                     <div class="position-tea">${escapeHtml(symbol)} <span style="color: var(--accent-purple); font-size: 10px;">IDX</span> ${dirBadge}${idxLevBadge}</div>
-                    <div class="position-qty">${absQty.toLocaleString()} kg @ $${pos.avg_entry_price.toFixed(4)} · Invested: $${margin.toFixed(2)}</div>
+                    <div class="position-qty">${absQty.toLocaleString()} kg · Open $${pos.avg_entry_price.toFixed(4)} <span class="pos-arrow">→</span> Mark $${exitPrice.toFixed(4)}</div>
                 </div>
                 <div class="position-value">
                     <div class="position-current">$${idxReturnValue.toFixed(2)}</div>

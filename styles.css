@@ -18656,3 +18656,10 @@ select.mc-input { font-family: inherit; cursor: pointer; }
 @media (max-width: 480px) {
     .admin-fin-form { grid-template-columns: 1fr; }
 }
+
+/* Position row open→mark arrow */
+.pos-arrow {
+    color: var(--text-muted);
+    margin: 0 2px;
+    font-weight: 700;
+}
