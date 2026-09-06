@@ -1703,7 +1703,13 @@ async function executeHubTrade(side) {
             );
             loadPendingOrders();
         } else if (isIndex) {
-            const result = await apiExecuteIndexTrade(lookupSymbol, side.toUpperCase(), quantity, price, leverage);
+            // Market index order OPENS at the Ask (BUY) / Bid (SELL) — the exact
+            // price shown in the form. Closes execute at mid (spread charged once).
+            const INDEX_SPREAD_PCT = 0.02; // 2% total = 1% per side
+            const idxExecPrice = side.toUpperCase() === 'BUY'
+                ? price * (1 + INDEX_SPREAD_PCT / 2)
+                : price * (1 - INDEX_SPREAD_PCT / 2);
+            const result = await apiExecuteIndexTrade(lookupSymbol, side.toUpperCase(), quantity, idxExecPrice, leverage);
             if (!result.success) {
                 throw new Error(result.error || 'Index trade failed');
             }

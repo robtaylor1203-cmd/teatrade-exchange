@@ -331,13 +331,16 @@ async function executeTrade() {
     try {
         if (isIndexTrade) {
             // ── INDEX TRADE ─────────────────────────────────────────────────────
-            // Send the raw MID price to the server. The SQL RPC is the single
-            // source of truth for spread calculation — it applies the spread
-            // from platform_config once, stores the spread-adjusted price in
-            // the DB, and returns it. No client-side spread on execution.
+            // The RPC stores the price we send AS-IS, so we apply the index spread
+            // here: BUY opens at the Ask, SELL opens at the Bid — the exact price
+            // shown in the trade form. Closes execute at mid (spread charged once).
+            const INDEX_SPREAD_PCT = 0.02; // 2% total = 1% per side
             const midPrice = (_liveIndex?.price && _liveIndex.price > 0) ? _liveIndex.price : price;
+            const execPrice = state.tradeType === 'BUY'
+                ? midPrice * (1 + INDEX_SPREAD_PCT / 2)
+                : midPrice * (1 - INDEX_SPREAD_PCT / 2);
 
-            const result = await apiExecuteIndexTrade(indexSymbol, state.tradeType, qty, midPrice, leverage);
+            const result = await apiExecuteIndexTrade(indexSymbol, state.tradeType, qty, execPrice, leverage);
 
             if (!result.success) {
                 throw new Error(result.error || 'Index trade failed');

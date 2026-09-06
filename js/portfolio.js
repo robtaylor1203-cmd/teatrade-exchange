@@ -118,12 +118,9 @@ function updatePortfolioDisplay() {
         const absQty = Math.abs(pos.quantity);
         const currentValue = absQty * index.price;
         const costBasis = absQty * pos.avg_entry_price;
-        // True Bid/Ask exit price — T212 model:
-        // INDEX spread = 2% total (1% per side).
-        // Longs sell at Bid (mid × 0.99), shorts cover at Ask (mid × 1.01).
-        const exitPrice = isShort
-            ? index.price * 1.01
-            : index.price * 0.99;
+        // Index closes execute at mid (spread is charged once, on open), so mark
+        // to mid here — this makes displayed P&L equal what you receive on close.
+        const exitPrice = index.price;
         const lev = Number(pos.leverage) || 1;
         const margin = costBasis / lev;
         const notionalValue = margin * lev;
@@ -191,8 +188,8 @@ function updatePortfolioDisplay() {
         const index = indexes.find(idx => idx.symbol === symbol);
         if (index && pos && pos.quantity !== 0) {
             const isShort = pos.quantity < 0;
-            // INDEX spread = 2% total (1% per side) for margin metrics consistency
-            const iep = isShort ? index.price * 1.01 : index.price * 0.99;
+            // Index closes execute at mid (spread charged on open only)
+            const iep = index.price;
             const inv = idxMargin * idxLev;
             const units = inv / pos.avg_entry_price;
             let idxPnl = isShort
@@ -618,9 +615,8 @@ function displayUserTrades(trades) {
                 const index = idxList.find(idx => idx.symbol === trade.index_symbol);
 
                 if (index) {
-                    // True Bid/Ask exit: INDEX spread = 2% total (1% per side)
-                    // Longs sell at Bid (mid × 0.99), shorts cover at Ask (mid × 1.01)
-                    const exitPrice = isShortIdx ? index.price * 1.01 : index.price * 0.99;
+                    // Index closes execute at mid (spread charged on open only)
+                    const exitPrice = index.price;
                     const notionalValue = total * leverage;
                     const units = notionalValue / trade.price;
                     pnl = isShortIdx
