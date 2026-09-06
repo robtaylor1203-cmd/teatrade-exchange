@@ -573,37 +573,6 @@
             style="width: 100%; margin-top: 14px; text-align: center;">BUY 100 kg</button>
     </div>
 
-    <!-- Multi-Chart Dashboard Modal -->
-    <div class="multi-chart-modal-overlay" id="multi-chart-modal">
-        <div class="multi-chart-modal">
-            <div class="multi-chart-header">
-                <div class="multi-chart-title">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="7" height="7"></rect>
-                        <rect x="14" y="3" width="7" height="7"></rect>
-                        <rect x="14" y="14" width="7" height="7"></rect>
-                        <rect x="3" y="14" width="7" height="7"></rect>
-                    </svg>
-                    Multi-Chart Dashboard
-                </div>
-                <div class="multi-chart-actions">
-                    <button class="mc-add-chart-btn" onclick="addMultiChart()">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <line x1="12" y1="5" x2="12" y2="19"></line>
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                        </svg>
-                        Add Chart
-                    </button>
-                    <button class="multi-chart-close" onclick="closeMultiChartModal()">&times;</button>
-                </div>
-            </div>
-            <div class="multi-chart-grid" id="multi-chart-grid">
-                <!-- Charts will be dynamically added here -->
-            </div>
-        </div>
-    </div>
-
     <!-- Price Alert Modal -->
     <div class="pairs-modal-overlay" id="price-alert-modal">
         <div class="pairs-modal" style="max-width: 340px;">
@@ -662,9 +631,7 @@
         </div>
         <nav class="nav-links">
             <a href="#" class="active">Markets</a>
-            <a href="#">Auctions</a>
-            <a href="#" onclick="openMultiChartModal(); return false;">Dashboard</a>
-            <a href="#">Analytics</a>
+            <a href="analytics.html">Analytics</a>
         </nav>
         <div class="user-section">
             <div class="market-status" id="market-status">
@@ -2892,7 +2859,6 @@
     <script defer src="js/ui.js?v=20260219u"></script>
     <script defer src="js/hub.js?v=20260225b"></script>
     <script defer src="js/quoteModal.js?v=20260226a"></script>
-    <script defer src="js/multiChart.js?v=20260218"></script>
     <div id="checkout-overlay" class="checkout-overlay" style="display:none;">
         <div class="checkout-overlay-content">
             <div class="checkout-spinner"></div>

@@ -1134,9 +1134,6 @@ function onTickerBatchComplete() {
         updateQuickQuoteLivePrice();
     }
 
-    // Multi-chart panels
-    updateMultiChartPrices();
-
     // Pairs table
     updatePairsTable();
 
