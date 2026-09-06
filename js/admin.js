@@ -78,6 +78,11 @@ function renderAdminFinance(container, data) {
     const raised = data.raised || {};
     const paid = data.paid_out || {};
     const byMonth = data.by_month || [];
+    const recent = data.recent_payouts || [];
+    const esc = typeof escapeHtml === 'function' ? escapeHtml : (s) => String(s == null ? '' : s);
+
+    const net = (Number(raised.total_pence) || 0) - (Number(paid.total_pence) || 0);
+    const netColor = net >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
 
     container.className = '';
     container.innerHTML = `
@@ -85,21 +90,94 @@ function renderAdminFinance(container, data) {
             <div class="admin-fin-hero">
                 <div class="admin-fin-hero-label">Total Funds Raised</div>
                 <div class="admin-fin-hero-value">${_fmtGbp(raised.total_pence)}</div>
-                <div class="admin-fin-hero-sub">${_fmt(raised.count || 0)} payments &middot; total paid out ${_fmtGbp(paid.total_pence)}</div>
+                <div class="admin-fin-hero-sub">${_fmt(raised.count || 0)} payments in &middot; ${_fmtGbp(paid.total_pence)} paid out &middot; <strong style="color:${netColor};">${_fmtGbp(net)} net</strong></div>
             </div>
             <div class="admin-fin-grid">
-                <div class="admin-fin-card"><div class="admin-fin-num">${_fmtGbp(raised.this_month)}</div><div class="admin-fin-lbl">This Month</div></div>
-                <div class="admin-fin-card"><div class="admin-fin-num">${_fmtGbp(raised.last_90d)}</div><div class="admin-fin-lbl">Last 90 Days</div></div>
-                <div class="admin-fin-card"><div class="admin-fin-num">${_fmtGbp(raised.ytd)}</div><div class="admin-fin-lbl">Year to Date</div></div>
-                <div class="admin-fin-card"><div class="admin-fin-num">${_fmtGbp(paid.total_pence)}</div><div class="admin-fin-lbl">Total Paid Out</div></div>
+                <div class="admin-fin-card"><div class="admin-fin-num">${_fmtGbp(raised.this_month)}</div><div class="admin-fin-lbl">Raised &middot; Month</div></div>
+                <div class="admin-fin-card"><div class="admin-fin-num">${_fmtGbp(raised.last_90d)}</div><div class="admin-fin-lbl">Raised &middot; 90 Days</div></div>
+                <div class="admin-fin-card"><div class="admin-fin-num">${_fmtGbp(raised.ytd)}</div><div class="admin-fin-lbl">Raised &middot; YTD</div></div>
+                <div class="admin-fin-card"><div class="admin-fin-num" style="color:var(--accent-red);">${_fmtGbp(paid.total_pence)}</div><div class="admin-fin-lbl">Total Paid Out</div></div>
             </div>
+
             ${byMonth.length ? `
             <div class="admin-fin-months">
                 <div class="admin-fin-months-title">Monthly Revenue</div>
-                ${byMonth.map(m => `<div class="admin-fin-month-row"><span>${m.month}</span><span class="admin-fin-month-amt">${_fmtGbp(m.pence)}</span><span class="admin-fin-month-count">${m.count} txns</span></div>`).join('')}
+                ${byMonth.map(m => `<div class="admin-fin-month-row"><span>${esc(m.month)}</span><span class="admin-fin-month-amt">${_fmtGbp(m.pence)}</span><span class="admin-fin-month-count">${m.count} txns</span></div>`).join('')}
             </div>` : ''}
+
+            <div class="admin-fin-months admin-fin-ledger">
+                <div class="admin-fin-months-title admin-fin-ledger-head">
+                    <span>Prize Payouts (Out)</span>
+                    <button class="admin-fin-add-btn" onclick="toggleRecordPayoutForm()">+ Record Payout</button>
+                </div>
+                <div id="admin-payout-form" class="admin-fin-form" style="display:none;">
+                    <input id="pay-recipient" class="admin-fin-input" placeholder="Recipient (username / name)">
+                    <input id="pay-amount" class="admin-fin-input" type="number" step="0.01" min="0" placeholder="Amount (£)">
+                    <input id="pay-reason" class="admin-fin-input" placeholder="Reason (e.g. Sept Challenge – 1st)">
+                    <input id="pay-method" class="admin-fin-input" placeholder="Method (e.g. Bank transfer)">
+                    <button class="admin-fin-save-btn" onclick="submitRecordPayout()">Save Payout</button>
+                </div>
+                <div id="admin-payout-list">
+                    ${recent.length === 0
+            ? '<div style="color:var(--text-muted);font-size:12px;padding:10px 0;">No payouts recorded yet.</div>'
+            : recent.map(p => {
+                const d = new Date(p.paid_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                const meta = [p.reason ? esc(p.reason) : '', p.method ? esc(p.method) : '', d].filter(Boolean).join(' · ');
+                return `<div class="admin-fin-payout-row">
+                                <div class="admin-fin-payout-main">
+                                    <span class="admin-fin-payout-name">${esc(p.recipient)}</span>
+                                    <span class="admin-fin-payout-meta">${meta}</span>
+                                </div>
+                                <span class="admin-fin-payout-amt">${_fmtGbp(p.amount_pence)}</span>
+                                <button class="admin-fin-del" title="Delete entry" onclick="deletePayout(${p.id})">&times;</button>
+                            </div>`;
+            }).join('')}
+                </div>
+            </div>
         </div>
     `;
+}
+
+function toggleRecordPayoutForm() {
+    const f = document.getElementById('admin-payout-form');
+    if (f) f.style.display = f.style.display === 'none' ? 'grid' : 'none';
+}
+
+async function submitRecordPayout() {
+    const recipient = document.getElementById('pay-recipient')?.value.trim();
+    const amountGbp = parseFloat(document.getElementById('pay-amount')?.value);
+    const reason = document.getElementById('pay-reason')?.value.trim();
+    const method = document.getElementById('pay-method')?.value.trim();
+
+    if (!recipient) { showToast('Missing info', 'Enter a recipient.', true); return; }
+    if (!amountGbp || amountGbp <= 0) { showToast('Missing info', 'Enter a valid amount.', true); return; }
+
+    try {
+        const { data, error } = await supabaseClient.rpc('admin_record_payout', {
+            p_recipient: recipient,
+            p_amount_pence: Math.round(amountGbp * 100),
+            p_reason: reason || null,
+            p_method: method || null,
+        });
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.error || 'Failed');
+        showToast('Payout Recorded', `${_fmtGbp(Math.round(amountGbp * 100))} to ${recipient}`);
+        loadAdminFinance();
+    } catch (e) {
+        showToast('Error', e.message || 'Could not record payout', true);
+    }
+}
+
+async function deletePayout(id) {
+    if (!confirm('Delete this payout entry? This only removes the record, not any real payment you made.')) return;
+    try {
+        const { data, error } = await supabaseClient.rpc('admin_delete_payout', { p_id: id });
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.error || 'Failed');
+        loadAdminFinance();
+    } catch (e) {
+        showToast('Error', e.message || 'Could not delete', true);
+    }
 }
 
 function _fmt(n) {
