@@ -882,7 +882,8 @@ function _applyHubTimeScaleFormat(tf) {
 // Show the timeframe's intended window when enough history is loaded; else fit all.
 function _setHubVisibleWindow(tvData) {
     if (!_hubTvChart || !tvData || tvData.length === 0) return;
-    const cfg = (typeof TIMEFRAME_CONFIG !== 'undefined') ? TIMEFRAME_CONFIG[state.currentTimeframe] : null;
+    const _htf = state.hubTimeframe || state.currentTimeframe;
+    const cfg = (typeof TIMEFRAME_CONFIG !== 'undefined') ? TIMEFRAME_CONFIG[_htf] : null;
     const lastT = Number(tvData[tvData.length - 1].time);
     const firstT = Number(tvData[0].time);
     if (cfg && cfg.hoursBack) {
@@ -1002,7 +1003,8 @@ function _toHubTvData(rawData) {
 
     // Wide timeframes render the synthetic daily series; scale it to end at the
     // live price so the fullscreen chart matches the main chart and the ticker.
-    if (state.currentTimeframe !== '1D' && out.length > 1) {
+    const _htf = state.hubTimeframe || state.currentTimeframe || '1W';
+    if (_htf !== '1D' && out.length > 1) {
         const live = Number(state.mainChartData?.basePrice) / _fx;
         const lastClose = out[out.length - 1].close;
         const scale = live / lastClose;
@@ -1097,10 +1099,14 @@ function drawHubChart() {
             try { _hubVolumeSeries.setData(volData); } catch (e) {}
         }
 
-        // Format axis + show the intended timeframe window (keeps the axis span
-        // correct and lets indicators fill from older warm-up candles).
-        _applyHubTimeScaleFormat(state.currentTimeframe);
-        try { _setHubVisibleWindow(tvData); } catch (e) {}
+        // Format axis + show the intended window AFTER layout settles — doing it
+        // synchronously on a freshly-opened (0-width) panel silently no-ops and
+        // leaves the data crammed. Use the hub's own timeframe, not the main chart's.
+        setTimeout(() => {
+            if (!_hubTvChart) return;
+            _applyHubTimeScaleFormat(currentTf);
+            try { _setHubVisibleWindow(tvData); } catch (e) { }
+        }, 60);
     }
 
     // Update tracking state
