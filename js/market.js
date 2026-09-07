@@ -252,7 +252,6 @@ async function loadChartDataFromHistory(symbol, symbolType = 'tea', timeframeOve
     const cfg = TIMEFRAME_CONFIG[tf] || TIMEFRAME_CONFIG['1D'];
 
     const _sinceFromHours = h => h ? new Date(Date.now() - h * 3600000).toISOString() : null;
-    let since = _sinceFromHours(cfg.hoursBack);
 
     const idxDef = symbolType === 'index' ? _findIndexDef(symbol) : null;
 
@@ -260,11 +259,17 @@ async function loadChartDataFromHistory(symbol, symbolType = 'tea', timeframeOve
     // intraday data so the current session is real.
     const simOnly = tf !== '1D';
 
+    // Fetch extra history beyond the displayed window so overlay indicators
+    // (SMA/EMA/Bollinger) have warm-up bars and fill the whole visible area. The
+    // chart is clamped back to cfg.hoursBack for display in _setVisibleWindow.
+    const fetchHours = cfg.hoursBack ? Math.round(cfg.hoursBack * 2.5) : null;
+    let since = _sinceFromHours(fetchHours);
+
     // Attempt load at the requested window first, then widen if too sparse.
     // Wider windows re-use the same OHLC interval so candle size stays consistent.
     const windows = [since];
-    if (cfg.hoursBack) {
-        windows.push(_sinceFromHours(cfg.hoursBack * 4));   // 4× wider
+    if (fetchHours) {
+        windows.push(_sinceFromHours(fetchHours * 4));   // 4× wider
         windows.push(null);                                   // all-time fallback
     }
 
