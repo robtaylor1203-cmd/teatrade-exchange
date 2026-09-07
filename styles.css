@@ -16651,9 +16651,15 @@ a.user-dropdown-item {
     border-radius: 50%;
 }
 
+#correlation-chart {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
 .corr-chart-area {
     flex: 1;
-    min-height: 200px;
+    min-height: 0;
     padding: 8px 12px 4px;
     position: relative;
 }
