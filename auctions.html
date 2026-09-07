@@ -80,6 +80,19 @@
         .auc-insight { margin-top: 16px; padding: 14px 16px; background: rgba(26,115,232,0.06); border: 1px solid rgba(26,115,232,0.2); border-radius: 10px; font-size: 13px; line-height: 1.65; color: var(--text-secondary); }
         .auc-insight strong { color: var(--text-primary); }
 
+        .auc-head-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+        .auc-fc-btn { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--text-secondary); background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 999px; padding: 6px 13px; cursor: pointer; transition: all .15s; white-space: nowrap; }
+        .auc-fc-btn:hover { color: var(--text-primary); border-color: var(--border-light); }
+        .auc-fc-btn.active { color: var(--accent-purple); border-color: var(--accent-purple); background: rgba(139,92,246,0.12); }
+        .auc-fc-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+        .auc-forecast { margin-top: 16px; padding: 16px; background: linear-gradient(160deg, rgba(139,92,246,0.07), var(--bg-card)); border: 1px solid rgba(139,92,246,0.28); border-radius: 12px; }
+        .auc-fc-head { font-size: 14px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+        .auc-fc-tag { font-size: 9px; font-weight: 700; letter-spacing: 0.5px; color: var(--accent-purple); background: rgba(139,92,246,0.16); padding: 2px 7px; border-radius: 999px; }
+        .auc-fc-body { font-size: 13px; line-height: 1.65; color: var(--text-secondary); margin-top: 12px; }
+        .auc-fc-body strong { color: var(--text-primary); }
+        .auc-fc-disclaim { font-size: 11px; color: var(--text-muted); margin-top: 12px; line-height: 1.5; }
+        .auc-fc-note { font-size: 13px; color: var(--text-secondary); }
+
         .auc-live-pill { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: var(--accent-green); background: rgba(16,185,129,0.14); padding: 2px 7px; border-radius: 999px; vertical-align: middle; margin-left: 6px; }
         .wx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 12px; }
         .wx-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
@@ -156,7 +169,10 @@
                     <h2 id="chart-title">Global Average — Monthly History</h2>
                     <div class="panel-note" id="chart-note">Tea, average of three auctions (USD/kg). Source: World Bank Pink Sheet.</div>
                 </div>
-                <span class="auc-signal" id="auc-signal"></span>
+                <div class="auc-head-right">
+                    <button class="auc-fc-btn" id="forecast-toggle" onclick="toggleForecast()"><span class="auc-fc-dot"></span> 12-Mo Forecast</button>
+                    <span class="auc-signal" id="auc-signal"></span>
+                </div>
             </div>
             <div id="benchmark-chart"></div>
             <div class="empty-state" id="chart-empty" style="display:none;">
@@ -164,6 +180,7 @@
             </div>
             <div class="auc-metrics" id="auc-metrics"></div>
             <div class="auc-insight" id="auc-insight"></div>
+            <div class="auc-forecast" id="auc-forecast" style="display:none;"></div>
             <div class="panel-note" style="margin-top:10px;">Tap any benchmark above to analyse that centre. Figures are educational, not executable prices.</div>
         </section>
 
@@ -267,6 +284,7 @@
         let ALL = { GLOBAL: [], MOMBASA: [], COLOMBO: [], KOLKATA: [], BRENT: [] }; // each DESC by date
         let selected = 'GLOBAL';
         let chart = null, areaSeries = null;
+        let forecastOn = false, fcLine = null, fcUpper = null, fcLower = null, WX = {};
 
         const SERIES_META = {
             GLOBAL:  { name: 'Global Average',      note: 'Tea, average of three auctions (USD/kg). Source: World Bank Pink Sheet.', color: '#1a73e8' },
@@ -328,6 +346,7 @@
             renderChart(ALL[key], meta.color);
             renderAnalytics(key);
             highlightWxRegion(key);
+            if (forecastOn) renderForecast(key);
         }
 
         function ensureChart() {
@@ -500,8 +519,14 @@
                         return { r, rain30, rain7, t7, rainLY };
                     } catch (e) { return { r, error: true }; }
                 }));
+                WX = {};
+                cards.forEach(c => {
+                    if (c.error) return;
+                    WX[c.r.key] = { rain30: c.rain30, t7: c.t7, name: c.r.name, yoy: (c.rainLY && c.rainLY > 3) ? (c.rain30 - c.rainLY) / c.rainLY * 100 : null };
+                });
                 grid.innerHTML = cards.map(renderWxCard).join('');
                 highlightWxRegion(selected);
+                if (forecastOn) renderForecast(selected);
             } catch (e) {
                 grid.innerHTML = '<div class="empty-state">Growing-region weather is unavailable right now.</div>';
             }
@@ -571,6 +596,130 @@
             }).join('');
             document.getElementById('buyers-insight').innerHTML =
                 `Global tea imports totalled <strong>$6.96&nbsp;billion</strong> in 2025 (down ~4.7% on 2024). The top five buyers — Pakistan, the USA, the UK, Saudi Arabia and Germany — account for roughly a third of world demand. <strong>Germany (+25%)</strong>, <strong>Morocco (+18%)</strong> and <strong>mainland China (+17%)</strong> are the fastest-growing markets, while <strong>Russia fell 63%</strong> — a major retreat by a historically large buyer of Ceylon and Assam tea that eases competition at those auctions.`;
+        }
+
+        // ── 12-Month price forecast (seasonal + damped trend, weather-informed) ──
+        const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const monthIso = (y, m) => `${y}-${String(m + 1).padStart(2, '0')}-01`;
+        const SEASON_NOTES = {
+            GLOBAL:  { region: null,      note: 'globally, prices tend to firm through the northern-hemisphere dry season and soften mid-year as monsoon-driven volumes arrive.' },
+            MOMBASA: { region: 'MOMBASA', note: 'Kenyan quality peaks in the dry Jan–Feb window; the long rains (Mar–May) and short rains (Oct–Dec) lift volumes and usually ease prices.' },
+            COLOMBO: { region: 'COLOMBO', note: 'Ceylon’s prized Western-quality season runs Jan–Mar; the south-west monsoon (May–Sep) swells low-grown volumes.' },
+            KOLKATA: { region: 'KOLKATA', note: 'Assam’s premium second flush (May–Jun) commands the best prices; the monsoon (Jun–Sep) then floods CTC volumes into H2.' },
+        };
+
+        function buildForecast(rows) {
+            const a = asc(rows || []); const n = a.length;
+            if (n < 18) return null;
+            const vals = a.map(x => x.v);
+            const dates = a.map(x => new Date(x.t + 'T00:00:00'));
+            const acc = {}, cnt = {};
+            for (let i = 12; i < n; i++) {
+                const m12 = avg(vals.slice(i - 12, i));
+                if (m12 > 0) { const mo = dates[i].getMonth(); acc[mo] = (acc[mo] || 0) + vals[i] / m12; cnt[mo] = (cnt[mo] || 0) + 1; }
+            }
+            const seas = {}; let sSum = 0;
+            for (let mo = 0; mo < 12; mo++) { seas[mo] = cnt[mo] ? acc[mo] / cnt[mo] : 1; sSum += seas[mo]; }
+            const sMean = sSum / 12; for (let mo = 0; mo < 12; mo++) seas[mo] /= (sMean || 1);
+            const win = Math.min(24, n); const ys = [];
+            for (let i = n - win; i < n; i++) ys.push(vals[i] / (seas[dates[i].getMonth()] || 1));
+            const xs = ys.map((_, i) => i); const mx = avg(xs), my = avg(ys);
+            let num = 0, den = 0; for (let i = 0; i < ys.length; i++) { num += (xs[i] - mx) * (ys[i] - my); den += (xs[i] - mx) ** 2; }
+            const slope = den ? num / den : 0;
+            const lastDeseason = ys[ys.length - 1];
+            const fit = xs.map(x => my + slope * (x - mx));
+            const sd = Math.sqrt(avg(ys.map((y, i) => (y - fit[i]) ** 2)));
+            const damp = 0.82; const out = []; const lastDate = dates[n - 1];
+            for (let k = 1; k <= 12; k++) {
+                const cumDamp = (1 - Math.pow(damp, k)) / (1 - damp);
+                const deseason = Math.max(0.3 * lastDeseason, lastDeseason + slope * cumDamp);
+                const d = new Date(lastDate.getFullYear(), lastDate.getMonth() + k, 1);
+                const sf = seas[d.getMonth()] || 1;
+                const f = deseason * sf;
+                const wid = sd * Math.sqrt(k) * sf;
+                out.push({ time: monthIso(d.getFullYear(), d.getMonth()), value: +f.toFixed(4), upper: +(f + wid).toFixed(4), lower: +Math.max(0.01, f - wid).toFixed(4) });
+            }
+            let hiMo = 0, loMo = 0; for (let mo = 1; mo < 12; mo++) { if (seas[mo] > seas[hiMo]) hiMo = mo; if (seas[mo] < seas[loMo]) loMo = mo; }
+            return { out, hiMo, loMo, lastActual: vals[n - 1], lastActualTime: a[n - 1].t };
+        }
+
+        function weatherForKey(key) {
+            const rk = (SEASON_NOTES[key] || {}).region;
+            if (rk && WX[rk] && WX[rk].yoy != null) return { yoy: WX[rk].yoy, name: WX[rk].name };
+            const vals = ['MOMBASA', 'COLOMBO', 'KOLKATA'].map(k => WX[k] && WX[k].yoy).filter(v => v != null);
+            if (vals.length) return { yoy: vals.reduce((s, x) => s + x, 0) / vals.length, name: 'the key growing regions' };
+            return null;
+        }
+
+        function clearForecast() {
+            [fcLine, fcUpper, fcLower].forEach(s => { if (s && chart) { try { chart.removeSeries(s); } catch (_) { } } });
+            fcLine = fcUpper = fcLower = null;
+            const p = document.getElementById('auc-forecast'); if (p) { p.style.display = 'none'; p.innerHTML = ''; }
+        }
+
+        function toggleForecast() {
+            forecastOn = !forecastOn;
+            document.getElementById('forecast-toggle').classList.toggle('active', forecastOn);
+            if (forecastOn) renderForecast(selected);
+            else { clearForecast(); if (chart) chart.timeScale().fitContent(); }
+        }
+
+        function renderForecast(key) {
+            clearForecast();
+            if (!forecastOn) return;
+            const panel = document.getElementById('auc-forecast');
+            panel.style.display = 'block';
+            const fc = buildForecast(ALL[key]);
+            if (!fc) { panel.innerHTML = '<div class="auc-fc-note">Not enough history to model this benchmark yet.</div>'; return; }
+            ensureChart();
+            const color = SERIES_META[key].color;
+            const start = { time: fc.lastActualTime, value: fc.lastActual };
+            fcLine = chart.addLineSeries({ color, lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
+            fcUpper = chart.addLineSeries({ color: hexA(color, 0.35), lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
+            fcLower = chart.addLineSeries({ color: hexA(color, 0.35), lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
+            fcLine.setData([start, ...fc.out.map(o => ({ time: o.time, value: o.value }))]);
+            fcUpper.setData([start, ...fc.out.map(o => ({ time: o.time, value: o.upper }))]);
+            fcLower.setData([start, ...fc.out.map(o => ({ time: o.time, value: o.lower }))]);
+            chart.timeScale().fitContent();
+            renderForecastPanel(key, fc);
+        }
+
+        function renderForecastPanel(key, fc) {
+            const panel = document.getElementById('auc-forecast');
+            const meta = SERIES_META[key];
+            const endF = fc.out[11].value, six = fc.out[5].value;
+            const move = (endF - fc.lastActual) / fc.lastActual * 100;
+            const lo = fc.out[11].lower, hi = fc.out[11].upper;
+            const endDate = new Date(fc.out[11].time + 'T00:00:00');
+            const endLabel = MON[endDate.getMonth()] + ' ' + endDate.getFullYear();
+
+            const wx = weatherForKey(key);
+            let wxBias = 'Neutral', wxCls = 'flat', wxSent = '';
+            if (wx) {
+                if (wx.yoy < -25) { wxBias = 'Supportive'; wxCls = 'up'; wxSent = `Growing conditions in ${wx.name} are running dry (rainfall ${wx.yoy.toFixed(0)}% vs last year), a yield-stress risk that skews the near-term balance toward tighter supply and firmer prices.`; }
+                else if (wx.yoy > 25) { wxBias = 'Softer'; wxCls = 'down'; wxSent = `Growing conditions in ${wx.name} are notably wet (rainfall +${wx.yoy.toFixed(0)}% vs last year), pointing to healthy volumes that can weigh on prices, with some leaf-quality risk.`; }
+                else { wxSent = `Growing conditions in ${wx.name} are broadly normal (rainfall ${wx.yoy >= 0 ? '+' : ''}${wx.yoy.toFixed(0)}% vs last year), so no strong crop skew right now.`; }
+            }
+
+            const metrics = [
+                tile(fmtUsd(endF), '12-Mo Target', clsOf(move)),
+                tile((move >= 0 ? '+' : '') + move.toFixed(1) + '%', 'Projected Move', clsOf(move)),
+                tile(fmtUsd(six), '6-Mo Target', 'flat'),
+                tile(fmtUsd(lo) + ' – ' + fmtUsd(hi), '12-Mo Range', 'flat'),
+                tile(MON[fc.hiMo] + ' / ' + MON[fc.loMo], 'Seasonal Peak / Trough', 'flat'),
+                tile(wxBias, 'Weather Bias', wxCls),
+            ].join('');
+
+            const dirWord = move >= 1 ? 'rise' : move <= -1 ? 'ease' : 'hold broadly flat';
+            let narrative = `Our model projects <strong>${meta.name}</strong> to ${dirWord} to about <strong>${fmtUsd(endF)}/kg</strong> by ${endLabel} — a ${move >= 0 ? 'gain' : 'decline'} of <strong>${Math.abs(move).toFixed(1)}%</strong> from today, within a ${fmtUsd(lo)}–${fmtUsd(hi)} band. `;
+            narrative += `Seasonally, prices tend to peak around <strong>${MON[fc.hiMo]}</strong> and bottom around <strong>${MON[fc.loMo]}</strong>; ${SEASON_NOTES[key].note} `;
+            if (wxSent) narrative += wxSent;
+
+            panel.innerHTML =
+                `<div class="auc-fc-head">12-Month Forecast <span class="auc-fc-tag">MODEL ESTIMATE</span></div>` +
+                `<div class="auc-metrics" style="margin-top:12px;">${metrics}</div>` +
+                `<div class="auc-fc-body">${narrative}</div>` +
+                `<div class="auc-fc-disclaim">Model estimate — seasonal pattern + damped trend from World Bank monthly data, informed by live growing-region weather. For education and market study only; not investment advice or a guarantee of future prices.</div>`;
         }
 
         const CALENDAR = [
