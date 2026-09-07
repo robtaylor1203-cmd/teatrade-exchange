@@ -7,8 +7,11 @@
 -- BEFORE RUNNING:
 --   1. Enable the "pg_cron" and "pg_net" extensions:
 --      Dashboard -> Database -> Extensions -> search each -> toggle ON.
---   2. Replace  PASTE_YOUR_SERVICE_ROLE_KEY_HERE  below with your
---      service_role key from  Dashboard -> Project Settings -> API.
+--   2. Replace  PASTE_YOUR_SERVICE_ROLE_KEY_HERE  below with the NEW-format
+--      SECRET key (starts with "sb_secret_") from Dashboard -> Settings -> API.
+--      IMPORTANT: the market-ticker function checks against SUPABASE_SERVICE_ROLE_KEY,
+--      which on this project is the new "sb_secret_..." key. The legacy "eyJ..."
+--      service_role JWT and the anon key both return 401 Unauthorized.
 --      (Keep the word "Bearer " in front of it.)
 -- ============================================================
 
