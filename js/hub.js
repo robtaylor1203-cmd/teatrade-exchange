@@ -860,6 +860,40 @@ function _destroyHubTvChart() {
     }
 }
 
+// Format the hub x-axis for the active timeframe (dates for wide views, time for 1D).
+function _applyHubTimeScaleFormat(tf) {
+    if (!_hubTvChart) return;
+    const fmtTick = (time) => {
+        const d = new Date(Number(time) * 1000);
+        if (tf === '1D') return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        if (tf === '1W' || tf === '1M') return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+        if (tf === '3M' || tf === '1Y') return d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+        return d.toLocaleDateString('en-GB', { year: 'numeric' });
+    };
+    _hubTvChart.applyOptions({
+        timeScale: { timeVisible: tf === '1D', secondsVisible: false, tickMarkFormatter: fmtTick },
+        localization: {
+            timeFormatter: (time) => new Date(Number(time) * 1000)
+                .toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        }
+    });
+}
+
+// Show the timeframe's intended window when enough history is loaded; else fit all.
+function _setHubVisibleWindow(tvData) {
+    if (!_hubTvChart || !tvData || tvData.length === 0) return;
+    const cfg = (typeof TIMEFRAME_CONFIG !== 'undefined') ? TIMEFRAME_CONFIG[state.currentTimeframe] : null;
+    const lastT = Number(tvData[tvData.length - 1].time);
+    const firstT = Number(tvData[0].time);
+    if (cfg && cfg.hoursBack) {
+        const from = lastT - cfg.hoursBack * 3600;
+        if (from > firstT) {
+            try { _hubTvChart.timeScale().setVisibleRange({ from, to: lastT }); return; } catch (_) { }
+        }
+    }
+    _hubTvChart.timeScale().fitContent();
+}
+
 /**
  * Initialize (or re-initialize) the TradingView chart for the hub.
  * Mirrors the configuration of the main screen TV chart in charts.js
@@ -1047,8 +1081,10 @@ function drawHubChart() {
             try { _hubVolumeSeries.setData(volData); } catch (e) {}
         }
 
-        // Only fit content on full reloads — not on ticks (would reset user zoom)
-        try { _hubTvChart.timeScale().fitContent(); } catch (e) {}
+        // Format axis + show the intended timeframe window (keeps the axis span
+        // correct and lets indicators fill from older warm-up candles).
+        _applyHubTimeScaleFormat(state.currentTimeframe);
+        try { _setHubVisibleWindow(tvData); } catch (e) {}
     }
 
     // Update tracking state

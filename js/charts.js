@@ -327,6 +327,44 @@ function _getChartCurrencyInfo() {
     return { symbol: curr, multiplier: 1 };
 }
 
+// Format the x-axis tick labels appropriately for the selected timeframe:
+// intraday times for 1D, calendar dates for wider views.
+function _applyTimeScaleFormat(tf) {
+    if (!tvChart) return;
+    const fmtTick = (time) => {
+        const d = new Date(Number(time) * 1000);
+        if (tf === '1D') return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        if (tf === '1W' || tf === '1M') return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+        if (tf === '3M' || tf === '1Y') return d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+        return d.toLocaleDateString('en-GB', { year: 'numeric' });
+    };
+    tvChart.applyOptions({
+        timeScale: { timeVisible: tf === '1D', secondsVisible: false, tickMarkFormatter: fmtTick },
+        localization: {
+            timeFormatter: (time) => new Date(Number(time) * 1000)
+                .toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        }
+    });
+}
+
+// Set the visible x-axis window to the timeframe's intended span when enough
+// history is loaded; otherwise fit whatever we have. Showing a fixed window keeps
+// the axis span matching the selected timeframe and lets indicators fill the
+// visible area from older warm-up candles instead of starting partway across.
+function _setVisibleWindow(tvData) {
+    if (!tvChart || !tvData || tvData.length === 0) return;
+    const cfg = (typeof TIMEFRAME_CONFIG !== 'undefined') ? TIMEFRAME_CONFIG[state.currentTimeframe] : null;
+    const lastT = Number(tvData[tvData.length - 1].time);
+    const firstT = Number(tvData[0].time);
+    if (cfg && cfg.hoursBack) {
+        const from = lastT - cfg.hoursBack * 3600;
+        if (from > firstT) {
+            try { tvChart.timeScale().setVisibleRange({ from, to: lastT }); return; } catch (_) { }
+        }
+    }
+    tvChart.timeScale().fitContent();
+}
+
 // =============================================
 // MAIN DRAW / BINDING
 // =============================================
@@ -455,20 +493,12 @@ function drawChart() {
     _chartLastDataLength = newLength;
     _chartLastType = state.chartType;
 
+    // Format the time axis for the active timeframe (dates for wide views, time for 1D)
+    _applyTimeScaleFormat(state.currentTimeframe);
+
     // Auto-scale to fit data frame on load or timeframe/symbol swap
     if (forceRescale) {
-        setTimeout(() => {
-            if (tvChart) {
-                if (tvData.length < 15) {
-                    tvChart.timeScale().setVisibleLogicalRange({
-                        from: tvData.length - 30,
-                        to: tvData.length + 2
-                    });
-                } else {
-                    tvChart.timeScale().fitContent();
-                }
-            }
-        }, 50);
+        setTimeout(() => _setVisibleWindow(tvData), 50);
         window._tvInitialScaleDone = true;
     }
 
