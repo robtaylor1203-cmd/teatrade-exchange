@@ -2949,52 +2949,37 @@ function renderChallengeTab() {
     const panel = document.getElementById('challenge-panel');
     if (!panel) return;
 
-    const now = new Date();
-    const monthName = now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-    const msLeft = Math.max(0, endOfMonth - now);
-    const daysLeft = Math.floor(msLeft / 86400000);
-    const hoursLeft = Math.floor((msLeft % 86400000) / 3600000);
-
     panel.innerHTML = `
         <div class="challenge-hero">
             <div class="challenge-hero-badge">&#127942; Monthly Trading Challenge</div>
-            <div class="challenge-hero-title">${monthName}</div>
-            <div class="challenge-hero-sub">Trade with skill and discipline. The top 3 members on the leaderboard each month win real cash prizes.</div>
-            <div class="challenge-countdown">
-                <div class="challenge-count-box"><span class="challenge-count-num">${daysLeft}</span><span class="challenge-count-label">days</span></div>
-                <div class="challenge-count-box"><span class="challenge-count-num">${hoursLeft}</span><span class="challenge-count-label">hrs</span></div>
-                <span class="challenge-count-text">left this round</span>
-            </div>
+            <div class="challenge-hero-title">Cash Prizes &mdash; Coming Soon</div>
+            <div class="challenge-hero-sub">A monthly skill competition where the top members on the leaderboard win real cash. We're putting the finishing touches on it &mdash; it launches as our founding community grows.</div>
+            <div class="challenge-soon-tag"><span class="challenge-soon-dot"></span>Launching soon</div>
         </div>
 
-        <div class="challenge-prizes">
+        <div class="challenge-prizes challenge-prizes-soon">
             <div class="challenge-prize gold"><div class="challenge-prize-medal">&#129351;</div><div class="challenge-prize-place">1st</div><div class="challenge-prize-amount">&pound;500</div></div>
             <div class="challenge-prize silver"><div class="challenge-prize-medal">&#129352;</div><div class="challenge-prize-place">2nd</div><div class="challenge-prize-amount">&pound;250</div></div>
             <div class="challenge-prize bronze"><div class="challenge-prize-medal">&#129353;</div><div class="challenge-prize-place">3rd</div><div class="challenge-prize-amount">&pound;100</div></div>
         </div>
 
-        <div class="store-card">
-            <div class="challenge-lb-head">
-                <span>Live Standings</span>
-                <span class="learn-live-tag"><span class="learn-live-dot"></span>LIVE</span>
-            </div>
-            <div id="challenge-leaderboard"><div style="text-align:center;padding:20px;color:var(--text-secondary);">Loading standings&hellip;</div></div>
+        <div class="store-card challenge-soon-card">
+            <div class="challenge-soon-head">&#128640; Unlocking as the community grows</div>
+            <p class="challenge-soon-body">The monthly cash competition goes live once TeaTrade reaches its founding membership milestone. Keep sharpening your edge on the simulated markets now &mdash; when it opens, your track record is ready to compete from day one.</p>
         </div>
 
         <div class="challenge-rules">
-            <strong>How it works</strong>
+            <strong>How it will work</strong>
             <ul>
-                <li>Members are ranked by <strong>portfolio return</strong> over the calendar month &mdash; rewarding skill and consistency, not luck.</li>
-                <li>Prizes are funded by TeaTrade and paid to the top 3 after each round.</li>
+                <li>Members ranked by <strong>portfolio return</strong> over the calendar month &mdash; rewarding skill and consistency, not luck.</li>
+                <li>Free to enter. Prizes funded by TeaTrade and paid to the top 3 after each round.</li>
                 <li>Open to members aged 18+. Winners are responsible for any personal tax.</li>
                 <li>TeaTrade may disqualify manipulative or abusive play to keep it fair.</li>
             </ul>
-            <p class="challenge-legal">A free-to-enter skill competition for members &mdash; not gambling and not a financial payout. Prizes are discretionary rewards for leaderboard performance on the simulated platform. Full <a href="/terms.html" target="_blank" rel="noopener">Terms</a> apply.</p>
+            <p class="challenge-legal">A free-to-enter skill competition &mdash; not gambling and not a financial payout. Prizes are discretionary rewards for leaderboard performance on the simulated platform. Full <a href="/terms.html" target="_blank" rel="noopener">Terms</a> apply.</p>
         </div>
     `;
-
-    _loadChallengeStandings();
+    // Competition is in "coming soon" mode — no live standings / payouts yet.
 }
 
 async function _loadChallengeStandings() {

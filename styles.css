@@ -18376,6 +18376,48 @@ select.mc-input { font-family: inherit; cursor: pointer; }
     gap: 10px;
     margin-bottom: 16px;
 }
+
+/* Challenge "coming soon" state */
+.challenge-soon-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 12px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-orange);
+    background: rgba(245,158,11,0.12);
+    border: 1px solid rgba(245,158,11,0.3);
+}
+.challenge-soon-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent-orange);
+    box-shadow: 0 0 0 0 rgba(245,158,11,0.5);
+    animation: challengeSoonPulse 1.8s infinite;
+}
+@keyframes challengeSoonPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(245,158,11,0.5); }
+    70%  { box-shadow: 0 0 0 7px rgba(245,158,11,0); }
+    100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
+}
+.challenge-prizes-soon { opacity: 0.85; }
+.challenge-soon-card { text-align: center; }
+.challenge-soon-head {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+.challenge-soon-body {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    margin: 0;
+}
 .challenge-prize {
     text-align: center;
     border-radius: 12px;
