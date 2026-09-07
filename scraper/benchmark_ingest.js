@@ -43,6 +43,43 @@ const SERIES_MAP = {
 // Only keep the most recent N months to stay lean.
 const MONTHS_TO_KEEP = 60;
 
+// NOAA ONI 3-month season code -> representative middle month.
+const SEASON_MID = { DJF: 1, JFM: 2, FMA: 3, MAM: 4, AMJ: 5, MJJ: 6, JJA: 7, JAS: 8, ASO: 9, SON: 10, OND: 11, NDJ: 12 };
+
+// Ingest the NOAA CPC Oceanic Niño Index (ONI) — the official El Niño / La Niña
+// measure — as the ENSO_ONI series. Public-domain US government data.
+async function ingestClimate(supabase) {
+    try {
+        const res = await fetch('https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt');
+        if (!res.ok) throw new Error('ONI fetch ' + res.status);
+        const text = await res.text();
+        const rows = [];
+        for (const line of text.trim().split('\n').slice(1)) {
+            const p = line.trim().split(/\s+/);
+            if (p.length < 4) continue;
+            const mm = SEASON_MID[p[0]];
+            const anom = parseFloat(p[3]);
+            if (!mm || !Number.isFinite(anom)) continue;
+            rows.push({
+                series: 'ENSO_ONI',
+                period_date: `${p[1]}-${String(mm).padStart(2, '0')}-01`,
+                price_usd_kg: anom,
+                source: 'noaa_cpc_oni',
+                source_url: 'https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt',
+            });
+        }
+        const recent = rows.slice(-36);
+        if (recent.length) {
+            const { error } = await supabase.from('auction_benchmarks').upsert(recent, { onConflict: 'series,period_date' });
+            if (error) throw error;
+            const last = recent[recent.length - 1];
+            console.log(`ENSO_ONI: upserted ${recent.length}, latest ONI ${last.price_usd_kg} (${last.period_date})`);
+        }
+    } catch (e) {
+        console.error('Climate (ONI) ingest skipped:', e.message);
+    }
+}
+
 async function resolveWorkbookUrl() {
     // The monthly XLSX link on the landing page carries a rotating hash, so we
     // discover it dynamically rather than hard-coding a URL that will break.
@@ -125,6 +162,8 @@ async function main() {
         .from('auction_benchmarks')
         .upsert(trimmed, { onConflict: 'series,period_date' });
     if (error) throw error;
+
+    await ingestClimate(supabase);
 
     console.log('Done. Latest per series:');
     for (const s of ['GLOBAL', 'MOMBASA', 'COLOMBO', 'KOLKATA', 'BRENT']) {

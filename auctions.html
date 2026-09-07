@@ -281,7 +281,7 @@
         }
 
         // ── Benchmark series state + analytics ────────────────────────────
-        let ALL = { GLOBAL: [], MOMBASA: [], COLOMBO: [], KOLKATA: [], BRENT: [] }; // each DESC by date
+        let ALL = { GLOBAL: [], MOMBASA: [], COLOMBO: [], KOLKATA: [], BRENT: [], ENSO_ONI: [] }; // each DESC by date
         let selected = 'GLOBAL';
         let chart = null, areaSeries = null;
         let forecastOn = false, fcLine = null, fcUpper = null, fcLower = null, WX = {};
@@ -326,7 +326,7 @@
                 .select('series, period_date, price_usd_kg')
                 .order('period_date', { ascending: false });
             if (error) { console.error(error); return; }
-            ALL = { GLOBAL: [], MOMBASA: [], COLOMBO: [], KOLKATA: [], BRENT: [] };
+            ALL = { GLOBAL: [], MOMBASA: [], COLOMBO: [], KOLKATA: [], BRENT: [], ENSO_ONI: [] };
             (data || []).forEach(r => { if (ALL[r.series]) ALL[r.series].push(r); });
             setCard('global', ALL.GLOBAL);
             setCard('mombasa', ALL.MOMBASA);
@@ -651,6 +651,40 @@
             return null;
         }
 
+        // El Niño / La Niña state from NOAA ONI (series ENSO_ONI)
+        function ensoState() {
+            const a = asc(ALL.ENSO_ONI || []);
+            if (!a.length) return null;
+            const oni = a[a.length - 1].v;
+            const prev = a.length > 3 ? a[a.length - 4].v : oni;
+            const mag = Math.abs(oni);
+            const phase = oni >= 0.5 ? 'El Niño' : oni <= -0.5 ? 'La Niña' : 'Neutral';
+            const strength = mag >= 2 ? 'very strong' : mag >= 1.5 ? 'strong' : mag >= 1 ? 'moderate' : mag >= 0.5 ? 'weak' : '';
+            const dir = (oni - prev) > 0.15 ? 'strengthening' : (oni - prev) < -0.15 ? 'weakening' : 'holding steady';
+            return { oni, phase, strength, dir };
+        }
+
+        function ensoImpact(key, e) {
+            if (!e || e.phase === 'Neutral') return e ? `ENSO is currently neutral (ONI ${e.oni.toFixed(1)}), so no strong El Niño / La Niña skew on the crop outlook.` : '';
+            const region = (SEASON_NOTES[key] || {}).region;
+            const isNino = e.phase === 'El Niño';
+            const tag = `a ${e.strength} ${e.phase} (ONI ${e.oni.toFixed(1)}, ${e.dir})`;
+            if (region === 'MOMBASA') {
+                return isNino
+                    ? `Climate driver: ${tag} typically supercharges East Africa's Oct–Dec short rains — boosting Kenyan crop volume, but heavy rain raises flooding, plucking-disruption and leaf-quality risks. Net skew: more volume (price-softening) with a real quality/logistics tail-risk.`
+                    : `Climate driver: ${tag} tends to dry out East Africa, raising drought and yield-stress risk for Kenyan tea — historically price-supportive.`;
+            }
+            if (region === 'KOLKATA' || region === 'COLOMBO') {
+                const where = region === 'KOLKATA' ? 'Assam / North India' : 'Sri Lanka';
+                return isNino
+                    ? `Climate driver: ${tag} tends to weaken the South-Asian monsoon — a drier, more erratic season that can trim the ${where} crop and support prices.`
+                    : `Climate driver: ${tag} tends to strengthen the monsoon — wetter conditions that usually lift ${where} volumes and weigh on prices.`;
+            }
+            return isNino
+                ? `Climate driver: ${tag} pulls the big origins in opposite directions — wetter East Africa (more Kenyan volume) but a drier South-Asian monsoon (tighter Indian/Ceylon crop) — a genuine swing factor for the global balance.`
+                : `Climate driver: ${tag} tends to dry East Africa while boosting the South-Asian monsoon — supportive for Kenyan prices, softer for Indian and Ceylon.`;
+        }
+
         function clearForecast() {
             [fcLine, fcUpper, fcLower].forEach(s => { if (s && chart) { try { chart.removeSeries(s); } catch (_) { } } });
             fcLine = fcUpper = fcLower = null;
@@ -694,6 +728,7 @@
             const endLabel = MON[endDate.getMonth()] + ' ' + endDate.getFullYear();
 
             const wx = weatherForKey(key);
+            const e = ensoState();
             let wxBias = 'Neutral', wxCls = 'flat', wxSent = '';
             if (wx) {
                 if (wx.yoy < -25) { wxBias = 'Supportive'; wxCls = 'up'; wxSent = `Growing conditions in ${wx.name} are running dry (rainfall ${wx.yoy.toFixed(0)}% vs last year), a yield-stress risk that skews the near-term balance toward tighter supply and firmer prices.`; }
@@ -708,18 +743,21 @@
                 tile(fmtUsd(lo) + ' – ' + fmtUsd(hi), '12-Mo Range', 'flat'),
                 tile(MON[fc.hiMo] + ' / ' + MON[fc.loMo], 'Seasonal Peak / Trough', 'flat'),
                 tile(wxBias, 'Weather Bias', wxCls),
+                e ? tile(e.phase + (e.strength ? ' · ' + e.strength : ''), 'ENSO · ONI ' + e.oni.toFixed(1), 'flat') : '',
             ].join('');
 
             const dirWord = move >= 1 ? 'rise' : move <= -1 ? 'ease' : 'hold broadly flat';
             let narrative = `Our model projects <strong>${meta.name}</strong> to ${dirWord} to about <strong>${fmtUsd(endF)}/kg</strong> by ${endLabel} — a ${move >= 0 ? 'gain' : 'decline'} of <strong>${Math.abs(move).toFixed(1)}%</strong> from today, within a ${fmtUsd(lo)}–${fmtUsd(hi)} band. `;
             narrative += `Seasonally, prices tend to peak around <strong>${MON[fc.hiMo]}</strong> and bottom around <strong>${MON[fc.loMo]}</strong>; ${SEASON_NOTES[key].note} `;
             if (wxSent) narrative += wxSent;
+            const enso = ensoImpact(key, e);
+            if (enso) narrative += ' ' + enso;
 
             panel.innerHTML =
                 `<div class="auc-fc-head">12-Month Forecast <span class="auc-fc-tag">MODEL ESTIMATE</span></div>` +
                 `<div class="auc-metrics" style="margin-top:12px;">${metrics}</div>` +
                 `<div class="auc-fc-body">${narrative}</div>` +
-                `<div class="auc-fc-disclaim">Model estimate — seasonal pattern + damped trend from World Bank monthly data, informed by live growing-region weather. For education and market study only; not investment advice or a guarantee of future prices.</div>`;
+                `<div class="auc-fc-disclaim">Model estimate — seasonal pattern + damped trend from World Bank monthly data, informed by live growing-region weather (Open-Meteo) and the NOAA ENSO (El Niño / La Niña) status. For education and market study only; not investment advice or a guarantee of future prices.</div>`;
         }
 
         const CALENDAR = [
