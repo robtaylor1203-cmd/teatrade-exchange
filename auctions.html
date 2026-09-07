@@ -61,6 +61,25 @@
         .auc-foot { border-top: 1px solid var(--border); padding: 18px 20px; text-align: center; font-size: 12px; color: var(--text-muted); }
         .auc-foot a { color: var(--text-secondary); text-decoration: none; }
 
+        .auc-card { cursor: pointer; transition: border-color .15s, transform .15s, box-shadow .15s; }
+        .auc-card:hover { transform: translateY(-2px); border-color: var(--border-light); }
+        .auc-card.selected { border-color: var(--accent-blue); box-shadow: 0 0 0 1px var(--accent-blue) inset; }
+
+        .auc-chart-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .auc-signal { flex-shrink: 0; font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 999px; margin-top: 2px; }
+        .auc-signal.up { color: var(--accent-green); background: rgba(16,185,129,0.12); }
+        .auc-signal.down { color: var(--accent-red); background: rgba(239,68,68,0.12); }
+        .auc-signal.flat { color: var(--text-secondary); background: rgba(148,163,184,0.12); }
+
+        .auc-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; margin-top: 18px; }
+        .auc-metric { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+        .auc-metric .m-val { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600; }
+        .auc-metric .m-val.up { color: var(--accent-green); }
+        .auc-metric .m-val.down { color: var(--accent-red); }
+        .auc-metric .m-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); margin-top: 5px; }
+        .auc-insight { margin-top: 16px; padding: 14px 16px; background: rgba(26,115,232,0.06); border: 1px solid rgba(26,115,232,0.2); border-radius: 10px; font-size: 13px; line-height: 1.65; color: var(--text-secondary); }
+        .auc-insight strong { color: var(--text-primary); }
+
         @media (max-width: 820px) { .auc-cards { grid-template-columns: repeat(2, 1fr); } }
     </style>
 </head>
@@ -93,36 +112,44 @@
 
         <!-- Headline benchmark cards -->
         <section class="auc-cards" id="benchmark-cards">
-            <div class="auc-card headline">
+            <div class="auc-card headline selected" data-series="GLOBAL" onclick="selectSeries('GLOBAL')" role="button" tabindex="0">
                 <div class="lbl">Global Average</div>
                 <div class="val" id="bm-global-val">—</div>
                 <div class="sub" id="bm-global-sub">Loading…</div>
             </div>
-            <div class="auc-card">
+            <div class="auc-card" data-series="MOMBASA" onclick="selectSeries('MOMBASA')" role="button" tabindex="0">
                 <div class="lbl">Mombasa</div>
                 <div class="val" id="bm-mombasa-val">—</div>
                 <div class="sub" id="bm-mombasa-sub"></div>
             </div>
-            <div class="auc-card">
+            <div class="auc-card" data-series="COLOMBO" onclick="selectSeries('COLOMBO')" role="button" tabindex="0">
                 <div class="lbl">Colombo</div>
                 <div class="val" id="bm-colombo-val">—</div>
                 <div class="sub" id="bm-colombo-sub"></div>
             </div>
-            <div class="auc-card">
+            <div class="auc-card" data-series="KOLKATA" onclick="selectSeries('KOLKATA')" role="button" tabindex="0">
                 <div class="lbl">Kolkata</div>
                 <div class="val" id="bm-kolkata-val">—</div>
                 <div class="sub" id="bm-kolkata-sub"></div>
             </div>
         </section>
 
-        <!-- Benchmark history chart -->
+        <!-- Benchmark history chart + analytics -->
         <section class="auc-panel">
-            <h2>Global Benchmark — Monthly History</h2>
-            <div class="panel-note">Tea, average of three auctions (USD/kg). Source: World Bank Pink Sheet.</div>
+            <div class="auc-chart-head">
+                <div>
+                    <h2 id="chart-title">Global Average — Monthly History</h2>
+                    <div class="panel-note" id="chart-note">Tea, average of three auctions (USD/kg). Source: World Bank Pink Sheet.</div>
+                </div>
+                <span class="auc-signal" id="auc-signal"></span>
+            </div>
             <div id="benchmark-chart"></div>
             <div class="empty-state" id="chart-empty" style="display:none;">
                 Benchmark history will appear after the next World Bank publication is ingested.
             </div>
+            <div class="auc-metrics" id="auc-metrics"></div>
+            <div class="auc-insight" id="auc-insight"></div>
+            <div class="panel-note" style="margin-top:10px;">Tap any benchmark above to analyse that centre. Figures are educational, not executable prices.</div>
         </section>
 
         <!-- Weekly India centre averages -->
@@ -201,33 +228,58 @@
             if (subEl) subEl.innerHTML = sub;
         }
 
+        // ── Benchmark series state + analytics ────────────────────────────
+        let ALL = { GLOBAL: [], MOMBASA: [], COLOMBO: [], KOLKATA: [] }; // each DESC by date
+        let selected = 'GLOBAL';
+        let chart = null, areaSeries = null;
+
+        const SERIES_META = {
+            GLOBAL:  { name: 'Global Average',      note: 'Tea, average of three auctions (USD/kg). Source: World Bank Pink Sheet.', color: '#1a73e8' },
+            MOMBASA: { name: 'Mombasa · Kenya',     note: 'Kenyan tea, Mombasa auction (USD/kg). Source: World Bank Pink Sheet.',    color: '#10b981' },
+            COLOMBO: { name: 'Colombo · Sri Lanka', note: 'Ceylon tea, Colombo auction (USD/kg). Source: World Bank Pink Sheet.',    color: '#8b5cf6' },
+            KOLKATA: { name: 'Kolkata · India',     note: 'Indian tea, Kolkata auction (USD/kg). Source: World Bank Pink Sheet.',    color: '#f59e0b' },
+        };
+
+        const avg = a => a.reduce((s, x) => s + x, 0) / a.length;
+        const stdev = a => { const m = avg(a); return Math.sqrt(avg(a.map(x => (x - m) ** 2))); };
+        const asc = rows => rows.slice().sort((a, b) => (a.period_date < b.period_date ? -1 : 1)).map(r => ({ t: r.period_date, v: Number(r.price_usd_kg) }));
+        const chgOverMonths = (a, k) => { const n = a.length; if (n < k + 1) return null; const past = a[n - 1 - k].v; return past ? (a[n - 1].v - past) / past * 100 : null; };
+        const clsOf = x => x == null ? 'flat' : (x >= 0 ? 'up' : 'down');
+        const chgStr = x => x == null ? '—' : (x >= 0 ? '+' : '') + x.toFixed(1) + '%';
+        const tile = (val, lbl, cls) => `<div class="auc-metric"><div class="m-val ${cls || 'flat'}">${val}</div><div class="m-lbl">${lbl}</div></div>`;
+        function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; }
+
         async function loadBenchmarks() {
             const { data, error } = await sb
                 .from('auction_benchmarks')
                 .select('series, period_date, price_usd_kg')
                 .order('period_date', { ascending: false });
-
             if (error) { console.error(error); return; }
-            const bySeries = { GLOBAL: [], MOMBASA: [], COLOMBO: [], KOLKATA: [] };
-            (data || []).forEach(r => { if (bySeries[r.series]) bySeries[r.series].push(r); });
-
-            setCard('global', bySeries.GLOBAL);
-            setCard('mombasa', bySeries.MOMBASA);
-            setCard('colombo', bySeries.COLOMBO);
-            setCard('kolkata', bySeries.KOLKATA);
-
-            renderChart(bySeries.GLOBAL);
+            ALL = { GLOBAL: [], MOMBASA: [], COLOMBO: [], KOLKATA: [] };
+            (data || []).forEach(r => { if (ALL[r.series]) ALL[r.series].push(r); });
+            setCard('global', ALL.GLOBAL);
+            setCard('mombasa', ALL.MOMBASA);
+            setCard('colombo', ALL.COLOMBO);
+            setCard('kolkata', ALL.KOLKATA);
+            selectSeries(selected);
         }
 
-        function renderChart(globalRows) {
+        function selectSeries(key) {
+            if (!SERIES_META[key]) return;
+            selected = key;
+            document.querySelectorAll('#benchmark-cards .auc-card')
+                .forEach(c => c.classList.toggle('selected', c.dataset.series === key));
+            const meta = SERIES_META[key];
+            document.getElementById('chart-title').textContent = meta.name + ' — Monthly History';
+            document.getElementById('chart-note').textContent = meta.note;
+            renderChart(ALL[key], meta.color);
+            renderAnalytics(key);
+        }
+
+        function ensureChart() {
+            if (chart) return;
             const container = document.getElementById('benchmark-chart');
-            const emptyEl = document.getElementById('chart-empty');
-            if (!globalRows || globalRows.length < 2) {
-                container.style.display = 'none';
-                emptyEl.style.display = 'block';
-                return;
-            }
-            const chart = LightweightCharts.createChart(container, {
+            chart = LightweightCharts.createChart(container, {
                 width: container.clientWidth,
                 height: 300,
                 layout: { background: { color: 'transparent' }, textColor: '#9ca3af' },
@@ -235,17 +287,84 @@
                 rightPriceScale: { borderColor: '#2d3a4f' },
                 timeScale: { borderColor: '#2d3a4f' },
                 crosshair: { mode: 0 },
+                localization: { priceFormatter: p => '$' + p.toFixed(2) },
             });
-            const series = chart.addAreaSeries({
-                lineColor: '#1a73e8', topColor: 'rgba(26,115,232,0.25)', bottomColor: 'rgba(26,115,232,0.02)', lineWidth: 2,
-            });
-            const points = globalRows
-                .slice()
-                .sort((a, b) => (a.period_date < b.period_date ? -1 : 1))
-                .map(r => ({ time: r.period_date, value: Number(r.price_usd_kg) }));
-            series.setData(points);
-            chart.timeScale().fitContent();
+            areaSeries = chart.addAreaSeries({ lineWidth: 2 });
             window.addEventListener('resize', () => chart.applyOptions({ width: container.clientWidth }));
+        }
+
+        function renderChart(rows, color) {
+            const container = document.getElementById('benchmark-chart');
+            const emptyEl = document.getElementById('chart-empty');
+            if (!rows || rows.length < 2) {
+                if (container) container.style.display = 'none';
+                emptyEl.style.display = 'block';
+                return;
+            }
+            emptyEl.style.display = 'none';
+            container.style.display = '';
+            ensureChart();
+            areaSeries.applyOptions({ lineColor: color, topColor: hexA(color, 0.25), bottomColor: hexA(color, 0.02) });
+            const pts = rows.slice().sort((a, b) => (a.period_date < b.period_date ? -1 : 1))
+                .map(r => ({ time: r.period_date, value: Number(r.price_usd_kg) }));
+            areaSeries.setData(pts);
+            chart.timeScale().fitContent();
+        }
+
+        function renderAnalytics(key) {
+            const metricsEl = document.getElementById('auc-metrics');
+            const insightEl = document.getElementById('auc-insight');
+            const signalEl = document.getElementById('auc-signal');
+            const a = asc(ALL[key] || []);
+            if (a.length < 3) { metricsEl.innerHTML = ''; insightEl.innerHTML = ''; signalEl.textContent = ''; signalEl.className = 'auc-signal'; return; }
+
+            const n = a.length, cur = a[n - 1].v;
+            const c1 = chgOverMonths(a, 1), c3 = chgOverMonths(a, 3), c6 = chgOverMonths(a, 6), c12 = chgOverMonths(a, 12);
+            const win = a.slice(-12).map(x => x.v);
+            const hi = Math.max(...win), lo = Math.min(...win);
+            const pos = hi > lo ? (cur - lo) / (hi - lo) * 100 : 50;
+            const rets = []; for (let i = Math.max(1, n - 12); i < n; i++) { if (a[i - 1].v) rets.push(a[i].v / a[i - 1].v - 1); }
+            const vol = rets.length ? stdev(rets) * Math.sqrt(12) * 100 : null;
+            const sma3 = avg(a.slice(-3).map(x => x.v)), sma6 = avg(a.slice(-6).map(x => x.v));
+            let signal = 'Range-bound', sigCls = 'flat';
+            if (cur > sma3 && sma3 > sma6) { signal = 'Uptrend'; sigCls = 'up'; }
+            else if (cur < sma3 && sma3 < sma6) { signal = 'Downtrend'; sigCls = 'down'; }
+            signalEl.className = 'auc-signal ' + sigCls; signalEl.textContent = signal;
+
+            let premiumTile = '', premiumInsight = '';
+            if (key !== 'GLOBAL') {
+                const g = asc(ALL.GLOBAL || []);
+                if (g.length) {
+                    const gCur = g[g.length - 1].v;
+                    const prem = (cur - gCur) / gCur * 100;
+                    let premThen = null;
+                    if (g.length > 6 && n > 6) { const gT = g[g.length - 7].v, cT = a[n - 7].v; if (gT) premThen = (cT - gT) / gT * 100; }
+                    const widening = premThen != null ? Math.abs(prem) > Math.abs(premThen) : null;
+                    premiumTile = tile((prem >= 0 ? '+' : '') + prem.toFixed(1) + '%', (prem >= 0 ? 'Premium' : 'Discount') + ' vs Global', prem >= 0 ? 'up' : 'down');
+                    premiumInsight = ` It trades at a <strong>${Math.abs(prem).toFixed(1)}% ${prem >= 0 ? 'premium' : 'discount'}</strong> to the global benchmark${widening != null ? (widening ? ', a gap that has widened over the past six months' : ', a gap that has narrowed over the past six months') : ''}.`;
+                }
+            }
+
+            metricsEl.innerHTML = [
+                tile(chgStr(c1), '1-Month', clsOf(c1)),
+                tile(chgStr(c3), '3-Month', clsOf(c3)),
+                tile(chgStr(c6), '6-Month', clsOf(c6)),
+                tile(chgStr(c12), '12-Month · YoY', clsOf(c12)),
+                tile(fmtUsd(lo) + ' – ' + fmtUsd(hi), '12-Mo Range · ' + pos.toFixed(0) + 'th %ile', 'flat'),
+                vol != null ? tile(vol.toFixed(0) + '%', 'Annualised Volatility', 'flat') : '',
+                premiumTile,
+            ].filter(Boolean).join('');
+
+            const meta = SERIES_META[key];
+            const trendWord = signal === 'Uptrend' ? 'trending higher' : signal === 'Downtrend' ? 'trending lower' : 'broadly range-bound';
+            let s = `<strong>${meta.name}</strong> is ${trendWord} at <strong>${fmtUsd(cur)}/kg</strong>`;
+            if (c3 != null) s += `, ${c3 >= 0 ? 'up' : 'down'} ${Math.abs(c3).toFixed(1)}% over three months`;
+            if (c12 != null) s += ` and ${c12 >= 0 ? 'up' : 'down'} ${Math.abs(c12).toFixed(1)}% year-on-year`;
+            s += '. ';
+            if (pos >= 80) s += `Price is near the top of its 12-month range (~${pos.toFixed(0)}th percentile), so further upside may be getting stretched.`;
+            else if (pos <= 20) s += `Price is near the bottom of its 12-month range (~${pos.toFixed(0)}th percentile) — historically a value zone.`;
+            else s += `Price sits mid-range (~${pos.toFixed(0)}th percentile of the last 12 months).`;
+            insightEl.innerHTML = s + premiumInsight;
         }
 
         async function loadWeekly() {
