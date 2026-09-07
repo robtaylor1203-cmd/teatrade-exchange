@@ -421,14 +421,28 @@ function drawChart() {
     const sortedData = [...state.chartData]
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    // Synchronize the last candle with the live ticker basePrice to prevent mismatch
+    // Synchronize with the live ticker price so the chart's right edge matches
+    // the header quote.
     if (sortedData.length > 0 && state.mainChartData && state.mainChartData.basePrice) {
         const livePriceUSD = Number(state.mainChartData.basePrice) / _fx;
         if (livePriceUSD > 0) {
             const lastCandle = sortedData[sortedData.length - 1];
-            lastCandle.close = livePriceUSD;
-            if (livePriceUSD > lastCandle.high) lastCandle.high = livePriceUSD;
-            if (livePriceUSD < lastCandle.low) lastCandle.low = livePriceUSD;
+            const lastClose = Number(lastCandle.close) || livePriceUSD;
+            // Wide timeframes render the synthetic daily series, whose static anchor
+            // can sit well below the live price. Scale the whole series so it ends at
+            // the live price — keeps it coherent with the ticker and avoids a jarring
+            // vertical jump on the final candle. 1D tracks the live tick directly.
+            const isWide = state.currentTimeframe !== '1D';
+            const scale = livePriceUSD / lastClose;
+            if (isWide && lastClose > 0 && scale > 0.2 && scale < 5) {
+                sortedData.forEach(d => {
+                    d.open *= scale; d.high *= scale; d.low *= scale; d.close *= scale;
+                });
+            } else {
+                lastCandle.close = livePriceUSD;
+                if (livePriceUSD > lastCandle.high) lastCandle.high = livePriceUSD;
+                if (livePriceUSD < lastCandle.low) lastCandle.low = livePriceUSD;
+            }
         }
     }
 

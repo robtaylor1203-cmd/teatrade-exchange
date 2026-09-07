@@ -996,9 +996,25 @@ function _toHubTvData(rawData) {
     });
 
     // Deduplicate by timestamp and sort ascending (TV requirement)
-    return [...new Map(tvData.map(d => [d.time, d])).values()]
+    let out = [...new Map(tvData.map(d => [d.time, d])).values()]
         .filter(d => d.close > 0)
         .sort((a, b) => a.time - b.time);
+
+    // Wide timeframes render the synthetic daily series; scale it to end at the
+    // live price so the fullscreen chart matches the main chart and the ticker.
+    if (state.currentTimeframe !== '1D' && out.length > 1) {
+        const live = Number(state.mainChartData?.basePrice) / _fx;
+        const lastClose = out[out.length - 1].close;
+        const scale = live / lastClose;
+        if (live > 0 && lastClose > 0 && scale > 0.2 && scale < 5) {
+            out = out.map(d => ({
+                time: d.time,
+                open: d.open * scale, high: d.high * scale, low: d.low * scale,
+                close: d.close * scale, value: d.value * scale, volume: d.volume,
+            }));
+        }
+    }
+    return out;
 }
 
 /**
