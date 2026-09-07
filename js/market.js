@@ -237,8 +237,8 @@ async function initializePriceCache() {
 // These per-timeframe limits are kept for the convertToOHLC call only.
 const TIMEFRAME_CONFIG = {
     '1D': { interval: 5, hoursBack: 24, limit: 100 },
-    '1W': { interval: 60, hoursBack: 168, limit: 5000 },
-    '1M': { interval: 240, hoursBack: 720, limit: 5000 },
+    '1W': { interval: 1440, hoursBack: 168, limit: 5000 },
+    '1M': { interval: 1440, hoursBack: 720, limit: 5000 },
     '3M': { interval: 1440, hoursBack: 2160, limit: 5000 },
     '1Y': { interval: 1440, hoursBack: 8760, limit: 5000 },
     'ALL': { interval: 10080, hoursBack: null, limit: 10000 }
@@ -256,6 +256,10 @@ async function loadChartDataFromHistory(symbol, symbolType = 'tea', timeframeOve
 
     const idxDef = symbolType === 'index' ? _findIndexDef(symbol) : null;
 
+    // Wide timeframes use the clean daily simulated series; 1D stays on live+sim
+    // intraday data so the current session is real.
+    const simOnly = tf !== '1D';
+
     // Attempt load at the requested window first, then widen if too sparse.
     // Wider windows re-use the same OHLC interval so candle size stays consistent.
     const windows = [since];
@@ -267,11 +271,11 @@ async function loadChartDataFromHistory(symbol, symbolType = 'tea', timeframeOve
     let result = null;
     for (const win of windows) {
         if (idxDef?.teas?.length) {
-            const compositeCandles = await _loadCompositeIndexOHLC(idxDef.teas, cfg, win);
+            const compositeCandles = await _loadCompositeIndexOHLC(idxDef.teas, cfg, win, simOnly);
             if (compositeCandles && compositeCandles.length >= 1) { result = compositeCandles; break; }
         }
 
-        const rawData = await loadPriceHistory(symbol, cfg.limit, win);
+        const rawData = await loadPriceHistory(symbol, cfg.limit, win, simOnly);
         if (rawData && rawData.length >= 2) {
             result = convertToOHLC(rawData, cfg.interval);
             break;
@@ -286,11 +290,11 @@ async function loadChartDataFromHistory(symbol, symbolType = 'tea', timeframeOve
 }
 
 // Load historical price data from database
-async function loadPriceHistory(symbol, limit = 500, since = null) {
+async function loadPriceHistory(symbol, limit = 500, since = null, simOnly = false) {
     if (!supabaseClient) return null;
 
     try {
-        const { data, error } = await apiFetchPriceHistory(symbol, limit, since);
+        const { data, error } = await apiFetchPriceHistory(symbol, limit, since, simOnly);
         if (error) {
             console.debug('Price history load:', error.message);
             return null;
@@ -302,9 +306,9 @@ async function loadPriceHistory(symbol, limit = 500, since = null) {
     }
 }
 
-async function _loadCompositeIndexOHLC(teaSymbols, cfg, since) {
+async function _loadCompositeIndexOHLC(teaSymbols, cfg, since, simOnly = false) {
     const allRows = await Promise.all(
-        teaSymbols.map(sym => loadPriceHistory(sym, cfg.limit, since))
+        teaSymbols.map(sym => loadPriceHistory(sym, cfg.limit, since, simOnly))
     );
 
     const intervalMs = cfg.interval * 60000;

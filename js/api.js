@@ -191,7 +191,7 @@ async function apiFetchTradeById(tradeId) {
  * @param {string} [since] - ISO timestamp; only return rows recorded after this time.
  * @returns {Promise<{data: Array|null, error: object|null}>}
  */
-async function apiFetchPriceHistory(symbol, limit, since) {
+async function apiFetchPriceHistory(symbol, limit, since, simOnly = false) {
     if (since && supabaseClient.from) {
         try {
             // Cap the lookback so a very large price_history table can't be forced
@@ -201,37 +201,48 @@ async function apiFetchPriceHistory(symbol, limit, since) {
             const scanSince = since > _floor ? since : _floor;
             const rowCap = Math.min(limit || 2000, 2000);
 
-            // Optimized 2-segment fetch to avoid slamming the connection pool on load.
-            // 1) Simulated history (1 row/day)
-            // 2) Live engine history
-            // By sorting descending and reversing, we ensure the most recent data is caught.
-            const [histResult, liveResult] = await Promise.all([
-                supabaseClient
-                    .from('price_history')
-                    .select('price, recorded_at, volume')
-                    .eq('symbol', symbol)
-                    .eq('is_simulated', true)
-                    .gte('recorded_at', scanSince)
-                    .order('recorded_at', { ascending: false })
-                    .limit(rowCap),
-                supabaseClient
-                    .from('price_history')
-                    .select('price, recorded_at, volume')
-                    .eq('symbol', symbol)
-                    .eq('is_simulated', false)
-                    .gte('recorded_at', scanSince)
-                    .order('recorded_at', { ascending: false })
-                    .limit(rowCap)
-            ]);
+            const simQuery = supabaseClient
+                .from('price_history')
+                .select('price, recorded_at, volume')
+                .eq('symbol', symbol)
+                .eq('is_simulated', true)
+                .gte('recorded_at', scanSince)
+                .order('recorded_at', { ascending: false })
+                .limit(rowCap);
 
-            if (!histResult.error || !liveResult.error) {
-                // Reverse desc back to chronological asc
-                const histData = (histResult.data || []).reverse();
-                const liveData = (liveResult.data || []).reverse();
+            // Wide timeframes use the clean daily simulated series only — the dense
+            // live-tick segment would otherwise truncate the window to a couple of
+            // days once the 2 000-row cap is hit.
+            if (simOnly) {
+                const simResult = await simQuery;
+                if (!simResult.error) {
+                    return { data: (simResult.data || []).reverse(), error: null };
+                }
+                // fall through to the generic query on error
+            } else {
+                // Optimized 2-segment fetch to avoid slamming the connection pool on load.
+                // 1) Simulated history (1 row/day)  2) Live engine history
+                const [histResult, liveResult] = await Promise.all([
+                    simQuery,
+                    supabaseClient
+                        .from('price_history')
+                        .select('price, recorded_at, volume')
+                        .eq('symbol', symbol)
+                        .eq('is_simulated', false)
+                        .gte('recorded_at', scanSince)
+                        .order('recorded_at', { ascending: false })
+                        .limit(rowCap)
+                ]);
 
-                const merged = [...histData, ...liveData]
-                    .sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime());
-                return { data: merged, error: null };
+                if (!histResult.error || !liveResult.error) {
+                    // Reverse desc back to chronological asc
+                    const histData = (histResult.data || []).reverse();
+                    const liveData = (liveResult.data || []).reverse();
+
+                    const merged = [...histData, ...liveData]
+                        .sort((a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime());
+                    return { data: merged, error: null };
+                }
             }
         } catch (_) {
             // Fall through to single query
