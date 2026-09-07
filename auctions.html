@@ -176,6 +176,17 @@
             </div>
         </section>
 
+        <!-- Who's buying: global tea import demand -->
+        <section class="auc-panel">
+            <h2>Who's Buying — Global Tea Import Demand</h2>
+            <div class="panel-note">The largest import markets for tea by value (2025). Where demand grows or retreats reshapes competition at every auction. Source: ITC Trade Map / UN Comtrade.</div>
+            <table class="auc-table" id="buyers-table">
+                <thead><tr><th>#</th><th>Country</th><th>Tea Imports · 2025</th><th>Share</th><th>YoY</th></tr></thead>
+                <tbody id="buyers-body"></tbody>
+            </table>
+            <div class="auc-insight" id="buyers-insight"></div>
+        </section>
+
         <!-- Weekly India centre averages -->
         <section class="auc-panel">
             <h2>Indian Centres — Latest Weekly Averages</h2>
@@ -253,7 +264,7 @@
         }
 
         // ── Benchmark series state + analytics ────────────────────────────
-        let ALL = { GLOBAL: [], MOMBASA: [], COLOMBO: [], KOLKATA: [] }; // each DESC by date
+        let ALL = { GLOBAL: [], MOMBASA: [], COLOMBO: [], KOLKATA: [], BRENT: [] }; // each DESC by date
         let selected = 'GLOBAL';
         let chart = null, areaSeries = null;
 
@@ -273,6 +284,23 @@
         const tile = (val, lbl, cls) => `<div class="auc-metric"><div class="m-val ${cls || 'flat'}">${val}</div><div class="m-lbl">${lbl}</div></div>`;
         function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; }
         const ord = n => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+        function pearson(x, y) {
+            const n = x.length; if (n < 3) return null;
+            const mx = avg(x), my = avg(y);
+            let sxy = 0, sxx = 0, syy = 0;
+            for (let i = 0; i < n; i++) { const dx = x[i] - mx, dy = y[i] - my; sxy += dx * dy; sxx += dx * dx; syy += dy * dy; }
+            const d = Math.sqrt(sxx * syy); return d ? sxy / d : null;
+        }
+        function corrWithBrent(key) {
+            const t = asc(ALL[key] || []), b = asc(ALL.BRENT || []);
+            if (t.length < 8 || b.length < 8) return null;
+            const bMap = {}; b.forEach(x => { bMap[x.t] = x.v; });
+            const pairs = t.filter(x => bMap[x.t] != null).map(x => [x.v, bMap[x.t]]);
+            if (pairs.length < 8) return null;
+            const tr = [], br = [];
+            for (let i = 1; i < pairs.length; i++) { const p = pairs[i - 1], c = pairs[i]; if (p[0] && p[1]) { tr.push(c[0] / p[0] - 1); br.push(c[1] / p[1] - 1); } }
+            return pearson(tr, br);
+        }
 
         async function loadBenchmarks() {
             const { data, error } = await sb
@@ -280,7 +308,7 @@
                 .select('series, period_date, price_usd_kg')
                 .order('period_date', { ascending: false });
             if (error) { console.error(error); return; }
-            ALL = { GLOBAL: [], MOMBASA: [], COLOMBO: [], KOLKATA: [] };
+            ALL = { GLOBAL: [], MOMBASA: [], COLOMBO: [], KOLKATA: [], BRENT: [] };
             (data || []).forEach(r => { if (ALL[r.series]) ALL[r.series].push(r); });
             setCard('global', ALL.GLOBAL);
             setCard('mombasa', ALL.MOMBASA);
@@ -357,6 +385,14 @@
             else if (cur < sma3 && sma3 < sma6) { signal = 'Downtrend'; sigCls = 'down'; }
             signalEl.className = 'auc-signal ' + sigCls; signalEl.textContent = signal;
 
+            const corr = corrWithBrent(key);
+            let corrInsight = '';
+            if (corr != null) {
+                const mag = Math.abs(corr);
+                const strength = mag >= 0.6 ? 'a strong' : mag >= 0.3 ? 'a moderate' : 'a weak';
+                corrInsight = ` Monthly moves show ${strength} ${corr >= 0 ? 'positive' : 'negative'} correlation (${corr.toFixed(2)}) with Brent crude — energy prices feed through to processing, packaging and freight.`;
+            }
+
             let premiumTile = '', premiumInsight = '';
             if (key !== 'GLOBAL') {
                 const g = asc(ALL.GLOBAL || []);
@@ -378,6 +414,7 @@
                 tile(chgStr(c12), '12-Month · YoY', clsOf(c12)),
                 tile(fmtUsd(lo) + ' – ' + fmtUsd(hi), '12-Mo Range · ' + ord(Math.round(pos)) + ' %ile', 'flat'),
                 vol != null ? tile(vol.toFixed(0) + '%', 'Annualised Volatility', 'flat') : '',
+                corr != null ? tile(corr.toFixed(2), 'Brent Correlation', 'flat') : '',
                 premiumTile,
             ].filter(Boolean).join('');
 
@@ -390,7 +427,7 @@
             if (pos >= 80) s += `Price is near the top of its 12-month range (~${ord(Math.round(pos))} percentile), so further upside may be getting stretched.`;
             else if (pos <= 20) s += `Price is near the bottom of its 12-month range (~${ord(Math.round(pos))} percentile) — historically a value zone.`;
             else s += `Price sits mid-range (~${ord(Math.round(pos))} percentile of the last 12 months).`;
-            insightEl.innerHTML = s + premiumInsight;
+            insightEl.innerHTML = s + premiumInsight + corrInsight;
         }
 
         async function loadWeekly() {
@@ -503,6 +540,39 @@
                 .forEach(c => c.classList.toggle('sel', c.dataset.region === key));
         }
 
+        // ── Who's buying: top tea import markets, 2025 (ITC Trade Map / UN Comtrade) ──
+        const BUYERS = [
+            { c: 'Pakistan', v: 629.9, s: 9.1, yoy: -0.7 },
+            { c: 'United States', v: 620.4, s: 8.9, yoy: 7.2 },
+            { c: 'United Kingdom', v: 393.4, s: 5.7, yoy: 4.4 },
+            { c: 'Saudi Arabia', v: 310.4, s: 4.5, yoy: 2.6 },
+            { c: 'Germany', v: 308.4, s: 4.4, yoy: 25.0 },
+            { c: 'Morocco', v: 289.3, s: 4.2, yoy: 18.2 },
+            { c: 'Egypt', v: 257.9, s: 3.7, yoy: -5.5 },
+            { c: 'United Arab Emirates', v: 233.3, s: 3.4, yoy: -10.0 },
+            { c: 'China (mainland)', v: 184.5, s: 2.7, yoy: 17.1 },
+            { c: 'Japan', v: 176.0, s: 2.5, yoy: 9.2 },
+            { c: 'France', v: 174.8, s: 2.5, yoy: null },
+            { c: 'Canada', v: 165.1, s: 2.4, yoy: 12.6 },
+            { c: 'Poland', v: 162.1, s: 2.3, yoy: null },
+            { c: 'Netherlands', v: 161.2, s: 2.3, yoy: null },
+            { c: 'Russia', v: 154.8, s: 2.2, yoy: -63.1 },
+        ];
+
+        function renderBuyers() {
+            const body = document.getElementById('buyers-body');
+            body.innerHTML = BUYERS.map((b, i) => {
+                let yoy = '<span style="color:var(--text-muted)">—</span>';
+                if (b.yoy != null) {
+                    const cls = b.yoy >= 0 ? 'up' : 'down';
+                    yoy = `<span class="yoy ${cls}">${b.yoy >= 0 ? '▲' : '▼'} ${Math.abs(b.yoy).toFixed(1)}%</span>`;
+                }
+                return `<tr><td>${i + 1}</td><td class="name">${b.c}</td><td>$${b.v.toFixed(1)}M</td><td>${b.s.toFixed(1)}%</td><td>${yoy}</td></tr>`;
+            }).join('');
+            document.getElementById('buyers-insight').innerHTML =
+                `Global tea imports totalled <strong>$6.96&nbsp;billion</strong> in 2025 (down ~4.7% on 2024). The top five buyers — Pakistan, the USA, the UK, Saudi Arabia and Germany — account for roughly a third of world demand. <strong>Germany (+25%)</strong>, <strong>Morocco (+18%)</strong> and <strong>mainland China (+17%)</strong> are the fastest-growing markets, while <strong>Russia fell 63%</strong> — a major retreat by a historically large buyer of Ceylon and Assam tea that eases competition at those auctions.`;
+        }
+
         const CALENDAR = [
             { centre: 'Mombasa',  region: 'Kenya · East Africa',  day: 'Mon–Tue', note: '~12,000 lots/wk' },
             { centre: 'Colombo',  region: 'Sri Lanka',            day: 'Tue–Wed', note: '~10,000 lots/wk' },
@@ -524,6 +594,7 @@
         }
 
         renderCalendar();
+        renderBuyers();
         loadBenchmarks();
         loadWeekly();
         loadWeather();

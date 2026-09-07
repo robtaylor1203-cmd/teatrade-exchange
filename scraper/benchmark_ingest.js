@@ -37,6 +37,7 @@ const SERIES_MAP = {
     'tea, mombasa': 'MOMBASA',
     'tea, colombo': 'COLOMBO',
     'tea, kolkata': 'KOLKATA',
+    'crude oil, brent': 'BRENT',
 };
 
 // Only keep the most recent N months to stay lean.
@@ -126,9 +127,9 @@ async function main() {
     if (error) throw error;
 
     console.log('Done. Latest per series:');
-    for (const s of ['GLOBAL', 'MOMBASA', 'COLOMBO', 'KOLKATA']) {
+    for (const s of ['GLOBAL', 'MOMBASA', 'COLOMBO', 'KOLKATA', 'BRENT']) {
         const latest = trimmed.filter(r => r.series === s)[0];
-        if (latest) console.log(`  ${s}: ${latest.price_usd_kg} USD/kg (${latest.period_date})`);
+        if (latest) console.log(`  ${s}: ${latest.price_usd_kg} (${latest.period_date})`);
     }
 }
 
