@@ -248,6 +248,7 @@
         const chgStr = x => x == null ? '—' : (x >= 0 ? '+' : '') + x.toFixed(1) + '%';
         const tile = (val, lbl, cls) => `<div class="auc-metric"><div class="m-val ${cls || 'flat'}">${val}</div><div class="m-lbl">${lbl}</div></div>`;
         function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; }
+        const ord = n => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
 
         async function loadBenchmarks() {
             const { data, error } = await sb
@@ -350,7 +351,7 @@
                 tile(chgStr(c3), '3-Month', clsOf(c3)),
                 tile(chgStr(c6), '6-Month', clsOf(c6)),
                 tile(chgStr(c12), '12-Month · YoY', clsOf(c12)),
-                tile(fmtUsd(lo) + ' – ' + fmtUsd(hi), '12-Mo Range · ' + pos.toFixed(0) + 'th %ile', 'flat'),
+                tile(fmtUsd(lo) + ' – ' + fmtUsd(hi), '12-Mo Range · ' + ord(Math.round(pos)) + ' %ile', 'flat'),
                 vol != null ? tile(vol.toFixed(0) + '%', 'Annualised Volatility', 'flat') : '',
                 premiumTile,
             ].filter(Boolean).join('');
@@ -361,9 +362,9 @@
             if (c3 != null) s += `, ${c3 >= 0 ? 'up' : 'down'} ${Math.abs(c3).toFixed(1)}% over three months`;
             if (c12 != null) s += ` and ${c12 >= 0 ? 'up' : 'down'} ${Math.abs(c12).toFixed(1)}% year-on-year`;
             s += '. ';
-            if (pos >= 80) s += `Price is near the top of its 12-month range (~${pos.toFixed(0)}th percentile), so further upside may be getting stretched.`;
-            else if (pos <= 20) s += `Price is near the bottom of its 12-month range (~${pos.toFixed(0)}th percentile) — historically a value zone.`;
-            else s += `Price sits mid-range (~${pos.toFixed(0)}th percentile of the last 12 months).`;
+            if (pos >= 80) s += `Price is near the top of its 12-month range (~${ord(Math.round(pos))} percentile), so further upside may be getting stretched.`;
+            else if (pos <= 20) s += `Price is near the bottom of its 12-month range (~${ord(Math.round(pos))} percentile) — historically a value zone.`;
+            else s += `Price sits mid-range (~${ord(Math.round(pos))} percentile of the last 12 months).`;
             insightEl.innerHTML = s + premiumInsight;
         }
 
