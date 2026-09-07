@@ -303,7 +303,8 @@ function renderHeatmap() {
     container.innerHTML = '<div class="heatmap-container">' + teas.map(tea => {
         const price = Number(tea.current_price) || 0;
         const prev = Number(tea.previous_price) || price;
-        const changePct = prev > 0 ? ((price - prev) / prev) * 100 : 0;
+        let changePct = prev > 0 ? ((price - prev) / prev) * 100 : 0;
+        if (!isFinite(changePct) || Math.abs(changePct) > 50) changePct = 0; // guard corrupt previous_price
         const vol = Number(tea.volume_24h) || 0;
         const volRatio = vol / maxVol;
 
@@ -804,6 +805,11 @@ function renderRSI() {
         container.innerHTML = '<div style="padding:20px;text-align:center;color:#333;font-family:var(--text-mono);font-size:11px;">No data</div>';
         return;
     }
+    // Guard against corrupt previous prices producing absurd % moves
+    rows.forEach(r => {
+        if (!isFinite(r.change24h) || Math.abs(r.change24h) > 50) r.change24h = 0;
+        if (!isFinite(r.change7d) || Math.abs(r.change7d) > 80) r.change7d = 0;
+    });
 
     const col = S.sortCol;
     const dir = S.sortDir === 'asc' ? 1 : -1;
